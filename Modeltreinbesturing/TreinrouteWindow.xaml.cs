@@ -2015,6 +2015,10 @@ public partial class TreinrouteWindow : Window
             {
                 trein.ActieveSnelheidsRampTimer?.Stop();
                 trein.ActieveSnelheidsRampTimer = null;
+                // BUG #30: zelfde opruiming als bij KeerTreinIndienActief - zonder dit moest
+                // dit stopcommando alsnog, per blok, achter nog wachtende, inmiddels
+                // achterhaalde snelheidscommando's van de net gestopte ramp aansluiten.
+                _hardwareBeheerder.VerwijderWachtendeSnelheidscommandosVoor(trein.Trein.DecoderAdres);
                 bool vooruitVoorHardwareGeenKandidaat = trein.Trein.OmgekeerdeRijrichting ? !trein.RijdtVooruit : trein.RijdtVooruit;
                 foreach (var blok in _blokBeheerder.Blokken)
                     _hardwareBeheerder.StuurLocSnelheidCommando(trein.Trein.DecoderAdres, 0, vooruitVoorHardwareGeenKandidaat, blok.Nummer, trein.Trein.DecoderStappen);
@@ -4628,6 +4632,20 @@ public partial class TreinrouteWindow : Window
             // rijden. Zelfde oplossing als bij StopAlleBekendeGeplaatsteLocs en
             // MeldTreinVastgelopen: stuur de (gecorrigeerde) snelheid naar ELK blok in het
             // project, ongeacht waar de software denkt dat de trein staat.
+            //
+            // BUG #30 (gebruikerswaarneming: "ik drukte op rijrichting keren maar er
+            // gebeurde niets, pas toen hij in blok 4 kwam keerde hij ineens"): deze
+            // ALL-blocks-burst hieronder loste BUG #27's probleem (correctie bereikte het
+            // verkeerde blok niet) al op, maar niet HOE SNEL hij aankomt - zie
+            // DinamoHardware.VerwijderWachtendeSnelheidscommandosVoor voor de volledige
+            // toelichting: zonder deze opruiming moest elke correctie-regel hieronder
+            // alsnog, per blok, achter een stapel inmiddels achterhaalde, nog niet
+            // verstuurde snelheidscommando's van de VORIGE (foutgerichte) ramp aansluiten -
+            // bij meerdere snelle correcties kon dat meerdere seconden duren voordat de
+            // loc de nieuwe richting daadwerkelijk kreeg. Nu wordt eerst alles wat voor
+            // deze decoder nog klaarstaat weggegooid - het is sowieso net overruled door
+            // dit bewuste besluit - zodat de burst hieronder voorin de rij komt.
+            _hardwareBeheerder.VerwijderWachtendeSnelheidscommandosVoor(trein.DecoderAdres);
             foreach (var blok in _blokBeheerder.Blokken)
                 _hardwareBeheerder.StuurLocSnelheidCommando(trein.DecoderAdres, rit.HuidigeSnelheidStap, vooruitVoorHardware, blok.Nummer, trein.DecoderStappen);
             foreach (int kruiswisselAdres in AlleKruiswisselRijAdressen())

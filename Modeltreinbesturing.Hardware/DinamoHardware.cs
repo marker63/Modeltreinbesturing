@@ -494,6 +494,44 @@ public class DinamoHardware : IHardwareInterface
         }
     }
 
+    /// <summary>BUG #30 (gebruikerswaarneming: "de reservering stond naar blok 7, ik zag dat
+    /// de loc de verkeerde kant op reed en drukte op rijrichting keren maar er gebeurde
+    /// niets, pas toen hij in blok 4 kwam keerde hij ineens"): bytes-analyse van de
+    /// hardware-log liet zien dat de OUDE, foutgerichte snelheidsramp gewoon 10+ seconden
+    /// bleef doorlopen EN -oplopen (stap 1 t/m 9, richting "achteruit"), dwars door zes
+    /// achtereenvolgende, in de app-log keurig bevestigde "handmatig omgekeerd"-correcties
+    /// heen, terwijl de bijbehorende correctie-pakketten (snelheid herhaaldelijk op 0,
+    /// richting "vooruit") er één voor één, met seconden ertussen, pas veel later uit
+    /// kwamen. Oorzaak: VerstuurDatagram hieronder slaat voor eenzelfde (decoderAdres,
+    /// blokNummer)-combinatie BEWUST alleen een BYTE-IDENTIEKE herhaling over (zie die
+    /// toelichting) - een inhoudelijk ANDER commando (nieuwe snelheid/richting) wordt nooit
+    /// verwijderd, want een eerdere, agressievere versie die dat WEL deed bleek een keer een
+    /// echt vertrek- of stopcommando te hebben weggegooid. Daardoor bleven de AL in de
+    /// wachtrij staande, inmiddels achterhaalde achteruit-stappen van de ramp (die vóór de
+    /// correctie al klaarstonden, en - zolang de ramp-timer nog niet gestopt was - ook
+    /// erna nog een paar keer bijvulden) gewoon, in volgorde, vóór de nieuwe correctie staan
+    /// - de 200ms-seriële-cyclus liet die stapel pas geleidelijk leeglopen, met de correctie
+    /// zelf er telkens achteraan.
+    /// ECHTE FIX, bewust SMALLER dan de eerder teruggedraaide aanpak hierboven (die gold
+    /// voor ALLE snelheidscommando's, altijd): deze methode verwijdert, ALLEEN op het
+    /// expliciete moment van een bewuste richtingscorrectie (TreinrouteWindow.
+    /// KeerTreinIndienActief) of een "geen kandidaat, nu stoppen"-beslissing, gericht alle
+    /// nog niet verstuurde, wachtende snelheidscommando's voor DEZE decoder, over ALLE
+    /// blokken - vlak VOORDAT de nieuwe, gecorrigeerde burst zelf de wachtrij in gaat. Op
+    /// dat moment is elke oudere, nog wachtende snelheidswaarde voor deze decoder per
+    /// definitie achterhaald (de gebruiker/software heeft zojuist bewust een nieuw besluit
+    /// genomen), dus dit raakt de eerder teruggedraaide "vertrek-dan-stop"-regressie niet:
+    /// die ging over twee ONAFHANKELIJK, kort na elkaar genomen besluiten tijdens NORMAAL
+    /// rijden, dit gaat over expliciet weggooien van alles wat vóór EEN SPECIFIEK,
+    /// aanwijsbaar correctiemoment al verouderd was.</summary>
+    public void VerwijderWachtendeSnelheidscommandosVoor(int decoderAdres)
+    {
+        lock (_vergrendeling)
+        {
+            _teVersturen.RemoveAll(item => item.SnelheidsSleutel?.DecoderAdres == decoderAdres);
+        }
+    }
+
     /// <summary>Bouwt een compleet, correct geframed datagram (header + data + checksum,
     /// zie klasse-commentaar) en zet het in de verstuur-wachtrij; de stuur-timer haalt
     /// het er op tijd weer uit. Rechtstreeks versturen zou de 200ms-cadans van de PC-als-

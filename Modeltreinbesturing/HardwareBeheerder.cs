@@ -271,6 +271,20 @@ public class HardwareBeheerder
     /// 126-staps commando, zie IHardwareInterface).</param>
     public void StuurLocSnelheidCommando(int decoderAdres, int stap, bool vooruit, int blokNummer = 0, int stappen = 126) => Huidige.ZetLocSnelheid(decoderAdres, stap, vooruit, blokNummer, stappen);
 
+    /// <summary>BUG #30: zie DinamoHardware.VerwijderWachtendeSnelheidscommandosVoor voor de
+    /// volledige toelichting - aanroepen vlak VOORDAT een bewuste richtingscorrectie
+    /// (TreinrouteWindow.KeerTreinIndienActief) of een "geen kandidaat, nu stoppen"-burst de
+    /// wachtrij in gaat, zodat die nooit meer achter een stapel inmiddels achterhaalde,
+    /// nog wachtende snelheidscommando's voor DEZELFDE decoder (over andere blokken) hoeft
+    /// te wachten. Alleen zinvol/geïmplementeerd voor Dinamo (die per blok een eigen
+    /// wachtrij-plek inneemt); andere interfaces sturen rechtstreeks, zonder zo'n wachtrij,
+    /// dus daar is niets op te ruimen.</summary>
+    public void VerwijderWachtendeSnelheidscommandosVoor(int decoderAdres)
+    {
+        if (Huidige is DinamoHardware dinamo)
+            dinamo.VerwijderWachtendeSnelheidscommandosVoor(decoderAdres);
+    }
+
     /// <summary>GEVONDEN, ZELFDE GAT ALS VraagMelderStatusOp HIERBOVEN (gebruikerswaarneming:
     /// "ik hoor nog steeds geen enkel wissel schakelen", ook na de VraagMelderStatusOp-fix):
     /// naast de melderstatus-vloedgolf bleek MainWindow.StopAlleBekendeGeplaatsteLocs (bij

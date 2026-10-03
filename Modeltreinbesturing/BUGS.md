@@ -225,6 +225,42 @@ Oorzaak, in twee lagen:
 ONTVANGER in `Dispatcher.Invoke` gewrapt worden zodra die UI aanraakt - nooit
 ervan uitgaan dat de aanroeper dat al voor je regelt.
 
+## #30 - "Rijrichting keren" leek niets te doen - correctie kwam pas enkele
+   seconden later aan (pas toen de loc blok4 al bereikt had)
+**Status:** Gefixt. Gebruikerswaarneming: "De reservering stond naar blok 7 ik
+zag dat de loc de verkeerde kant op reed en drukte op rijrichting keren maar er
+gebeurde niets, pas toen hij in blok 4 kwam keerde hij ineens, dat was wel
+fijn." De correctie werd dus niet genegeerd - hij kwam alleen veel te laat aan.
+Oorzaak, gevonden via byte-analyse van de hardware-log: de software stuurt
+snelheidscommando's naar de Dinamo via één wachtrij die, door de 200ms-per-
+pakket seriële cadans van de Dinamo-master, hooguit 5 commando's per seconde
+kan versturen. `VerstuurDatagram` slaat daarbij BEWUST alleen een
+BYTE-IDENTIEKE herhaling voor dezelfde (decoderAdres, blokNummer)-combinatie
+over (zie het bestaande commentaar daar) - een eerdere, agressievere versie die
+ook inhoudelijk ANDERE commando's voor diezelfde combinatie verving, is ooit
+teruggedraaid omdat die een keer een echt vertrek-daarna-stopcommando weggooide.
+Gevolg hier: toen de gebruiker op "keren" drukte, stonden er van de vorige
+(foutgerichte) snelheidsramp nog meerdere, inmiddels achterhaalde
+snelheidsstappen in de wachtrij voor dezelfde blokken - de nieuwe,
+gecorrigeerde burst moest daar gewoon, in volgorde, achteraan aansluiten. Bij
+zes snelle correcties achter elkaar (zoals in de log te zien) liep dat op tot
+ruim 10 seconden vertraging, precies de tijd die de loc nodig had om van blok7
+naar blok4 te rijden.
+**Fix:** nieuwe, bewust SMALLE methode `DinamoHardware.
+VerwijderWachtendeSnelheidscommandosVoor(decoderAdres)` (doorgegeven via
+`HardwareBeheerder`) die alle nog niet verstuurde snelheidscommando's voor één
+decoder, over alle blokken, uit de wachtrij verwijdert. Deze wordt UITSLUITEND
+aangeroepen op de twee momenten waarop de software zelf een bewust, nieuw
+besluit neemt dat alles ervoor overruled: `TreinrouteWindow.
+KeerTreinIndienActief` (handmatige/automatische richtingscorrectie) en de
+"geen kandidaat, nu stoppen"-beslissing in `AutomatischeStapProberen` (bug
+#27). Op die twee momenten is elke oudere, nog wachtende snelheidswaarde voor
+deze decoder per definitie achterhaald, dus dit raakt de eerder teruggedraaide
+"vertrek-dan-stop"-regressie niet: die ging over twee onafhankelijke besluiten
+tijdens normaal rijden, dit gaat over een expliciet, aanwijsbaar
+correctiemoment. De algemene coalescing-regel in `VerstuurDatagram` zelf is
+niet aangepast.
+
 ---
 
 _Laatst bijgewerkt: zie git-historie van dit bestand zodra het project op
