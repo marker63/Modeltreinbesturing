@@ -54,35 +54,21 @@ public class HardwareBeheerder
     /// doorgestuurd, ongeacht of het instellingenscherm open staat.</summary>
     private void DoorsturenNaarLog(string bericht) => HardwareCommunicatieLog.Log("Info", bericht);
 
-    /// <summary>BUG #28 (gebruikersmelding: "bij opstarten direct een kortsluitmelding op
-    /// het rijscherm in het rood, gaat na lange wachttijd in blok 3 ineens toch rijden" +
-    /// "wissel 14 op het scherm afbuigend, maar fysiek nog gewoon rechtdoor"): wordt hier
-    /// gezet via RegistreerBaanBeheerderVoorAutomatischeHerinitialisatie, zodat
-    /// DoorgevenKortsluitingStatus hieronder, zodra een kortsluiting weer opgeheven wordt,
-    /// zelfstandig alle wissels/driewegwissels/kruiswissels opnieuw hun gewenste stand kan
-    /// sturen - zie HerinitialiseerAlleWissels hieronder voor de volledige toelichting.
-    /// Null zolang MainWindow deze koppeling nog niet gelegd heeft (bijv. heel vroeg in de
-    /// opstart) - dan gebeurt er simpelweg niets extra's, zoals voorheen.</summary>
-    private BaanOntwerpBeheerder? _baanBeheerderVoorHerinit;
-
-    public void RegistreerBaanBeheerderVoorAutomatischeHerinitialisatie(BaanOntwerpBeheerder baanBeheerder) =>
-        _baanBeheerderVoorHerinit = baanBeheerder;
-
-    private void DoorgevenKortsluitingStatus(bool actief)
-    {
-        KortsluitingStatusGewijzigd?.Invoke(actief);
-        // Alleen bij het OPHEFFEN van een fout (actief==false) - zie DinamoHardware.
-        // Poort_DataReceived: dat gebeurt uitsluitend op de overgang "was fout, nu niet
-        // meer", nooit herhaald zolang de fout al bekend was. Precies het moment waarop
-        // eventueel tijdens de fout verloren/onderbroken wisselcommando's hersteld moeten
-        // worden.
-        if (!actief && _baanBeheerderVoorHerinit != null)
-        {
-            int aantal = HerinitialiseerAlleWissels(_baanBeheerderVoorHerinit);
-            if (aantal > 0)
-                HardwareCommunicatieLog.Log("Info", $"Kortsluiting/foutstatus opgeheven - voor de zekerheid {aantal} wissel(s)/driewegwissel(s)/kruiswissel(s) opnieuw hun stand gestuurd (zie BUG #28: een puls tijdens de fout kan een wissel fysiek in de verkeerde stand hebben achtergelaten zonder dat de software dat kon weten).");
-        }
-    }
+    /// <summary>BUG #29 (gebruikersmelding: na de BUG #28-fix hieronder verscheen de hele
+    /// tijd "Fout bij lezen van Dinamo: The calling thread cannot access this object
+    /// because a different thread owns it" in de hardware-log): DinamoHardware.
+    /// Poort_DataReceived (en dus ook KortsluitingStatusGewijzigd/DoorgevenKortsluitingStatus
+    /// hieronder) loopt op de achtergrondthread van SerialPort.DataReceived, NIET op de
+    /// WPF-UI-thread. De BUG #28-fix riep hier voorheen rechtstreeks, synchroon,
+    /// HerinitialiseerAlleWissels aan - die leest BaanOntwerpBeheerder.Symbolen (WPF-
+    /// gebonden) en vuurt via StuurWisselCommando het WisselStandGewijzigd-event, dat
+    /// BaanontwerpWindow gebruikt om Redraw() aan te roepen - stuk voor stuk UI-aanrakingen
+    /// die alleen op de UI-thread mogen. Precies zoals MainWindow.Bezetmelding_VanHardware
+    /// dit AL via Dispatcher.Invoke doet voor exact hetzelfde soort achtergrondthread-
+    /// events, verplaatst naar MainWindow (dat wél een Dispatcher heeft - HardwareBeheerder
+    /// zelf niet) en daar in Dispatcher.Invoke gewrapt. HardwareBeheerder blijft hier dus
+    /// weer bij zijn oorspronkelijke, simpele taak: alleen doorgeven.</summary>
+    private void DoorgevenKortsluitingStatus(bool actief) => KortsluitingStatusGewijzigd?.Invoke(actief);
 
     /// <summary>Verzamelt en (opnieuw) verstuurt de gewenste stand van ALLE wissels,
     /// driewegwissels en (Engelse) kruiswissels - gedeelde kern achter zowel de

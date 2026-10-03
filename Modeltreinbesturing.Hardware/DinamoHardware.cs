@@ -751,9 +751,27 @@ public class DinamoHardware : IHardwareInterface
             // het openen van de poort) mag de buffer niet voor altijd laten doorgroeien.
             if (_ontvangstBuffer.Count > 256) _ontvangstBuffer.Clear();
 
+            // BUG #29 (gebruikersmelding: "Fout bij lezen van Dinamo: The calling thread
+            // cannot access this object because a different thread owns it" bleef, na ÉÉN
+            // enkele echte F-bit-overgang, honderden keren per minuut herhalen): deze hele
+            // methode loopt op de achtergrondthread van SerialPort.DataReceived. Als een
+            // abonnee van KortsluitingStatusGewijzigd (zie BUG #28 in HardwareBeheerder/
+            // MainWindow) een exception gooit - bijv. omdat hij UI-gebonden state aanraakt
+            // zonder naar de UI-thread te marshallen - werd die exception hiervoor pas
+            // helemaal onderaan Poort_DataReceived opgevangen, NA deze methode maar VOOR
+            // de regel die _dinamoMeldeFoutVorigeKeer bijwerkte. Resultaat: die vlag bleef
+            // voor altijd op "true" staan, dus elke VOLGENDE aanroep (er komt voortdurend
+            // serieel verkeer binnen) zag opnieuw "was fout, nu niet meer", loggede opnieuw
+            // "opgeheven", riep het event opnieuw aan, kreeg opnieuw dezelfde exception - een
+            // oneindige lus van exact datzelfde berichtenpaar. Nu wordt de vlag ALTIJD eerst
+            // bijgewerkt, vóórdat het event naar buiten gaat - een crashende abonnee kan deze
+            // eigen boekhouding dus nooit meer corrumperen, ongeacht wat die abonnee fout
+            // doet.
+            bool wasFout = _dinamoMeldeFoutVorigeKeer;
+            _dinamoMeldeFoutVorigeKeer = dinamoMeldtFout;
             if (dinamoMeldtFout)
             {
-                if (!_dinamoMeldeFoutVorigeKeer)
+                if (!wasFout)
                 {
                     // GEBRUIKERSCORRECTIE ("koploper geeft alleen een melding, laat alle
                     // treinen gewoon rijden ook in het blok met de kortsluiting, Dinamo
@@ -768,12 +786,11 @@ public class DinamoHardware : IHardwareInterface
                 }
                 StuurResetFault();
             }
-            else if (_dinamoMeldeFoutVorigeKeer)
+            else if (wasFout)
             {
                 StatusBericht?.Invoke("Dinamo's foutstatus is opgeheven.");
                 KortsluitingStatusGewijzigd?.Invoke(false);
             }
-            _dinamoMeldeFoutVorigeKeer = dinamoMeldtFout;
         }
         catch (TimeoutException) { /* niets gelezen binnen de timeout, prima */ }
         catch (Exception ex)

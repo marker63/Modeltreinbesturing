@@ -194,6 +194,37 @@ foutgegane stand nooit met 100% zekerheid detecteren/herstellen. Bij
 terugkerende twijfel over wissel 14 specifiek: controleer na een kortsluiting
 even visueel of hij inderdaad is meegekomen.
 
+## #29 - BUG #28-fix veroorzaakte zelf een crash-lus: honderden keren per minuut
+   "Fout bij lezen van Dinamo: The calling thread cannot access this object
+   because a different thread owns it"
+**Status:** Gefixt. Gevonden direct na het publiceren van #28 (hardware-log van
+een sessie die zelfs niet "gestart" was - alleen verbinden al gaf de ruis).
+Oorzaak, in twee lagen:
+1. `DinamoHardware.Poort_DataReceived` loopt op de achtergrondthread van
+   `SerialPort.DataReceived`, niet op de WPF-UI-thread. De #28-fix riep vanuit
+   die thread rechtstreeks `HerinitialiseerAlleWissels` aan, die UI-gebonden
+   state aanraakt (`Symbolen`, en via `WisselStandGewijzigd` een `Redraw()`) -
+   dat mag alleen op de UI-thread, exact zoals `MainWindow.
+   Bezetmelding_VanHardware` dat al via `Dispatcher.Invoke` deed voor
+   soortgelijke hardware-events. Fix: de herinitialisatie-aanroep is verplaatst
+   naar `MainWindow` (die wél een Dispatcher heeft) en daar in
+   `Dispatcher.Invoke` gewrapt; `HardwareBeheerder.DoorgevenKortsluitingStatus`
+   doet weer precies wat de naam zegt: alleen doorgeven.
+2. Dieper gat, ONAFHANKELIJK van punt 1 en voortaan structureel voorkomen: de
+   exception uit punt 1 werd pas helemaal onderaan `Poort_DataReceived`
+   opgevangen - NA de code die zou moeten bijhouden "was dit al bekend als
+   fout" (`_dinamoMeldeFoutVorigeKeer`), maar VOOR de regel die die vlag
+   bijwerkte. Die vlag bleef daardoor permanent op "fout" staan, dus elke
+   volgende aanroep (er komt continu serieel verkeer binnen) zag opnieuw een
+   "net opgeheven"-overgang, probeerde het event opnieuw, kreeg dezelfde
+   exception, ad infinitum. Fix: de vlag wordt nu ALTIJD eerst bijgewerkt,
+   vóórdat het event verstuurd wordt - een crashende abonnee kan deze
+   boekhouding dus nooit meer corrumperen, wat er ook misgaat.
+**Les voor volgende keer:** elk event dat vanuit `DinamoHardware`/
+`HardwareBeheerder` komt (dus van de hardware-achtergrondthread) moet door de
+ONTVANGER in `Dispatcher.Invoke` gewrapt worden zodra die UI aanraakt - nooit
+ervan uitgaan dat de aanroeper dat al voor je regelt.
+
 ---
 
 _Laatst bijgewerkt: zie git-historie van dit bestand zodra het project op

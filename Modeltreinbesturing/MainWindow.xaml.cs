@@ -77,10 +77,26 @@ public partial class MainWindow : Window
         _hardwareBeheerder.HardwareGewijzigd += () => _hardwareBeheerder.Huidige.BezetmeldingGewijzigd += Bezetmelding_VanHardware;
         _hardwareBeheerder.Huidige.BezetmeldingGewijzigd += Bezetmelding_VanHardware;
 
-        // BUG #28: koppelt _baanBeheerder aan de hardwarelaag zodat die, zodra een Dinamo-
-        // kortsluiting/foutstatus weer opgeheven wordt, zelfstandig alle wissels opnieuw
-        // hun stand kan sturen (zie HardwareBeheerder.HerinitialiseerAlleWissels).
-        _hardwareBeheerder.RegistreerBaanBeheerderVoorAutomatischeHerinitialisatie(_baanBeheerder);
+        // BUG #28/#29: zodra Dinamo's kortsluiting/foutstatus weer opgeheven wordt, worden
+        // alle wissels opnieuw hun gewenste stand gestuurd (zie HardwareBeheerder.
+        // HerinitialiseerAlleWissels) - een puls die tijdens de fout onderbroken werd, kan
+        // een wissel anders fysiek in de verkeerde stand achterlaten zonder dat de software
+        // dat ooit kon weten. BUG #29: dit event komt van DinamoHardware.Poort_DataReceived,
+        // dat op de achtergrondthread van SerialPort.DataReceived loopt, NIET op de UI-
+        // thread - HerinitialiseerAlleWissels raakt wél UI-gebonden state aan (Symbolen,
+        // Redraw via WisselStandGewijzigd). Daarom hier, net als Bezetmelding_VanHardware
+        // hieronder, altijd via Dispatcher.Invoke - nooit rechtstreeks vanuit de
+        // hardwarelaag zelf (die heeft ook geen Dispatcher).
+        _hardwareBeheerder.KortsluitingStatusGewijzigd += actief =>
+        {
+            if (actief) return;
+            Dispatcher.Invoke(() =>
+            {
+                int aantal = _hardwareBeheerder.HerinitialiseerAlleWissels(_baanBeheerder);
+                if (aantal > 0)
+                    HardwareCommunicatieLog.Log("Info", $"Kortsluiting/foutstatus opgeheven - voor de zekerheid {aantal} wissel(s)/driewegwissel(s)/kruiswissel(s) opnieuw hun stand gestuurd (zie BUG #28).");
+            });
+        };
 
         // Automatisch de meest recente backup laden bij het opstarten, zodat je nooit
         // zelf aan Opslaan hoeft te denken - puur een vangnet, dus als het laden om wat
