@@ -534,9 +534,54 @@ public partial class BaanVerkenner
                     // De loc is helemaal niet vertrokken: klopt de blokkoppeling van deze
                     // melder wel? Eén keer opnieuw bepalen voordat we iets concluderen.
                     blokGecontroleerd = true;
-                    _log.Waarschuwing($"De loc vertrok niet van melder {start}. Blokkoppeling wordt gecontroleerd.");
-                    _kaart.Melder(start).DinamoBlok = null;
-                    await BlokZoekenBijStart(start);
+
+                    // BUG #33 (gebruikerswaarneming: "je ziet de loc op bezet melder 5 en 16
+                    // en je gaat allerlei melders en blokken aansturen, dat moet beter
+                    // kunnen"): hieronder stond voorheen DIRECT de koppeling weggegooid
+                    // (`DinamoBlok = null`) gevolgd door `BlokZoekenBijStart` - een VOLLEDIGE
+                    // blokproef die ELK bekend Dinamo-blok, in BEIDE richtingen, elk
+                    // BlokproefLangSeconden (hier 30 sec) lang uitprobeert. Voor een baan met
+                    // 16 blokken is dat in het ergste geval 16 × 2 × 30 = 960 sec (16 minuten)
+                    // - terwijl de software het blok voor déze melder vaak AL kende (hier
+                    // bijvoorbeeld blok 3 voor melder 5, een paar minuten eerder zelf
+                    // gevonden). Fix: eerst GOEDKOOP herbevestigen via het AL bekende blok
+                    // (één poging, met de korte BlokproefKortSeconden-wachttijd in plaats van
+                    // de lange) - lukt dat, dan is er geen reden om de koppeling weg te gooien
+                    // en de dure volledige zoektocht te starten. Pas als deze snelle
+                    // herbevestiging ECHT niets oplevert (het blok klopt dus waarschijnlijk
+                    // niet meer - bijv. een wissel die stiekem omgezet is), vervalt de
+                    // koppeling alsnog en volgt exact dezelfde volledige blokproef als
+                    // voorheen - dit pad is dus NIET verwijderd, alleen niet meer de EERSTE
+                    // stap.
+                    int? bekendBlok = BlokVan(start);
+                    bool bevestigd = false;
+                    if (bekendBlok is int bb)
+                    {
+                        _log.Rijden($"De loc vertrok niet van melder {start} - eerst het al bekende Dinamo-blok {bb} nog eens proberen voordat de volledige blokproef start.");
+                        await StuurNaarBlok(bb, r, _ins.Verkensnelheid);
+                        var eindHerbevestiging = _klok.Nu + TimeSpan.FromSeconds(_ins.BlokproefKortSeconden);
+                        while (_klok.Nu < eindHerbevestiging)
+                        {
+                            await Wacht(Poll);
+                            if (_monitor.Bijwerken().Count > 0) { bevestigd = true; break; }
+                        }
+                        if (bevestigd)
+                        {
+                            _hw.ZetLocSnelheid(_ins.LocAdres, 0, r == Richting.Vooruit, bb, _ins.LocStappen);
+                            await StopLoc();
+                            await Nastellen(start, r);
+                        }
+                        else
+                        {
+                            await StuurNaarBlok(bb, r, 0);
+                        }
+                    }
+                    if (!bevestigd)
+                    {
+                        _log.Waarschuwing($"De loc vertrok niet van melder {start}. Blokkoppeling wordt gecontroleerd.");
+                        _kaart.Melder(start).DinamoBlok = null;
+                        await BlokZoekenBijStart(start);
+                    }
                     _monitor.Bijwerken();
                     await StuurSnelheid(r, snelheid);
                     laatsteWijziging = _klok.Nu;

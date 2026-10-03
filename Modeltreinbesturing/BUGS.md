@@ -343,6 +343,39 @@ een log alleen (zie het user-instructie "test het eerst grondig").
 **Praktisch advies voor nu:** zet de kruipsnelheid voor deze baan laag (3-5)
 en herhaal de verkenning.
 
+## #33 - Baanverkenner gooide een AL bekende blokkoppeling weg en deed een
+   volledige (minutenlange) blokproef opnieuw, ook als maar één korte
+   herbevestiging nodig was
+**Status:** Gefixt. Gebruikerswaarneming: "je ziet de loc op bezet melder 5 en
+16 en je gaat allerlei melders en blokken aansturen, dat moet beter kunnen."
+Analyse van een meegestuurd baanverkenner-log liet zien dat de verkenner,
+nadat de loc (vanaf een eerder genesteld "kopspoor" op melder 5, waar hij ook
+nog deels op melder 16 stond) niet terugreed naar melder 16, de bestaande
+koppeling "melder 5 → Dinamo-blok 3" - een paar minuten eerder in diezelfde
+sessie zelf gevonden - gewoon WEGGOOIDE en een volledige `BlokZoekenBijStart`
+startte: ELK bekend Dinamo-blok, in BEIDE richtingen, elk BlokproefLangSeconden
+(hier 30 sec) lang geprobeerd. Op een baan met 16 Dinamo-blokken is dat in het
+ergste geval 16 × 2 × 30 = 960 seconden (16 minuten) voor iets waarvan de
+software het antwoord al wist. Precies dit liet de verkenning "allerlei
+melders en blokken aansturen" terwijl de gebruiker toekeek, en precies dit
+maakte de sessie na ~8 minuten nog steeds niets verder.
+**Fix:** vóór de dure volledige blokproef wordt nu eerst, als de melder al een
+bekend blok heeft, dat ene blok nog één keer kort geprobeerd (met de KORTE
+BlokproefKortSeconden-wachttijd in plaats van de lange) - lukt dat, dan wordt
+de loc gewoon teruggezet op de startmelder en gaat de rit normaal verder,
+zonder de koppeling te verliezen. Pas als die snelle herbevestiging ECHT niets
+oplevert (de koppeling klopt dan waarschijnlijk echt niet meer, bijvoorbeeld
+door een omgezette wissel), vervalt de koppeling alsnog en volgt exact dezelfde
+volledige blokproef als voorheen - dat vangnet is dus niet weggehaald, alleen
+niet meer de EERSTE stap.
+**Nog niet aangepakt (bewust, zie nuance bij bug #32):** de ALLERSEERSTE
+blokproef (wanneer een melder nog NOOIT een blok had) blijft noodzakelijkerwijs
+traag voor blokken die NIET het goede blok zijn (elk zo'n blok moet de volle
+BlokproefLangSeconden afwachten om zeker te zijn dat er niets gebeurt) - dat is
+inherent aan "veilig een onbekend blok uitsluiten", niet aan een gemiste
+afkorting. Wie dat sneller wil, kan `BlokproefLangSeconden` zelf verlagen in de
+instellingen (ten koste van een kleinere veiligheidsmarge).
+
 ---
 
 _Laatst bijgewerkt: zie git-historie van dit bestand zodra het project op
