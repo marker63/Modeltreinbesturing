@@ -1,0 +1,22 @@
+<Window x:Class="Modeltreinbesturing.NieuwAccountDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Nieuw account" Width="380" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+    <StackPanel Margin="16">
+        <TextBlock x:Name="UitlegTekst" TextWrapping="Wrap" Margin="0,0,0,14"/>
+        <TextBlock Text="Gebruikersnaam:" Margin="0,0,0,4"/>
+        <TextBox x:Name="NaamBox" Margin="0,0,0,12"/>
+        <TextBlock Text="Wachtwoord:" Margin="0,0,0,4"/>
+        <PasswordBox x:Name="WachtwoordBox" Margin="0,0,0,12"/>
+        <TextBlock Text="Wachtwoord herhalen:" Margin="0,0,0,4"/>
+        <PasswordBox x:Name="WachtwoordHerhaalBox" Margin="0,0,0,12"/>
+        <CheckBox x:Name="IsAdminBox" Margin="0,0,0,16">
+            <TextBlock Text="Deze gebruiker mag zelf ook andere accounts beheren (beheerder)" TextWrapping="Wrap" Width="330"/>
+        </CheckBox>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Aanmaken" Padding="10,4" Margin="0,0,8,0" Click="Aanmaken_Click" IsDefault="True"/>
+            <Button Content="Annuleren" Padding="10,4" IsCancel="True"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

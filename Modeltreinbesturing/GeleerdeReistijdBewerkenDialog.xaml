@@ -1,0 +1,22 @@
+<Window x:Class="Modeltreinbesturing.GeleerdeReistijdBewerkenDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Geleerde reistijd toevoegen/bewerken" Height="260" Width="340"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="NoResize">
+    <StackPanel Margin="16">
+        <TextBlock Margin="0,0,0,12" TextWrapping="Wrap"
+                   Text="Vul hier vast een schatting in voor een blok dat nog nooit een echte meting heeft gehad - handig als de generieke standaarddrempel (30 sec) te kort blijkt voor een langer traject, waardoor de rit steeds voortijdig als 'vastgelopen' wordt afgebroken vóórdat de echte aankomst ooit bevestigd kan worden."/>
+        <TextBlock Text="Naar blok:" Margin="0,0,0,2"/>
+        <ComboBox x:Name="NaarBlokCombo" Margin="0,0,0,8"/>
+        <TextBlock Text="Vanuit blok (aankomstrichting):" Margin="0,0,0,2"/>
+        <ComboBox x:Name="VanBlokCombo" Margin="0,0,0,8"/>
+        <TextBlock Text="Loc:" Margin="0,0,0,2"/>
+        <ComboBox x:Name="LocCombo" Margin="0,0,0,8"/>
+        <TextBlock Text="Geschatte reistijd (seconden):" Margin="0,0,0,2"/>
+        <TextBox x:Name="SecondenBox" Margin="0,0,0,12"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="OK" Padding="10,4" Margin="0,0,8,0" Click="Ok_Click" IsDefault="True"/>
+            <Button Content="Annuleren" Padding="10,4" IsCancel="True"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

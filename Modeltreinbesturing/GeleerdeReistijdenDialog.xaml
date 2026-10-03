@@ -1,0 +1,16 @@
+<Window x:Class="Modeltreinbesturing.GeleerdeReistijdenDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Geleerde reistijden" Height="480" Width="420"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Top" Margin="0,0,0,8" TextWrapping="Wrap"
+                   Text="Per blok de reistijd die de software zelf gemeten heeft (voortschrijdend gemiddelde: elke nieuwe echte meting telt voor 30% mee, de opgebouwde geschiedenis voor 70%). Wordt gebruikt als veiligheidsdrempel bij echte hardware - een blok zonder waarde heeft nog geen enkele echte meting gehad en gebruikt dan de generieke standaarddrempel."/>
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
+            <Button Content="Toevoegen/bewerken..." Padding="10,4" Margin="0,0,8,0" Click="ToevoegenBewerken_Click"/>
+            <Button Content="Alles wissen..." Padding="10,4" Margin="0,0,8,0" Click="AllesWissen_Click"/>
+            <Button Content="Sluiten" Padding="10,4" Click="Sluiten_Click"/>
+        </StackPanel>
+        <ListBox x:Name="ReistijdenLijst"/>
+    </DockPanel>
+</Window>

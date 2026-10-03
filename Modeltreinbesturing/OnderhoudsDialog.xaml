@@ -1,0 +1,45 @@
+<Window x:Class="Modeltreinbesturing.OnderhoudsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Incidenten en wijzigingen" Height="560" Width="600"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Top" Margin="0,0,0,10" TextWrapping="Wrap"
+                   Text="Een onderhoudslog per object - vrij te koppelen aan bijv. 'Wissel 12', 'Loc NS 1263' of 'Blok 34'. Een INCIDENT is iets dat kapot/mis is (een storing, onverwacht gedrag); een WIJZIGING is iets dat bewust aangepast of vervangen is."/>
+
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+            <TextBlock Text="Zoek op object:" Margin="0,0,0,4"/>
+            <TextBox x:Name="FilterBox" TextChanged="FilterBox_TextChanged"/>
+        </StackPanel>
+
+        <StackPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+            <TextBlock Text="Nieuwe registratie:" FontWeight="Bold" Margin="0,0,0,4"/>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                <TextBlock Text="Soort:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <ComboBox x:Name="SoortCombo" Width="100" Margin="0,0,10,0"/>
+                <TextBlock Text="Object:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <TextBox x:Name="ObjectBox" Width="140" Margin="0,0,10,0"/>
+                <CheckBox x:Name="AfgerondBox" Content="Afgerond" VerticalAlignment="Center"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                <TextBlock Text="Titel:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <TextBox x:Name="TitelBox" Width="400"/>
+            </StackPanel>
+            <TextBlock Text="Omschrijving:" Margin="0,0,0,4"/>
+            <TextBox x:Name="OmschrijvingBox" Height="50" TextWrapping="Wrap" AcceptsReturn="True" Margin="0,0,0,8"/>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                <Image x:Name="FotoPreview" Width="50" Height="50" Stretch="UniformToFill" Margin="0,0,8,0"/>
+                <Button Content="Foto kiezen..." Padding="8,4" Margin="0,0,8,0" VerticalAlignment="Center" Click="FotoKiezen_Click"/>
+                <Button Content="Foto verwijderen" Padding="8,4" VerticalAlignment="Center" Click="FotoVerwijderen_Click"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal">
+                <Button Content="Toevoegen" Padding="8,4" Margin="0,0,8,0" Click="Toevoegen_Click"/>
+                <Button Content="Afgerond omschakelen" Padding="8,4" Margin="0,0,8,0" Click="AfgerondOmschakelen_Click"/>
+                <Button Content="Verwijderen" Padding="8,4" Margin="0,0,8,0" Click="Verwijderen_Click"/>
+                <Button Content="Sluiten" Padding="8,4" Click="Sluiten_Click"/>
+            </StackPanel>
+        </StackPanel>
+
+        <ListBox x:Name="RecordsLijst" SelectionChanged="RecordsLijst_SelectionChanged"/>
+    </DockPanel>
+</Window>

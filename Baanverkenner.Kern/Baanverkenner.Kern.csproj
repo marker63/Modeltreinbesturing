@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- De eigenlijke verkenlogica van de Baanverkenner, los van het WPF-venster: rijden,
+       melders volgen, wissels proberen, baankaart opbouwen, rapport maken. Geen WPF hier,
+       zodat dit ook zonder scherm (bijv. met de gesimuleerde proefbaan) getest kan worden. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Baanverkenner.Kern</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Modeltreinbesturing.Hardware\Modeltreinbesturing.Hardware.csproj" />
+  </ItemGroup>
+
+</Project>

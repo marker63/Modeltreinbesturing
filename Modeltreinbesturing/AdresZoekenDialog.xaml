@@ -1,0 +1,39 @@
+<Window x:Class="Modeltreinbesturing.AdresZoekenDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Rijstroom-adres zoeken" Height="520" Width="560"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <DockPanel Margin="16">
+        <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,12"
+                   Text="Doorloopt een reeks rijstroom-adressen: stuurt de gekozen loc voor elk adres kort een lage snelheid, en kijkt of er tijdens dat venster een bezetmelder van stand wisselt - dat wijst op het adres dat deze sectie echt voedt. Zet de loc EERST stilstaand op de te onderzoeken sectie, en zorg dat er geen andere trein tegelijk rijdt (anders is een gevonden wissel niet betrouwbaar toe te schrijven)."/>
+
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="Loc:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <ComboBox x:Name="LocCombo" Width="220"/>
+        </StackPanel>
+
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="Van adres:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <TextBox x:Name="VanAdresBox" Width="60" Text="1"/>
+            <TextBlock Text="Tot en met adres:" VerticalAlignment="Center" Margin="16,0,8,0"/>
+            <TextBox x:Name="TotAdresBox" Width="60" Text="255"/>
+        </StackPanel>
+
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="Testduur per adres (sec):" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <TextBox x:Name="WachttijdBox" Width="60" Text="20"/>
+            <TextBlock Text="Testsnelheid (stap):" VerticalAlignment="Center" Margin="16,0,8,0"/>
+            <TextBox x:Name="SnelheidBox" Width="60" Text="3"/>
+        </StackPanel>
+
+        <TextBlock x:Name="StatusTekst" DockPanel.Dock="Top" TextWrapping="Wrap" FontWeight="Bold" Foreground="DarkSlateGray" Margin="0,4,0,8" Text="Nog niet gestart."/>
+
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button x:Name="StartKnop" Content="Start" Padding="10,4" Margin="0,0,8,0" Click="Start_Click"/>
+            <Button x:Name="StopKnop" Content="Stop" Padding="10,4" Margin="0,0,8,0" Click="Stop_Click" IsEnabled="False"/>
+            <Button Content="Sluiten" Padding="10,4" Click="Sluiten_Click"/>
+        </StackPanel>
+
+        <ListBox x:Name="LogLijst" DockPanel.Dock="Top" FontFamily="Consolas" FontSize="12"/>
+    </DockPanel>
+</Window>

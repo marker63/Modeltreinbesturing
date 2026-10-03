@@ -1,0 +1,21 @@
+<Window x:Class="Modeltreinbesturing.WisselTestDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Test alle wissels" Height="360" Width="480"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Closing="Window_Closing">
+    <DockPanel Margin="16">
+        <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,10"
+                   Text="Zet elke wissel op de baan achtereenvolgens om (rechtdoor naar afbuigend en weer terug), met een korte pauze ertussen - handig om na het aansluiten van hardware in één keer te zien of alles bedraad is. Werkt alleen daadwerkelijk fysiek met echte, verbonden hardware; zonder hardware zie je alleen de software-standen wisselen."/>
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
+            <TextBlock Text="Pauze tussen wissels (sec):" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBox x:Name="PauzeBox" Width="40" Text="1.5"/>
+        </StackPanel>
+        <TextBlock x:Name="VoortgangTekst" DockPanel.Dock="Top" FontWeight="Bold" Margin="0,0,0,10" Text="Nog niet gestart."/>
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,10,0,0">
+            <Button Content="▶ Start test" Padding="10,4" Margin="0,0,8,0" Click="Start_Click" Background="ForestGreen" Foreground="White"/>
+            <Button Content="⛔ Stop" Padding="10,4" Margin="0,0,8,0" Click="Stop_Click"/>
+            <Button Content="Sluiten" Padding="10,4" Click="Sluiten_Click"/>
+        </StackPanel>
+        <ListBox x:Name="ResultatenLijst"/>
+    </DockPanel>
+</Window>

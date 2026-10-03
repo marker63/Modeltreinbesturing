@@ -1,0 +1,32 @@
+<Window x:Class="Modeltreinbesturing.MeldpuntenVerkennerDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Meldpuntenverkenner" Height="560" Width="620"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <DockPanel Margin="16">
+        <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,12"
+                   Text="Toont live elke binnenkomende bezetmelding - ook meldpunten die nog aan GEEN enkel blok gekoppeld zijn (die worden hieronder oranje gemarkeerd). Duw de loc met de hand over het te onderzoeken stuk spoor en kijk welk meldernummer oplicht - zo kun je een onbekende melder (zoals eerder melder 8) direct aan een fysieke plek koppelen, zonder dat er iets automatisch aangestuurd wordt."/>
+
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+            <CheckBox x:Name="AlleenOnbekendeBox" Content="Alleen onbekende (nog niet gekoppelde) meldpunten tonen" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="Wis lijst" Padding="10,4" Margin="0,0,8,0" Click="Wissen_Click"/>
+            <Button Content="Sluiten" Padding="10,4" Click="Sluiten_Click"/>
+        </StackPanel>
+
+        <ListBox x:Name="LogLijst" DockPanel.Dock="Top" FontFamily="Consolas" FontSize="12">
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="Foreground" Value="{Binding Kleur}"/>
+                </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding Tekst}" FontWeight="{Binding Gewicht}"/>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </DockPanel>
+</Window>

@@ -1,0 +1,27 @@
+<Window x:Class="Modeltreinbesturing.HardwareDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Hardware-interface" Height="360" Width="440"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <DockPanel Margin="16">
+        <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,12"
+                   Text="Kies met welke hardware Modeltreinbesturing praat. Zonder hardware blijft alles pure software-simulatie, zoals tot nu toe."/>
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+            <RadioButton x:Name="GeenBox" Content="Geen (simulatie)" GroupName="Hardware" Margin="0,0,0,4" IsChecked="True"/>
+            <RadioButton x:Name="DinamoBox" Content="VPEB Dinamo" GroupName="Hardware" Margin="0,0,0,4"/>
+            <RadioButton x:Name="IntelliboxBox" Content="Uhlenbrock Intellibox (LocoNet)" GroupName="Hardware" Margin="0,0,0,4"/>
+            <RadioButton x:Name="DccExBox" Content="DCC-EX" GroupName="Hardware" Margin="0,0,0,4"/>
+        </StackPanel>
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,12">
+            <TextBlock Text="COM-poort:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <ComboBox x:Name="ComPoortCombo" Width="120"/>
+            <Button Content="Vernieuwen" Padding="8,4" Margin="8,0,0,0" Click="Vernieuwen_Click"/>
+        </StackPanel>
+        <TextBlock x:Name="StatusTekst" DockPanel.Dock="Top" TextWrapping="Wrap" Foreground="DarkSlateGray" Margin="0,0,0,12"/>
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Ontkoppelen" Padding="10,4" Margin="0,0,8,0" Click="Ontkoppelen_Click"/>
+            <Button Content="Verbinden" Padding="10,4" Margin="0,0,8,0" Click="Verbinden_Click"/>
+            <Button Content="Sluiten" Padding="10,4" Click="Sluiten_Click"/>
+        </StackPanel>
+    </DockPanel>
+</Window>

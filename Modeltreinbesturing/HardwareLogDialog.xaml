@@ -1,0 +1,18 @@
+<Window x:Class="Modeltreinbesturing.HardwareLogDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Hardware-communicatielog" Height="520" Width="720"
+        WindowStartupLocation="CenterOwner" Closing="Window_Closing">
+    <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,10"
+                   Text="Alle inkomende ('In', van de hardware) en uitgaande ('Uit', naar de hardware) communicatie, live bijgewerkt. Zonder een echte, verbonden interface (Simulatie-modus) toont dit puur ter info wélke commando's er verstuurd ZOUDEN worden. Gele regels ('Info') zijn geen daadwerkelijke communicatie, maar meldingen over de interface zelf - bijv. als een commando (nog) niet ondersteund wordt door de gekozen hardware."/>
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
+            <CheckBox x:Name="AutomatischScrollenBox" Content="Automatisch meescrollen" IsChecked="True" VerticalAlignment="Center" Margin="0,0,16,0"/>
+            <Button Content="Wissen" Padding="8,4" Margin="0,0,8,0" Click="Wissen_Click"/>
+            <Button Content="Exporteren..." Padding="8,4" Margin="0,0,8,0" Click="Exporteren_Click"/>
+            <Button Content="Exporteren als leesbare tekst (CSV)..." Padding="8,4" Margin="0,0,8,0" Click="ExporterenLeesbaar_Click"/>
+            <Button Content="Sluiten" Padding="8,4" Click="Sluiten_Click"/>
+        </StackPanel>
+        <ListBox x:Name="RegelsLijst" FontFamily="Consolas" FontSize="12"/>
+    </DockPanel>
+</Window>

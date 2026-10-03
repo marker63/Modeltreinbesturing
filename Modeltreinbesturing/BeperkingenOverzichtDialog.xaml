@@ -1,0 +1,23 @@
+<Window x:Class="Modeltreinbesturing.BeperkingenOverzichtDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Overzicht beperkingen" Height="520" Width="480"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize" ShowInTaskbar="False">
+    <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Top" Margin="0,0,0,8" TextWrapping="Wrap"
+                   Text="Alle beperkingen die door variabele/vaste treinroutes worden opgelegd, in één overzicht - net als in het echte Koploper, waar je vanuit het tabblad Rijgedrag zo'n overzicht kunt opvragen. Puur ter inzage; wijzigen doe je nog steeds via de eigen beheerschermen."/>
+        <Button DockPanel.Dock="Bottom" Content="Sluiten" Padding="10,4" HorizontalAlignment="Right" Margin="0,8,0,0" Click="Sluiten_Click"/>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <TextBlock Text="Richtingsverboden" FontWeight="Bold" Margin="0,0,0,4"/>
+                <ListBox x:Name="RichtingsverbodenLijst" Height="100" Margin="0,0,0,12"/>
+                <TextBlock Text="Stopverboden (blokken waar niet gestopt mag worden)" FontWeight="Bold" Margin="0,0,0,4"/>
+                <ListBox x:Name="StopverbodenLijst" Height="100" Margin="0,0,0,12"/>
+                <TextBlock Text="Stopverbod stilstand (doorrijden mag, hier eindigen niet)" FontWeight="Bold" Margin="0,0,0,4"/>
+                <ListBox x:Name="StopverbodStilstandLijst" Height="100" Margin="0,0,0,12"/>
+                <TextBlock Text="Uitgesloten wissels per route" FontWeight="Bold" Margin="0,0,0,4"/>
+                <ListBox x:Name="UitgeslotenWisselsLijst" Height="100"/>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

@@ -1,0 +1,32 @@
+<Window x:Class="Modeltreinbesturing.DashboardDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Dashboard" Height="520" Width="480"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="16">
+            <TextBlock Text="Baanoverzicht" FontWeight="Bold" FontSize="16" Margin="0,0,0,10"/>
+            <TextBlock x:Name="BaanoverzichtTekst" TextWrapping="Wrap" Margin="0,0,0,16"/>
+
+            <TextBlock Text="Rijstatistieken (alle locs samen)" FontWeight="Bold" FontSize="16" Margin="0,0,0,10"/>
+            <TextBlock x:Name="RijstatistiekenTekst" TextWrapping="Wrap" Margin="0,0,0,16"/>
+
+            <TextBlock Text="Incidenten en wijzigingen" FontWeight="Bold" FontSize="16" Margin="0,0,0,10"/>
+            <TextBlock x:Name="OnderhoudTekst" TextWrapping="Wrap" Margin="0,0,0,16"/>
+
+            <TextBlock Text="Aandachtspunten" FontWeight="Bold" FontSize="16" Margin="0,0,0,10"/>
+            <TextBlock x:Name="AandachtspuntenTekst" TextWrapping="Wrap" Margin="0,0,0,16"/>
+
+            <TextBlock Text="Mogelijk vastgelopen/vergeten treinen" FontWeight="Bold" FontSize="16" Margin="0,0,0,10"/>
+            <TextBlock x:Name="StilstaandeTreinenTekst" TextWrapping="Wrap" Margin="0,0,0,16"/>
+
+            <TextBlock Text="Locs met onderhoud nodig" FontWeight="Bold" FontSize="16" Margin="0,0,0,10"/>
+            <TextBlock x:Name="OnderhoudNodigTekst" TextWrapping="Wrap" Margin="0,0,0,16"/>
+
+            <StackPanel Orientation="Horizontal">
+                <Button Content="Sluiten" Padding="10,4" Margin="0,0,8,0" Click="Sluiten_Click"/>
+                <Button Content="Exporteer als tekstbestand..." Padding="10,4" Click="Exporteren_Click"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Window>

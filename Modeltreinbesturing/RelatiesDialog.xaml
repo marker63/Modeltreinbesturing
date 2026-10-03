@@ -1,0 +1,16 @@
+<Window x:Class="Modeltreinbesturing.RelatiesDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Relaties beheren" Height="480" Width="380"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Top" Margin="0,0,0,8" TextWrapping="Wrap"
+                   Text="Alle vastgelegde rij-relaties (van/naar). Koploper's 'uit-via-naar'-principe: markeer een relatie als 'Keer' als de loc bij DIE overgang fysiek van rijrichting moet wisselen (bijv. een normaal blok waar de trein weer terug moet naar waar hij vandaan kwam) - net als een kopspoor krijgt zo'n overgang dan de ingestelde wachttijd bij keren. 'Kans' bepaalt hoe vaak deze richting wordt gekozen t.o.v. andere alternatieven bij vrij automatisch rijden zonder duidelijke voorkeur (1 = standaard, hoger = vaker)."/>
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
+            <Button Content="Keer omschakelen" Padding="10,4" Margin="0,0,8,0" Click="KeerOmschakelen_Click"/>
+            <Button Content="Kans wijzigen..." Padding="10,4" Margin="0,0,8,0" Click="KansWijzigen_Click"/>
+            <Button Content="Sluiten" Padding="10,4" Click="Sluiten_Click"/>
+        </StackPanel>
+        <ListBox x:Name="RelatiesLijst"/>
+    </DockPanel>
+</Window>

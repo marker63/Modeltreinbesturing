@@ -1,0 +1,22 @@
+<Window x:Class="Modeltreinbesturing.WisselstratenDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Wisselstraten beheren" Height="480" Width="440"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Top" Margin="0,0,0,8" TextWrapping="Wrap"
+                   Text="Alle vastgelegde wisselstraten. Dit scherm is om te bekijken/corrigeren — een wissel voor het EERST toevoegen doe je via de Wisselstraat-tool in het baanontwerp zelf (van-blok klikken, naar-blok klikken, dan de wissel klikken). Hier kun je een verkeerd vastgelegde stand corrigeren (dubbelklik een wissel hieronder), een wisselstraat handmatig activeren (zet meteen alle bijbehorende wissels goed, zonder een hele route te hoeven rijden), of verwijderen."/>
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="Activeer deze wisselstraat" Padding="10,4" Margin="0,0,8,0" Click="Activeren_Click"/>
+            <Button Content="Kopiëren (nieuwe variant)" Padding="10,4" Margin="0,0,8,0" Click="Kopieren_Click"
+                    ToolTip="Maakt een nieuwe, alternatieve wisselstraat tussen hetzelfde blokpaar, met dezelfde wissels/standen als startpunt - net als Koploper's 'kopieer gehele wisselstraat' voor bijna-identieke wisselstraten."/>
+            <Button Content="Dubbelen opruimen" Padding="10,4" Margin="0,0,8,0" Click="DubbelenOpruimen_Click"/>
+            <Button Content="Verwijderen" Padding="10,4" Margin="0,0,8,0" Click="Verwijderen_Click"/>
+            <Button Content="Sluiten" Padding="10,4" IsDefault="True" Click="Sluiten_Click"/>
+        </StackPanel>
+        <ListBox x:Name="WisselstratenLijst" Height="150" DockPanel.Dock="Top" Margin="0,0,0,8"
+                 SelectionChanged="WisselstratenLijst_SelectionChanged"/>
+        <TextBlock DockPanel.Dock="Top" Text="Wissels in geselecteerde wisselstraat:" FontWeight="Bold" Margin="0,0,0,4"/>
+        <ListBox x:Name="WisselsLijst" MouseDoubleClick="WisselsLijst_MouseDoubleClick"/>
+    </DockPanel>
+</Window>

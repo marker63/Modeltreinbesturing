@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Baanverkenner: los programma dat met één testloc de bezetmelders, wissels, kopsporen
+       en (bij Dinamo) de blokkoppeling van een baan zelf in kaart brengt. Het resultaat
+       (baankaart .json) kan later in Modeltreinbesturing geïmporteerd worden. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Baanverkenner</RootNamespace>
+    <AssemblyName>Baanverkenner</AssemblyName>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Baanverkenner.Kern\Baanverkenner.Kern.csproj" />
+    <ProjectReference Include="..\Modeltreinbesturing.Hardware\Modeltreinbesturing.Hardware.csproj" />
+  </ItemGroup>
+
+</Project>

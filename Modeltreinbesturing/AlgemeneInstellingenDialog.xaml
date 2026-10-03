@@ -1,0 +1,45 @@
+<Window x:Class="Modeltreinbesturing.AlgemeneInstellingenDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Algemene instellingen" Height="420" Width="480"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <StackPanel Margin="12">
+        <TextBlock TextWrapping="Wrap" Margin="0,0,0,12"
+                   Text="Database-brede instellingen - net als Koploper's 'Algemeen -> Instellingen per database'. Eenmalig instellen, geldt daarna voor de hele baan/database."/>
+
+        <TextBlock Text="Standaard uitroltijd bij stoppen (sec):" Margin="0,0,0,4" TextWrapping="Wrap"/>
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+            <TextBox x:Name="StandaardUitrolBox" Width="60" Margin="0,0,8,0"/>
+            <TextBlock Text="Een blok kan dit individueel overschrijven bij de blokeigenschappen." VerticalAlignment="Center" TextWrapping="Wrap" FontSize="11" Foreground="DimGray"/>
+        </StackPanel>
+
+        <TextBlock Text="Rustpauze tussen wissel/sein-commando's (ms):" Margin="0,0,0,4" TextWrapping="Wrap"/>
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+            <TextBox x:Name="WisselRustpauzeBox" Width="60" Margin="0,0,8,0"/>
+            <TextBlock Text="Voorkomt dat meerdere gelijktijdige commando's de digitale bus overbelasten." VerticalAlignment="Center" TextWrapping="Wrap" FontSize="11" Foreground="DimGray"/>
+        </StackPanel>
+
+        <CheckBox x:Name="GeluidenIngeschakeldBox" Content="Geluiden ingeschakeld" Margin="0,0,0,16"/>
+
+        <TextBlock Text="Snelheidsmeting (voor geijkte snelheden - geldt voor alle locs):" FontWeight="Bold" Margin="0,0,0,4" TextWrapping="Wrap"/>
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+            <TextBlock Text="Melder 1:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+            <ComboBox x:Name="Melder1Combo" Width="70" Margin="0,0,10,0"/>
+            <TextBlock Text="Melder 2:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+            <ComboBox x:Name="Melder2Combo" Width="70" Margin="0,0,10,0"/>
+            <TextBlock Text="Traject (mm):" VerticalAlignment="Center" Margin="0,0,4,0"/>
+            <TextBox x:Name="LengteTrajectBox" Width="60"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+            <TextBlock Text="Modelschaal 1 :" VerticalAlignment="Center" Margin="0,0,4,0"/>
+            <TextBox x:Name="ModelschaalBox" Width="40" Margin="0,0,10,0"/>
+            <TextBlock Text="Manier van meten:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+            <ComboBox x:Name="ManierVanMetenCombo" Width="110"/>
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal">
+            <Button Content="Opslaan" Padding="10,4" Margin="0,0,8,0" Click="Opslaan_Click"/>
+            <Button Content="Sluiten" Padding="10,4" Click="Sluiten_Click"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

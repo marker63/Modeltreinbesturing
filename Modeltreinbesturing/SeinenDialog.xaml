@@ -1,0 +1,31 @@
+<Window x:Class="Modeltreinbesturing.SeinenDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Seinen beheren" Height="480" Width="460"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Top" Margin="0,0,0,8" TextWrapping="Wrap"
+                   Text="Alle seinen in het baanontwerp, met hun koppeling en het live seinbeeld (rood/geel/groen, of 'handmatig' zonder koppeling). Selecteer een sein en kies hieronder een ander blok om te herkoppelen, of Ontkoppelen om los te maken."/>
+        <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                <TextBlock Text="Type sein:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <ComboBox x:Name="TypeCombo" Width="160" Margin="0,0,8,0" SelectionChanged="Type_SelectionChanged"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                <TextBlock Text="Koppelen aan blok:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <ComboBox x:Name="BlokCombo" Width="160" Margin="0,0,8,0"/>
+                <Button Content="Koppelen" Padding="8,4" Click="Koppelen_Click"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                <TextBlock Text="Of als rangeersein aan wisselstraat:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <ComboBox x:Name="WisselstraatCombo" Width="160" Margin="0,0,8,0"/>
+                <Button Content="Koppelen" Padding="8,4" Click="KoppelenAanWisselstraat_Click"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Ontkoppelen" Padding="10,4" Margin="0,0,8,0" Click="Ontkoppelen_Click"/>
+                <Button Content="Sluiten" Padding="10,4" IsDefault="True" Click="Sluiten_Click"/>
+            </StackPanel>
+        </StackPanel>
+        <ListBox x:Name="SeinenLijst" SelectionChanged="SeinenLijst_SelectionChanged"/>
+    </DockPanel>
+</Window>

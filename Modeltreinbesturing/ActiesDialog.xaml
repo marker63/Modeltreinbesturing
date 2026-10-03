@@ -1,0 +1,34 @@
+<Window x:Class="Modeltreinbesturing.ActiesDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Acties beheren" Height="460" Width="440"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Top" Margin="0,0,0,8" TextWrapping="Wrap"
+                   Text="Een eenvoudige automatisering, geïnspireerd op Koploper's Sequens: als een blok bezet/vrij wordt (of GERESERVEERD wordt/niet meer gereserveerd is), zet dit automatisch een schakelaar op de baan in een gekozen stand. 'Bezet/vrij' is handig voor bijv. een 'vertrek toegestaan'-lampje. 'Gereserveerd/niet meer gereserveerd' is handig voor bijv. een overweg: die moet al dicht zijn VOORDAT de trein er is, dus reageert op de reservering, niet pas op de bezetmelding zelf. Er moet al minstens één Schakelaar-symbool op de baan staan om een actie te kunnen aanmaken."/>
+        <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+            <TextBlock Text="Nieuwe actie:" FontWeight="Bold" Margin="0,0,0,4"/>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                <TextBlock Text="Blok:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <ComboBox x:Name="BlokCombo" Width="80" Margin="0,0,10,0"/>
+                <TextBlock Text="wordt:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <ComboBox x:Name="GebeurtenisCombo" Width="150"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                <TextBlock Text="→ schakelaar:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <ComboBox x:Name="SchakelaarCombo" Width="140" Margin="0,0,10,0"/>
+                <TextBlock Text="op:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <ComboBox x:Name="StandCombo" Width="70" Margin="0,0,10,0"/>
+                <TextBlock Text="Puls (sec, 0=blijvend):" VerticalAlignment="Center" Margin="0,0,4,0"
+                           ToolTip="Koploper-praktijkvoorbeeld: een schakelaar die een externe geluidsmodule (bijv. stationsomroep) aanstuurt moet vaak een KORTE PULS zijn i.p.v. een blijvende stand - veel modules reageren op een momentane schakeling. 0 = schakelaar blijft gewoon op de ingestelde stand staan (bestaand gedrag)."/>
+                <TextBox x:Name="PulsSecondenBox" Width="40" Text="0"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal">
+                <Button Content="Toevoegen" Padding="8,4" Margin="0,0,8,0" Click="Toevoegen_Click"/>
+                <Button Content="Verwijderen" Padding="8,4" Margin="0,0,8,0" Click="Verwijderen_Click"/>
+                <Button Content="Sluiten" Padding="8,4" Click="Sluiten_Click"/>
+            </StackPanel>
+        </StackPanel>
+        <ListBox x:Name="ActiesLijst"/>
+    </DockPanel>
+</Window>

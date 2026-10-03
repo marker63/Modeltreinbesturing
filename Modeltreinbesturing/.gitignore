@@ -1,0 +1,11 @@
+# Bouwoutput
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Overig
+*.DS_Store

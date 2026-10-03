@@ -1,0 +1,79 @@
+<Window x:Class="Modeltreinbesturing.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Modeltreinbesturing - Onderhouden blokken" Height="700" Width="1000" MinHeight="450" MinWidth="750"
+        KeyDown="Window_KeyDown">
+    <DockPanel>
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_Bestand">
+                <MenuItem Header="Opslaan" Click="Opslaan_Click"/>
+                <MenuItem Header="Laden" Click="Laden_Click"/>
+                <MenuItem x:Name="RecenteProjectenMenu" Header="Recent geopend" SubmenuOpened="RecenteProjectenMenu_SubmenuOpened"/>
+                <MenuItem Header="Nieuw" Click="Nieuw_Click"/>
+                <Separator/>
+                <MenuItem Header="Oudere backup openen..." Click="OudereBackupOpenen_Click"/>
+                <Separator/>
+                <MenuItem Header="Exporteer als afbeelding" Click="Exporteren_Click"/>
+                <Separator/>
+                <MenuItem Header="Verberg dit venster (terug naar kijkscherm)" Click="VerbergBlokkenschema_Click"/>
+                <MenuItem Header="Programma afsluiten" Click="ProgrammaAfsluiten_Click"/>
+            </MenuItem>
+            <MenuItem Header="_Vensters">
+                <MenuItem Header="Baanontwerp openen" Click="OpenBaanontwerp_Click"/>
+                <MenuItem Header="Baanoverzicht (kijk-modus)" Click="OpenBaanoverzichtKijkModus_Click"/>
+                <MenuItem Header="Treinroutes" Click="OpenTreinroutes_Click"/>
+            </MenuItem>
+            <MenuItem Header="_Beheren">
+                <MenuItem Header="Treintypes beheren" Click="TreintypesBeheren_Click"/>
+                <MenuItem Header="Treinen beheren" Click="TreinenBeheren_Click"/>
+                <MenuItem Header="Richtingsverboden beheren" Click="RichtingsverbodenBeheren_Click"/>
+                <MenuItem Header="Stopverboden beheren" Click="StopverbodenBeheren_Click"/>
+                <MenuItem Header="Stopverbod stilstand beheren" Click="StopverbodStilstandBeheren_Click"/>
+                <MenuItem Header="Overzicht beperkingen" Click="OverzichtBeperkingen_Click"/>
+                <MenuItem Header="Blokgroepen beheren" Click="BlokgroepenBeheren_Click"/>
+                <MenuItem Header="Relaties beheren" Click="RelatiesBeheren_Click"/>
+                <MenuItem Header="Acties beheren" Click="ActiesBeheren_Click"/>
+                <MenuItem Header="Algemene instellingen" Click="AlgemeneInstellingenBeheren_Click"/>
+                <MenuItem Header="Incidenten en wijzigingen" Click="OnderhoudBeheren_Click"/>
+                <MenuItem Header="Dashboard" Click="DashboardTonen_Click"/>
+                <MenuItem Header="Controleer mijn baan" Click="BaanControleren_Click"/>
+                <Separator/>
+                <MenuItem Header="Kleurenschema aanpassen" Click="KleurenschemaAanpassen_Click"/>
+                <MenuItem Header="Hardware-interface" Click="HardwareInterface_Click"/>
+                <MenuItem Header="Hardware-communicatielog" Click="HardwareLogTonen_Click"/>
+                <MenuItem Header="Rijstroom-adres zoeken..." Click="AdresZoeken_Click"/>
+                <MenuItem Header="Wisseladres zoeken..." Click="WisselAdresZoeken_Click"/>
+                <MenuItem Header="Meldpuntenverkenner..." Click="MeldpuntenVerkenner_Click"/>
+                <MenuItem Header="Geleerde reistijden bekijken..." Click="GeleerdeReistijdenBekijken_Click" ToolTip="Toont per blok de reistijd die de software zelf gemeten heeft van echte bezetmeldingen."/>
+                <MenuItem Header="Geleerde reistijden wissen..." Click="GeleerdeReistijdenWissen_Click" ToolTip="Wist Blok.GeleerdeReistijdSeconden voor alle blokken - gebruik dit als een eerdere, afwijkende meting (bijv. van vóór een software-update) een veiligheidsdrempel te kort heeft gemaakt."/>
+                <Separator/>
+                <MenuItem Header="Gebruikers beheren..." Click="GebruikersBeheren_Click"/>
+            </MenuItem>
+            <MenuItem Header="_Geselecteerd blok">
+                <MenuItem Header="Loc plaatsen" Click="LocPlaatsen_Click"/>
+                <MenuItem Header="Loc weghalen" Click="LocWeghalen_Click"/>
+                <Separator/>
+                <MenuItem Header="Handmatig bezetten/vrijgeven" Click="HandmatigBezet_Click"/>
+                <MenuItem Header="Foutmelding zetten/opheffen" Click="Foutmelding_Click"/>
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="Gebruiksaanwijzing" InputGestureText="F1" Click="Gebruiksaanwijzing_Click"/>
+                <MenuItem Header="Over Modeltreinbesturing" Click="OverProgramma_Click"/>
+            </MenuItem>
+        </Menu>
+        <TextBlock DockPanel.Dock="Top" Margin="8" TextWrapping="Wrap"
+                   Text="Rechtermuisknop op een lege plek: nieuw blok. Sleep een blok bovenop een ander blok: relatie (rijrichting). Ctrl+sleep een blok met een geplaatste loc naar een DIRECT verbonden blok: loc daarheen verplaatsen en automatisch laten rijden. Sleep een blok naar een lege plek: verplaatsen. Klik een blok aan en druk Delete: verwijderen. Dubbelklik een blok: eigenschappen (omschrijving, bezetmeldpunten)." />
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="8,0,8,8">
+            <TextBlock Text="Ga naar blok:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBox x:Name="GaNaarBlokBox" Width="80" KeyDown="GaNaarBlokBox_KeyDown"/>
+            <Button Content="Ga" Padding="8,2" Margin="6,0,0,0" Click="GaNaarBlok_Click"/>
+        </StackPanel>
+        <ScrollViewer x:Name="SchemaScrollViewer" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+            <Canvas x:Name="SchemaCanvas" Background="White" Width="3000" Height="3000"
+                    MouseRightButtonDown="SchemaCanvas_MouseRightButtonDown"
+                    MouseLeftButtonDown="SchemaCanvas_MouseLeftButtonDown"
+                    MouseMove="SchemaCanvas_MouseMove"
+                    MouseLeftButtonUp="SchemaCanvas_MouseLeftButtonUp" />
+        </ScrollViewer>
+    </DockPanel>
+</Window>

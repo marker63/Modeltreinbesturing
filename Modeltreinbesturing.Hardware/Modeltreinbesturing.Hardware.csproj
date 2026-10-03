@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Gedeelde hardwarebibliotheek: gebruikt door zowel Modeltreinbesturing als de
+       Baanverkenner. Een fix in bijv. DinamoHardware hoeft zo maar op één plek. Bewust
+       net8.0 (geen -windows): bevat geen WPF, alleen seriële communicatie. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Modeltreinbesturing.Hardware</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.IO.Ports" Version="8.0.0" />
+  </ItemGroup>
+
+</Project>

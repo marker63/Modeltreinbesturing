@@ -1,0 +1,188 @@
+<Window x:Class="Modeltreinbesturing.BaanontwerpWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Modeltreinbesturing - Baanontwerp" Height="700" Width="1100" MinHeight="450" MinWidth="850"
+        KeyDown="Window_KeyDown">
+    <DockPanel>
+        <!-- Gebruikersverzoek: "in alle schermen een programma afsluiten in de menubalk" -
+             dit venster had in bouw-modus voorheen HELEMAAL geen menubalk (puur de
+             werkbalk hieronder, met een "Sluiten"-knop die alleen DIT venster sluit, niet
+             de hele applicatie) - vandaar dit kleine, ALTIJD zichtbare menu (in
+             tegenstelling tot KijkModusMenu hieronder, dat alleen in kijk-modus zin heeft).-->
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_Programma">
+                <MenuItem Header="Programma afsluiten" Click="ProgrammaAfsluiten_Click"/>
+            </MenuItem>
+        </Menu>
+        <ScrollViewer x:Name="WerkbalkScrollViewer" DockPanel.Dock="Top" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+            <StackPanel Orientation="Horizontal" Margin="6" Background="#EEE">
+                <RadioButton x:Name="ToolVerplaatsen" Content="Verplaatsen" GroupName="Tool" IsChecked="True" Margin="4" Checked="Tool_Checked"/>
+                <RadioButton x:Name="ToolLijn" Content="Lijn" GroupName="Tool" Margin="4" Checked="Tool_Checked"/>
+                <RadioButton x:Name="ToolWissel" Content="Wissel" GroupName="Tool" Margin="4" Checked="Tool_Checked"/>
+                <RadioButton x:Name="ToolSein" Content="Sein" GroupName="Tool" Margin="4" Checked="Tool_Checked"/>
+                <RadioButton x:Name="ToolStootblok" Content="Stootblok" GroupName="Tool" Margin="4" Checked="Tool_Checked"/>
+                <RadioButton x:Name="ToolPerron" Content="Perron" GroupName="Tool" Margin="4" Checked="Tool_Checked"/>
+                <RadioButton x:Name="ToolTekst" Content="Tekst" GroupName="Tool" Margin="4" Checked="Tool_Checked"/>
+                <RadioButton x:Name="ToolSchakelaar" Content="Schakelaar" GroupName="Tool" Margin="4" Checked="Tool_Checked"/>
+                <RadioButton x:Name="ToolPijl" Content="Pijl" GroupName="Tool" Margin="4" Checked="Tool_Checked"/>
+                <RadioButton x:Name="ToolOntkoppelrail" Content="Ontkoppelrail" GroupName="Tool" Margin="4" Checked="Tool_Checked"/>
+                <RadioButton x:Name="ToolBezetmelder" Content="Bezetmelder" GroupName="Tool" Margin="4" Checked="Tool_Checked"/>
+                <RadioButton x:Name="ToolOverloopwissel" Content="Overloopwissel koppelen" GroupName="Tool" Margin="4" Checked="Tool_Checked"/>
+                <RadioButton x:Name="ToolDriewegwissel" Content="Driewegwissel" GroupName="Tool" Margin="4" Checked="Tool_Checked"/>
+                <RadioButton x:Name="ToolKruiswissel" Content="Kruiswissel" GroupName="Tool" Margin="4" Checked="Tool_Checked"/>
+                <RadioButton x:Name="ToolEngelseWissel" Content="Engelse wissel" GroupName="Tool" Margin="4" Checked="Tool_Checked"/>
+                <RadioButton x:Name="ToolKoppelen" Content="Koppelen aan blok" GroupName="Tool" Margin="4" Checked="Tool_Checked"/>
+                <RadioButton x:Name="ToolWisselstraat" Content="Wisselstraat" GroupName="Tool" Margin="4" Checked="Tool_Checked"/>
+                <Button Content="↶ Ongedaan maken" Padding="8,4" Margin="8,4,4,4" Click="OngedaanMaken_Click" ToolTip="Geeft het laatst verwijderde symbool terug (sneltoets: Ctrl+Z)."/>
+                <Button Content="↷ Opnieuw" Padding="8,4" Margin="4" Click="OpnieuwUitvoeren_Click" ToolTip="Verwijdert het laatst-ongedaan-gemaakte symbool opnieuw (sneltoets: Ctrl+Y)."/>
+                <Button Content="Wisselstraten beheren" Padding="8,4" Margin="8,4,4,4" Click="WisselstratenBeheren_Click"/>
+                <Button Content="Test alle wissels" Padding="8,4" Margin="4" Click="WisselTest_Click"/>
+                <Button Content="Seinen beheren" Padding="8,4" Margin="4" Click="SeinenBeheren_Click"/>
+                <Button Content="Loc plaatsen" Padding="8,4" Margin="8,4,4,4" Click="LocPlaatsen_Click"/>
+                <Button Content="Loc weghalen" Padding="8,4" Margin="4" Click="LocWeghalen_Click"/>
+                <Button Content="Exporteer als afbeelding" Padding="8,4" Margin="4" Click="Exporteren_Click"/>
+                <Button Content="Sluiten" Padding="8,4" Margin="16,4,4,4" Click="Sluiten_Click"/>
+                <Button Content="Help (F1)" Padding="8,4" Margin="4" Click="Gebruiksaanwijzing_Click"/>
+                <CheckBox x:Name="ToonRasterBox" Content="Toon raster" VerticalAlignment="Center" Margin="16,4,4,4" Checked="ToonRaster_Changed" Unchecked="ToonRaster_Changed"/>
+                <CheckBox x:Name="UitlijnenOpRasterBox" Content="Uitlijnen op raster" VerticalAlignment="Center" Margin="8,4,4,4" IsChecked="True"/>
+            </StackPanel>
+        </ScrollViewer>
+        <!-- Alleen zichtbaar in kijk-modus: toegang tot de bouwschermen, die anders
+             onbereikbaar zijn geworden nu MainWindow standaard verborgen blijft. -->
+        <Menu x:Name="KijkModusMenu" DockPanel.Dock="Top" Visibility="Collapsed">
+            <MenuItem Header="_Bouwschermen">
+                <MenuItem Header="Blokkenschema" Click="OpenBlokkenschema_Click"/>
+                <MenuItem Header="Baanontwerp (bewerken)" Click="OpenBaanontwerpBewerken_Click"/>
+                <MenuItem Header="Treinroutes" Click="OpenTreinroutesVanuitKijkscherm_Click"/>
+            </MenuItem>
+            <MenuItem Header="Incidenten en wijzigingen" Click="OnderhoudVanuitKijkscherm_Click"
+                      ToolTip="Bekijk de onderhoudslog per object, of meld zelf een incident/wijziging - geen inloggen nodig."/>
+            <MenuItem Header="Dashboard" Click="DashboardVanuitKijkscherm_Click"/>
+            <MenuItem Header="Exporteer als afbeelding" Click="Exporteren_Click"/>
+            <MenuItem Header="Over Modeltreinbesturing" Click="OverProgrammaVanuitKijkscherm_Click"/>
+        </Menu>
+        <TextBlock x:Name="StatusTekst" DockPanel.Dock="Top" Margin="6,0,6,6" Foreground="DarkSlateGray" TextWrapping="Wrap"/>
+        <!-- GEBRUIKERSVERZOEK ("Koploper kan een melding geven als hij kortsluiting ziet,
+             kan je die ook toevoegen?") - duidelijk zichtbare banner, i.p.v. dat dit alleen
+             in de (verborgen) Hardware-communicatielog verschijnt. Staat standaard
+             ingeklapt (Visibility=Collapsed) en wordt alleen getoond zolang Dinamo's eigen
+             foutstatus (F-bit, dekt kortsluiting) actief is - zie
+             HardwareBeheerder.KortsluitingStatusGewijzigd. -->
+        <Border x:Name="KortsluitingBanner" DockPanel.Dock="Top" Background="#C0392B" Padding="10,6" Margin="6,0,6,6" Visibility="Collapsed">
+            <TextBlock Text="⚠ Dinamo meldt een fout op het spoor (mogelijk kortsluiting) - dit is puur informatief, Dinamo blijft gewoon rijspanning geven en alle treinen rijden door." Foreground="White" FontWeight="Bold" TextWrapping="Wrap"/>
+        </Border>
+        <StackPanel x:Name="TabbladenBalk" DockPanel.Dock="Top" Orientation="Horizontal" Margin="6,0,6,6"/>
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="6,0,6,6">
+            <TextBlock Text="Ga naar blok:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBox x:Name="GaNaarBlokBox" Width="80" KeyDown="GaNaarBlokBox_KeyDown"/>
+            <Button Content="Ga" Padding="8,2" Margin="6,0,0,0" Click="GaNaarBlok_Click"/>
+        </StackPanel>
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="6,0,6,6">
+            <TextBlock Text="Zoeken (blok/wissel/sein-adres of loc-naam):" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <TextBox x:Name="ZoekBox" Width="180" KeyDown="ZoekBox_KeyDown"/>
+            <Button Content="Zoek" Padding="8,2" Margin="6,0,16,0" Click="Zoeken_Click"/>
+            <Button Content="Toon vrije opstelsporen" Padding="8,2" Click="ToonVrijeOpstelsporen_Click"
+                    ToolTip="Handig bij het wegzetten van meerdere locs aan het eind van een sessie."/>
+        </StackPanel>
+        <!-- Alleen zichtbaar in kijk-modus: bulk-bediening voor alle treinen tegelijk, plus
+             de individuele loc-uit-blok-knop (werkt op de geselecteerde regel in het
+             Overzicht locomotieven hieronder) - hier bewust in dezelfde, al goed zichtbare
+             rij gezet i.p.v. onderin het smalle zijpaneel, waar 'm blijkbaar makkelijk over
+             het hoofd werd gezien. -->
+        <StackPanel x:Name="AlleTreinenKnoppenBalk" DockPanel.Dock="Top" Orientation="Horizontal" Margin="6,0,6,10" Visibility="Collapsed">
+            <Button Content="▶ Go (alle treinen)" Padding="10,5" Margin="0,0,8,0" Background="ForestGreen" Foreground="White" FontWeight="Bold" Click="AlleTreinenGaanRijden_Click" ToolTip="Alle rijdende treinen laten vertrekken naar hun volgende blok."/>
+            <Button Content="🅿 Opstellen (alle treinen)" Padding="10,5" Margin="0,0,8,0" Background="SteelBlue" Foreground="White" FontWeight="Bold" Click="AlleTreinenOpstellen_Click" ToolTip="Elke geplaatste loc naar het dichtstbijzijnde vrije opstelspoor sturen."/>
+            <Button Content="⛔ Stop (alle op bestemming)" Padding="10,5" Margin="0,0,8,0" Background="Firebrick" Foreground="White" FontWeight="Bold" Click="AlleTreinenStoppen_Click" ToolTip="Stopt ALLE rijdende treinen direct (ook onderweg, niet alleen al aangekomen op hun bestemming) - inclusief een expliciet stopcommando naar elke bekende, geplaatste loc."/>
+            <Button Content="🅾 Rustig stoppen (einde rijweg)" Padding="10,5" Margin="0,0,8,0" Background="DarkGoldenrod" Foreground="White" FontWeight="Bold" Click="AlleTreinenRustigStoppen_Click" ToolTip="GEEN noodstop: elke rijdende trein maakt zijn huidige, al ingezette stap gewoon af en stopt daarna netjes - niet halverwege een overgang."/>
+            <Button Content="🚫 Loc uit blok halen" Padding="10,5" Background="DarkOrange" Foreground="White" FontWeight="Bold" Click="LocVerwijderen_Click" ToolTip="Haalt de in het Overzicht locomotieven hieronder GESELECTEERDE loc van zijn blok af (bijv. omdat hij defect is) - de loc zelf blijft gewoon in de lijst staan."/>
+        </StackPanel>
+        <!-- Alleen zichtbaar in kijk-modus: simulatiesnelheid, ook meteen aanpasbaar terwijl
+             er treinen rijden. Werkt hetzelfde als de knoppenbalk erboven, dus ook gewoon
+             zonder login te gebruiken. -->
+        <StackPanel x:Name="SimulatiesnelheidBalk" DockPanel.Dock="Top" Orientation="Horizontal" Margin="6,0,6,10" Visibility="Collapsed">
+            <TextBlock Text="Simulatiesnelheid:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <RadioButton x:Name="SnelheidSnelBox" Content="Snel (2x)" GroupName="Simulatiesnelheid" VerticalAlignment="Center" Margin="0,0,10,0" Checked="Simulatiesnelheid_Changed"/>
+            <RadioButton x:Name="SnelheidNormaalBox" Content="Normaal" GroupName="Simulatiesnelheid" VerticalAlignment="Center" Margin="0,0,10,0" IsChecked="True" Checked="Simulatiesnelheid_Changed"/>
+            <RadioButton x:Name="SnelheidLangzaamBox" Content="Langzaam (2x)" GroupName="Simulatiesnelheid" VerticalAlignment="Center" Margin="0,0,10,0" Checked="Simulatiesnelheid_Changed"/>
+            <RadioButton x:Name="SnelheidZeerLangzaamBox" Content="Zeer langzaam (4x)" GroupName="Simulatiesnelheid" VerticalAlignment="Center" Checked="Simulatiesnelheid_Changed"/>
+        </StackPanel>
+        <!-- Alleen zichtbaar in kijk-modus: standaard uitroltijd (Koploper's "berekende
+             stopplaats na... cm", hier als tijd-equivalent). Losse rij i.p.v. bij de
+             simulatiesnelheid, want dit is een database-brede instelling, geen live-toggle. -->
+        <StackPanel x:Name="UitrolBalk" DockPanel.Dock="Top" Orientation="Horizontal" Margin="6,0,6,10" Visibility="Collapsed">
+            <TextBlock Text="Standaard uitroltijd bij stoppen (sec):" VerticalAlignment="Center" Margin="0,0,8,0" TextWrapping="Wrap" Width="220"/>
+            <TextBox x:Name="StandaardUitrolBox" Width="50" Margin="0,0,8,0"/>
+            <Button Content="Zet" Padding="8,4" Margin="0,0,16,0" Click="StandaardUitrolZetten_Click" ToolTip="Hoe lang een trein na het bereiken van de stopmelder nog nodig heeft om écht stil te staan (net als Koploper's 'berekende stopplaats na... cm', hier als tijd i.p.v. cm). Een blok kan dit individueel overschrijven bij de blokeigenschappen."/>
+            <CheckBox x:Name="GeluidenIngeschakeldBox" Content="Geluiden aan" VerticalAlignment="Center" Margin="0,0,6,0" Checked="GeluidenToggle_Changed" Unchecked="GeluidenToggle_Changed"
+                      ToolTip="Koploper's 'alle geluiden en rookgeneratoren van treinen in- of uitschakelen' - schakelt de .wav-geluiden van loc-functies aan/uit op DIT toestel."/>
+            <Slider x:Name="VolumeSlider" Width="70" Minimum="0" Maximum="100" VerticalAlignment="Center" Margin="0,0,16,0" ValueChanged="VolumeSlider_ValueChanged" ToolTip="Volume van loc-functiegeluiden."/>
+            <CheckBox x:Name="DonkereModusBox" Content="Donkere modus" VerticalAlignment="Center" Margin="0,0,16,0" Checked="DonkereModusToggle_Changed" Unchecked="DonkereModusToggle_Changed"
+                      ToolTip="Prettiger bij een gedimde treinkamer - past de achtergrond en spoorkleur van dit kijkscherm aan."/>
+            <CheckBox x:Name="BeursModusBox" Content="Beursmodus" VerticalAlignment="Center" Checked="BeursModusToggle_Changed" Unchecked="BeursModusToggle_Changed"
+                      ToolTip="Voor onbemand doordraaien op een tentoonstelling/clubavond: elke 15 seconden wordt automatisch (zonder melding) een nieuwe rit gestart voor elke geplaatste loc die stilstaat - net als steeds zelf op 'Go' klikken, maar dan vanzelf."/>
+        </StackPanel>
+        <!-- Alleen zichtbaar in kijk-modus (zie code-behind): het "Overzicht locomotieven"
+             als vast onderdeel van hetzelfde venster, i.p.v. een los venster - zo heb je als
+             eindgebruiker maar één scherm nodig: de baan zelf plús de treinenlijst om
+             vandaaruit naar een blok te slepen. VÓÓR het canvas gezet en met een vaste
+             DockPanel.Dock="Right" - het canvas komt daarna als LAATSTE, ongedockte child,
+             zodat dat automatisch de rest van de ruimte vult i.p.v. dat het 3000x3000-canvas
+             (zonder eigen vaste breedte) dit paneel bijna tot nul zou samendrukken. Breder
+             dan de eerste versie (320->460): de GridView-kolommen samen waren breder dan het
+             paneel zelf, waardoor tekst afgekapt werd. -->
+        <DockPanel x:Name="LocOverzichtPaneel" DockPanel.Dock="Right" Width="460" Margin="8,0,0,0" Visibility="Collapsed">
+            <DockPanel DockPanel.Dock="Top">
+                <Button DockPanel.Dock="Right" Content="Kolommen..." Padding="6,2" Click="LocKolommen_Click"
+                        ToolTip="Kies welke kolommen zichtbaar zijn in het overzicht hieronder."/>
+                <TextBlock Text="Overzicht locomotieven" FontWeight="Bold"/>
+            </DockPanel>
+            <TextBlock DockPanel.Dock="Top" Margin="0,4,0,8" TextWrapping="Wrap" FontSize="11" Foreground="DimGray"
+                       Text="Sleep een loc naar een blok om 'm daar neer te zetten. Sleep naar een ANDER blok dan waar hij al staat: de loc zoekt dan zelf zijn weg daarnaartoe (rekening houdend met richtingsverboden en andere beperkingen) en gaat automatisch rijden."/>
+            <ListView x:Name="LocLijst" DockPanel.Dock="Top"
+                      PreviewMouseLeftButtonDown="LocLijst_PreviewMouseLeftButtonDown"
+                      PreviewMouseMove="LocLijst_PreviewMouseMove"
+                      SelectionChanged="LocLijst_SelectionChanged">
+                <!-- GEEN vaste kolommen hier - LocLijst.View wordt bij het opstarten en na
+                     elke wijziging in het "Kolommen..."-scherm programmatisch opgebouwd
+                     (zie BaanontwerpWindow.xaml.cs: BouwLocLijstKolommen), want dat is de
+                     enige manier om de kolomkeuze pas ten tijde van uitvoeren aan te
+                     kunnen passen. -->
+            </ListView>
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,6,0,0">
+                <Button Content="⏸ Pauzeren" Padding="8,4" Margin="0,0,6,0" Click="LocPauzeren_Click"
+                        ToolTip="Stopt ALLEEN de geselecteerde loc, zonder 'm uit zijn blok te halen - het blok blijft bezet en reserveringen verderop blijven staan. Andere treinen rijden gewoon door."/>
+                <Button Content="▶ Hervatten" Padding="8,4" Margin="0,0,6,0" Click="LocHervatten_Click"
+                        ToolTip="Laat een gepauzeerde loc exact vanaf hetzelfde punt verder rijden."/>
+                <Button Content="Reservering opheffen" Padding="8,4" Click="LocReserveringOpheffen_Click"
+                        ToolTip="De loc blijft op zijn huidige blok staan, maar alle nog niet bereikte, gereserveerde blokken verderop komen vrij - de geplande rit vervalt (kan niet meer hervat worden, wel een nieuwe rit starten)."/>
+            </StackPanel>
+            <Border DockPanel.Dock="Top" BorderBrush="DimGray" BorderThickness="0,1,0,0" Margin="0,8,0,0" Padding="0,8,0,0">
+                <StackPanel>
+                    <TextBlock Text="Handmatig rijden (geselecteerde loc)" FontWeight="Bold" Margin="0,0,0,4"/>
+                    <TextBlock x:Name="HandmatigRijdenInfoTekst" TextWrapping="Wrap" FontSize="11" Foreground="DimGray" Margin="0,0,0,6" Text="Selecteer eerst een geplaatste loc hierboven."/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <RadioButton x:Name="VooruitBox" Content="Vooruit" GroupName="HandmatigeRijrichting" IsChecked="True" Margin="0,0,16,0" Checked="HandmatigeSnelheid_Changed"/>
+                        <RadioButton x:Name="AchteruitBox" Content="Achteruit" GroupName="HandmatigeRijrichting" Checked="HandmatigeSnelheid_Changed"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <TextBlock Text="Stap:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <Slider x:Name="HandmatigeStapSlider" Width="220" Minimum="0" Maximum="28" TickFrequency="1" IsSnapToTickEnabled="True" ValueChanged="HandmatigeSnelheid_Changed"/>
+                        <TextBlock x:Name="HandmatigeStapTekst" Text="0" Width="24" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                    <Button Content="⛔ Stop deze loc" Padding="8,4" HorizontalAlignment="Left" Click="HandmatigStoppen_Click"/>
+                </StackPanel>
+            </Border>
+        </DockPanel>
+        <Canvas x:Name="StatistiekGrafiekCanvas" DockPanel.Dock="Bottom" Height="70" Background="#1E1E1E"
+                Visibility="Collapsed" SizeChanged="StatistiekGrafiekCanvas_SizeChanged"
+                ToolTip="Statistiekgrafiek (laatste 5 minuten): wit gestreept = daggemiddelde aantal rijdende locs, geel = actueel aantal rijdende locs, blauw = aantal locs stilstaand in een blok."/>
+        <ScrollViewer x:Name="BaanScrollViewer" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+            <Canvas x:Name="BaanCanvas" Background="White" Width="3000" Height="3000"
+                    AllowDrop="True" Drop="BaanCanvas_Drop"
+                    MouseLeftButtonDown="BaanCanvas_MouseLeftButtonDown"
+                    MouseMove="BaanCanvas_MouseMove"
+                    MouseLeftButtonUp="BaanCanvas_MouseLeftButtonUp"
+                    MouseRightButtonDown="BaanCanvas_MouseRightButtonDown"/>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

@@ -1,0 +1,18 @@
+<Window x:Class="Modeltreinbesturing.LoginDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Inloggen" Width="340" SizeToContent="Height"
+        WindowStartupLocation="CenterScreen" ResizeMode="NoResize">
+    <StackPanel Margin="16">
+        <TextBlock TextWrapping="Wrap" Margin="0,0,0,12"
+                   Text="De bouwschermen (blokkenschema, baanontwerp, treinroutes) zijn alleen toegankelijk voor een geregistreerd account. Het kijkscherm blijft gewoon vrij toegankelijk."/>
+        <TextBlock Text="Gebruikersnaam:" Margin="0,0,0,4"/>
+        <TextBox x:Name="NaamBox" Margin="0,0,0,10"/>
+        <TextBlock Text="Wachtwoord:" Margin="0,0,0,4"/>
+        <PasswordBox x:Name="WachtwoordBox" Margin="0,0,0,10" KeyDown="WachtwoordBox_KeyDown"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Inloggen" Padding="10,4" Margin="0,0,8,0" Click="Inloggen_Click" IsDefault="True"/>
+            <Button Content="Annuleren" Padding="10,4" IsCancel="True"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

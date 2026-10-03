@@ -1,0 +1,34 @@
+<Window x:Class="Modeltreinbesturing.BlokOverzichtDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Blokoverzicht" Height="540" Width="480"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <DockPanel Margin="12">
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0" HorizontalAlignment="Right">
+            <Button x:Name="OnderhoudKnop" Content="Onderhoud melden voor dit blok..." Padding="10,4" Margin="0,0,8,0" Click="OnderhoudMelden_Click"/>
+            <Button Content="Sluiten" Padding="10,4" Click="Sluiten_Click"/>
+        </StackPanel>
+        <TabControl>
+            <TabItem Header="Blok">
+                <TextBox x:Name="BlokTekst" IsReadOnly="True" TextWrapping="NoWrap" IsReadOnlyCaretVisible="True"
+                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                         BorderThickness="0" Background="Transparent" FontFamily="Consolas" Padding="4"/>
+            </TabItem>
+            <TabItem Header="Bezetmelders">
+                <TextBox x:Name="MeldersTekst" IsReadOnly="True" TextWrapping="NoWrap" IsReadOnlyCaretVisible="True"
+                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                         BorderThickness="0" Background="Transparent" FontFamily="Consolas" Padding="4"/>
+            </TabItem>
+            <TabItem Header="Status">
+                <TextBox x:Name="StatusOverzichtTekst" IsReadOnly="True" TextWrapping="NoWrap" IsReadOnlyCaretVisible="True"
+                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                         BorderThickness="0" Background="Transparent" FontFamily="Consolas" Padding="4"/>
+            </TabItem>
+            <TabItem Header="Loc">
+                <TextBox x:Name="LocTekst" IsReadOnly="True" TextWrapping="NoWrap" IsReadOnlyCaretVisible="True"
+                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                         BorderThickness="0" Background="Transparent" FontFamily="Consolas" Padding="4"/>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</Window>

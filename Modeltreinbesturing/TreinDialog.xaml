@@ -1,0 +1,151 @@
+<Window x:Class="Modeltreinbesturing.TreinDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Treinen beheren" Height="700" Width="680" MinHeight="420" MinWidth="600"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize" ShowInTaskbar="False">
+    <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Top" Margin="0,0,0,8" TextWrapping="Wrap"
+                   Text="Individuele treinen - elk hoort bij een treintype (bepaalt de snelheid) en heeft een eigen lengte (bepaalt of hij in een blok past)."/>
+        <ScrollViewer DockPanel.Dock="Bottom" VerticalScrollBarVisibility="Auto" MaxHeight="420">
+        <StackPanel Margin="0,8,0,0">
+            <TextBlock Text="Geselecteerde trein:" FontWeight="Bold" Margin="0,0,0,4"/>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                <TextBlock Text="Omschrijving:" Width="90" VerticalAlignment="Center"/>
+                <TextBox x:Name="OmschrijvingBox" Width="220"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                <TextBlock Text="Foto:" Width="90" VerticalAlignment="Top"/>
+                <Image x:Name="FotoPreview" Width="50" Height="50" Stretch="UniformToFill" Margin="0,0,8,0"/>
+                <StackPanel VerticalAlignment="Center">
+                    <Button Content="Kies foto..." Padding="8,2" Click="FotoKiezen_Click" HorizontalAlignment="Left"/>
+                    <Button Content="Verwijderen" Padding="8,2" Margin="0,4,0,0" Click="FotoVerwijderen_Click" HorizontalAlignment="Left"/>
+                </StackPanel>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                <TextBlock Text="Decoderadres:" Width="90" VerticalAlignment="Center"/>
+                <TextBox x:Name="DecoderAdresBox" Width="80"/>
+                <TextBlock Text="dit nummer toont Koploper in het blokje, niet de naam" Margin="6,0,0,0" VerticalAlignment="Center" Foreground="DimGray" FontSize="10"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                <TextBlock Text="Decoderstappen:" Width="90" VerticalAlignment="Center"/>
+                <ComboBox x:Name="DecoderStappenCombo" Width="80">
+                    <ComboBoxItem Content="14"/>
+                    <ComboBoxItem Content="28"/>
+                    <ComboBoxItem Content="128"/>
+                </ComboBox>
+            </StackPanel>
+            <CheckBox x:Name="RangerenBox" Content="Rangeer-modus (massasimulatie tijdelijk uit)" Margin="90,0,0,4"/>
+            <CheckBox x:Name="OmgekeerdeRijrichtingBox" Content="Decoder is andersom geprogrammeerd (vooruit/achteruit omdraaien naar de hardware)" Margin="90,0,0,4"/>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                <TextBlock Text="Eigen accel./rem:" Width="90" VerticalAlignment="Center"/>
+                <TextBox x:Name="AccelaratieBox" Width="50" Margin="0,0,4,0"/>
+                <TextBlock Text="/" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <TextBox x:Name="RemBox" Width="50"/>
+                <TextBlock Text="sec (0/0 = gebruik treintype; Koploper kiest altijd de traagste van beide)" Margin="6,0,0,0" VerticalAlignment="Center" Foreground="DimGray" FontSize="10" TextWrapping="Wrap" Width="180"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                <TextBlock Text="Draaischijf:" Width="90" VerticalAlignment="Center"/>
+                <TextBox x:Name="DraaischijfAfstandBox" Width="80"/>
+                <TextBlock Text="cm doorrijden na 1e detectie op de brug (0 = geen draaischijf)" Margin="6,0,0,0" VerticalAlignment="Center" Foreground="DimGray" FontSize="10"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                <TextBlock Text="Treintype:" Width="90" VerticalAlignment="Center"/>
+                <ComboBox x:Name="TreintypeCombo" Width="220"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                <TextBlock Text="Lengte:" Width="90" VerticalAlignment="Center"/>
+                <TextBox x:Name="LengteBox" Width="80"/>
+                <TextBlock Text="cm" Margin="6,0,0,0" VerticalAlignment="Center"/>
+            </StackPanel>
+            <CheckBox x:Name="IsTreinstelBox" Content="Is (ook) een treinstel" Margin="90,0,0,8"/>
+            <CheckBox x:Name="MagNietKerenBox" Content="Mag nooit gedwongen keren (automatisch rijden)" Margin="90,0,0,8"
+                      ToolTip="Net als in de echte spoorwereld: een loc-getrokken trein mag niet zomaar achteruit rijden. HARDE regel, geen terugval - een kandidaat-vervolgblok dat uiteindelijk altijd op een kopspoor/Keer-relatie uitkomt wordt onvoorwaardelijk uitgesloten. Blijft er niets bruikbaars over, dan wacht de trein gewoon (keert nooit, ook niet als laatste redmiddel). Zet dit UIT voor rangeerbewegingen, waar keren wel moet kunnen."/>
+            <StackPanel Orientation="Horizontal" Margin="90,0,0,8">
+                <TextBlock Text="Rijstatistieken:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <TextBlock x:Name="RijstatistiekenTekst" VerticalAlignment="Center" Text="- / -" FontStyle="Italic" Margin="0,0,10,0"
+                           ToolTip="Cumulatieve rijtijd en afgelegde afstand van deze loc, net als iTrain's 'travelled time and distance indicators per loc' - handig voor onderhoudsplanning. Afstand telt alleen mee voor blokken waar een bloklengte is ingevuld."/>
+                <Button Content="Teller resetten" Padding="6,2" Margin="0,0,10,0" Click="RijstatistiekenResetten_Click"/>
+                <TextBlock Text="Onderhoud na (uren, 0=geen):" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <TextBox x:Name="OnderhoudDrempelBox" Width="40"
+                         ToolTip="Zodra de totale rijtijd dit aantal uren overschrijdt, signaleert het Dashboard dat deze loc onderhoud nodig heeft."/>
+            </StackPanel>
+            <CheckBox x:Name="GeijktBox" Content="Geijkte snelheid (i.p.v. de snelheid van het treintype) - stappentabel:" Margin="90,0,0,4"
+                      ToolTip="Het echte Koploper meet dit automatisch door de loc heen en weer te laten rijden tussen twee terugmeldsecties op een bekende afstand, van de hoogste decoderstap naar beneden totdat de loc kennelijk stilstaat. Wij hebben geen fysieke hardware om dat te meten, dus vul de tabel hieronder zelf in (of gebruik 'Genereer' als startpunt)."/>
+            <ListBox x:Name="StappentabelLijst" Margin="90,0,0,4" Height="90" HorizontalAlignment="Left" Width="200"/>
+            <StackPanel Orientation="Horizontal" Margin="90,0,0,4">
+                <TextBlock Text="Stap:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <TextBox x:Name="NieuweStapBox" Width="40" Margin="0,0,10,0"/>
+                <TextBlock Text="km/u:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <TextBox x:Name="NieuweStapSnelheidBox" Width="45" Margin="0,0,10,0"/>
+                <Button Content="Toevoegen/wijzigen" Padding="6,2" Margin="0,0,6,0" Click="StapToevoegen_Click"/>
+                <Button Content="Verwijderen" Padding="6,2" Click="StapVerwijderen_Click"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="90,0,0,8">
+                <TextBlock Text="Genereer lineaire reeks: hoogste stap" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <TextBox x:Name="GenereerHoogsteStapBox" Width="40" Margin="0,0,10,0"/>
+                <TextBlock Text="op" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <TextBox x:Name="GenereerMaxSnelheidBox" Width="45" Margin="0,0,4,0"/>
+                <TextBlock Text="km/u" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <Button Content="Genereer" Padding="6,2" Click="StappentabelGenereren_Click"/>
+            </StackPanel>
+            <Border BorderBrush="DimGray" BorderThickness="0,1,0,0" Margin="90,4,0,4" Padding="0,6,0,0">
+                <StackPanel>
+                    <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="DimGray" Margin="0,0,0,4"
+                               Text="Echte meting (zoals Koploper): meet de tijd tussen twee bezetmelders op een bekend traject en rekent dat om naar een schaalsnelheid. Werkt alleen zodra er echte hardware aangesloten is die deze bezetmelders daadwerkelijk stuurt. De bezetmelders/trajectlengte/modelschaal stel je eenmalig in bij Beheren -> Algemene instellingen (geldt voor alle locs, hoef je hier niet per loc te herhalen)."/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                        <Button Content="▶ Start meting" Padding="6,2" Margin="0,0,8,0" Background="ForestGreen" Foreground="White" Click="StartMeting_Click"/>
+                        <Button Content="⛔ Noodstop" Padding="6,2" Margin="0,0,8,0" Background="Firebrick" Foreground="White" Click="MetingNoodstop_Click"/>
+                        <TextBlock Text="Voor stap:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                        <TextBox x:Name="MetingStapBox" Width="40" Margin="0,0,10,0"/>
+                        <Button Content="Gebruik deze meting" Padding="6,2" Click="MetingGebruiken_Click"/>
+                    </StackPanel>
+                    <TextBlock x:Name="MetingStatusTekst" TextWrapping="Wrap" FontStyle="Italic" Text="Nog geen meting gestart."/>
+                </StackPanel>
+            </Border>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                <TextBlock Text="Dubbeltractie:" Width="90" VerticalAlignment="Center"/>
+                <ComboBox x:Name="KnechtCombo" Width="140" Margin="0,0,8,0"/>
+                <Button Content="Koppelen" Padding="8,4" Margin="0,0,8,0" Click="Koppelen_Click"/>
+                <Button Content="Ontkoppelen" Padding="8,4" Click="Ontkoppelen_Click"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal">
+                <Button Content="Wijzigingen opslaan" Padding="8,4" Margin="0,0,8,0" Click="Opslaan_Click"/>
+                <Button Content="Nieuwe trein" Padding="8,4" Margin="0,0,8,0" Click="Nieuw_Click"/>
+                <Button Content="Verwijderen" Padding="8,4" Margin="0,0,8,0" Click="Verwijderen_Click"/>
+                <Button Content="Exporteren..." Padding="8,4" Margin="0,0,8,0" Click="Exporteren_Click"/>
+                <Button Content="Importeren..." Padding="8,4" Margin="0,0,8,0" Click="Importeren_Click"/>
+                <Button Content="Materieellijst (CSV)..." Padding="8,4" Margin="0,0,8,0" Click="MaterieellijstExporteren_Click"
+                        ToolTip="Een leesbaar overzicht van al je locs (in Excel/Numbers/etc. te openen) - voor administratie, in tegenstelling tot 'Exporteren...' hierboven dat een technisch back-upformaat is."/>
+                <Button Content="Sluiten" Padding="8,4" Click="Sluiten_Click"/>
+            </StackPanel>
+        </StackPanel>
+        </ScrollViewer>
+        <DockPanel DockPanel.Dock="Right" Width="260" Margin="12,0,0,0">
+            <TextBlock DockPanel.Dock="Top" Text="Loc-functies" FontWeight="Bold" Margin="0,0,0,4"/>
+            <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,4"
+                       Text="Gaan automatisch 'af' (gelogd) op het gekozen moment tijdens het rijden - bijv. verlichting of hoorn. Vul een DCC-functienummer in om dit ook daadwerkelijk naar de decoder te sturen (met echte hardware), en/of koppel een .wav-bestand om het lokaal op de computer te laten klinken."/>
+            <StackPanel DockPanel.Dock="Bottom" Margin="0,4,0,0">
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBox x:Name="FunctieNaamBox" Width="110" Margin="0,0,4,0"/>
+                    <ComboBox x:Name="FunctieGebeurtenisCombo" Width="140"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="F-nr (leeg=geen):" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                    <TextBox x:Name="FunctieNummerBox" Width="40" Margin="0,0,10,0"/>
+                    <RadioButton x:Name="FunctieAanBox" Content="Aan" GroupName="FunctieAanUit" IsChecked="True" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                    <RadioButton x:Name="FunctieUitBox" Content="Uit" GroupName="FunctieAanUit" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBox x:Name="FunctieGeluidBox" Width="180" IsReadOnly="True" Margin="0,0,4,0"/>
+                    <Button Content="..." Padding="8,4" Click="FunctieGeluidKiezen_Click"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="Toevoegen" Padding="8,4" Margin="0,0,8,0" Click="FunctieToevoegen_Click"/>
+                    <Button Content="Verwijderen" Padding="8,4" Click="FunctieVerwijderen_Click"/>
+                </StackPanel>
+            </StackPanel>
+            <ListBox x:Name="FunctiesLijst"/>
+        </DockPanel>
+        <ListBox x:Name="TreinenLijst" SelectionChanged="TreinenLijst_SelectionChanged"/>
+    </DockPanel>
+</Window>

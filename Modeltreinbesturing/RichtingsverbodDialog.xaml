@@ -1,0 +1,33 @@
+<Window x:Class="Modeltreinbesturing.RichtingsverbodDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Richtingsverboden beheren" Height="440" Width="420"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Top" Margin="0,0,0,8" TextWrapping="Wrap"
+                   Text="Een richtingsverbod verbiedt dat een route van 'Van' naar 'Naar' rijdt - laat 'Uit' leeg voor altijd verboden, of kies een blok om het verbod alleen te laten gelden als de trein daarvandaan kwam."/>
+        <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+            <TextBlock Text="Nieuw verbod:" FontWeight="Bold" Margin="0,0,0,4"/>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                <TextBlock Text="Van:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <ComboBox x:Name="VanCombo" Width="80" Margin="0,0,10,0"/>
+                <TextBlock Text="Naar:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <ComboBox x:Name="NaarCombo" Width="80" Margin="0,0,10,0"/>
+                <TextBlock Text="Uit (optioneel):" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <ComboBox x:Name="UitCombo" Width="80"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                <TextBlock Text="Alleen voor treintype:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <ComboBox x:Name="TreintypeCombo" Width="140" Margin="0,0,4,0"/>
+                <Button Content="✕" Padding="6,4" Click="TreintypeWissen_Click" ToolTip="Treintype-keuze wissen (verbod geldt dan voor alle treintypes)"/>
+            </StackPanel>
+            <TextBlock Text="(geen treintype gekozen = geldt voor alle treintypes)" FontSize="11" Foreground="DimGray" Margin="0,0,0,8"/>
+            <StackPanel Orientation="Horizontal">
+                <Button Content="Toevoegen" Padding="8,4" Margin="0,0,8,0" Click="Toevoegen_Click"/>
+                <Button Content="Verwijderen" Padding="8,4" Margin="0,0,8,0" Click="Verwijderen_Click"/>
+                <Button Content="Sluiten" Padding="8,4" Click="Sluiten_Click"/>
+            </StackPanel>
+        </StackPanel>
+        <ListBox x:Name="VerbodenLijst"/>
+    </DockPanel>
+</Window>

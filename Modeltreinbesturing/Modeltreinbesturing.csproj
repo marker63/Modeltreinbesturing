@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Modeltreinbesturing</RootNamespace>
+    <!-- Toont in het "Over dit programma"-scherm (AboutDialog) - handmatig ophogen bij
+         een noemenswaardige release, geen automatische versienummering. -->
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- De hardware-koppelingen (Dinamo/Intellibox/DCC-EX/Simulatie) staan sinds de komst
+         van de Baanverkenner in een eigen, gedeelde bibliotheek. System.IO.Ports komt via
+         die projectverwijzing mee. -->
+    <ProjectReference Include="..\Modeltreinbesturing.Hardware\Modeltreinbesturing.Hardware.csproj" />
+  </ItemGroup>
+
+</Project>

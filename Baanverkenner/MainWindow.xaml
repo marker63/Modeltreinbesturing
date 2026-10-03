@@ -1,0 +1,247 @@
+<Window x:Class="Baanverkenner.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Baanverkenner - baan automatisch in kaart brengen"
+        Width="1280" Height="820" MinWidth="1050" MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        Closing="Window_Closing">
+    <Grid Margin="10">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="390"/>
+            <ColumnDefinition Width="12"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- ===================== Links: instellingen ===================== -->
+        <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="InstellingenPaneel">
+
+                <GroupBox Header="1. Verbinding">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition/>
+                                <RowDefinition/>
+                                <RowDefinition/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Style="{StaticResource Label}" Text="Centrale"/>
+                            <ComboBox x:Name="InterfaceCombo" Grid.Column="1" SelectionChanged="InterfaceCombo_SelectionChanged"/>
+                            <TextBlock x:Name="ComPoortLabel" Grid.Row="1" Style="{StaticResource Label}" Text="COM-poort"/>
+                            <ComboBox x:Name="ComPoortCombo" Grid.Row="1" Grid.Column="1" IsEditable="True"/>
+                            <TextBlock x:Name="SimSnelheidLabel" Grid.Row="2" Style="{StaticResource Label}" Text="Simulatie-tempo"/>
+                            <ComboBox x:Name="SimSnelheidCombo" Grid.Row="2" Grid.Column="1"/>
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <Button x:Name="VerbindenKnop" Content="Verbinden" Click="Verbinden_Click"/>
+                            <Button x:Name="OntkoppelenKnop" Content="Ontkoppelen" Click="Ontkoppelen_Click" IsEnabled="False"/>
+                        </StackPanel>
+                        <TextBlock x:Name="VerbindingStatus" Style="{StaticResource Uitleg}" Text="Niet verbonden."/>
+                    </StackPanel>
+                </GroupBox>
+
+                <GroupBox Header="2. Testloc">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Style="{StaticResource Label}" Text="Decoderadres"/>
+                        <TextBox x:Name="LocAdresBox" Grid.Column="1"/>
+                        <TextBlock Grid.Row="1" Style="{StaticResource Label}" Text="Rijstappen decoder"/>
+                        <ComboBox x:Name="LocStappenCombo" Grid.Row="1" Grid.Column="1"/>
+                        <TextBlock Grid.Row="2" Style="{StaticResource Label}" Text="Verkensnelheid (stap)"/>
+                        <TextBox x:Name="VerkensnelheidBox" Grid.Row="2" Grid.Column="1"/>
+                        <TextBlock Grid.Row="3" Style="{StaticResource Label}" Text="Kruipsnelheid (stap)"/>
+                        <TextBox x:Name="KruipsnelheidBox" Grid.Row="3" Grid.Column="1"/>
+                        <TextBlock Grid.Row="4" Grid.ColumnSpan="2" Style="{StaticResource Uitleg}"
+                                   Text="Gebruik een losse loc zonder wagons die goed door wissels rijdt. Houd de snelheid laag: bij een van achteren verkeerd staande wissel volgt een kortsluiting."/>
+                    </Grid>
+                </GroupBox>
+
+                <GroupBox Header="3. Wissels">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Style="{StaticResource Label}" Text="Adressen van"/>
+                        <TextBox x:Name="AdresVanBox" Grid.Column="1"/>
+                        <TextBlock Grid.Row="1" Style="{StaticResource Label}" Text="Adressen t/m"/>
+                        <TextBox x:Name="AdresTotBox" Grid.Row="1" Grid.Column="1"/>
+                        <TextBlock Grid.Row="2" Style="{StaticResource Label}" Text="Pauze na commando (ms)"/>
+                        <TextBox x:Name="WisselPauzeBox" Grid.Row="2" Grid.Column="1"/>
+                        <TextBlock Grid.Row="3" Grid.ColumnSpan="2" Style="{StaticResource Uitleg}"
+                                   Text="ALLE adressen in dit bereik worden één voor één omgezet - ook seinen en ontkoppelrails die op zo'n adres zitten."/>
+                    </Grid>
+                </GroupBox>
+
+                <GroupBox x:Name="DinamoGroep" Header="4. Dinamo">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="150"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Style="{StaticResource Label}" Text="Blokken"/>
+                        <TextBox x:Name="DinamoBlokkenBox" Grid.Column="1" ToolTip="Bijv. 1-16 of 1-8,12,20-24"/>
+                        <TextBlock Grid.Row="1" Style="{StaticResource Label}" Text="Hoogste meldernummer"/>
+                        <TextBox x:Name="HoogsteMelderBox" Grid.Row="1" Grid.Column="1"/>
+                        <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Style="{StaticResource Uitleg}"
+                                   Text="Bij Dinamo gaat een rijcommando via een blok. De verkenner zoekt per sectie zelf uit welk blok de loc van rijstroom voorziet door de blokken één voor één te proberen."/>
+                    </Grid>
+                </GroupBox>
+
+                <Expander Header="5. Tijden en veiligheid (geavanceerd)" Margin="0,0,0,10">
+                    <Grid Margin="4,6,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="230"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Style="{StaticResource Label}" Text="Max. seconden tussen melders"/>
+                        <TextBox x:Name="MaxSecBox" Grid.Column="1"/>
+                        <CheckBox x:Name="SlimmeTimeoutCheck" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,4" Content="Slimme wachttijd (3x langste gemeten reistijd)"/>
+                        <TextBlock Grid.Row="2" Style="{StaticResource Label}" Text="Min. seconden tussen melders"/>
+                        <TextBox x:Name="MinSecBox" Grid.Row="2" Grid.Column="1"/>
+                        <TextBlock Grid.Row="3" Style="{StaticResource Label}" Text="Geen melder bezet → kortsluiting na (s)"/>
+                        <TextBox x:Name="LegeMeldersBox" Grid.Row="3" Grid.Column="1"/>
+                        <TextBlock Grid.Row="4" Style="{StaticResource Label}" Text="Max. kortsluitingen per plek"/>
+                        <TextBox x:Name="MaxKortsluitBox" Grid.Row="4" Grid.Column="1"/>
+                        <TextBlock Grid.Row="5" Style="{StaticResource Label}" Text="Ontdenderen melders (ms)"/>
+                        <TextBox x:Name="OntdenderBox" Grid.Row="5" Grid.Column="1"/>
+                        <TextBlock Grid.Row="6" Style="{StaticResource Label}" Text="Blokproef bij start: max. s per blok"/>
+                        <TextBox x:Name="BlokLangBox" Grid.Row="6" Grid.Column="1"/>
+                        <TextBlock Grid.Row="7" Style="{StaticResource Label}" Text="Blokproef onderweg: max. s per blok"/>
+                        <TextBox x:Name="BlokKortBox" Grid.Row="7" Grid.Column="1"/>
+                        <TextBlock Grid.Row="8" Style="{StaticResource Label}" Text="Doorrijden vóór blokproef (s)"/>
+                        <TextBox x:Name="BlokInrijBox" Grid.Row="8" Grid.Column="1"/>
+                        <TextBlock Grid.Row="9" Style="{StaticResource Label}" Text="Extra melders na afwijking"/>
+                        <TextBox x:Name="ExtraMeldersBox" Grid.Row="9" Grid.Column="1"/>
+                        <CheckBox x:Name="BasisHerhalenCheck" Grid.Row="10" Grid.ColumnSpan="2" Margin="0,4" Content="Basisrit twee keer rijden ter controle"/>
+                        <TextBlock Grid.Row="11" Grid.ColumnSpan="2" Style="{StaticResource Uitleg}"
+                                   Text="Heeft je baan onbewaakte stukken (wissels zonder melder) waar de loc langer dan een paar seconden 'onzichtbaar' is, verhoog dan de kortsluittijd."/>
+                    </Grid>
+                </Expander>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- ===================== Rechts: bediening, voortgang, resultaat ===================== -->
+        <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <DockPanel Grid.Row="0" LastChildFill="False">
+                <Button x:Name="StartKnop" Content="▶  Start verkenning" Click="Start_Click" FontWeight="SemiBold" Background="#D9EFE7"/>
+                <Button x:Name="HervatVorigeKnop" Content="Vorige verkenning hervatten" Click="HervatVorige_Click"/>
+                <Button x:Name="PauzeKnop" Content="Pauze" Click="Pauze_Click" IsEnabled="False" MinWidth="80"/>
+                <Button x:Name="StopKnop" Content="Stoppen" Click="Stop_Click" IsEnabled="False"/>
+                <Button x:Name="NoodstopKnop" DockPanel.Dock="Right" Content="NOODSTOP" Click="Noodstop_Click"
+                        Background="#C62828" Foreground="White" FontWeight="Bold" FontSize="15" Padding="18,6" Margin="0"/>
+            </DockPanel>
+
+            <Border Grid.Row="1" Margin="0,10,0,10" Padding="12,8" BorderBrush="#DFE3EA" BorderThickness="1" CornerRadius="6" Background="#F6F7F9">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock x:Name="FaseTekst" FontSize="16" FontWeight="SemiBold" Text="Klaar om te starten"/>
+                        <TextBlock x:Name="BezigTekst" Foreground="#5D6678" TextWrapping="Wrap" Text="Kies de centrale, verbind, vul de testloc in en klik op Start."/>
+                        <StackPanel x:Name="LivePaneel" Orientation="Horizontal" Margin="0,8,0,0" IsEnabled="False">
+                            <TextBlock Text="Snelheid aanpassen tijdens de verkenning:   verken" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <TextBox x:Name="LiveVerkenBox" Width="45"/>
+                            <TextBlock Text="kruip" VerticalAlignment="Center" Margin="10,0,6,0"/>
+                            <TextBox x:Name="LiveKruipBox" Width="45"/>
+                            <Button x:Name="LiveToepassenKnop" Content="Toepassen" Click="LiveToepassen_Click" Margin="10,0,0,0" Padding="8,2"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <WrapPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock x:Name="TellerMelders" Margin="14,0,0,0" Text="Melders: 0"/>
+                        <TextBlock x:Name="TellerWissels" Margin="14,0,0,0" Text="Wissels: 0"/>
+                        <TextBlock x:Name="TellerAdressen" Margin="14,0,0,0" Text="Nog te testen adressen: -"/>
+                        <TextBlock x:Name="TellerOpdrachten" Margin="14,0,0,0" Text="Opdrachten: 0 / 0"/>
+                        <TextBlock x:Name="TellerKortsluit" Margin="14,0,0,0" Text="Kortsluitingen: 0"/>
+                        <TextBlock x:Name="TellerTijd" Margin="14,0,0,0" Text="Tijd: 0:00:00"/>
+                    </WrapPanel>
+                </Grid>
+            </Border>
+
+            <TabControl x:Name="Tabs" Grid.Row="2">
+                <TabItem Header="Logboek">
+                    <ListBox x:Name="LogLijst" FontFamily="Consolas" FontSize="12.5"
+                             VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Tekst}" Foreground="{Binding Kleur}" FontWeight="{Binding Gewicht}"/>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </TabItem>
+                <TabItem x:Name="ResultaatTab" Header="Resultaat">
+                    <TextBox x:Name="ResultaatBox" IsReadOnly="True" FontFamily="Consolas" FontSize="12.5"
+                             VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                             Text="Nog geen resultaat."/>
+                </TabItem>
+                <TabItem Header="Hardware-communicatie">
+                    <ListBox x:Name="HardwareLijst" FontFamily="Consolas" FontSize="12"
+                             VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Tekst}" Foreground="{Binding Kleur}" FontWeight="{Binding Gewicht}"/>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </TabItem>
+            </TabControl>
+
+            <WrapPanel Grid.Row="3" Margin="0,10,0,0">
+                <Button x:Name="RapportOpenenKnop" Content="Rapport bekijken" Click="RapportOpenen_Click" Margin="0,0,6,4"/>
+                <Button x:Name="RapportHtmlKnop" Content="Rapport opslaan (HTML)…" Click="RapportHtml_Click" Margin="0,0,6,4"/>
+                <Button x:Name="RapportTekstKnop" Content="Rapport opslaan (tekst)…" Click="RapportTekst_Click" Margin="0,0,6,4"/>
+                <Button x:Name="BaankaartKnop" Content="Baankaart opslaan (voor import)…" Click="Baankaart_Click" Margin="0,0,6,4"/>
+                <Button x:Name="LogOpslaanKnop" Content="Logboek opslaan…" Click="LogOpslaan_Click" Margin="0,0,6,4"/>
+                <Button x:Name="HardwareLogKnop" Content="Hardwarelog opslaan…" Click="HardwareLog_Click" Margin="0,0,6,4"/>
+            </WrapPanel>
+        </Grid>
+    </Grid>
+</Window>

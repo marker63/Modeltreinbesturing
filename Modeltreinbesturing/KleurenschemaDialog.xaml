@@ -1,0 +1,41 @@
+<Window x:Class="Modeltreinbesturing.KleurenschemaDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Kleurenschema aanpassen" Height="480" Width="420" MinHeight="360" MinWidth="380"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize" ShowInTaskbar="False">
+    <DockPanel Margin="16">
+        <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,8"
+                   Text="Zoals Koploper's eigen 'Instellingen per database' - tabblad kleuren. Wijzigingen gelden meteen in alle open vensters."/>
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="Kleurenblind-vriendelijk" Padding="10,4" Margin="0,0,8,0" Click="Kleurenblind_Click"
+                    ToolTip="Vervangt het rood/groen-contrast (het lastigst te onderscheiden bij kleurenblindheid) door een blauw/oranje-gebaseerd palet (Okabe-Ito), voor iedereen goed te onderscheiden."/>
+            <Button Content="Standaardkleuren herstellen" Padding="10,4" Margin="0,0,8,0" Click="Standaard_Click"/>
+            <Button Content="Sluiten" Padding="10,4" IsDefault="True" Click="Sluiten_Click"/>
+        </StackPanel>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ItemsControl x:Name="CategorieenLijst">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="160"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding Naam}" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Column="1" ItemsSource="{Binding Palet}" SelectedItem="{Binding HuidigeKleur, Mode=TwoWay}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Rectangle Width="16" Height="16" Fill="{Binding Kleur}" Stroke="Black" StrokeThickness="0.5" Margin="0,0,6,0"/>
+                                            <TextBlock Text="{Binding Naam}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</Window>
