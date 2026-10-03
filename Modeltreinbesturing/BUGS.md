@@ -261,6 +261,44 @@ tijdens normaal rijden, dit gaat over een expliciet, aanwijsbaar
 correctiemoment. De algemene coalescing-regel in `VerstuurDatagram` zelf is
 niet aangepast.
 
+## #31 - Aanhoudende Dinamo-foutstatus liet de verstuur-wachtrij dichtslibben met
+   tientallen identieke "Reset Fault"-commando's - alles werd daardoor traag,
+   de loc ging pas lang na het indrukken van "Go" rijden
+**Status:** Gefixt. Gebruikerswaarneming: "ik ben al weer uren bezig ... vanmorgen
+reed hij nog een aantal rondjes zonder problemen en nu staat hij weer constant
+stil ... ik vind alles enorm traag, de loc ging pas zeer laat rijden nadat ik op
+Go had gedrukt." Bytes-analyse van de hardware-log (111 sec sessie) liet een
+scheve verdeling zien: 190x "Reset Fault", 208x een niet-herkend periodiek
+melder-statusverzoek, maar maar 86x een echt snelheidscommando. Oorzaak:
+`StuurResetFault()` wordt (bewust, zie de toelichting daarbij) opnieuw
+aangeroepen op ELKE ontvangstcyclus zolang Dinamo's eigen F-bit=1 blijft staan -
+nodig omdat Dinamo anders voor altijd in foutmodus kan blijven hangen als de
+eerste reset nooit aankomt/verwerkt wordt. `VerstuurDatagram`'s dedup-check (die
+een BYTE-IDENTIEKE, nog niet verstuurde herhaling overslaat) gold echter
+UITSLUITEND voor commando's MET een snelheidsSleutel (decoderAdres+blokNummer) -
+Reset Fault heeft die sleutel niet. Resultaat: bij een fout die een tijdje
+aanhield (in dit log ruim 90 sec), stapelden zich tientallen identieke, nog
+niet verstuurde Reset Fault-pakketten op in de normale verstuur-wachtrij, ALLE
+vóór de inmiddels ook wachtende, echte snelheids-/wisselcommando's (zoals het
+commando dat "Go" zelf had moeten versturen) - die moesten vervolgens, via de
+200ms-per-pakket-cyclus, één voor één achter die hele stapel aansluiten voordat
+ze ooit verstuurd werden.
+**Fix:** de byte-identieke-dedup in `VerstuurDatagram` geldt nu ook voor
+commando's ZONDER sleutel (null == null telt als een geldige match) - er staat
+zo nooit meer dan ÉÉN nog niet verstuurde Reset Fault (of, voor
+`VraagMelderStatusOp`, twee aanvragen voor PRECIES dezelfde melder) in de
+wachtrij. De herhaal-semantiek zelf (net zo lang blijven proberen als de fout
+aanhoudt) blijft volledig intact: zodra die ene verstuurd is, mag de volgende
+ontvangstcyclus gewoon weer een nieuwe toevoegen als de fout nog steeds actief
+is - alleen de ONGECONTROLEERDE OPSTAPELING is weg.
+**Belangrijke nuance:** dit verklaart waarom "alles traag" aanvoelde en waarom
+"Go" lang op zich liet wachten, maar verklaart niet met zekerheid de losse
+melder-timeouts (melder 15/8 "niet ontvangen binnen 39 sec") uit hetzelfde log -
+dat kan zowel een (verder vertraagd) actief statusverzoek zijn geweest dat ook
+achter de stapel moest wachten, als een echt gemiste fysieke bezetmelding
+tijdens de aanhoudende Dinamo-foutstatus. Mocht een melder-timeout zich blijven
+herhalen NA deze fix, dan wijst dat eerder naar de tweede mogelijkheid.
+
 ---
 
 _Laatst bijgewerkt: zie git-historie van dit bestand zodra het project op

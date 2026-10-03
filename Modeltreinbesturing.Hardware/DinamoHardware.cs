@@ -555,8 +555,27 @@ public class DinamoHardware : IHardwareInterface
             // of overgeslagen - dat zou een echt vertrek- of stopcommando kunnen wissen dat
             // net iets eerder al klaarstond. Zo'n commando sluit gewoon, in volgorde,
             // achteraan aan.
-            if (snelheidsSleutel.HasValue &&
-                _teVersturen.Any(item => item.SnelheidsSleutel == snelheidsSleutel && item.Payload.AsSpan().SequenceEqual(payload)))
+            //
+            // BUG #31 (gebruikerswaarneming: "alles is enorm traag, de loc ging pas zeer
+            // laat rijden nadat ik op Go had gedrukt", gevonden tijdens een sessie met een
+            // langere, aanhoudende Dinamo-foutstatus): de dedup hierboven gold voorheen
+            // UITSLUITEND voor commando's MET een snelheidsSleutel. StuurResetFault (geen
+            // sleutel, geen prioriteit) wordt echter door Poort_DataReceived opnieuw
+            // aangeroepen op ELKE ontvangstcyclus zolang Dinamo's eigen F-bit=1 blijft
+            // staan (bewust zo ontworpen, zie StuurResetFault - dat moet ZO blijven voor
+            // een trage/verloren eerste reset). Zonder sleutel werd echter NOOIT gecontroleerd
+            // of er al een identieke, nog niet verstuurde Reset Fault in de wachtrij stond -
+            // dus bij een aanhoudende fout (in dit log ruim 90 seconden) stapelden zich
+            // tientallen BYTE-IDENTIEKE Reset Fault-pakketten op in _teVersturen, allemaal
+            // vóór de al wachtende snelheids-/wisselcommando's, die daardoor alsnog, één
+            // voor één via de 200ms-cyclus, achter die hele stapel moesten aansluiten.
+            // Fix: de byte-identieke-dedup geldt nu ook zonder sleutel (null == null is een
+            // geldige, bedoelde match) - er staat zo nooit meer dan ÉÉN ongeverzonden Reset
+            // Fault (of, voor VraagMelderStatusOp, twee aanvragen voor PRECIES dezelfde
+            // melder) in de wachtrij, zonder de herhaal-semantiek zelf aan te tasten: zodra
+            // die ene verstuurd is, mag en zal een volgende cyclus er gewoon weer één
+            // toevoegen als de fout nog steeds aanhoudt.
+            if (_teVersturen.Any(item => item.SnelheidsSleutel == snelheidsSleutel && item.Payload.AsSpan().SequenceEqual(payload)))
                 return; // exact dezelfde, nog niet verstuurde herhaling - niets nieuws te melden
             _teVersturen.Add((payload, snelheidsSleutel));
         }
