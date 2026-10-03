@@ -322,6 +322,33 @@ public partial class MainWindow : Window
             MessageBox.Show(this, ex.Message, "Controleer de instellingen", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
+        // BUG #32 (gebruikerscasus: verkenning liep vast - de loc "kon niet netjes op melder
+        // 16 gezet worden" en kwam uiteindelijk bijna een hele ronde verder op melder 29/30
+        // terecht): bytes-analyse van de hardware-log liet zien dat dit NIET de bekende
+        // kortsluitstatus-vlucht was (die trad hier tweemaal kort op en werd beide keren
+        // netjes opgeheven, precies zoals BUG #31 bedoeld is) - de loc schoot simpelweg door
+        // tijdens het "kruipen" (Nastellen hieronder in BaanVerkenner.Rijden.cs), omdat de
+        // kruipsnelheid in deze sessie op 20 stond (verkensnelheid 28, dus bijna even snel als
+        // "vol gas") op een baan waar een heel blok in minder dan 1 seconde wordt doorlopen
+        // (zie de bezetmeldingen in het log, vaak <1 sec na elkaar). "Kruipen" is bedoeld om
+        // heel langzaam precies op de juiste melder te stoppen; bij zo'n hoge kruipsnelheid kan
+        // de software dat venster nooit op tijd zien en schiet de loc door voordat er ooit
+        // gestopt wordt. De bestaande validatie controleerde alleen "kruip ≤ verken", niet of
+        // kruip ABSOLUUT laag genoeg is om nog echt te kunnen "kruipen" - vandaar deze extra,
+        // niet-blokkerende waarschuwing (de gebruiker kan nog steeds bewust doorgaan).
+        if (ins.Kruipsnelheid > 10 && ins.Kruipsnelheid * 2 > ins.Verkensnelheid)
+        {
+            var kruipWaarschuwing = MessageBox.Show(this,
+                $"De kruipsnelheid ({ins.Kruipsnelheid}) is vrij hoog ten opzichte van de verkensnelheid ({ins.Verkensnelheid}). " +
+                "\"Kruipen\" is bedoeld om heel langzaam precies op de juiste melder te stoppen - bij een hoge kruipsnelheid, " +
+                "zeker op een baan met korte blokken, kan de software niet op tijd ingrijpen en schiet de loc ver door " +
+                "(dit veroorzaakte eerder een mislukte verkenning: de loc kwam bijna een hele ronde verder terecht).\n\n" +
+                "Een veel lagere kruipsnelheid (bijvoorbeeld 3-5) wordt aangeraden.\n\n" +
+                $"Toch doorgaan met kruipsnelheid {ins.Kruipsnelheid}?",
+                "Kruipsnelheid lijkt hoog", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (kruipWaarschuwing != MessageBoxResult.Yes) return;
+        }
+
         BewaarKeuzes(ins);
 
         var vorige = LaadVoortgang();

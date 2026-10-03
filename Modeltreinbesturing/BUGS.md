@@ -299,6 +299,50 @@ achter de stapel moest wachten, als een echt gemiste fysieke bezetmelding
 tijdens de aanhoudende Dinamo-foutstatus. Mocht een melder-timeout zich blijven
 herhalen NA deze fix, dan wijst dat eerder naar de tweede mogelijkheid.
 
+## #32 - Baanverkenner: "nastellen" (kruipen naar de juiste melder) schoot ver door
+   bij een te hoge kruipsnelheid - verkenning liep vast met "De loc kon niet
+   netjes op melder 16 gezet worden"
+**Status:** Gedeeltelijk verzacht (waarschuwing toegevoegd), niet volledig
+"gefixt" - zie nuance hieronder. Gebruikerswaarneming: "duurt heel lang voor de
+loc gaat rijden, geeft constant kortsluitmeldingen en rijdt een stukje stopt
+rijdt weer een stukje en blijft dan definitief staan." Bytes- en loganalyse van
+een meegestuurde Baanverkenner-sessie (hardwarelog + baanverkenner-log) liet
+twee LOSSE dingen zien:
+1. Twee kortsluitmeldingen vroeg in de sessie (tijdens het systematisch op
+   "rechtdoor" zetten van alle wisseladressen 1 t/m 32 - elke ~0,6 sec een
+   nieuwe spoel bekrachtigen kan op een echte baan best een kort, voorbijgaand
+   stroompiekje geven) - BEIDE keren werd de foutstatus netjes en zonder
+   herhaalstorm opgeheven, dus BUG #31's fix werkt hier zoals bedoeld: geen
+   opstapeling van Reset Fault-commando's meer.
+2. Het ECHTE, uiteindelijke vastlopen (~16 sec na het laatst bekende punt
+   schoot de loc van melder 5 door naar melder 29/30 - bijna een hele ronde
+   verder) had NIETS met kortsluiting te maken, maar met de ingestelde
+   kruipsnelheid: deze sessie gebruikte kruipsnelheid 20 bij verkensnelheid 28
+   (bijna "vol gas"), terwijl `Nastellen` in BaanVerkenner.Rijden.cs bedoeld is
+   om met een ECHTE kruipsnelheid net op de juiste melder te stoppen. Op deze
+   baan wordt een heel blok in minder dan 1 seconde doorlopen (zie de
+   bezetmeldingen in het log) - bij kruipsnelheid 20 kan de software de
+   doelmelder onmogelijk op tijd zien worden, dus de ingebouwde
+   "doorgeschoten"-detectie (die vereist dat de doelmelder eerst ECHT bezet
+   werd gezien) kreeg nooit de kans om te vuren, en de loc crosste gewoon door
+   tot het volledige wachtvenster (15+ sec) verstreken was.
+**Fix (voorzichtig, alleen een waarschuwing - zie nuance):** een niet-
+blokkerende bevestigingsvraag bij het starten van een verkenning als de
+kruipsnelheid groot is (>10 én meer dan de helft van de verkensnelheid),
+met uitleg waarom dat risicovol is en een concreet lager advies (3-5).
+**Belangrijke nuance:** dit lost het ONDERLIGGENDE gat in `Nastellen`'s
+doorschiet-detectie niet op (die blijft afhankelijk van het ooit zien van de
+doelmelder als bezet, vóór hij weer vrijkomt) - bij een combinatie van hoge
+snelheid + zeer korte blokken kan dat gat nog steeds toeslaan, ook bij een
+kruipsnelheid die de waarschuwing niet triggert. Een robuustere oplossing (bijv.
+direct ingrijpen zodra een melder bezet raakt die niet het doel/de buur is, in
+plaats van te wachten tot het hele venster verstreken is) raakt kernlogica
+in `Nastellen` die op meerdere plekken in BaanVerkenner.Rijden.cs hergebruikt
+wordt - dat wordt pas aangepakt met een echte testrit erna, niet blind vanuit
+een log alleen (zie het user-instructie "test het eerst grondig").
+**Praktisch advies voor nu:** zet de kruipsnelheid voor deze baan laag (3-5)
+en herhaal de verkenning.
+
 ---
 
 _Laatst bijgewerkt: zie git-historie van dit bestand zodra het project op
