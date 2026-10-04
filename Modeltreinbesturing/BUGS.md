@@ -376,6 +376,51 @@ inherent aan "veilig een onbekend blok uitsluiten", niet aan een gemiste
 afkorting. Wie dat sneller wil, kan `BlokproefLangSeconden` zelf verlagen in de
 instellingen (ten koste van een kleinere veiligheidsmarge).
 
+## #34 - Baanverkenner stuurde de rijsnelheid maar ÉÉN keer per rit naar het
+   blok van de STARTmelder - bij een al bekend vervolgblok bleef de loc daarna
+   gewoon stilstaan (en dat werd dan ten onrechte "doodlopend" genoemd)
+**Status:** Gefixt - dit is vermoedelijk de kernoorzaak van de "onlogische
+handelingen"/"lijkt wel of je ze niet opslaat"-waarneming. Gebruiker: "Als je 1
+keer van melder 16 in blok 4 naar melder 5 in blok 3 vooruit gereden bent moet
+je dat al onthouden en bij een volgende poging weet je dat al... en blijf je
+doorrijden in dezelfde richting." De koppeling werd WEL onthouden (zie
+baankaart.json: melder 5 → Dinamo-blok 3 bleef tussen pogingen bewaard) - het
+echte probleem zat in wat de software met die kennis deed. Bytes/logvergelijk
+van twee identieke pogingen (16 → 5, vooruit) binnen dezelfde sessie:
+- 1e poging (blok van melder 5 nog ONBEKEND): rit kwam keurig tot bij melder 5
+  én reed gewoon door naar melder 13.
+- 2e poging (blok van melder 5 nu AL BEKEND, dus GEEN blokproef meer nodig):
+  rit kwam bij melder 5 en bleef daar stilstaan tot de wachttijd verstreek -
+  gemeld als "doodlopend" (kopspoor), terwijl de baan daar helemaal niet
+  doodloopt.
+Oorzaak: Dinamo's rijcommando's gaan ALTIJD via een blokadres (zie de
+klasse-uitleg bovenaan `DinamoHardware.cs`: "DCC-commando's worden altijd VIA
+EEN BLOK verstuurd, niet rechtstreeks naar een decoderadres") - een
+snelheidscommando dat naar blok 4 verstuurd is, bereikt de loc niet meer zodra
+hij fysiek blok 3 binnenrijdt. `Rit()` in BaanVerkenner.Rijden.cs stuurde de
+rijsnelheid echter maar ÉÉN keer, helemaal aan het BEGIN van de hele rit (naar
+het blok van de toen-huidige melder) - zodra de loc nadien een grens overstak
+naar een volgend, AL bekend blok, kwam er nooit een nieuw snelheidscommando
+voor dát blok, dus verloor de loc daar feitelijk de aansturing. Dat de EERSTE
+poging (blok nog onbekend) wél doorreed, was puur toeval: de blokproef
+(`BlokZoekenNaInrijden`) stuurt via `Nastellen` zelf al een vers commando naar
+het zojuist gevonden blok, als bijwerking van het preciezer neerzetten - geen
+bewuste "blijf rijden"-logica.
+**Fix:** zodra een nieuwe melder met een AL BEKEND blok bezet raakt, stuurt
+`Rit()` nu opnieuw de rijsnelheid (gewoon door, of kruipend als het doel al in
+zicht is) naar het blok van die nieuwe melder. Is het blok nog NIET bekend, dan
+verandert er niets - dat loopt nog steeds via de bestaande blokproef. Dit raakt
+zowel gewone verkenningsritten als navigatieritten (naar een specifieke
+doelmelder), want beide liepen tegen exact dezelfde aanname aan.
+**Nog open, apart van deze fix:** in dezelfde sessie weigerde de loc ook eens
+"achteruit" terug te rijden van melder 5 naar 16 en kwam in plaats daarvan bij
+melder 15 uit ("Onderweg naar melder 16 werd onverwacht melder 15 bezet”) -
+dat wijst eerder op een wissel die bij "achteruit vanaf 5" een ANDERE route
+oplevert dan "achteruit vanaf 16" (mogelijk door de Engelse wissel/kruiswissel
+op deze testbaan), niet op dezelfde blok-aansturingsfout. Dit is NIET blind
+"gefixt" - eerst een nieuwe test na bug #34 afwachten; als dit blijft
+terugkomen, apart oppakken met een eigen bugnummer.
+
 ---
 
 _Laatst bijgewerkt: zie git-historie van dit bestand zodra het project op

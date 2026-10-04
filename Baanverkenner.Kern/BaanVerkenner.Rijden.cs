@@ -451,6 +451,32 @@ public partial class BaanVerkenner
                 onderbroken = false;
                 _log.Rijden($"  melder {m} bezet{(dt is double s ? $" (na {s:0.0} s)" : "")}");
 
+                // BUG #34 (gebruikerswaarneming: "je ziet de loc op bezet melder 5 en 16 en je
+                // gaat allerlei melders en blokken aansturen, dat moet beter kunnen" - en
+                // concreet: bij een HERHAALDE rit 16→5, waarvan het blok van melder 5 al
+                // bekend was, bleef de loc na melder 5 gewoon stilstaan en werd dat ten
+                // onrechte als "doodlopend" gemeld, terwijl de EERSTE keer (toen het blok van
+                // melder 5 nog onbekend was) de rit wél gewoon doorreed naar melder 13).
+                // Oorzaak: Dinamo's rijcommando's gaan ALTIJD via een blokadres (zie
+                // DinamoHardware's klasse-uitleg: "DCC-commando's worden altijd VIA EEN BLOK
+                // verstuurd, niet rechtstreeks naar een decoderadres") - een commando dat naar
+                // blok 4 ging, bereikt de loc niet meer zodra hij fysiek blok 3 induit. Dit
+                // stuk code stuurde de rijsnelheid maar ÉÉN keer, bij de START van de hele rit
+                // (naar het blok van de toen-huidige melder) - zodra de loc een GRENS
+                // overstak naar een volgend, AL bekend blok, kwam er nooit een nieuw
+                // snelheidscommando voor dát blok. De eerste keer "werkte" het toevallig omdat
+                // de blokproef voor melder 5 (toen nog onbekend) via Nastellen zelf al een
+                // vers commando naar het zojuist gevonden blok 3 stuurde - puur een
+                // bijwerking, geen opzet. Fix: zodra een nieuwe melder met een AL BEKEND blok
+                // bezet raakt, wordt de rijsnelheid (gewoon door, of kruipend als het doel al
+                // in zicht is) opnieuw gestuurd naar het blok van die nieuwe melder - zo blijft
+                // de loc ook doorrijden over een melder-grens heen waarvoor geen blokproef
+                // meer nodig is. Is het blok van deze melder nog NIET bekend, dan verandert er
+                // hier niets - dat blijft precies zoals voorheen via de blokproef hieronder
+                // lopen.
+                if (BlokVereist && BlokVan(m) is not null)
+                    await StuurSnelheid(r, doelInzicht ? _ins.Kruipsnelheid : snelheid);
+
                 if (doel.IsNavigatie)
                 {
                     if (m == doel.DoelMelder && !doelInzicht)
