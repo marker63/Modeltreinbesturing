@@ -31,9 +31,26 @@ public static class BlokVoorstel
                 Markeer(obs.NaMelder, obs.VolgendeBijAfbuigend);
             }
 
-        bool Samen(int a, int b) =>
-            !viaWissel.Contains((Math.Min(a, b), Math.Max(a, b)))
-            && Equals(blokVan.GetValueOrDefault(a), blokVan.GetValueOrDefault(b));
+        // BUG #38. Gebruikerswaarneming: Koploper (gebaseerd op de echte bedrading) meldt
+        // melder 5, 13 en 14 als ÉÉN bezetmelder-blok (Dinamo-blok 3), terwijl de Baanverkenner
+        // dit in 3 losse voorgestelde blokken knipte omdat er tussen 5-13 (wisseladres 2) en
+        // 13-14 (wisseladres 5) een splitsende wissel gevonden is. Beide wissels zijn van
+        // weerszijden getest en hun afbuigende tak bereikt in beide gevallen geen enkele
+        // melder (een echte, dubbel bevestigde doodlopende aftakking/kopspoor). Melder 5, 13
+        // en 14 delen desondanks hetzelfde Dinamo-blok: dat betekent dat dit één ononderbroken
+        // elektrische rijstroomsectie is, en een trein daar dus altijd als één geheel bezet
+        // wordt gemeld - onafhankelijk van de wisselstand en onafhankelijk van of er een
+        // (dood lopende) aftakking in ligt. Een gevonden wissel mag daarom nooit een splitsing
+        // afdwingen tussen twee melders die al een bekend, gelijk Dinamo-blok hebben: de echte
+        // bedrading (waarmee Koploper al jaren foutloos rijdt) is dan het sterkere bewijs.
+        bool Samen(int a, int b)
+        {
+            var blokA = blokVan.GetValueOrDefault(a);
+            var blokB = blokVan.GetValueOrDefault(b);
+            if (!Equals(blokA, blokB)) return false;
+            if (blokA is not null) return true;
+            return !viaWissel.Contains((Math.Min(a, b), Math.Max(a, b)));
+        }
 
         var groepVan = new Dictionary<int, int>();
         var groepen = new List<List<int>>();

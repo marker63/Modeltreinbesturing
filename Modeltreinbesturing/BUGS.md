@@ -550,6 +550,47 @@ wisselwaarnemingen (adres 4, 6, 7, 8, 9, 10) staan al in de eerder opgeslagen
 onschadelijk (ze markeren allemaal dezelfde, op zich al terechte scheiding
 tussen blok 5 en blok 6 bij melder 28/26) en kunnen gewoon blijven staan.
 
+## #38 - Voorgestelde blokken werden onnodig gesplitst bij een wissel met een
+   bevestigde dood lopende aftakking, ook als de melders al hetzelfde
+   Dinamo-blok hadden
+
+**Gebruikerswaarneming:** "Apart koploper meld namelijk dat blok 3 bezet is
+bij melders 5 en 13 en 14" - Koploper (gebaseerd op de echte, al jarenlang
+foutloos rijdende bedrading) meldt melder 5, 13 en 14 als ÉÉN bezet blok. De
+Baanverkenner stelde hier echter 3 losse blokken voor (voorgesteld blok 1:
+melder 5, blok 3: melder 13, blok 4: melder 14). Gevraagd wat wisseladres 2
+en 5 (die deze splitsing veroorzaakten) fysiek zijn, antwoordde de gebruiker:
+"Wissel 2 bevind zich in bezetmelder 5, de andere 2 bezetmelders zitten
+vanaf melder 16 gerekend na melder 5."
+
+**Analyse (uit de baankaart.json van 12:40):** de overgangen bevestigen de
+echte volgorde 16 → 5 → 13 → 14 → 24 precies zoals de gebruiker aangaf.
+Melder 5, 13 én 14 hebben alle drie `DinamoBlok: 3` - dus elektrisch gezien
+is dit één ononderbroken rijstroomsectie. Wisseladres 2 (gevonden "na melder
+5 (vooruit): rechtdoor → melder 13, afbuigend → geen melder bereikt") en
+wisseladres 5 (gevonden "na melder 14 (achteruit): rechtdoor → melder 13,
+afbuigend → geen melder bereikt") zijn dus allebei - van weerszijden, dus
+dubbel bevestigd - een wissel met een echte dood lopende aftakking (kopspoor)
+binnen datzelfde elektrische blok.
+
+**Oorzaak:** `BlokVoorstel.Bereken()` (`BlokVoorstel.cs`) splitste melders in
+losse voorgestelde blokken zodra er ÓÓK een gevonden wissel tussen zat
+(`viaWissel`), zelfs wanneer beide melders al een bekend, gelijk Dinamo-blok
+hadden. Maar een gelijk Dinamo-blok betekent dat de melders dezelfde
+elektrische sectie delen: een trein wordt daar altijd als één geheel bezet
+gemeld, wisselstand of niet, en ook als er een (dood lopende) aftakking in
+die sectie ligt. Een gevonden wissel mag dat dus nooit overrulen - de echte
+bedrading (waarmee Koploper al jaren foutloos rijdt) is het sterkere bewijs
+dan de wissel-topologie die de Baanverkenner zelf aflegt.
+
+**Fix:** `Samen(a, b)` in `BlokVoorstel.cs` kijkt nu eerst naar het
+Dinamo-blok: zijn melder a en b al bekend en gelijk qua Dinamo-blok, dan
+horen ze altijd bij elkaar, ook als er een wissel tussen gevonden is. Alleen
+als het Dinamo-blok van (één van) de melders onbekend is, wordt - net als
+voorheen - naar de gevonden wissels gekeken om te bepalen of ze gesplitst
+moeten worden. Hierdoor stelt de Baanverkenner melder 5, 13 en 14 nu als
+één blok voor, zoals Koploper ook al deed.
+
 ---
 
 _Laatst bijgewerkt: zie git-historie van dit bestand zodra het project op
