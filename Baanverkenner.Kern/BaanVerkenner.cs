@@ -441,8 +441,23 @@ public partial class BaanVerkenner
                     ExtraNaAfwijking = _ins.ExtraMeldersNaAfwijking,
                     StopBijMelders = kortsluitStops
                 });
-                await TerugNaarMetControle(o, proef, o.Configuratie.Met(a));
+                // BUG #35 (gebruikerswaarneming: wissel 2 stond nog op afbuigend toen de loc
+                // achteruit van melder 5 terug naar melder 16 moest rijden; dat veroorzaakte een
+                // kortsluiting omdat de loc tegen de wisseltong aanreed die voor DIE rijrichting
+                // in de verkeerde stand stond). Vroeger werd het geteste adres pas NA
+                // TerugNaarMetControle (de terugrit) weer teruggezet - de terugrit werd dus
+                // altijd nog met de wissel in de testafstand (afbuigend) gereden, ook als de
+                // heenrit er helemaal niet echt doorheen kwam. De loc staat hier altijd stil
+                // (Rit() stopt hem voor elke return), dus de wissel nu al terugzetten - VOORDAT
+                // de terugrit begint - is een veilige, statische omzetting en laat de terugrit
+                // over exact dezelfde (bekende, werkende) wisselstand lopen als de basisrit.
+                // Blijkt de terugweg daardoor toch af te wijken (de heenrit ging écht via de
+                // afbuigende tak), dan vangt TerugNaarMetControle dat al op zoals voor elke
+                // andere wissel die van achteren verkeerd staat (NavigatieFout -> als
+                // kortsluitpunt/"opengereden wissel" geregistreerd) - dat pad bestond al en
+                // wordt hier niet aangeraakt.
                 await ZetWissel(a, false);
+                await TerugNaarMetControle(o, proef, o.Configuratie);
 
                 Vergelijk(o, basis, proef, a);
             }

@@ -421,6 +421,58 @@ op deze testbaan), niet op dezelfde blok-aansturingsfout. Dit is NIET blind
 "gefixt" - eerst een nieuwe test na bug #34 afwachten; als dit blijft
 terugkomen, apart oppakken met een eigen bugnummer.
 
+## #35 - Baanverkenner reed tijdens een wisselproef terug naar de startmelder
+   terwijl de zojuist geteste wissel nog in de testafstand (afbuigend) stond -
+   dat gaf een kortsluiting tegen de verkeerd staande wisseltong
+**Status:** Gefixt. Gebruiker (tijdens een nog lopende verkenning, rechtstreeks
+waargenomen): "de rit van melder 16 naar melder 5 plots niet meer werkte, dit
+kwam nadat je wissel 2 had omgeschakeld naar afbuigend. Dit veroorzaakt een
+kortsluiting omdat de loc tegen de wisseltong aanrijd die in de verkeerde stand
+staat." Log bevestigt dit exact: 08:46:42 adres 2 → afbuigend, 08:46:45 melder
+5 bezet (heenrit kwam keurig aan), 08:47:16 "Rijden achteruit van melder 5 naar
+melder 16" (de terugrit van de wisselproef) - en die terugrit kwam niet eens op
+gang ("De loc vertrok niet van melder 5"). Omdat dat (dankzij bug #33's fix)
+eerst als een mogelijk blok-probleem werd opgevat, startte de verkenner daarna
+ook nog een volledige, trage blokproef voor melder 5 (blok 1, 2, 9, 10, 11,
+12, 13, ... elk 30 s) - terwijl het blok van melder 5 allang bekend was (3) en
+daar niets mis mee was.
+Oorzaak: in `VoerOpdrachtUit` (BaanVerkenner.cs) werd het geteste adres pas
+teruggezet NA de terugrit naar de startmelder:
+```
+await ZetWissel(a, true);
+var proef = await Rit(...);           // heenrit, met wissel a op afbuigend
+await TerugNaarMetControle(o, proef, o.Configuratie.Met(a));  // terugrit - óók nog met a op afbuigend!
+await ZetWissel(a, false);            // pas nu weer terug naar de bekende stand
+```
+De heenrit (16 → 5) bleek dus geen gebruik te maken van wissel 2 in afbuigende
+stand (anders was de loc nooit gewoon bij melder 5 aangekomen) - maar de
+terugrit (5 → 16, dus van de ANDERE kant door hetzelfde wisselpunt) liep via
+precies dat punt wél tegen de nog steeds afbuigend staande wisseltong aan.
+**Fix:** het geteste adres wordt nu al teruggezet naar de bekende (rechtdoor)
+stand vlak NADAT de heenrit stopt, VOORDAT de terugrit wordt gestart - dus:
+```
+var proef = await Rit(...);
+await ZetWissel(a, false);            // nu al terug, vóór de terugrit
+await TerugNaarMetControle(o, proef, o.Configuratie);   // terugrit met de bekende, werkende wisselstand
+```
+Dit is veilig: `Rit()` stopt de loc altijd volledig voordat hij teruggeeft, dus
+de wissel wordt alleen omgezet terwijl de loc stilstaat, nooit onder een rijdende
+loc. Blijkt de terugweg ondanks dat tóch af te wijken (bijvoorbeeld omdat de
+heenrit wél degelijk over de afbuigende tak liep), dan vangt de bestaande
+`TerugNaarMetControle`-foutafhandeling dat al op zoals voor elke andere wissel
+die van achteren verkeerd staat (wordt als kortsluitpunt/"opengereden wissel"
+geregistreerd) - dat pad bestond al en is voor deze fix niet aangepast.
+**Geleerde les/voor vervolgonderzoek:** de gebruiker beschreef ook een manier om
+zo'n geval verder te benutten (wissel bewust in de geleerde stand terugzetten,
+nog een melder verder rijden ter bevestiging, en de afbuigende tak apart vanaf
+de startmelder verkennen met een eigen vermelding in de geleerde lijst). Dat
+is in essentie al hoe de bestaande adrestest-loop werkt (`Vergelijk` + de
+geregistreerde `WisselWaarneming`/kortsluitpunt-afhandeling) zodra de hierboven
+beschreven terugrit niet meer onnodig faalt; er is geen aparte extra logica
+voor nodig. Dit moet wel opnieuw getest worden op de echte baan, want de
+volledige wisselproef voor melder 5 (veroorzaakt door deze bug) was nog niet
+afgerond toen dit gemeld werd.
+
 ---
 
 _Laatst bijgewerkt: zie git-historie van dit bestand zodra het project op
