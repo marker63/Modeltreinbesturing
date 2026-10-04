@@ -23,6 +23,12 @@ public class Opdracht
     /// meteen vast waar die tak heen gaat.</summary>
     public int? BronAdres { get; set; }
     public int? BronRechtdoorVolgende { get; set; }
+    /// <summary>BUG #39: als deze opdracht zelf geen nieuwe melder bereikt (de basisrit blijft
+    /// meteen stilstaan), worden de nog niet geïdentificeerde adressen toch, één voor één,
+    /// getest - in plaats van de opdracht over te slaan. Zo kan een tweede wissel die, samen
+    /// met een al afbuigend gezette wissel, een anders doodlopende tak alsnog opent, gevonden
+    /// worden.</summary>
+    public bool TestCombinaties { get; set; }
     public string Sleutel => $"{Configuratie.Sleutel}|{Start}|{Richting}";
 }
 
@@ -414,12 +420,15 @@ public partial class BaanVerkenner
             // ---- Iets nieuws om te testen? ----
             var overgangen = Overgangen(basis.Reeks, o.Richting);
             var nieuw = overgangen.Where(s => !_status.GetesteOvergangen.Contains(s)).ToList();
-            if (nieuw.Count == 0)
+            if (nieuw.Count == 0 && !o.TestCombinaties)
             {
                 _log.Info("Deze rit bevat geen overgangen die niet al met alle adressen getest zijn - adrestest overgeslagen.");
                 await TerugNaarHuis(o.Route);
                 return;
             }
+            // BUG #39: bij een TestCombinaties-opdracht komt de basisrit zelf meestal geen
+            // stap verder (vandaar dat hij anders overgeslagen zou worden) - toch wordt hier
+            // doorgegaan naar de adrestest hieronder, zie de toelichting bij Opdracht.TestCombinaties.
 
             // ---- Alle adressen één voor één ----
             foreach (var a in _ins.WisselAdressen())
@@ -739,6 +748,33 @@ public partial class BaanVerkenner
                     Reden = $"andere kant van adres {a} verkennen (vanaf melder {r2b}, andersom): vanaf melder {x} ({o.Richting.Tekst()}) leek afbuigend doodlopend, maar de wissel ligt mogelijk pas ná melder {x} en wordt dan hier van de puntzijde benaderd",
                     BronAdres = a,
                     BronRechtdoorVolgende = x
+                });
+
+                // BUG #39. Gebruikerswaarneming (na de voltooide verkenning van 04-10-2026):
+                // "Als je vanuit bezetmelder 13 wissel 1 en 2 afbuigend had gezet en naar blok 5
+                // was gereden [...] had je in blok 1 terechtgekomen." Blok 1 en 2 bleven voor de
+                // verkenner onbereikbaar (adres 1 staat in "adressen zonder effect"), terwijl
+                // wissel 1 en 2 pas SAMEN een route openen - wissel 2 alléén op afbuigend geeft
+                // hier dus terecht "geen melder bereikt", maar dat betekent niet dat de
+                // afbuigende tak nergens heen gaat, alleen dat er een TWEEDE wissel (hier: adres
+                // 1) nog in de weg staat in zijn standaardstand. De verkenner testte tot nu toe
+                // alleen één adres per keer tegen de vaste basisrit, en sloeg een opdracht die
+                // zelf geen melder verder kwam (`nieuw.Count == 0` in VoerOpdrachtUit) altijd
+                // over - zo'n combinatie van twee wissels kon dus nooit ontdekt worden. Fix:
+                // naast het bestaande testen "van de andere kant" (hierboven, bug #36) wordt nu
+                // ook, vanaf hetzelfde punt en in dezelfde richting maar met adres {a} al op
+                // afbuigend gezet, een opdracht gepland die wél alle (nog niet geïdentificeerde)
+                // adressen één voor één test, ook al rijdt de basisrit van die opdracht zelf
+                // nergens heen. Zo wordt gevonden of een TWEEDE adres, in combinatie met {a},
+                // de afbuigende tak van {a} alsnog opent.
+                Plan(new Opdracht
+                {
+                    Configuratie = cA,
+                    Start = x,
+                    Richting = o.Richting,
+                    Route = RouteMet(o.Route, c, o.Richting, t.Take(i).ToList()),
+                    Reden = $"combinaties met adres {a} testen (vanaf melder {x}, {o.Richting.Tekst()}): afbuigend leek hier alleen doodlopend, maar misschien opent een tweede wissel, samen met {a} op afbuigend, alsnog een route",
+                    TestCombinaties = true
                 });
             }
             return;

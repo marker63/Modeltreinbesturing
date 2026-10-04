@@ -591,6 +591,53 @@ voorheen - naar de gevonden wissels gekeken om te bepalen of ze gesplitst
 moeten worden. Hierdoor stelt de Baanverkenner melder 5, 13 en 14 nu als
 één blok voor, zoals Koploper ook al deed.
 
+## #39 - Een doodlopende afbuigende tak werd nooit opnieuw getest in
+   combinatie met een TWEEDE wisseladres
+
+**Gebruikerswaarneming (na de voltooide verkenning van 04-10-2026):**
+"blok 6 en 7 heb je heel vaak gereden maar zie ik niet juist terug, en de
+blokken 1 en 2 had je gewoon kunnen rijden. Als je vanuit bezetmelder 13
+wissel 1 en 2 afbuigend had gezet en naar blok 5 was gereden en dan in
+dezelfde richting verder had je in blok 1 terechtgekomen en als je dan
+wissel 6 en 9 op rechtdoor had gezet was je vanuit blok 1 in blok 2
+terechtgekomen."
+
+**Analyse:** blok 1 (melders 1-9-10) en blok 2 (melders 4-11-12) komen in
+het rapport helemaal niet voor, en adres 1 staat in "adressen zonder
+gevonden effect" - niet omdat wisseladres 1 geen echte wissel is, maar omdat
+hij **pas samen met adres 2 op afbuigend** een route opent. Wisseladres 2
+alleen op afbuigend geeft terecht "geen melder bereikt" (bevestigd in bug
+#36/#38), maar dat kwam niet doordat die tak nergens heen gaat - er staat
+een TWEEDE wissel (adres 1) nog in de weg, in zijn standaardstand.
+
+**Oorzaak:** de verkenner test per opdracht altijd maar één adres per keer
+tegen de basisrit (`foreach (var a in _ins.WisselAdressen())` in
+`VoerOpdrachtUit`). Als die ene testrit zelf geen enkele nieuwe melder
+bereikt (`nieuw.Count == 0`), werd de hele opdracht overgeslagen - inclusief
+het testen van de overige adressen. Een combinatie van twee wissels die
+allebei op afbuigend moeten staan voor er een route ontstaat, kon zo nooit
+ontdekt worden: zodra adres 2 alleen al vastliep, werd nergens nog geprobeerd
+of een ander adres (zoals adres 1), samen met adres 2, de tak alsnog opent.
+
+**Fix:** naast de bestaande "andere kant"-test (bug #36) plant de verkenner
+nu, zodra een afbuigende tak "geen melder bereikt" geeft, ook een opdracht
+die vanaf hetzelfde punt, in dezelfde richting, met dat adres al op afbuigend
+gezet, gewoon ALLE nog niet geïdentificeerde adressen één voor één test -
+ook als de basisrit van die opdracht zelf nergens verder komt
+(`Opdracht.TestCombinaties`, die de bestaande "sla over als er niets nieuws
+is"-regel in `VoerOpdrachtUit` nu bewust negeert). Zo wordt een tweede
+wissel die, in combinatie, een route opent, bij de volgende verkenning
+automatisch gevonden - zonder dat we hoeven te gokken welk adres dat precies
+is.
+
+**Nog open:** blok 6 en 7 (20-27-28 en 21-29-30) zijn in het rapport wél
+gewoon correct terechtgekomen (ze zaten op de hoofdlus en zijn tientallen
+keren bereden) - dat deel van de gebruikersopmerking lijkt te gaan over de
+leesbaarheid van de vergelijkingstabel/het blokkenschema, niet over een
+fout in de verkenning zelf. Zodra de volgende verkenning (met deze fix) ook
+blok 1 en 2 gevonden heeft, kan het blokkenschema opnieuw gecontroleerd
+worden.
+
 ---
 
 _Laatst bijgewerkt: zie git-historie van dit bestand zodra het project op
