@@ -211,17 +211,20 @@ ul{margin:6px 0 0 18px;padding:0}
             sb.Append("</ul></div>");
         }
 
-        // Kortsluitpunten
-        sb.Append("<h2>Kortsluitpunten</h2>");
-        if (k.Kortsluitpunten.Count == 0) sb.Append("<p>Geen kortsluitingen tijdens de basisritten.</p>");
+        // Kortsluitpunten en onverwachte terugwegen (BUG #40: niet meer allebei "kortsluiting"
+        // noemen, en niet meer stellig "wissel" zeggen - dit kan ook een gemiste melder op een
+        // recht stuk spoor zonder wissel zijn).
+        sb.Append("<h2>Kortsluitpunten en onverwachte terugwegen</h2>");
+        if (k.Kortsluitpunten.Count == 0) sb.Append("<p>Geen kortsluitingen of onverwachte terugwegen tijdens de basisritten.</p>");
         else
         {
-            sb.Append("<table><tr><th>#</th><th>Plaats</th><th>Wisselstand</th><th>Keer</th><th>Status</th></tr>");
+            sb.Append("<table><tr><th>#</th><th>Soort</th><th>Plaats</th><th>Wisselstand</th><th>Keer</th><th>Status</th></tr>");
             foreach (var x in k.Kortsluitpunten)
             {
                 string st = x.Opgelost ? $"<span class=\"ok\">opgelost: adres {x.OpgelostDoorAdres} op {(x.OpgelostMetAfbuigend == true ? "afbuigend" : "rechtdoor")}</span>"
                     : x.Opgegeven ? "<span class=\"fout\">opgegeven</span>" : "<span class=\"let\">open</span>";
-                sb.Append($"<tr><td class=\"num\">{x.Id}</td><td>na melder {x.NaMelder} ({x.Richting.Tekst()})</td><td>{E(x.Configuratie)}</td><td>{x.AantalKortsluitingen}</td><td>{st}</td></tr>");
+                string soort = x.Soort == KortsluitpuntSoort.OnverwachteTerugweg ? "onverwachte terugweg (geen kortsluiting, mogelijk geen wissel)" : "kortsluiting";
+                sb.Append($"<tr><td class=\"num\">{x.Id}</td><td>{soort}</td><td>na melder {x.NaMelder} ({x.Richting.Tekst()})</td><td>{E(x.Configuratie)}</td><td>{x.AantalKortsluitingen}</td><td>{st}</td></tr>");
             }
             sb.Append("</table>");
         }
@@ -289,9 +292,9 @@ ul{margin:6px 0 0 18px;padding:0}
         foreach (var e in k.Kopsporen) sb.AppendLine($"  na melder {e.Melder} ({e.Richting.Tekst()})");
         if (k.Kopsporen.Count == 0) sb.AppendLine("  (geen)");
 
-        Kop("KORTSLUITPUNTEN");
+        Kop("KORTSLUITPUNTEN EN ONVERWACHTE TERUGWEGEN");
         foreach (var x in k.Kortsluitpunten)
-            sb.AppendLine($"  #{x.Id} na melder {x.NaMelder} ({x.Richting.Tekst()}), {x.Configuratie}: " +
+            sb.AppendLine($"  #{x.Id} [{(x.Soort == KortsluitpuntSoort.OnverwachteTerugweg ? "onverwachte terugweg, geen kortsluiting" : "kortsluiting")}] na melder {x.NaMelder} ({x.Richting.Tekst()}), {x.Configuratie}: " +
                 (x.Opgelost ? $"opgelost met adres {x.OpgelostDoorAdres} op {(x.OpgelostMetAfbuigend == true ? "afbuigend" : "rechtdoor")}" : x.Opgegeven ? "opgegeven" : "open"));
         if (k.Kortsluitpunten.Count == 0) sb.AppendLine("  (geen)");
 

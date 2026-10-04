@@ -100,11 +100,23 @@ public class Eindpunt
     public string Configuratie { get; set; } = "";
 }
 
+/// <summary>BUG #40: twee heel verschillende dingen werden allebei "kortsluitpunt" genoemd:
+/// een echte elektrische kortsluiting (RitEinde.Kortsluiting - de hardware meldt storing), en
+/// een onverwachte terugweg (TerugNaarMetControle: de loc kwam terug via een andere melder
+/// dan hij heen ging). De hardware meldt daarbij GEEN kortsluiting - er is dus géén storing,
+/// alleen een onvoorspelbare rijweg. De oorzaak is niet per se een wissel: op een recht stuk
+/// spoor zonder wissel kan dit ook door een gemiste meting bij de heenrit ontstaan, dus deze
+/// soort beweert niet welke oorzaak het is. Beide soorten worden nog wel op dezelfde manier
+/// opgeslagen en vermeden (StopBijMelders), maar het rapport moet ze niet meer allebei
+/// "kortsluiting" noemen.</summary>
+public enum KortsluitpuntSoort { Kortsluiting, OnverwachteTerugweg }
+
 public class Kortsluitpunt
 {
     public int Id { get; set; }
     public int NaMelder { get; set; }
     public Richting Richting { get; set; }
+    public KortsluitpuntSoort Soort { get; set; } = KortsluitpuntSoort.Kortsluiting;
     public Configuratie Configuratie { get; set; } = Configuratie.Basis;
     /// <summary>Hoe de loc hier komt (vanaf de startmelder).</summary>
     public List<Etappe> Route { get; set; } = new();

@@ -588,7 +588,20 @@ public partial class BaanVerkenner
         }
     }
 
-    private void RegistreerKortsluitpunt(Opdracht o, List<int> reeks, Configuratie c, List<Etappe> route, Richting r)
+    // BUG #40. Gebruikerswaarneming: "bezetmelder 136 zit in blok 11 en is gewoon goed
+    // berijdbaar, maar je geeft aan dat daar kortsluiting is, geen idee hoe je daar bij kwam."
+    // Melder 136 kreeg nooit écht een kortsluiting (de hardware meldde niets) - de terugrit
+    // kwam alleen via een andere melder terug dan de heenrit ging gereden was (TerugNaarMetControle
+    // ving dat op als NavigatieFout). Dat is precies het "ongepolariseerd puntstuk: geen
+    // kortsluiting" geval dat in de eigen toelichtingstekst van TerugNaarMetControle al
+    // benoemd werd, maar het kwam toch als "Kortsluitpunt"/"kortsluiting" in het logboek en
+    // rapport terecht, omdat beide gevallen (een echte elektrische kortsluiting én een
+    // opengereden wissel) dezelfde Kortsluitpunt-boekhouding deelden. Fix: RegistreerKortsluitpunt
+    // krijgt er een Soort bij, zodat het rapport een opengereden wissel niet meer "kortsluiting"
+    // noemt - de boekhouding (StopBijMelders, LosKortsluitpuntenOp) blijft ongewijzigd, die mag
+    // beide soorten gewoon blijven vermijden/proberen op te lossen.
+    private void RegistreerKortsluitpunt(Opdracht o, List<int> reeks, Configuratie c, List<Etappe> route, Richting r,
+        KortsluitpuntSoort soort = KortsluitpuntSoort.Kortsluiting)
     {
         int x = reeks[^1];
         var bestaand = _kaart.Kortsluitpunten.FirstOrDefault(k => k.NaMelder == x && k.Richting == r && k.Configuratie.Equals(c));
@@ -599,11 +612,14 @@ public partial class BaanVerkenner
             NaMelder = x,
             Richting = r,
             Configuratie = c,
+            Soort = soort,
             Route = RouteMet(route, c, r, reeks),
             AantalKortsluitingen = 1
         };
         _kaart.Kortsluitpunten.Add(k);
-        _log.Vondst($"Kortsluitpunt #{k.Id}: direct na melder {x} ({r.Tekst()}, {c}). Waarschijnlijk een wissel die van achteren in de verkeerde stand bereden wordt; wordt later opgelost.");
+        _log.Vondst(soort == KortsluitpuntSoort.OnverwachteTerugweg
+            ? $"Onverwachte terugweg #{k.Id}: direct na melder {x} ({r.Tekst()}, {c}) kwam de loc terug via een andere melder dan verwacht. Geen kortsluiting - mogelijk een wissel die van achteren in de verkeerde stand bereden wordt, mogelijk een melder die de eerste keer niet geregistreerd is; wordt zo mogelijk later opgelost."
+            : $"Kortsluitpunt #{k.Id}: direct na melder {x} ({r.Tekst()}, {c}). Waarschijnlijk een wissel die van achteren in de verkeerde stand bereden wordt; wordt later opgelost.");
     }
 
     private HashSet<int> KortsluitStops(Configuratie c, Richting r) =>
@@ -918,10 +934,12 @@ public partial class BaanVerkenner
     }
 
     /// <summary>Terug naar de start van de opdracht. Gaat de loc op de terugweg een andere
-    /// kant op dan hij heen kwam, dan is er heen vrijwel zeker een wissel van achteren
-    /// OPENGEREDEN (ongepolariseerd puntstuk: geen kortsluiting, maar ook geen geldige
-    /// rijweg). Die overgang wordt dan uit de kaart gehaald en als kortsluitpunt behandeld,
-    /// zodat volgende ritten er vóór stoppen en de oplosfase de juiste wisselstand zoekt.</summary>
+    /// kant op dan hij heen kwam, dan was dit een onverwachte terugweg: geen kortsluiting, maar
+    /// ook geen geldige/voorspelbare rijweg (BUG #40 - dit is niet per se een opengereden
+    /// wissel: op een recht stuk spoor zonder wissel kan dit ook door een gemiste meting bij de
+    /// heenrit ontstaan). Die overgang wordt dan uit de kaart gehaald en net als een
+    /// kortsluitpunt behandeld, zodat volgende ritten er vóór stoppen en de oplosfase - als
+    /// er wél een wissel in de buurt gevonden wordt - de juiste wisselstand kan proberen.</summary>
     private async Task TerugNaarMetControle(Opdracht o, RitResultaat rit, Configuratie c)
     {
         try
@@ -934,11 +952,20 @@ public partial class BaanVerkenner
             if (idx >= 1)
             {
                 int w = rit.Reeks[idx - 1];
-                string tekst = $"Opengereden wissel vermoed tussen melder {w} en {y} ({o.Richting.Tekst()}, {c}): heen ging de loc van {w} naar {y}, terug ging hij na {y} naar {z}. Die wissel staat van achteren tegen de rijrichting in (ongepolariseerd puntstuk: geen kortsluiting). Deze overgang is niet in de kaart opgenomen.";
+                // BUG #40. Gebruikerswaarneming: "bezetmelder 136 zit in blok 11 en is
+                // gewoon goed berijdbaar, [...] geen idee hoe je daar bij kwam" - en later:
+                // "blok 10, 11, 12 is een recht stukje spoor waar je alleen heen en weer kan
+                // pendelen [...]", dus zonder wissel. De tekst hieronder zei eerder stellig
+                // "die wissel staat van achteren tegen de rijrichting in" - maar hier bleek
+                // helemaal geen wissel te liggen. Een terugweg via een andere melder dan
+                // verwacht kan dus ook zonder wissel ontstaan, bijvoorbeeld een melder die bij
+                // de eerste rit niet (op tijd) geregistreerd werd. Deze tekst beweert daarom
+                // niet meer dat het om een wissel gaat.
+                string tekst = $"Onverwachte terugweg na melder {w}/{y} ({o.Richting.Tekst()}, {c}): heen ging de loc van {w} naar {y}, terug ging hij na {y} naar {z} - niet terug naar {w}. Geen kortsluiting. Mogelijk ligt hier een wissel die van achteren in de verkeerde stand bereden wordt, mogelijk is dit een gewoon recht stuk spoor en is een melder bij de heenrit niet geregistreerd. Deze overgang is niet in de kaart opgenomen.";
                 _kaart.Waarschuwingen.Add(tekst);
                 _log.Waarschuwing(tekst);
                 _kaart.Overgangen.RemoveAll(x => x.Van == w && x.Naar == y && x.Richting == o.Richting && x.GezienBijConfiguraties.All(k => k == c.Sleutel));
-                RegistreerKortsluitpunt(o, rit.Reeks.Take(idx).ToList(), c, o.Route, o.Richting);
+                RegistreerKortsluitpunt(o, rit.Reeks.Take(idx).ToList(), c, o.Route, o.Richting, KortsluitpuntSoort.OnverwachteTerugweg);
             }
             throw;
         }

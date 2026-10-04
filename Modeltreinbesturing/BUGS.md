@@ -638,6 +638,45 @@ fout in de verkenning zelf. Zodra de volgende verkenning (met deze fix) ook
 blok 1 en 2 gevonden heeft, kan het blokkenschema opnieuw gecontroleerd
 worden.
 
+## #40 - Een onverwachte terugweg werd altijd "kortsluiting" genoemd én
+   altijd aan een wissel toegeschreven, ook waar geen wissel ligt
+
+**Gebruikerswaarneming:** "bezetmelder 136 zit in blok 11 en is gewoon goed
+berijdbaar, maar je geeft aan dat daar kortsluiting is, geen idee hoe je
+daar bij kwam." En, nadat eerst aan een opengereden wissel gedacht werd:
+"Hoe kom je bij een opengereden wissel, Blok 10, 11, 12 is een recht stukje
+spoor waar je alleen heen en weer kan pendelen om treinen te ijken."
+
+**Analyse (uit het logboek):** de loc reed achteruit van melder 144 via 136
+naar 132 (verwacht en correct). Op de terugweg (vooruit) kwam hij na melder
+132 echter niet terug bij 136, maar bij melder 133. De hardware meldde
+hierbij geen enkele storing - dit was dus geen elektrische kortsluiting.
+
+Dit werd toch opgeslagen en getoond als "Kortsluitpunt", en de bijbehorende
+tekst beweerde stellig dat er "een wissel van achteren tegen de rijrichting
+in" zou liggen. Beide waren fout: blok 10/11/12 is, zoals de gebruiker
+aangeeft, een recht stuk pendelspoor zonder wissel - de onverwachte terugweg
+kwam dus ergens anders door, waarschijnlijk een melder (133) die bij de
+heenrit niet (op tijd) geregistreerd is.
+
+**Oorzaak:** `TerugNaarMetControle` nam bij elke afwijkende terugweg
+automatisch aan dat dit een "opengereden wissel" was (een ongepolariseerd,
+onbekrachtigd puntstuk) - zowel in de interne boekhouding (hergebruikte de
+Kortsluitpunt-structuur) als in de getoonde tekst. Dat is een redelijke
+eerste gok op een spoor MET wissels, maar een onterechte, te stellige
+aanname op een stuk spoor zonder wissel.
+
+**Fix:** de nieuwe `Soort`-waarde (zie ook hierboven) heet nu neutraal
+"OnverwachteTerugweg" in plaats van "OpengeredenWissel", en alle teksten
+(logboek, rapport, code-commentaar) noemen dit voortaan "een onverwachte
+terugweg (geen kortsluiting)" zonder te beweren dat het om een wissel gaat
+- met als mogelijke oorzaken zowel "een wissel die verkeerd bereden wordt"
+als "een melder die de eerste keer niet geregistreerd is". De boekhouding
+(ritten stoppen er voor, de oplosfase probeert zo mogelijk een wisseladres)
+blijft ongewijzigd - die werkt toch alleen als er daadwerkelijk een
+wisseladres bij gevonden wordt, en doet dan niets fout bij een stuk spoor
+zonder wissel.
+
 ---
 
 _Laatst bijgewerkt: zie git-historie van dit bestand zodra het project op
