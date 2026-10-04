@@ -422,7 +422,6 @@ public partial class BaanVerkenner
             }
 
             // ---- Alle adressen één voor één ----
-            var kortsluitStops = KortsluitStops(o.Configuratie, o.Richting);
             foreach (var a in _ins.WisselAdressen())
             {
                 if (a < o.VolgendAdres) continue;
@@ -432,6 +431,31 @@ public partial class BaanVerkenner
                 _bezig = $"opdracht #{o.Id}: adres {a} testen";
                 MeldVoortgang();
                 BewaarNu();
+
+                // BUG #37. Gebruikerswaarneming: in één tussenstand werden 6 verschillende
+                // wisseladressen (4, 6, 7, 8, 9, 10) ALLEMAAL gemeld als "wissel na melder 28,
+                // van achteren bereden, afbuigend -> kortsluiting tussen melder 28 en 26" - met
+                // exact dezelfde tekst. Zes losse DCC-adressen kunnen onmogelijk dezelfde
+                // fysieke wissel zijn; de overgangen-statistiek laat ook zien dat 28->26 toen
+                // nog maar in 8 van de 36 pogingen daadwerkelijk lukte. De rest strandde dus
+                // toch al, ONGEACHT welk adres er net getest werd - dit was dus al een eigen,
+                // apart kortsluitpunt (kortsluitpunt #1, na melder 28 vooruit, alle wissels
+                // rechtdoor), niet iets wat door deze zes adressen werd VEROORZAAKT. Oorzaak:
+                // `kortsluitStops` werd maar ÉÉN keer berekend, VOORDAT deze foreach-lus over
+                // alle wisseladressen begon.
+                // Zodra adres 4 toevallig als eerste tegen dat al bestaande, wankele punt
+                // aanliep en zo kortsluitpunt #1 deed ontstaan, bleef de rest van de adressen
+                // (6, 7, 8, 9, 10, ...) in DEZELFDE opdracht toch nog gewoon doorrijden tot
+                // voorbij melder 28 - want hun proefrit kreeg nog de VERSE, bijgewerkte lijst
+                // met bekende kortsluitpunten niet te zien. Elke van die adressen liep daardoor
+                // zelf ook (opnieuw, onnodig) tegen dezelfde al bekende kortsluiting aan, en
+                // kreeg dat ten onrechte als EIGEN vondst toegeschreven. Fix: de lijst met
+                // bekende kortsluitpunten nu bij elk adres opnieuw ophalen (in plaats van ervoor
+                // vastgezet), zodat een kortsluitpunt dat tijdens deze lus ontdekt wordt
+                // meteen ook de nog te testen adressen behoedt - geen herhaalde onnodige
+                // kortsluitingen én geen valse toeschrijvingen meer aan adressen die er niets
+                // mee te maken hebben.
+                var kortsluitStops = KortsluitStops(o.Configuratie, o.Richting);
 
                 await ZetWissel(a, true);
                 var proef = await Rit(o.Start, o.Richting, new RitDoel

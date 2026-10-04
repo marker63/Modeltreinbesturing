@@ -512,6 +512,44 @@ liep op het moment van melden net opnieuw vast op de bug #34-geleerde
 zie bug #34's "nog open"-notitie). Graag deze fix samen met een hernieuwde
 poging voor wissel 2 testen.
 
+## #37 - Binnen één opdracht werden meerdere, totaal verschillende wisseladressen
+   (4, 6, 7, 8, 9, 10) ten onrechte allemaal beschuldigd van exact dezelfde
+   kortsluiting bij melder 28, terwijl dat gewoon een al bekend, apart,
+   wankel punt was
+**Status:** Gefixt - gevonden bij een tussentijdse controle-log die de
+gebruiker expliciet stuurde om op onjuistheden/verbeteringen te checken.
+Het "Wissels"-overzicht in het rapport liet zes adressen zien die stuk voor
+stuk woordelijk hetzelfde meldden: "na melder 28 (vooruit), van achteren
+bereden... afbuigend: kortsluiting tussen melder 28 en 26." Zes losse
+DCC-adressen kunnen onmogelijk dezelfde fysieke wissel zijn. De
+overgangen-statistiek in de baankaart liet ook zien dat de overgang 28→26 op
+dat moment al in slechts 8 van de 36 pogingen daadwerkelijk lukte - dus dit
+was al een eigen, apart, wankel punt (kortsluitpunt #1, "na melder 28
+vooruit, alle wissels rechtdoor"), onafhankelijk van welk wisseladres er
+toevallig naast werd getest.
+Oorzaak: in `VoerOpdrachtUit` (BaanVerkenner.cs) werd de lijst met bekende
+kortsluitpunten (`kortsluitStops`, gebruikt om de proefrit vóór zo'n bekend
+punt te laten stoppen) maar ÉÉN keer berekend, VOORDAT de lus over alle
+wisseladressen begon. Zodra adres 4 (als eerste in de lijst) toevallig tegen
+dat al bestaande wankele punt aanliep en zo kortsluitpunt #1 deed ontstaan,
+kregen de daarna geteste adressen (6, 7, 8, 9, 10, ...) binnen DEZELFDE
+opdracht de bijgewerkte lijst niet te zien - hun proefrit reed dus telkens
+weer onnodig door tot voorbij melder 28, liep daar zelf ook (opnieuw) tegen
+dezelfde al bekende kortsluiting aan, en kreeg dat vervolgens ten onrechte als
+eigen vondst toegeschreven. Dat betekende: vijf extra, volledig vermijdbare
+echte kortsluitingen (met noodstop + herstelrit erbovenop) voor iets wat na
+de eerste keer al bekend was.
+**Fix:** de lijst met bekende kortsluitpunten wordt nu bij elk wisseladres
+opnieuw opgehaald, in plaats van één keer vooraf vastgezet. Zo behoedt een
+kortsluitpunt dat halverwege de lus ontdekt wordt meteen ook de nog te testen
+adressen erna - geen herhaalde onnodige kortsluitingen meer, en geen valse
+toeschrijvingen aan adressen die er niets mee te maken hadden.
+**Nog aanwezig in eerder opgeslagen voortgang:** de zes foutieve
+wisselwaarnemingen (adres 4, 6, 7, 8, 9, 10) staan al in de eerder opgeslagen
+`baankaart.json` en worden niet automatisch gecorrigeerd - ze zijn verder
+onschadelijk (ze markeren allemaal dezelfde, op zich al terechte scheiding
+tussen blok 5 en blok 6 bij melder 28/26) en kunnen gewoon blijven staan.
+
 ---
 
 _Laatst bijgewerkt: zie git-historie van dit bestand zodra het project op
