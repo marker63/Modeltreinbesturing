@@ -692,6 +692,31 @@ public partial class BaanVerkenner
                     _kaart.RegistreerKopspoor(t[^1], o.Richting, cA);
                 }
             }
+            // BUG #36. Gebruikerswaarneming: wissel 2 ligt pas een stukje VERDER dan waar
+            // melder 5 begint te reageren - rijdend vanaf melder 16 licht melder 5 in BEIDE
+            // standen van wissel 2 op, dus "afbuigend → geen melder bereikt" hier betekent
+            // niet automatisch een echt doodlopend stuk. De loc kan de wissel vanaf melder 16
+            // alleen van de afbuigende kant (puntzijde omgekeerd/trailing) naderen, en dat kan
+            // - afhankelijk van hoe de wissel precies ligt - vastlopen zonder nieuwe melder of
+            // kortsluiting te geven, zelfs als er verderop wél degelijk een nieuwe, nog
+            // onbekende melder ligt. Net als bij een kortsluiting-bij-omzetten (zie hierboven)
+            // is de enige manier om dat zeker te weten: dezelfde wissel nog eens testen, maar
+            // dan vanaf de ANDERE, al bekende kant (de rechtdoor-vervolgmelder, achteruit) -
+            // vanaf daar wordt de wissel van de puntzijde (facing) benaderd, wat altijd een
+            // eenduidig resultaat geeft.
+            if (afbuigend is null && rechtdoor is int r2b)
+            {
+                Plan(new Opdracht
+                {
+                    Configuratie = cA,
+                    Start = r2b,
+                    Richting = o.Richting.Om(),
+                    Route = RouteMet(o.Route, c, o.Richting, b.Take(i + 1).ToList()),
+                    Reden = $"andere kant van adres {a} verkennen (vanaf melder {r2b}, andersom): vanaf melder {x} ({o.Richting.Tekst()}) leek afbuigend doodlopend, maar de wissel ligt mogelijk pas ná melder {x} en wordt dan hier van de puntzijde benaderd",
+                    BronAdres = a,
+                    BronRechtdoorVolgende = x
+                });
+            }
             return;
         }
 

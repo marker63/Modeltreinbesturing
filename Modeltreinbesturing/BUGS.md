@@ -473,6 +473,45 @@ voor nodig. Dit moet wel opnieuw getest worden op de echte baan, want de
 volledige wisselproef voor melder 5 (veroorzaakt door deze bug) was nog niet
 afgerond toen dit gemeld werd.
 
+## #36 - Een wisselproef die "afbuigend → geen melder bereikt" concludeerde werd
+   altijd als (vrijwel) doodlopend geregistreerd - ook als de wissel vanaf de
+   geteste kant gewoon niet goed te beoordelen was en er verderop wél een
+   nieuwe melder lag
+**Status:** Gefixt, dankzij een hele precieze uitleg van de gebruiker over de
+fysieke ligging van wissel 2 (direct na bug #35's fix getest - zie daar).
+Samengevat, in de gebruiker's eigen woorden: "je krijgt in beide standen van
+wissel 2 keurig de melding dat de loc melder 5 activeert, echter na een heel
+klein stukje in het bereik van melder 5 ligt pas de wisseltong van wissel 2."
+Dat betekent: vanaf melder 16 gereden licht melder 5 ALTIJD op, ongeacht de
+stand van wissel 2 - de wissel zelf ligt pas een stukje verder, nog binnen
+melder 5's eigen bereik. Rijd je vanaf melder 16 door met wissel 2 afbuigend,
+dan nader je die wissel van de kant die niet overeenkomt met de afbuigende
+stand (vanuit 16 bezien is "rechtdoor" de kant die bij melder 5's sectie
+hoort) - de loc liep dan gewoon vast zonder nieuwe melder (geen kortsluiting,
+simpelweg geen beweging meer), wat de verkenner ten onrechte als "doodlopend
+stuk" opvatte. In werkelijkheid ligt er, benaderd van de ANDERE kant (vanaf
+melder 13, achteruit - de kant die de wissel van de puntzijde nadert), een
+heel normale, nog onbekende melder achter die afbuigende stand - precies zoals
+bij een "kortsluiting-bij-omzetten" (zie bug-afhandeling hierboven: "wissel
+wordt van achteren/samenvoegend bereden"), alleen dan zonder kortsluiting.
+Oorzaak: in `Vergelijk` (BaanVerkenner.cs) werd voor het geval "rechtdoor geeft
+een bekende vervolgmelder, afbuigend geeft géén nieuwe melder" alleen een
+waarneming vastgelegd (en bij een "doodlopend"-rit zelfs een kopspoor
+geregistreerd) - er werd nooit, zoals bij een kortsluiting vóór het bekende
+punt, een extra test gepland vanaf de andere, al bekende kant.
+**Fix:** exact dezelfde aanpak als bij "kortsluiting-bij-omzetten" hierboven,
+nu ook toegepast op dit geval: zodra een wisselproef concludeert "rechtdoor →
+melder X (bekend), afbuigend → geen nieuwe melder", plant de verkenner een
+extra opdracht om die wissel nog eens te testen, maar dan vanaf melder X in de
+omgekeerde richting (dus van de puntzijde, "facing", benaderd) - zo wordt het
+onderscheid tussen "echt doodlopend" en "wissel verkeerd benaderd vanaf deze
+kant" alsnog gemaakt, zonder dat de gebruiker dit handmatig moet uitvoeren.
+**Nog te bevestigen:** dit is nog niet op de echte baan getest (de verkenning
+liep op het moment van melden net opnieuw vast op de bug #34-geleerde
+"onverwachte melder 15 i.p.v. 16"-afwijking, een apart, nog openstaand punt -
+zie bug #34's "nog open"-notitie). Graag deze fix samen met een hernieuwde
+poging voor wissel 2 testen.
+
 ---
 
 _Laatst bijgewerkt: zie git-historie van dit bestand zodra het project op
