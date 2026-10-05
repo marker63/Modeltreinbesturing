@@ -972,7 +972,7 @@ public partial class MainWindow : Window
             // van ELK bekend meldpunt in het hele project meteen opgevraagd - feiten
             // verzamelen zodra dat kan, in plaats van pas als er toevallig naar gevraagd
             // wordt.
-            if (_hardwareBeheerder.Huidige is DinamoHardware)
+            if (_hardwareBeheerder.Huidige.KanMelderStatusOpvragen)
                 VraagAlleMelderStatusOp("bij het verbinden");
 
             StopAlleBekendeGeplaatsteLocs("bij het (opnieuw) verbinden");

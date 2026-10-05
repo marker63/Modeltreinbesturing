@@ -39,9 +39,12 @@ public partial class HardwareDialog : Window
             case "Dinamo": DinamoBox.IsChecked = true; break;
             case "Intellibox": IntelliboxBox.IsChecked = true; break;
             case "DccEx": DccExBox.IsChecked = true; break;
+            case "Z21": Z21Box.IsChecked = true; break;
             default: GeenBox.IsChecked = true; break;
         }
-        if (keuze.ComPoort != null && ComPoortCombo.Items.Contains(keuze.ComPoort))
+        if (keuze.InterfaceType == "Z21" && keuze.ComPoort != null)
+            ComPoortCombo.Text = keuze.ComPoort; // bij de Z21 is dit het IP-adres
+        else if (keuze.ComPoort != null && ComPoortCombo.Items.Contains(keuze.ComPoort))
             ComPoortCombo.SelectedItem = keuze.ComPoort;
     }
 
@@ -52,6 +55,19 @@ public partial class HardwareDialog : Window
     }
 
     private void Vernieuwen_Click(object sender, RoutedEventArgs e) => VulComPoorten();
+
+    /// <summary>De Z21 zit op het netwerk, niet op een COM-poort: het veld wordt dan een
+    /// invulveld voor het IP-adres (bijv. 192.168.0.111). Tijdens het opbouwen van het
+    /// scherm bestaat PoortLabel nog niet, vandaar de null-check.</summary>
+    private void Z21Box_Gewijzigd(object sender, RoutedEventArgs e)
+    {
+        if (PoortLabel is null || ComPoortCombo is null) return;
+        bool z21 = Z21Box.IsChecked == true;
+        PoortLabel.Text = z21 ? "IP-adres:" : "COM-poort:";
+        ComPoortCombo.IsEditable = z21;
+        if (z21) ComPoortCombo.ToolTip = "IP-adres van de Z21, bijv. 192.168.0.111 (standaardpoort 21105)";
+        else ComPoortCombo.ToolTip = null;
+    }
 
     private void Bericht_Ontvangen(string bericht)
     {
@@ -67,14 +83,17 @@ public partial class HardwareDialog : Window
             StatusTekst.Text = "Simulatiemodus actief.";
             return;
         }
-        if (ComPoortCombo.SelectedItem is not string comPoort)
+        bool z21Gekozen = Z21Box.IsChecked == true;
+        string? comPoort = z21Gekozen ? ComPoortCombo.Text.Trim() : ComPoortCombo.SelectedItem as string;
+        if (string.IsNullOrEmpty(comPoort))
         {
-            MessageBox.Show(this, "Kies eerst een COM-poort.", "Modeltreinbesturing", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(this, z21Gekozen ? "Vul eerst het IP-adres van de Z21 in (bijv. 192.168.0.111)." : "Kies eerst een COM-poort.", "Modeltreinbesturing", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
         IHardwareInterface nieuw = DccExBox.IsChecked == true ? new DccExHardware()
             : IntelliboxBox.IsChecked == true ? new IntelliboxHardware()
+            : z21Gekozen ? new Z21Hardware()
             : new DinamoHardware();
         nieuw.StatusBericht += Bericht_Ontvangen;
         try
@@ -118,7 +137,7 @@ public partial class HardwareDialog : Window
     /// gevraagd wordt (zie StartStaartFase voor de bug die dit voorkomt).</summary>
     private void VraagAlleMelderStatusOp()
     {
-        if (_hardwareBeheerder.Huidige is not DinamoHardware) return;
+        if (!_hardwareBeheerder.Huidige.KanMelderStatusOpvragen) return;
         // BUGFIX: zie HardwareBeheerder.VraagMelderStatusOp - dit ging voorheen rechtstreeks
         // naar DinamoHardware, buiten de wissel-/seinwachtrij om, en kon zo de wissel-
         // initialisatie hierboven (InitialiseerWisselsMetVlag) verdringen/vertragen.

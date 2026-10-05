@@ -38,7 +38,7 @@ venster) voor een volledig overzicht van alle functies, sneltoetsen en tips.
 - Een apart "kijkscherm" om de baan tijdens het rijden te bedienen zonder het
   bewerk-scherm te hoeven gebruiken.
 - Hardware-ondersteuning voor **Dinamo/VPEB**, **Uhlenbrock Intellibox
-  (LocoNet)** en **DCC-EX**.
+  (LocoNet)**, **DCC-EX** en **Roco/Fleischmann Z21** (LAN/UDP; nog niet getest).
 - Automatische, tijdgestempelde backups bij het afsluiten, met de mogelijkheid
   om een eerdere versie terug te openen.
 
@@ -91,7 +91,7 @@ voor wie wil meehelpen:
 - **Hardware: Dinamo/VPEB is getest op een echte baan, de rest niet.** De
   Dinamo-koppeling (snelheid, functies, wissels, seinen, bezetmelders) draait
   inmiddels tegen echte apparatuur en is daarbij met Wireshark-opnames van de
-  originele Koploper vergeleken. De Intellibox (LocoNet)- en DCC-EX-koppelingen
+  originele Koploper vergeleken. De Intellibox (LocoNet)-, DCC-EX- en Z21-koppelingen
   zijn met beste weten volgens de specificaties gebouwd maar nog niet
   uitgeprobeerd - test voorzichtig en begin met één wissel.
 - **Baanverkenner koppelen aan het project:** via Beheren > *Baankaart

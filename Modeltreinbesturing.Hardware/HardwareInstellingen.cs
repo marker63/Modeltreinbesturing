@@ -65,6 +65,7 @@ public static class HardwareInstellingen
         DinamoHardware => "Dinamo",
         DccExHardware => "DccEx",
         IntelliboxHardware => "Intellibox",
+        Z21Hardware => "Z21",
         _ => "Simulatie"
     };
 
@@ -76,6 +77,7 @@ public static class HardwareInstellingen
         "Dinamo" => new DinamoHardware(),
         "DccEx" => new DccExHardware(),
         "Intellibox" => new IntelliboxHardware(),
+        "Z21" => new Z21Hardware(),
         "Simulatie" => new SimulatieHardware(),
         _ => null
     };

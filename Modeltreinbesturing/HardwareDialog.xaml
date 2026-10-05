@@ -1,7 +1,7 @@
 <Window x:Class="Modeltreinbesturing.HardwareDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Hardware-interface" Height="360" Width="440"
+        Title="Hardware-interface" Height="390" Width="440"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
     <DockPanel Margin="16">
         <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,12"
@@ -11,10 +11,12 @@
             <RadioButton x:Name="DinamoBox" Content="VPEB Dinamo" GroupName="Hardware" Margin="0,0,0,4"/>
             <RadioButton x:Name="IntelliboxBox" Content="Uhlenbrock Intellibox (LocoNet)" GroupName="Hardware" Margin="0,0,0,4"/>
             <RadioButton x:Name="DccExBox" Content="DCC-EX" GroupName="Hardware" Margin="0,0,0,4"/>
+            <RadioButton x:Name="Z21Box" Content="Roco/Fleischmann Z21 (netwerk) - nog niet getest" GroupName="Hardware" Margin="0,0,0,4"
+                         Checked="Z21Box_Gewijzigd" Unchecked="Z21Box_Gewijzigd"/>
         </StackPanel>
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,12">
-            <TextBlock Text="COM-poort:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-            <ComboBox x:Name="ComPoortCombo" Width="120"/>
+            <TextBlock x:Name="PoortLabel" Text="COM-poort:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <ComboBox x:Name="ComPoortCombo" Width="150"/>
             <Button Content="Vernieuwen" Padding="8,4" Margin="8,0,0,0" Click="Vernieuwen_Click"/>
         </StackPanel>
         <TextBlock x:Name="StatusTekst" DockPanel.Dock="Top" TextWrapping="Wrap" Foreground="DarkSlateGray" Margin="0,0,0,12"/>

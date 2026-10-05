@@ -36,6 +36,7 @@ public partial class MainWindow : Window
         new("VPEB Dinamo", "Dinamo"),
         new("DCC-EX", "DccEx"),
         new("Intellibox (LocoNet)", "Intellibox"),
+        new("Roco/Fleischmann Z21 (netwerk, nog niet getest)", "Z21"),
         new("Simulatie-proefbaan, als Dinamo (zonder echte baan)", "SimDinamo"),
         new("Simulatie-proefbaan, als DCC-centrale (zonder echte baan)", "SimDcc"),
     };
@@ -209,6 +210,7 @@ public partial class MainWindow : Window
         if (InterfaceCombo.SelectedItem is not CentraleKeuze k) return;
         var zichtbaarCom = k.IsSimulatie ? Visibility.Collapsed : Visibility.Visible;
         ComPoortLabel.Visibility = zichtbaarCom;
+        if (ComPoortLabel is System.Windows.Controls.TextBlock poortTekst) poortTekst.Text = k.Soort == "Z21" ? "IP-adres" : "COM-poort";
         ComPoortCombo.Visibility = zichtbaarCom;
         SimSnelheidLabel.Visibility = k.IsSimulatie ? Visibility.Visible : Visibility.Collapsed;
         SimSnelheidCombo.Visibility = SimSnelheidLabel.Visibility;
@@ -237,6 +239,7 @@ public partial class MainWindow : Window
                 case "Dinamo": hw = new DinamoHardware(); break;
                 case "DccEx": hw = new DccExHardware(); break;
                 case "Intellibox": hw = new IntelliboxHardware(); break;
+                case "Z21": hw = new Z21Hardware(); break;
                 default:
                     _sim = DemoBaan.Maak(k.Soort == "SimDinamo");
                     hw = _sim;

@@ -770,3 +770,27 @@ géén Block Alarm. Dat bevestigt dat daar geen kortsluiting was.
 **Niet gedaan (bewust):** Modeltreinbesturing zelf zet bij zo'n alarm geen blok op
 foutmelding en stopt niets - zoals je eerder zei laat Koploper alleen een melding
 zien en blijven de treinen rijden. Het alarm staat nu wel in de hardwarelog.
+
+---
+
+## #44 - Geen ondersteuning voor Roco/Fleischmann Z21 (NIEUW, NOG NIET GETEST)
+
+**Aanleiding:** Marco vroeg om zoveel mogelijk uit online bronnen (Traintastic,
+officiële specificaties) in de software te verwerken, met de vermelding dat nieuwe
+koppelingen nog niet getest zijn.
+
+**Toegevoegd:** `Z21Hardware` (Modeltreinbesturing.Hardware), volgens de officiële
+"Z21 LAN Protocol Specification" v1.13: UDP poort 21105, loc-snelheid (14/28/126
+stappen), functies, wissels (pulse van 100 ms en daarna uitschakelen), seinen als
+wissel, noodstop, kortsluitstatus en R-Bus-bezetmelders (broadcast-flags 0x103).
+Keepalive elke 15 s. Beschikbaar in Hardware-dialoog (IP-adres) en in de Baanverkenner.
+
+**STATUS: NOG NIET GETEST tegen een echte Z21.** Alleen de byte-opbouw is nagerekend.
+
+**Let op:**
+- Wisselrichting (rechtdoor/afbuigend) is niet uit de bronnen te halen:
+  `AfbuigendIsUitgang2` is instelbaar; controleer met één wissel.
+- Bij verbinden wordt de railspanning ingeschakeld; na een kortsluiting schakelt de
+  Z21 zelf uit en wordt niet automatisch weer ingeschakeld.
+- Melderstatus-opvraag (`KanMelderStatusOpvragen`) werkt nu voor elke koppeling die
+  dat meldt, niet meer alleen Dinamo.

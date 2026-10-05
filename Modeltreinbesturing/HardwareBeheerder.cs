@@ -258,6 +258,8 @@ public class HardwareBeheerder
     {
         if (Huidige is DinamoHardware dinamo)
             dinamo.VraagMelderStatusOp(meldernummer);
+        else if (Huidige.KanMelderStatusOpvragen)
+            Huidige.VraagMelderStatusOp(meldernummer); // o.a. Z21 (nog niet getest)
     }
 
     /// <summary>Handmatig rijden: BEWUST NIET via dezelfde wachtrij/rustpauze als wissel-
