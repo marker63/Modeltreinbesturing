@@ -4,7 +4,7 @@
         Title="Controleer mijn baan" Height="480" Width="600"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
     <DockPanel Margin="12">
-        <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,10"
+        <TextBlock x:Name="UitlegTekst" DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,10"
                    Text="Scant op veelvoorkomende configuratiefouten (ontbrekende bezetmelders, losse wissels, kapotte routes). Puur signalerend - lost niets automatisch op, geeft alleen aan waar je zelf naar zou kunnen kijken."/>
         <TextBlock x:Name="SamenvattingTekst" DockPanel.Dock="Top" FontWeight="Bold" Margin="0,0,0,10"/>
         <Button DockPanel.Dock="Bottom" Content="Sluiten" Padding="10,4" HorizontalAlignment="Left" Margin="0,10,0,0" Click="Sluiten_Click"/>

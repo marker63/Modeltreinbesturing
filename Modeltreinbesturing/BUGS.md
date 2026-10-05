@@ -681,3 +681,53 @@ zonder wissel.
 
 _Laatst bijgewerkt: zie git-historie van dit bestand zodra het project op
 GitHub staat._
+
+## #41 - Een blok met foutmelding (paars) werd nergens als "niet beschikbaar"
+   gezien bij het kiezen van een volgend blok of het starten van een route
+
+**Status:** Gefixt (nog niet getest op de echte baan).
+
+**Achtergrond:** in het geheugen stond sinds eerder een openstaand punt: "als ik
+een blok handmatig bezet meld of defect meld rijden er toch treinen naartoe, dat
+mag natuurlijk niet". Nooit afgemaakt onderzocht.
+
+**Analyse:** de kandidaat-filters in `AutomatischeStapProberen` (en de
+vroege-aankomst-, terugval- en start-controles) keken alleen naar `IsBezet` en
+`IsGereserveerd`. Handmatig bezet zit al in `IsBezet` (`ZetHandmatigBezet` voegt
+het blok aan `_bezetteBlokken` toe) - dat deel van de klacht klopte dus niet
+meer. Een blok met **foutmelding** (de paarse latch bij spookmelding of
+rijrichting-mismatch) staat echter in een aparte verzameling en werd nergens
+meegeteld. Terwijl juist daar de software niet zeker meer weet of er een loc
+staat.
+
+**Fix:** nieuwe `BlokBeheerder.IsGeblokkeerdVoorRit(blok)` = bezet OF gereserveerd
+OF foutmelding. Alle 7 plekken in `TreinrouteWindow` (3 kandidaat-filters, de
+terugvalcheck, de startcontrole bij Automatisch, de conflictcheck bij vaste
+routes incl. het eigen-loc-op-startblok-geval, en de blokgroep-check) gebruiken
+nu die ene regel, zodat ze niet meer uit elkaar kunnen lopen.
+
+**Les uit de Baanverkenner:** dezelfde soort fout (twee bijna-identieke
+controles die niet allebei bijgewerkt worden) kwam daar ook voor (#37). Een
+gedeelde helper is de structurele oplossing.
+
+## #42 - Geen manier om een Baanverkenner-baankaart met het project te vergelijken
+
+**Status:** Gefixt (nieuwe functie, nog niet getest op de echte baan).
+
+**Aanleiding:** de Baanverkenner is bedoeld om uiteindelijk de baan in
+Modeltreinbesturing te krijgen ("resultaten later importeren"), maar de koppeling
+bestond nog niet - de vergelijking in `BLOKKENSCHEMA.md` moest met de hand en met
+losse Python-scripts gebeuren.
+
+**Oplossing:** Beheren > "Baankaart vergelijken (Baanverkenner)..." leest een
+`baankaart_*.json` en toont, signalerend (niets wordt aangepast), in
+`BaankaartVergelijker`: (1) melders die de verkenner zag maar in geen blok
+zitten, (2) projectmelders die de verkenner nooit zag, (3) melders waarvan het
+Dinamo-blok afwijkt van het blok waarin ze staan, (4) overloop-melders in
+meerdere blokken (info), (5) bereden overgangen zonder relatie in het project
+(pas "waarschuwing" bij 3 of meer keer, anders meetstoring-info), (6) kopsporen
+die geen Kopspoor-blok zijn, (7) wisseladressen met/zonder bevestigd effect,
+(8) kortsluitpunten en onverwachte terugwegen. De logica is op de echte
+testbaan-JSON en de voltooide baankaart van 04-10-2026 nagerekend: ze vindt
+precies melder 129, de overloop-melder 24 (blok 3/4/7) en één zelden geziene
+overgang 28->5 - dezelfde bevindingen als in `BLOKKENSCHEMA.md`.

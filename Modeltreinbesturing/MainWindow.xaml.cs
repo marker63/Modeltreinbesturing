@@ -1498,6 +1498,39 @@ public partial class MainWindow : Window
         dialoog.ShowDialog();
     }
 
+    private void BaankaartVergelijken_Click(object sender, RoutedEventArgs e)
+    {
+        var kies = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Kies een baankaart van de Baanverkenner",
+            Filter = "Baankaart (*.json)|*.json|Alle bestanden (*.*)|*.*"
+        };
+        if (kies.ShowDialog(this) != true) return;
+
+        Baanverkenner.Kern.Baankaart? kaart;
+        try
+        {
+            kaart = Baanverkenner.Kern.Baankaart.VanJson(System.IO.File.ReadAllText(kies.FileName));
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Dit bestand is geen geldige baankaart:\n{ex.Message}", "Baankaart vergelijken", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (kaart is null)
+        {
+            MessageBox.Show(this, "Het bestand is leeg.", "Baankaart vergelijken", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var meldingen = new BaankaartVergelijker().Vergelijk(kaart, _beheerder, _baanBeheerder);
+        var dialoog = new BaanControleDialog(
+            "Baankaart vergelijken",
+            $"Vergelijking van '{System.IO.Path.GetFileName(kies.FileName)}' ({kaart.Melders.Count} melders, {kaart.Wissels.Count} wissels met effect) met dit project. Puur signalerend - er wordt niets aangepast.",
+            meldingen) { Owner = this };
+        dialoog.ShowDialog();
+    }
+
     private void HandmatigBezet_Click(object sender, RoutedEventArgs e)
     {
         if (_geselecteerdBlok is null)

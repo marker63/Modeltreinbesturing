@@ -17,6 +17,10 @@
          van de Baanverkenner in een eigen, gedeelde bibliotheek. System.IO.Ports komt via
          die projectverwijzing mee. -->
     <ProjectReference Include="..\Modeltreinbesturing.Hardware\Modeltreinbesturing.Hardware.csproj" />
+    <!-- Alleen voor het INLEZEN van een baankaart (Beheren > Baankaart vergelijken): de
+         Baankaart-klassen blijven op één plek staan, zodat een wijziging aan het bestands-
+         formaat niet op twee plaatsen bijgehouden hoeft te worden. -->
+    <ProjectReference Include="..\Baanverkenner.Kern\Baanverkenner.Kern.csproj" />
   </ItemGroup>
 
 </Project>

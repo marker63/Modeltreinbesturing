@@ -88,15 +88,15 @@ Dit is een groeiend project — onderstaande punten zijn een eerlijk overzicht
 van wat nog niet (volledig) klopt of nog niet getest is, juist als startpunt
 voor wie wil meehelpen:
 
-- **Nog niet getest tegen echte hardware.** De Dinamo/VPEB-, Intellibox
-  (LocoNet)- en DCC-EX-koppelingen zijn met beste weten geïmplementeerd
-  volgens de beschikbare specificaties, maar niemand heeft ze nog
-  daadwerkelijk tegen fysieke apparatuur uitgeprobeerd. Test voorzichtig en
-  begin met één wissel.
-- **Dinamo: handmatig rijden nog niet geïmplementeerd.** Het exacte
-  "Rijden"-datagram uit de Dinamo Interface Specificatie 3.2 ontbrak in wat
-  bij het bouwen beschikbaar was — wissels/seinen/bezetmelding werken wel,
-  handmatige loc-snelheid nog niet.
+- **Hardware: Dinamo/VPEB is getest op een echte baan, de rest niet.** De
+  Dinamo-koppeling (snelheid, functies, wissels, seinen, bezetmelders) draait
+  inmiddels tegen echte apparatuur en is daarbij met Wireshark-opnames van de
+  originele Koploper vergeleken. De Intellibox (LocoNet)- en DCC-EX-koppelingen
+  zijn met beste weten volgens de specificaties gebouwd maar nog niet
+  uitgeprobeerd - test voorzichtig en begin met één wissel.
+- **Baanverkenner koppelen aan het project:** via Beheren > *Baankaart
+  vergelijken* leg je een baankaart naast je project. Dit signaleert alleen,
+  het importeert (nog) niet automatisch.
 - **Snelheidsijking is nog niet in de praktijk getest** (vereist twee echte
   bezetmelders op een bekend meettraject).
 - **Dubbeltractie herkent de baas/knecht-koppeling nog niet automatisch** (zoals

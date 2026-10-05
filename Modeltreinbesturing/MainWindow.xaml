@@ -37,6 +37,7 @@
                 <MenuItem Header="Incidenten en wijzigingen" Click="OnderhoudBeheren_Click"/>
                 <MenuItem Header="Dashboard" Click="DashboardTonen_Click"/>
                 <MenuItem Header="Controleer mijn baan" Click="BaanControleren_Click"/>
+                <MenuItem Header="Baankaart vergelijken (Baanverkenner)..." Click="BaankaartVergelijken_Click"/>
                 <Separator/>
                 <MenuItem Header="Kleurenschema aanpassen" Click="KleurenschemaAanpassen_Click"/>
                 <MenuItem Header="Hardware-interface" Click="HardwareInterface_Click"/>

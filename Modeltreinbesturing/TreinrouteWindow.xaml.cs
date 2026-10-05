@@ -718,8 +718,8 @@ public partial class TreinrouteWindow : Window
             var locOpStartblok = _blokBeheerder.LocOpBlok(route.Startblok);
             bool eigenLocOpStartblok = gekozenTreinAuto != null && locOpStartblok == gekozenTreinAuto;
             bool startblokBeschikbaar = eigenLocOpStartblok
-                ? !_blokBeheerder.IsGereserveerd(route.Startblok)
-                : !_blokBeheerder.IsBezet(route.Startblok) && !_blokBeheerder.IsGereserveerd(route.Startblok);
+                ? !_blokBeheerder.IsGereserveerd(route.Startblok) && !_blokBeheerder.IsFoutmelding(route.Startblok)
+                : !_blokBeheerder.IsGeblokkeerdVoorRit(route.Startblok);
             if (startblokBeschikbaar)
             {
                 bool rangeertAuto = gekozenTreinAuto?.Rangeren == true;
@@ -894,8 +894,8 @@ public partial class TreinrouteWindow : Window
         var conflicterendBlok = pad.FirstOrDefault(b =>
         {
             if (b == pad[0] && gekozenTrein != null && _blokBeheerder.LocOpBlok(b) == gekozenTrein)
-                return _blokBeheerder.IsGereserveerd(b); // eigen loc op het startblok: alleen een reservering is nog een echte blokkade
-            return _blokBeheerder.IsBezet(b) || _blokBeheerder.IsGereserveerd(b);
+                return _blokBeheerder.IsGereserveerd(b) || _blokBeheerder.IsFoutmelding(b); // eigen loc op het startblok: alleen een reservering is nog een echte blokkade
+            return _blokBeheerder.IsGeblokkeerdVoorRit(b);
         });
         if (conflicterendBlok != null)
         {
@@ -921,7 +921,7 @@ public partial class TreinrouteWindow : Window
             if (groep is null || !groep.EnkeleTreinbeweging) continue;
 
             var conflicterendGroepsblok = groep.Blokken
-                .Where(b => b != blok && (_blokBeheerder.IsBezet(b) || _blokBeheerder.IsGereserveerd(b)))
+                .Where(b => b != blok && _blokBeheerder.IsGeblokkeerdVoorRit(b))
                 .FirstOrDefault();
             if (conflicterendGroepsblok is null) continue;
 
@@ -1781,7 +1781,7 @@ public partial class TreinrouteWindow : Window
         var kandidaten = _blokBeheerder.VolgendeBlokken(huidig)
             .Where(b => _routeBeheerder.IsOvergangToegestaan(trein.VorigBlok, huidig, b, trein.EffectiefTreintype))
             .Where(b => _stopverbodBeheerder.IsStoppenToegestaan(b, trein.EffectiefTreintype))
-            .Where(b => !_blokBeheerder.IsBezet(b) && !_blokBeheerder.IsGereserveerd(b))
+            .Where(b => !_blokBeheerder.IsGeblokkeerdVoorRit(b))
             .Where(b => PadIsFysiekHaalbaar(huidig, b))
             .ToList();
 
@@ -1827,7 +1827,7 @@ public partial class TreinrouteWindow : Window
                 .Where(b => b != huidig)
                 .Any(b => _routeBeheerder.IsOvergangToegestaan(huidig, trein.VorigBlok, b, trein.EffectiefTreintype)
                     && _stopverbodBeheerder.IsStoppenToegestaan(b, trein.EffectiefTreintype)
-                    && !_blokBeheerder.IsBezet(b) && !_blokBeheerder.IsGereserveerd(b)
+                    && !_blokBeheerder.IsGeblokkeerdVoorRit(b)
                     && PadIsFysiekHaalbaar(trein.VorigBlok, b));
             // GEVONDEN GAT (fysiek bevestigd door de gebruiker: wissel 14 zit tussen blok 4
             // en blok 5, en in AFBUIGENDE stand loopt hij via de kruiswissel en wissel 5
@@ -1962,7 +1962,7 @@ public partial class TreinrouteWindow : Window
             Blok? terugvalKandidaat = null;
             if (trein.VorigBlok != null
                 && _blokBeheerder.Relaties.Any(r => r.Van == huidig && r.Naar == trein.VorigBlok)
-                && !_blokBeheerder.IsBezet(trein.VorigBlok) && !_blokBeheerder.IsGereserveerd(trein.VorigBlok)
+                && !_blokBeheerder.IsGeblokkeerdVoorRit(trein.VorigBlok)
                 && _stopverbodBeheerder.IsStoppenToegestaan(trein.VorigBlok, trein.EffectiefTreintype)
                 && PadIsFysiekHaalbaar(huidig, trein.VorigBlok))
             {
@@ -2360,7 +2360,7 @@ public partial class TreinrouteWindow : Window
             var vroegeKandidaten = _blokBeheerder.VolgendeBlokken(volgendBlok)
                 .Where(b => _routeBeheerder.IsOvergangToegestaan(huidig, volgendBlok, b, trein.EffectiefTreintype))
                 .Where(b => _stopverbodBeheerder.IsStoppenToegestaan(b, trein.EffectiefTreintype))
-                .Where(b => !_blokBeheerder.IsBezet(b) && !_blokBeheerder.IsGereserveerd(b))
+                .Where(b => !_blokBeheerder.IsGeblokkeerdVoorRit(b))
                 .Where(b => PadIsFysiekHaalbaar(volgendBlok, b))
                 .ToList();
             // GEVONDEN GAT (gebruikerswaarneming: "trein raakt de weg kwijt in blok 6" -

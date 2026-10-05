@@ -66,6 +66,14 @@ public class BlokBeheerder
 
     public bool IsBezet(Blok blok) => _bezetteBlokken.Contains(blok);
 
+    /// <summary>BUG #41: kan een rit dit blok NU als volgend blok krijgen? Nee als het bezet
+    /// is (ook handmatig bezet, dat zit in _bezetteBlokken), gereserveerd is, OF een
+    /// foutmelding heeft. Een foutmelding (paars: spookmelding/rijrichting-latch) betekent
+    /// dat de software niet meer zeker weet of er een loc staat - dan mag er zeker geen
+    /// tweede trein naartoe gestuurd worden. Eén plek voor deze regel, zodat de kandidaat-
+    /// filters en de start-controles niet meer uit elkaar kunnen lopen.</summary>
+    public bool IsGeblokkeerdVoorRit(Blok blok) => IsBezet(blok) || IsGereserveerd(blok) || IsFoutmelding(blok);
+
     /// <summary>Gereserveerd = onderdeel van het pad van een rijdende trein, maar de trein is er nog niet -
     /// het tussenstation tussen "vrij" en "bezet", zoals in Koploper's eigen kleurenschema.</summary>
     public bool IsGereserveerd(Blok blok) => _gereserveerdeBlokken.Contains(blok);
