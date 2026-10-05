@@ -249,6 +249,15 @@ public static class DinamoLogVertaler
         }
 
         // === Inkomend: van Dinamo (spiegelt Poort_DataReceived) ===
+        if (data.Length == 2 && (data[0] & 0x7C) == 0x30)
+        {
+            // BUG #43: Block Alarm (0011000S)(bbbbbbb) - S=1: kortsluiting in dit blok.
+            bool kortsluiting = (data[0] & 0x02) != 0;
+            int alarmBlok = (((data[0] & 0x01) << 7) | data[1]) + 1; // 0-based -> 1-based
+            return new VertaaldeRegel(tijdstip, richting, "Blok-alarm", "", "", "", "", "", "", "", "",
+                CombineerToelichting(kortsluiting ? $"KORTSLUITING in blok {alarmBlok}" : $"geen kortsluiting meer in blok {alarmBlok}", faultTekst), ruw);
+        }
+
         if (data.Length == 2 && (data[0] & 0x60) == 0x40)
         {
             // Switch-event: (10CSSSS)(sssssss)

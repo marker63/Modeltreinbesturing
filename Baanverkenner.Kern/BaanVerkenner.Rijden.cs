@@ -56,6 +56,30 @@ public partial class BaanVerkenner
 
     private int? BlokVan(int melder) => _kaart.Melders.FirstOrDefault(m => m.Nummer == melder)?.DinamoBlok;
 
+    // BUG #43: Dinamo meldt een kortsluiting ook PER BLOK (Block Alarm, zie IBlokAlarmBron),
+    // en bij ons spoor gebeurde dat zonder dat het globale F-bit ooit gezet werd - de
+    // Baanverkenner zag daardoor niets en wachtte 30 s (en draaide daarna een 17 minuten
+    // durende, nutteloze blokproef) terwijl de loc in de kortsluiting stond. Het event komt
+    // op de seriële thread binnen, dus alles hieronder is vergrendeld.
+    private readonly object _alarmSlot = new();
+    private readonly HashSet<int> _alarmBlokken = new();
+    private List<int> _laatsteKortsluitBlokken = new();
+
+    private void HardwareMeldtBlokAlarm(int blok, bool kortsluiting)
+    {
+        lock (_alarmSlot)
+        {
+            if (kortsluiting) _alarmBlokken.Add(blok);
+            else _alarmBlokken.Remove(blok);
+        }
+        if (kortsluiting && _klok.Nu >= _negeerKortsluitingTot) _kortsluitingGemeld = true;
+    }
+
+    private List<int> HuidigeAlarmBlokken()
+    {
+        lock (_alarmSlot) return _alarmBlokken.OrderBy(b => b).ToList();
+    }
+
     private void HardwareMeldtKortsluiting(bool actief)
     {
         if (!actief) return;
@@ -639,8 +663,12 @@ public partial class BaanVerkenner
     private async Task<RitResultaat> Kortsluiting(RitResultaat res, string reden)
     {
         int x = res.Reeks[^1];
+        _laatsteKortsluitBlokken = HuidigeAlarmBlokken();
         _hw.Noodstop();
-        _log.Waarschuwing($"KORTSLUITING/ONTSPORING vermoed na melder {x} ({res.Richting.Tekst()}): {reden}. Noodstop.");
+        string alarmTekst = _laatsteKortsluitBlokken.Count > 0
+            ? $" Dinamo meldt kortsluiting in blok {string.Join(" en ", _laatsteKortsluitBlokken)}."
+            : "";
+        _log.Waarschuwing($"KORTSLUITING/ONTSPORING vermoed na melder {x} ({res.Richting.Tekst()}): {reden}.{alarmTekst} Noodstop.");
         await VolledigeStop();
         res.Einde = RitEinde.Kortsluiting;
         _kortsluitingenTotaal++;

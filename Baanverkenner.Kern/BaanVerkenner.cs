@@ -157,6 +157,7 @@ public partial class BaanVerkenner
         _token = token;
         _hw.BezetmeldingGewijzigd += _monitor.Ontvang;
         _hw.KortsluitingStatusGewijzigd += HardwareMeldtKortsluiting;
+        if (_hw is IBlokAlarmBron alarmBron) alarmBron.BlokAlarmGewijzigd += HardwareMeldtBlokAlarm;
         try
         {
             bool hervat = _status.Kaart.StartMelder != 0;
@@ -234,6 +235,7 @@ public partial class BaanVerkenner
             BewaarNu();
             _hw.BezetmeldingGewijzigd -= _monitor.Ontvang;
             _hw.KortsluitingStatusGewijzigd -= HardwareMeldtKortsluiting;
+            if (_hw is IBlokAlarmBron alarmBron2) alarmBron2.BlokAlarmGewijzigd -= HardwareMeldtBlokAlarm;
             MeldVoortgang();
         }
     }
@@ -605,7 +607,13 @@ public partial class BaanVerkenner
     {
         int x = reeks[^1];
         var bestaand = _kaart.Kortsluitpunten.FirstOrDefault(k => k.NaMelder == x && k.Richting == r && k.Configuratie.Equals(c));
-        if (bestaand is not null) { bestaand.AantalKortsluitingen++; return; }
+        var alarmBlokken = soort == KortsluitpuntSoort.Kortsluiting ? _laatsteKortsluitBlokken.ToList() : new List<int>();
+        if (bestaand is not null)
+        {
+            bestaand.AantalKortsluitingen++;
+            foreach (var b in alarmBlokken) if (!bestaand.AlarmBlokken.Contains(b)) bestaand.AlarmBlokken.Add(b);
+            return;
+        }
         var k = new Kortsluitpunt
         {
             Id = _status.VolgendeKortsluitId++,
@@ -613,13 +621,14 @@ public partial class BaanVerkenner
             Richting = r,
             Configuratie = c,
             Soort = soort,
+            AlarmBlokken = alarmBlokken,
             Route = RouteMet(route, c, r, reeks),
             AantalKortsluitingen = 1
         };
         _kaart.Kortsluitpunten.Add(k);
         _log.Vondst(soort == KortsluitpuntSoort.OnverwachteTerugweg
             ? $"Onverwachte terugweg #{k.Id}: direct na melder {x} ({r.Tekst()}, {c}) kwam de loc terug via een andere melder dan verwacht. Geen kortsluiting - mogelijk een wissel die van achteren in de verkeerde stand bereden wordt, mogelijk een melder die de eerste keer niet geregistreerd is; wordt zo mogelijk later opgelost."
-            : $"Kortsluitpunt #{k.Id}: direct na melder {x} ({r.Tekst()}, {c}). Waarschijnlijk een wissel die van achteren in de verkeerde stand bereden wordt; wordt later opgelost.");
+            : $"Kortsluitpunt #{k.Id}: direct na melder {x} ({r.Tekst()}, {c})." + (alarmBlokken.Count > 0 ? $" Dinamo meldde kortsluiting in blok {string.Join(" en ", alarmBlokken)}." : "") + " Waarschijnlijk een wissel die van achteren in de verkeerde stand bereden wordt; wordt later opgelost.");
     }
 
     private HashSet<int> KortsluitStops(Configuratie c, Richting r) =>

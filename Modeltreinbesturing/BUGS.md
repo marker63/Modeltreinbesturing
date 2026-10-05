@@ -731,3 +731,42 @@ die geen Kopspoor-blok zijn, (7) wisseladressen met/zonder bevestigd effect,
 testbaan-JSON en de voltooide baankaart van 04-10-2026 nagerekend: ze vindt
 precies melder 129, de overloop-melder 24 (blok 3/4/7) en één zelden geziene
 overgang 28->5 - dezelfde bevindingen als in `BLOKKENSCHEMA.md`.
+
+## #43 - Dinamo's kortsluiting-alarm per blok (Block Alarm) werd genegeerd; de
+   Baanverkenner zag een echte kortsluiting niet en verloor er 17 minuten mee
+
+**Status:** Gefixt (nog niet getest op de echte baan).
+
+**Gevonden via:** het open-source project Traintastic (traintastic.org), dat Dinamo-
+ondersteuning bouwt. Hun `dinamomessages.hpp` beschrijft een "BlockAlarm"-datagram
+(`0x30`, bit 1 = kortsluiting) dat wij nooit verwerkten. Daarna in onze eigen logs
+gezocht: 14 ontvangen datagrammen van dit type, allemaal onopgemerkt gebleven.
+
+**Het bewijs (log van 04-10-2026, 08:46):** de Baanverkenner zette adres 2 op
+afbuigend met de loc op melder 5 (op de wisseltong). 08:46:45.6 "melder 5 bezet";
+08:46:46.3 en .5 kwamen `4AB28282` en `0AB283C1` binnen = Block Alarm met
+kortsluiting in Dinamo-blok 3 en 4 (0-based 2 en 3). Het globale F-bit werd niet
+gezet - de Baanverkenner wachtte op dat F-bit en zag dus niets. Gevolg: 30 s
+niets, "de loc vertrok niet van melder 5", dan de volledige blokproef over 16
+blokken (08:47:54 - 09:04:07) en de conclusie "geen enkel Dinamo-blok kon de loc
+laten rijden". Dat gebeurde in dezelfde vorm nog twee keer (09:04:45, 09:18:55).
+De bijbehorende 0x30 (geen kortsluiting meer) volgde steeds kort nadat het wissel
+weer rechtdoor stond.
+
+**Fix:**
+- Nieuwe `IBlokAlarmBron` (Hardware): optionele interface voor koppelingen die per
+  blok alarmen melden; alleen `DinamoHardware` implementeert hem.
+- `DinamoHardware` herkent `(0011000S)(bbbbbbb)`, vuurt `BlokAlarmGewijzigd` bij
+  een echte wijziging (blok 1-based) en meldt het in het statusbericht/de
+  communicatielog ("Dinamo meldt KORTSLUITING in blok N").
+- `DinamoLogVertaler` toont het datagram als "Blok-alarm".
+- Baanverkenner: een blok-alarm met kortsluiting telt nu als kortsluiting (zelfde pad
+  als het F-bit), noodstop volgt meteen. Het alarm-blok staat in de logregel, in
+  `Kortsluitpunt.AlarmBlokken` en in het rapport (kolom "Dinamo-alarm").
+
+**Bonus-bevestiging voor #40:** in het log van melder 136 (blok 10/11/12) staat
+géén Block Alarm. Dat bevestigt dat daar geen kortsluiting was.
+
+**Niet gedaan (bewust):** Modeltreinbesturing zelf zet bij zo'n alarm geen blok op
+foutmelding en stopt niets - zoals je eerder zei laat Koploper alleen een melding
+zien en blijven de treinen rijden. Het alarm staat nu wel in de hardwarelog.

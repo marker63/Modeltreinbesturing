@@ -121,6 +121,10 @@ public class Kortsluitpunt
     /// <summary>Hoe de loc hier komt (vanaf de startmelder).</summary>
     public List<Etappe> Route { get; set; } = new();
     public int AantalKortsluitingen { get; set; }
+    /// <summary>BUG #43: de Dinamo-blokken waarvoor de centrale op het moment van de
+    /// kortsluiting zelf een kortsluiting-alarm meldde (Block Alarm). Leeg als de
+    /// hardware dit niet meldt (andere centrale, of alleen via het F-bit).</summary>
+    public List<int> AlarmBlokken { get; set; } = new();
     public bool Opgelost { get; set; }
     public bool Opgegeven { get; set; }
     public int? OpgelostDoorAdres { get; set; }

@@ -34,7 +34,7 @@ namespace Modeltreinbesturing.Hardware;
 /// kan dus geen commando verstuurd worden - dat wordt dan duidelijk gemeld i.p.v. blok 0
 /// (een ander, geldig blok) te gebruiken. Nog NIET getest tegen echte hardware.
 /// </summary>
-public class DinamoHardware : IHardwareInterface
+public class DinamoHardware : IHardwareInterface, IBlokAlarmBron
 {
     private SerialPort? _poort;
     private System.Threading.Timer? _stuurTimer;
@@ -134,6 +134,17 @@ public class DinamoHardware : IHardwareInterface
     public event Action<int, bool>? BezetmeldingGewijzigd;
     public event Action<string>? StatusBericht;
     public event Action<bool>? KortsluitingStatusGewijzigd;
+
+    /// <summary>BUG #43: Dinamo meldt een kortsluiting niet alleen via het globale F-bit in de
+    /// header, maar ook PER BLOK met een eigen 2-byte "Block Alarm"-datagram:
+    /// (0011000S)(bbbbbbb) - byte 1 = 0x30 | (kortsluiting ? 0x02 : 0) | blokbit 7, byte 2 =
+    /// blokbit 6..0 (0-based, dus +1 voor Blok.Nummer). Bewezen uit de echte logs van
+    /// 04-10-2026: tijdens "adres 2 afbuigend" met de loc op melder 5 kwam 0,7 s later
+    /// `4AB28282` + `0AB283C1` binnen = kortsluiting in blok 3 én 4, zonder dat het F-bit ooit
+    /// werd gezet. Onze code negeerde deze datagrammen tot nu toe. Bron voor de
+    /// bitindeling: Traintastic (BlockAlarm in dinamomessages.hpp), bevestigd tegen onze logs.</summary>
+    public event Action<int, bool>? BlokAlarmGewijzigd;
+    private readonly Dictionary<int, bool> _laatsteBlokAlarm = new();
 
     public Task VerbindenAsync(string comPoort)
     {
@@ -777,6 +788,24 @@ public class DinamoHardware : IHardwareInterface
                 {
                     byte data1 = (byte)(_ontvangstBuffer[i + 1] & 0x7F);
                     byte data2 = (byte)(_ontvangstBuffer[i + 2] & 0x7F);
+                    if ((data1 & 0x7C) == 0x30)
+                    {
+                        // BUG #43: Block Alarm - zie BlokAlarmGewijzigd. Alleen doorgeven bij een
+                        // echte wijziging; een "geen kortsluiting" voor een blok dat nooit in
+                        // kortsluiting stond is geen nieuws.
+                        int alarmBlok = (((data1 & 0x01) << 7) | data2) + 1; // 0-based -> 1-based
+                        bool alarmKortsluiting = (data1 & 0x02) != 0;
+                        _laatsteBlokAlarm.TryGetValue(alarmBlok, out bool alarmVorige);
+                        if (alarmVorige != alarmKortsluiting)
+                        {
+                            _laatsteBlokAlarm[alarmBlok] = alarmKortsluiting;
+                            StatusBericht?.Invoke(alarmKortsluiting
+                                ? $"Dinamo meldt KORTSLUITING in blok {alarmBlok}."
+                                : $"Dinamo: kortsluiting in blok {alarmBlok} is opgeheven.");
+                            BlokAlarmGewijzigd?.Invoke(alarmBlok, alarmKortsluiting);
+                        }
+                    }
+                    else
                     // patroon "10CSSSS" (spontaan event, bit6=1,bit5=0) OF "11CSSSS"
                     // (antwoord op een statusaanvraag, bit6=1,bit5=1) - beide zijn qua
                     // adres/C-bit-opbouw identiek, dus hier gewoon één gezamenlijke check
