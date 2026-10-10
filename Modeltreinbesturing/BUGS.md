@@ -1258,3 +1258,11 @@ Controleren of alles wat de Baanverkenner (#61-#64) heeft geleerd ook in het Mod
 - Overloopwissels (twee wissels samen afbuigend, `LostKortsluitingOp` met partner, kortsluitpunt opgelost door adres b): de importer gebruikt wisselwaarnemingen nog niet.
 - Omgekeerde overgangen (#64): importer leest overgangen al in beide richtingen (Van of Naar), dus waarschijnlijk al goed - nog bevestigen met de kaart van 13:40.
 - Blokhints/leerprofiel hoeven niet naar het hoofdprogramma.
+
+## #65 - OPEN (Marco 14:24/14:30): wissels schakelden fysiek niet meer, software stuurde wel en Dinamo bevestigde
+**Waarneming:** run 14:06-14:22: alle commando's verstuurd en door de Dinamo bevestigd (zelfde frames als 13:xx), maar fysiek ging geen wissel om; alle adressen "geen verschil" (om 13:28 gaf adres 2
+afbuigend nog melder 12). Eerste rit 13->14 kreeg direct na de initialisatie kortsluiting in blok 3 (ook om 13:05). Oplossing door Marco: Dinamo-systeem spanningsloos maken en opnieuw opstarten; daarna
+werden de wissels weer geïnitialiseerd en reageerden ze (nog te bevestigen na de voortgezette testrit).
+**Hypothese (Marco, niet bewezen):** zoals in Koploper "Wissels niet gezet storing": een volgelopen buffer in de Dinamo. Wij sturen elk wisselcommando 3x (6 frames) en bij elke adrestest twee commando's.
+**Mogelijke maatregelen (nog NIET gebouwd, eerst Marco's akkoord):** (1) wissel-effectcontrole: een wissel met bewezen effect (bijv. adres 2 -> melder 12) die later geen effect meer heeft stopt de verkenner met de melding
+"wissel reageert niet, Dinamo opnieuw opstarten"; (2) aantal wisselcommando's tellen en loggen (hoeveel voor de storing begon); (3) eventueel minder herhalingen of meer pauze tussen wisselcommando's, alleen na bewijs uit de log.
