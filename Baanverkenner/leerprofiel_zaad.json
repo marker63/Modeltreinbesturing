@@ -5,43 +5,72 @@
       "Van": 144,
       "Naar": 143,
       "Richting": "Vooruit",
-      "SecondenXStap": 204.489,
+      "SecondenXStap": 203.73804133333334,
       "Aantal": 9
     },
     {
       "Van": 144,
       "Naar": 136,
       "Richting": "Achteruit",
-      "SecondenXStap": 208.264,
+      "SecondenXStap": 206.93372746666665,
       "Aantal": 9
     },
     {
       "Van": 136,
       "Naar": 133,
       "Richting": "Achteruit",
-      "SecondenXStap": 36.288,
+      "SecondenXStap": 36.288456,
       "Aantal": 16
     },
     {
       "Van": 133,
       "Naar": 136,
       "Richting": "Vooruit",
-      "SecondenXStap": 138.47,
-      "Aantal": 10
+      "SecondenXStap": 149.34789624,
+      "Aantal": 15
     },
     {
       "Van": 136,
       "Naar": 144,
       "Richting": "Vooruit",
-      "SecondenXStap": 35.683,
+      "SecondenXStap": 36.163907057142865,
       "Aantal": 14
     },
     {
       "Van": 133,
       "Naar": 132,
       "Richting": "Achteruit",
-      "SecondenXStap": 157.68,
+      "SecondenXStap": 157.71285179999998,
+      "Aantal": 14
+    },
+    {
+      "Van": 132,
+      "Naar": 133,
+      "Richting": "Vooruit",
+      "SecondenXStap": 36.71517648,
+      "Aantal": 10
+    },
+    {
+      "Van": 132,
+      "Naar": 140,
+      "Richting": "Achteruit",
+      "SecondenXStap": 38.639099279999996,
+      "Aantal": 10
+    },
+    {
+      "Van": 140,
+      "Naar": 139,
+      "Richting": "Achteruit",
+      "SecondenXStap": 208.53716853333339,
+      "Aantal": 9
+    },
+    {
+      "Van": 140,
+      "Naar": 132,
+      "Richting": "Vooruit",
+      "SecondenXStap": 204.00462108000002,
       "Aantal": 10
     }
-  ]
+  ],
+  "AantalMetingen": 116
 }

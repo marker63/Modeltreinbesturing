@@ -1,0 +1,326 @@
+{
+  "FormaatVersie": 1,
+  "Programma": "Baanverkenner",
+  "Gestart": "2026-10-10T11:02:01.819747+02:00",
+  "Bijgewerkt": "2026-10-10T11:38:22.288643+02:00",
+  "Voltooid": true,
+  "Hardware": "VPEB Dinamo",
+  "LocAdres": 5408,
+  "LocStappen": 28,
+  "RefSnelheid": 12,
+  "StartMelder": 144,
+  "WisselAdresVan": 1,
+  "WisselAdresTot": 1,
+  "Melders": [
+    {
+      "Nummer": 132,
+      "DinamoBlok": 10
+    },
+    {
+      "Nummer": 133,
+      "DinamoBlok": 11
+    },
+    {
+      "Nummer": 136,
+      "DinamoBlok": 12
+    },
+    {
+      "Nummer": 139,
+      "DinamoBlok": 10
+    },
+    {
+      "Nummer": 140,
+      "DinamoBlok": 10
+    },
+    {
+      "Nummer": 143,
+      "DinamoBlok": 12
+    },
+    {
+      "Nummer": 144,
+      "DinamoBlok": 12
+    }
+  ],
+  "Overgangen": [
+    {
+      "Van": 144,
+      "Naar": 143,
+      "Richting": "Vooruit",
+      "AantalKeer": 13,
+      "GemiddeldeSeconden": 16.978170111111112,
+      "AantalMetingen": 9,
+      "GezienBijConfiguraties": [
+        "",
+        "1"
+      ]
+    },
+    {
+      "Van": 143,
+      "Naar": 144,
+      "Richting": "Achteruit",
+      "AantalKeer": 13,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        "",
+        "1"
+      ]
+    },
+    {
+      "Van": 144,
+      "Naar": 136,
+      "Richting": "Achteruit",
+      "AantalKeer": 15,
+      "GemiddeldeSeconden": 17.244477288888888,
+      "AantalMetingen": 9,
+      "GezienBijConfiguraties": [
+        "",
+        "1"
+      ]
+    },
+    {
+      "Van": 136,
+      "Naar": 133,
+      "Richting": "Achteruit",
+      "AantalKeer": 15,
+      "GemiddeldeSeconden": 3.028686864285715,
+      "AantalMetingen": 14,
+      "GezienBijConfiguraties": [
+        "",
+        "1"
+      ]
+    },
+    {
+      "Van": 133,
+      "Naar": 132,
+      "Richting": "Achteruit",
+      "AantalKeer": 15,
+      "GemiddeldeSeconden": 13.142737649999999,
+      "AantalMetingen": 14,
+      "GezienBijConfiguraties": [
+        "",
+        "1"
+      ]
+    },
+    {
+      "Van": 132,
+      "Naar": 133,
+      "Richting": "Vooruit",
+      "AantalKeer": 15,
+      "GemiddeldeSeconden": 3.05959804,
+      "AantalMetingen": 10,
+      "GezienBijConfiguraties": [
+        "",
+        "1"
+      ]
+    },
+    {
+      "Van": 133,
+      "Naar": 136,
+      "Richting": "Vooruit",
+      "AantalKeer": 15,
+      "GemiddeldeSeconden": 12.44565802,
+      "AantalMetingen": 15,
+      "GezienBijConfiguraties": [
+        "",
+        "1"
+      ]
+    },
+    {
+      "Van": 136,
+      "Naar": 144,
+      "Richting": "Vooruit",
+      "AantalKeer": 15,
+      "GemiddeldeSeconden": 3.013658921428572,
+      "AantalMetingen": 14,
+      "GezienBijConfiguraties": [
+        "",
+        "1"
+      ]
+    },
+    {
+      "Van": 132,
+      "Naar": 140,
+      "Richting": "Achteruit",
+      "AantalKeer": 10,
+      "GemiddeldeSeconden": 3.21992494,
+      "AantalMetingen": 10,
+      "GezienBijConfiguraties": [
+        "",
+        "1"
+      ]
+    },
+    {
+      "Van": 140,
+      "Naar": 139,
+      "Richting": "Achteruit",
+      "AantalKeer": 10,
+      "GemiddeldeSeconden": 17.37809737777778,
+      "AantalMetingen": 9,
+      "GezienBijConfiguraties": [
+        "",
+        "1"
+      ]
+    },
+    {
+      "Van": 139,
+      "Naar": 140,
+      "Richting": "Vooruit",
+      "AantalKeer": 10,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        "",
+        "1"
+      ]
+    },
+    {
+      "Van": 140,
+      "Naar": 132,
+      "Richting": "Vooruit",
+      "AantalKeer": 10,
+      "GemiddeldeSeconden": 17.00038509,
+      "AantalMetingen": 10,
+      "GezienBijConfiguraties": [
+        "",
+        "1"
+      ]
+    }
+  ],
+  "Wissels": [],
+  "Kopsporen": [
+    {
+      "Melder": 143,
+      "Richting": "Vooruit",
+      "Configuratie": "alle wissels rechtdoor"
+    },
+    {
+      "Melder": 139,
+      "Richting": "Achteruit",
+      "Configuratie": "alle wissels rechtdoor"
+    }
+  ],
+  "Trajecten": [
+    {
+      "Configuratie": {
+        "Afbuigend": []
+      },
+      "Start": 144,
+      "Richting": "Vooruit",
+      "Reeks": [
+        144,
+        143
+      ],
+      "Einde": "Doodlopend"
+    },
+    {
+      "Configuratie": {
+        "Afbuigend": []
+      },
+      "Start": 144,
+      "Richting": "Achteruit",
+      "Reeks": [
+        144,
+        136,
+        133,
+        132,
+        140,
+        139
+      ],
+      "Einde": "Doodlopend"
+    },
+    {
+      "Configuratie": {
+        "Afbuigend": []
+      },
+      "Start": 143,
+      "Richting": "Achteruit",
+      "Reeks": [
+        143,
+        144,
+        136,
+        133,
+        132,
+        140,
+        139
+      ],
+      "Einde": "Doodlopend"
+    },
+    {
+      "Configuratie": {
+        "Afbuigend": []
+      },
+      "Start": 132,
+      "Richting": "Vooruit",
+      "Reeks": [
+        132,
+        133,
+        136,
+        144,
+        143
+      ],
+      "Einde": "Doodlopend"
+    },
+    {
+      "Configuratie": {
+        "Afbuigend": []
+      },
+      "Start": 139,
+      "Richting": "Vooruit",
+      "Reeks": [
+        139,
+        140,
+        132,
+        133,
+        136,
+        144,
+        143
+      ],
+      "Einde": "Doodlopend"
+    }
+  ],
+  "Kortsluitpunten": [],
+  "AdressenZonderEffect": [
+    1
+  ],
+  "VoorgesteldeBlokken": [
+    {
+      "Nummer": 1,
+      "Melders": [
+        132,
+        140,
+        139
+      ],
+      "DinamoBlok": 10,
+      "Buren": [
+        2
+      ]
+    },
+    {
+      "Nummer": 2,
+      "Melders": [
+        133
+      ],
+      "DinamoBlok": 11,
+      "Buren": [
+        1,
+        3
+      ]
+    },
+    {
+      "Nummer": 3,
+      "Melders": [
+        136,
+        144,
+        143
+      ],
+      "DinamoBlok": 12,
+      "Buren": [
+        2
+      ]
+    }
+  ],
+  "Waarschuwingen": [
+    "Basisrit vanaf melder 144 achteruit (alle wissels rechtdoor) gaf niet steeds dezelfde melders: 144, 136, 133, 132 / 144, 136, 133, 132, 140, 139 / 144, 136, 133, 132, 140, 139. Gebruikt: 144, 136, 133, 132, 140, 139. Controleer deze melders op spookmeldingen."
+  ]
+}

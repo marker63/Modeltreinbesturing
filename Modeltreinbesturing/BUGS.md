@@ -1161,3 +1161,35 @@ dan niet wachten op "geen nieuwe melder binnen de wachttijd" maar direct stoppen
 Let op: alleen bij een echt kopspoor (<= 1 buurmelder, zie #56) en bij dezelfde wisselconfiguratie; nooit voor een melder die alleen
 "doodlopend" leek door stilvallen (#55, #57). Eerste keer dat een einde ontdekt wordt blijft de wachttijd nodig. Ook de Nastellen-kruip
 tegen het stootjuk (#58) en de blokproef bij een bekend kopspoor kunnen dan korter.
+
+## #61 - Baanverkenner: loc staat op twee secties en komt niet meer in beweging (rit 10-10 11:38, melder 136 en 132)
+**Eerst de goede uitkomst:** de rit van 11:02-11:38 (36 min 20 s) was voor het eerst een volledig geslaagde verkenning van het pendeltraject
+(blok 10 = melders 132/140/139, blok 11 = melder 133, blok 12 = melders 136/144/143; kopsporen 143 en 139; 5 trajecten, 10 gemeten
+overgangen). Die kaart/het rapport/de logs staan als referentie in `Tools/CompileCheck/testdata/*_pendel_2026-10-10_1138_geslaagd.*`
+en de importer/dienst/leerprofiel-tests (`GeslaagdeRitTest`) draaien erop. `Baanverkenner/leerprofiel_zaad.json` is ververst met de
+tijden van 10:25 + 11:38 (10 overgangen). Let op: heen en terug zijn NIET gelijk (136->133 = 3 s, 133->136 = 12 s bij snelheid 12,
+omdat de tijd tussen twee "bezet"-meldingen van de positie van de melders afhangt) - dus tijden nooit spiegelen.
+
+**Wat er mis ging (uit de hardwarelog, 2 plekken, zelfde oorzaak):** een loc die vanuit stilstand met een deel in twee secties
+(= twee Dinamo-blokken) staat, komt niet in beweging als het rijcommando maar naar EEN van die blokken gaat (3 x 30 s, 0 beweging;
+pas bij een commando naar alle blokken reed hij binnen 2 s weg).
+1. Melder 136 (11:06:53): de loc rolde tijdens de stopprocedure (VolledigeStop, ~3 s na de melding "136 bezet" omdat 136 maar 3 s
+   lang is) met de neus in 133 (`4AD184E1` = melder 133 bezet, 0,4 s voor de stop). De blokproef zocht daarna blok voor blok:
+   12, 10, 11 (6 s elk) en 10, 11, 12 (30 s elk) zonder beweging; blok 12 WAS goed, maar de loc stond ook in blok 11. Verlies: ~110 s en
+   melder 136 kreeg pas bij de rit erna zijn blok.
+2. Melder 132 (11:09:54): na het neerzetten flikkerde melder 133 (bezet/vrij/bezet binnen een seconde); het rijcommando ging op dat
+   moment alleen naar blok 10 (133 stond even "vrij"), terwijl de loc ook in 133 (blok 11) stond. 30 s stilstand, daarna "doodlopend na 132"
+   (onterecht; 140/139 volgen) - de rit herstelde zichzelf pas door de terugrit.
+**Fix (Baanverkenner.Kern/BaanVerkenner.Rijden.cs):**
+- Na de volledige stop vóór een blokproef: staat de loc op meer dan alleen de nieuwe melder, dan eerst `Nastellen` (terugkruipen met alle
+  blokken) tot alleen die melder bezet is; lukt dat niet, dan geen proef maar de rit gaat door (de proef komt bij een volgende rit; geen
+  poging geteld).
+- `VoedOntbrekendeBlokken`: staat de loc op meerdere melders en ontbreekt het rijcommando voor het (bekende) blok van een van die melders,
+  dan krijgt dat blok het commando er alsnog bij (`_voedingBlokken` houdt bij welke blokken het laatste commando kregen). Blokken die
+  nog onbekend zijn blijven buiten schot, zodat de blokproef-opzet (loc rolt zelf helemaal de nieuwe sectie in) ongewijzigd blijft.
+**Test:** simulator kreeg `StilstaanRemtOpGrens` (vanuit stilstand op twee blokken rijdt de loc alleen weg als alle blokken het commando
+krijgen) en het rijden met meerdere blokken tegelijk. Bij sectielengte 136 = 50 en 52 cm (de loc staat na de stop op de grens) faalde
+de OUDE code (blokproef mislukt) en slaagt de nieuwe; 15 sectielengtes + flikkerende melders 132/133/136 groen. ALLES OK.
+**Eerlijk:** het tweede punt (flikkering bij 132) liet zich in de simulator niet afdwingen; de oorzaak komt uit de hardwarelog en de
+fix is in de simulator alleen op "geen verslechtering" getest. NOG NIET GETEST OP DE BAAN.
+**Nog open uit deze rit:** ~8 van de 36 minuten gingen op aan wachten bij bekende doodlopende einden (-> #60, gepland).

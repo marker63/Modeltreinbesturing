@@ -98,9 +98,13 @@ public partial class BaanVerkenner
     /// <summary>Stuurt een snelheid naar de loc. Bij Dinamo via de blokken van de melders
     /// waar de loc nu staat; is daarvan een blok onbekend, dan naar ALLE blokken (er staat
     /// maar één loc op de baan, dus dat kan veilig - het is alleen trager).</summary>
+    /// <summary>BUG #61: de blokken die het laatste rijcommando kregen (leeg = de loc staat stil).</summary>
+    private readonly HashSet<int> _voedingBlokken = new();
+
     private async Task StuurSnelheid(Richting r, int stap)
     {
         bool vooruit = r == Richting.Vooruit;
+        _voedingBlokken.Clear();
         if (!BlokVereist)
         {
             _hw.ZetLocSnelheid(_ins.LocAdres, stap, vooruit, 0, _ins.LocStappen);
@@ -110,7 +114,24 @@ public partial class BaanVerkenner
         var blokken = BlokkenVoorHuidigePlek();
         blokken ??= _ins.DinamoBlokLijst();
         foreach (var b in blokken) _hw.ZetLocSnelheid(_ins.LocAdres, stap, vooruit, b, _ins.LocStappen);
+        if (stap > 0) _voedingBlokken.UnionWith(blokken);
         await Wacht(DinamoCyclus * blokken.Count);
+    }
+
+    /// <summary>BUG #61: staat de loc met een deel in meerdere secties en ontbreekt het rijcommando voor een
+    /// (bekend) blok daarvan, dan gaat het commando ook daarheen. Op de baan (11:38, melder 132/133) vertrok
+    /// de loc na een flikkering alleen met het blok van 132, terwijl hij ook in 133 stond: 30 s stilstand.
+    /// Blokken die nog onbekend zijn blijven buiten schot (die loc moet zelf in de nieuwe sectie uitrollen).</summary>
+    private async Task VoedOntbrekendeBlokken(IReadOnlyCollection<int> bezet, Richting r, int stap)
+    {
+        if (!BlokVereist || _voedingBlokken.Count == 0 || bezet.Count < 2) return;
+        var ontbreekt = bezet.Select(BlokVan).Where(b => b is not null).Select(b => b!.Value).Distinct()
+            .Where(b => !_voedingBlokken.Contains(b)).ToList();
+        if (ontbreekt.Count == 0) return;
+        _log.Info($"De loc staat op meerdere melders ({Lijst(bezet)}); rijcommando ook naar blok {string.Join(", ", ontbreekt)}.");
+        foreach (var b in ontbreekt) _hw.ZetLocSnelheid(_ins.LocAdres, stap, r == Richting.Vooruit, b, _ins.LocStappen);
+        _voedingBlokken.UnionWith(ontbreekt);
+        await Wacht(DinamoCyclus * ontbreekt.Count);
     }
 
     /// <summary>Blokken van de melders waar de loc nu staat, of null als er (nog) één
@@ -131,6 +152,8 @@ public partial class BaanVerkenner
 
     private async Task StuurNaarBlok(int blok, Richting r, int stap)
     {
+        _voedingBlokken.Clear();
+        if (stap > 0) _voedingBlokken.Add(blok);
         _hw.ZetLocSnelheid(_ins.LocAdres, stap, r == Richting.Vooruit, blok, _ins.LocStappen);
         await Wacht(DinamoCyclus);
     }
@@ -139,6 +162,7 @@ public partial class BaanVerkenner
     /// de volledige stop.</summary>
     private async Task StopLoc()
     {
+        _voedingBlokken.Clear();
         if (!BlokVereist)
         {
             _hw.ZetLocSnelheid(_ins.LocAdres, 0, true, 0, _ins.LocStappen);
@@ -160,6 +184,7 @@ public partial class BaanVerkenner
     /// gaat; daarna controleren dat er echt niets meer beweegt.</summary>
     private async Task VolledigeStop()
     {
+        _voedingBlokken.Clear();
         if (!BlokVereist)
         {
             _hw.Noodstop();
@@ -584,6 +609,7 @@ public partial class BaanVerkenner
                     return await Kortsluiting(res, $"geen enkele melder meer bezet na melder {res.Reeks[^1]}");
             }
             else leegSinds = null;
+            await VoedOntbrekendeBlokken(bezet, r, doelInzicht ? _ins.Kruipsnelheid : snelheid);
 
             // ---- Nieuwe melders ----
             // BUG #54: een loc die met één draaistel al in de VOLGENDE melder staat (bijv. deels in 144
@@ -745,6 +771,30 @@ public partial class BaanVerkenner
                 heelInNieuweSectieSinds = null;
                 await VolledigeStop();
                 int proefMelder = res.Reeks[^1];
+                // BUG #61 (rit van 10-10 11:38, melder 136): de loc rolde tijdens het stoppen met een deel de
+                // volgende melder in en staat nu op TWEE secties. Een blokproef met één blok kan hem dan niet laten
+                // bewegen (het voedende blok remt tegen het onbekrachtigde blok), dus 3 x 30 s verloren en geen
+                // blok gevonden. Eerst netjes terugkruipen tot alleen deze melder bezet is (alle blokken), dan pas de proef.
+                _monitor.Bijwerken();
+                var naStop = _monitor.Bezet;
+                if (!(naStop.Count == 1 && naStop.Contains(proefMelder)))
+                {
+                    _log.Info($"Melder {proefMelder}: de loc staat na het stoppen op meerdere melders ({Lijst(naStop)}); eerst terugzetten voordat het blok gezocht wordt.");
+                    if (naStop.Contains(proefMelder) && naStop.FirstOrDefault(x => x != proefMelder, -1) is int andere and >= 0)
+                        await Nastellen(proefMelder, r, voor: andere);
+                    _monitor.Bijwerken();
+                    naStop = _monitor.Bezet;
+                    if (!(naStop.Count == 1 && naStop.Contains(proefMelder)))
+                    {
+                        // Lukt dat niet (of de loc staat inmiddels helemaal in de volgende melder): geen proef nu, de rit gaat
+                        // door; het blok van deze melder wordt bij een volgende rit alsnog gezocht.
+                        _log.Waarschuwing($"Melder {proefMelder}: kon de loc niet op alleen die melder zetten - blokproef overgeslagen, rit gaat door.");
+                        await StuurSnelheid(r, doelInzicht ? _ins.Kruipsnelheid : snelheid);
+                        laatsteWijziging = _klok.Nu;
+                        onderbroken = true;
+                        continue;
+                    }
+                }
                 _proefPogingen[proefMelder] = _proefPogingen.GetValueOrDefault(proefMelder) + 1;
                 if (!await BlokZoekenNaInrijden(proefMelder, res.Reeks[^2], r) && !await BlokZoekenDoorrijdend(proefMelder, r))
                     _log.Waarschuwing(_proefPogingen[proefMelder] < MaxProefPogingen

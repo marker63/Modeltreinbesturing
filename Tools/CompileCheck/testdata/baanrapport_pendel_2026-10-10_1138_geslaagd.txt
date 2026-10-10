@@ -1,0 +1,60 @@
+BAANVERKENNER - RAPPORT
+============================================================
+Status        : voltooid
+Hardware      : VPEB Dinamo
+Testloc       : adres 5408 (28 stappen)
+Startmelder   : 144
+Wisseladressen: 1 t/m 1
+Gestart       : 10-10-2026 11:02   duur: 36 min 20 s
+Gevonden      : 7 melders, 0 wissels, 2 doodlopende einden, 3 voorgestelde blokken
+(Richtingen zijn die van de testloc zelf.)
+
+WISSELS
+-------
+  (geen)
+
+GEREDEN TRAJECTEN
+-----------------
+  [vooruit, alle wissels rechtdoor]
+     144 → 143  ▮ doodlopend
+  [achteruit, alle wissels rechtdoor]
+     144 → 136 → 133 → 132 → 140 → 139  ▮ doodlopend
+  [achteruit, alle wissels rechtdoor]
+     143 → 144 → 136 → 133 → 132 → 140 → 139  ▮ doodlopend
+  [vooruit, alle wissels rechtdoor]
+     132 → 133 → 136 → 144 → 143  ▮ doodlopend
+  [vooruit, alle wissels rechtdoor]
+     139 → 140 → 132 → 133 → 136 → 144 → 143  ▮ doodlopend
+
+MELDERS
+-------
+  Melder 132  blok 10    vooruit → 133        achteruit → 140
+  Melder 133  blok 11    vooruit → 136        achteruit → 132
+  Melder 136  blok 12    vooruit → 144        achteruit → 133
+  Melder 139  blok 10    vooruit → 140        achteruit → 
+  Melder 140  blok 10    vooruit → 132        achteruit → 139
+  Melder 143  blok 12    vooruit →            achteruit → 144
+  Melder 144  blok 12    vooruit → 143        achteruit → 136
+
+VOORGESTELDE BLOKKEN
+--------------------
+  Blok 1  : melders 132 - 140 - 139 (Dinamo-blok 10)   grenst aan: 2
+  Blok 2  : melders 133 (Dinamo-blok 11)   grenst aan: 1, 3
+  Blok 3  : melders 136 - 144 - 143 (Dinamo-blok 12)   grenst aan: 2
+
+DOODLOPENDE EINDEN
+------------------
+  na melder 143 (vooruit)
+  na melder 139 (achteruit)
+
+KORTSLUITPUNTEN EN ONVERWACHTE TERUGWEGEN
+-----------------------------------------
+  (geen)
+
+ADRESSEN ZONDER GEVONDEN EFFECT
+-------------------------------
+  1
+
+AANDACHTSPUNTEN
+---------------
+  - Basisrit vanaf melder 144 achteruit (alle wissels rechtdoor) gaf niet steeds dezelfde melders: 144, 136, 133, 132 / 144, 136, 133, 132, 140, 139 / 144, 136, 133, 132, 140, 139. Gebruikt: 144, 136, 133, 132, 140, 139. Controleer deze melders op spookmeldingen.

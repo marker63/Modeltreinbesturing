@@ -75,6 +75,10 @@ public class SimulatieBaan : IHardwareInterface
     public bool DinamoGedrag { get; set; }
     /// <summary>Gedrag van de echte baan (BUG #34/#57): zodra de loc helemaal uit het blok is waarnaar het laatste rijcommando ging, blijft hij stilstaan. Standaard uit, zodat de DemoBaan (wissels zonder eigen melder) ongewijzigd werkt.</summary>
     public bool StaatStilZonderBlokcommando { get; set; }
+    /// <summary>Gedrag van de echte baan (11:38-rit, BUG #61): een loc die vanuit stilstand met een deel in twee blokken staat, gaat alleen rijden als het rijcommando naar ALLE die blokken gaat (een voedend blok naast een onbekrachtigd blok remt de loc af). Een rijdende loc rolt gewoon door. Standaard uit.</summary>
+    public bool StilstaanRemtOpGrens { get; set; }
+    private readonly HashSet<int> _aangestuurd = new();
+    private bool _bewegend;
     /// <summary>Alleen voor tests (BUG #57): (melder waar het midden van de loc staat, blok, vooruit)-combinaties waarvoor een rijcommando met snelheid > 0 niets doet (waarde = hoe vaak het commando verloren gaat; daarna werkt het weer).</summary>
     public Dictionary<(int Melder, int Blok, bool Vooruit), int> GeblokkeerdeCommandos { get; } = new();
     /// <summary>Meldt kortsluiting via KortsluitingStatusGewijzigd (zoals Dinamo's F-bit).</summary>
@@ -199,6 +203,8 @@ public class SimulatieBaan : IHardwareInterface
         if (DinamoGedrag && !BlokkenVanLoc().Contains(blokNummer)) return; // komt niet aan
         if (DinamoGedrag && _element is Sectie huidig && stap > 0 && VerliesCommando((huidig.Melder, blokNummer, vooruit))) return; // test: dit commando gaat verloren
         _commandoBlok = blokNummer;
+        if (stap > 0 && _decoderStap > 0 && _decoderVooruit == vooruit) _aangestuurd.Add(blokNummer);
+        else { _aangestuurd.Clear(); if (stap > 0) _aangestuurd.Add(blokNummer); }
         _decoderStap = Math.Max(0, stap);
         _decoderVooruit = vooruit;
     });
@@ -282,10 +288,16 @@ public class SimulatieBaan : IHardwareInterface
     {
         if (_element is null) return;
         bool fBit = DinamoGedrag && nu < _fBitTot;
-        if (fBit || _decoderStap == 0) return;
+        if (fBit || _decoderStap == 0) { _bewegend = false; return; }
         // Echte Dinamo (gezien op de baan, BUG #34/#57): een rijcommando gaat via een blok. Zodra de loc
         // helemaal uit dat blok is, komt er geen commando meer aan en blijft hij stilstaan.
-        if (DinamoGedrag && StaatStilZonderBlokcommando && _commandoBlok is int cb && !BlokkenVanLoc().Contains(cb)) { _decoderStap = 0; return; }
+        if (DinamoGedrag && StaatStilZonderBlokcommando && _commandoBlok is not null && !(_aangestuurd.Count > 0 ? _aangestuurd.Any(b => BlokkenVanLoc().Contains(b)) : BlokkenVanLoc().Contains(_commandoBlok.Value))) { _decoderStap = 0; _bewegend = false; return; }
+        if (DinamoGedrag && StilstaanRemtOpGrens && !_bewegend)
+        {
+            var onder = BlokkenVanLoc();
+            if (onder.Count > 1 && !onder.All(_aangestuurd.Contains)) return;
+        }
+        _bewegend = true;
         int v = _decoderVooruit ? 1 : -1;
 
         if (_kortsluiting)

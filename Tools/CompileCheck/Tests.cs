@@ -41,11 +41,21 @@ public static class Tests
 
 
         PendelScenario(new Dictionary<(int, int, bool), int> { [(132, 10, true)] = 2, [(132, 10, false)] = 2 }, "pendel (proef blijft mislukken)", true);
+
+        // BUG #61 (11:38-rit): loc staat bij het stoppen met een deel in twee secties
+        foreach (var fl in new[] { 133, 132, 136 })
+            PendelScenario(new Dictionary<(int, int, bool), int>(), $"pendel (loc op grens, melder {fl} flikkert)", true, flikker: fl, grensRem: true);
+        foreach (var l in new[] { 50.0, 52.0, 54.0, 56.0, 58.0, 60.0, 62.0, 64.0, 66.0, 68.0, 70.0, 72.0, 75.0, 80.0, 100.0 })
+        {
+            var gr = PendelScenario(new Dictionary<(int, int, bool), int>(), $"pendel (loc op grens, sectie 136 = {l} cm)", true, lengte136: l, grensRem: true);
+            var tekst = gr.Log.AlsTekst();
+            Eis(!tekst.Contains("terugrijden gaf bij geen enkel blok"), $"pendel (loc op grens, 136 = {l} cm): geen mislukte blokproef met de loc op twee secties");
+        }
     }
 
-    static (BaanVerkenner V, VerkenLog Log, VerkenInstellingen Ins, double Seconden) PendelScenario(Dictionary<(int, int, bool), int> blokkeringen, string naam, bool blokMoetBekendZijn, int proefKort = 6, int flikker = 0, LeerProfiel? profiel = null, double lengte136 = 80, bool autoSnelheid = false)
+    static (BaanVerkenner V, VerkenLog Log, VerkenInstellingen Ins, double Seconden) PendelScenario(Dictionary<(int, int, bool), int> blokkeringen, string naam, bool blokMoetBekendZijn, int proefKort = 6, int flikker = 0, LeerProfiel? profiel = null, double lengte136 = 80, bool autoSnelheid = false, bool grensRem = false)
     {
-        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, StaatStilZonderBlokcommando = true, LocAdres = 5408 };
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, StaatStilZonderBlokcommando = true, LocAdres = 5408, StilstaanRemtOpGrens = grensRem };
         foreach (var gb in blokkeringen) sim.GeblokkeerdeCommandos[gb.Key] = gb.Value; // op de baan gaf het 'klein stukje terug' bij melder 132 geen beweging
         var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
         var s143 = sim.NieuweSectie(143, 100, 12); var s144 = sim.NieuweSectie(144, 400, 12); var s136 = sim.NieuweSectie(136, lengte136, 12);
@@ -71,6 +81,31 @@ public static class Tests
         Eis(!k.Kopsporen.Any(x => x.Melder == 132), naam + ": melder 132 is GEEN kopspoor");
         Eis(k.Kopsporen.Any(x => x.Melder == 139) && k.Kopsporen.Any(x => x.Melder == 143), naam + ": echte uiteinden 139 en 143 zijn kopspoor");
         return (v, log, ins, (klok.Nu - new DateTime(2026, 1, 1, 12, 0, 0)).TotalSeconds);
+    }
+
+    // De geslaagde, volledige rit van 10-10 11:38 (blokken 10, 11, 12): referentie voor importer en leerprofiel
+    static void GeslaagdeRitTest()
+    {
+        var k = Laad("baankaart_pendel_2026-10-10_1138_geslaagd.json");
+        Eis(k.Voltooid && k.Melders.Count == 7 && k.Wissels.Count == 0, "11:38-kaart: voltooid, 7 melders, geen wissels");
+        var bb = new BlokBeheerder();
+        new BaankaartImporter().Importeer(k, bb);
+        Eis(bb.Blokken.Select(b => b.Nummer).OrderBy(x => x).SequenceEqual(new[] { 10, 11, 12 }), "11:38-kaart: blokken 10, 11 en 12");
+        Eis(bb.Blokken.First(b => b.Nummer == 10).Bezetmeldpunten.Select(p => p.MeldernNummer).OrderBy(x => x).SequenceEqual(new[] { 132, 139, 140 }), "11:38-kaart: blok 10 = melders 132, 139, 140");
+        Eis(bb.Blokken.First(b => b.Nummer == 11).Bezetmeldpunten.Select(p => p.MeldernNummer).SequenceEqual(new[] { 133 }), "11:38-kaart: blok 11 = melder 133");
+        Eis(bb.Blokken.First(b => b.Nummer == 12).Bezetmeldpunten.Select(p => p.MeldernNummer).OrderBy(x => x).SequenceEqual(new[] { 136, 143, 144 }), "11:38-kaart: blok 12 = melders 136, 143, 144");
+        Eis(k.Kopsporen.Select(x => x.Melder).OrderBy(x => x).SequenceEqual(new[] { 139, 143 }), "11:38-kaart: kopsporen 139 en 143");
+        Eis(bb.Relaties.All(r => r.RijrichtingVooruit != null) && bb.Relaties.Count >= 2, "11:38-kaart: alle relaties hebben een rijrichting");
+        var rb = new TreinrouteBeheerder(new RichtingsverbodBeheerder());
+        Eis(new DienstAanvuller().Vul(bb.Blokken, rb, bb).Toegevoegd.Count > 0, "11:38-kaart: automatische dienst wordt aangemaakt");
+        // alle 12 gemeten overgangen staan in het leerprofiel
+        var lp = new LeerProfiel(); lp.Leer(Laad("baankaart_pendel_2026-10-10_1025.json"), 12); lp.Leer(k, 12);
+        Eis(lp.Overgangen.Count == 10, "11:38-kaart: leerprofiel kent de 10 gemeten overgangen (143->144 en 139->140 zijn nooit gemeten: die ritten begonnen op het uiteinde) (nu " + lp.Overgangen.Count + ")");
+        Eis(Math.Abs((lp.Verwacht(144, 143, Richting.Vooruit, 12) ?? 0) - 17.0) < 1.0, "11:38-kaart: 144 -> 143 duurt ongeveer 17 s bij snelheid 12");
+        Eis((lp.Verwacht(136, 133, Richting.Achteruit, 12) ?? 99) < 5, "11:38-kaart: 136 -> 133 is een korte sectie (< 5 s)");
+        Eis((lp.Verwacht(133, 136, Richting.Vooruit, 12) ?? 0) > 10, "11:38-kaart: 133 -> 136 duurt juist lang (12 s): heen en terug zijn NIET gelijk, dus niet spiegelen");
+        var zaadPad = Environment.GetEnvironmentVariable("GENEREER_ZAAD");
+        if (!string.IsNullOrEmpty(zaadPad)) { File.WriteAllText(zaadPad, lp.AlsJson()); Console.WriteLine("  zaadprofiel geschreven naar " + zaadPad); }
     }
 
     static void Eis(bool ok, string tekst) { Console.WriteLine((ok ? "OK    " : "FOUT  ") + tekst); if (!ok) _fouten++; }
@@ -120,6 +155,7 @@ public static class Tests
         Eis(rb.Treinroutes.Count == 1 && rb.Treinroutes[0] == bestaand, "dienst-herstel verwijdert alleen eigen routes");
 
         PendelTest();
+        GeslaagdeRitTest();
 
         Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)");
         return _fouten == 0 ? 0 : 1;

@@ -1,0 +1,289 @@
+Baanverkenner - logboek
+============================================================
+2026-10-10 11:02:01.821  STAP    Verkenning start.
+2026-10-10 11:02:01.821  info    Leerprofiel: 6 overgangen uit eerdere verkenningen (tijden worden omgerekend naar verkensnelheid 12).
+2026-10-10 11:02:01.821  info    Hardware: VPEB Dinamo. Testloc adres 5408 (28 stappen), verkensnelheid 12, kruipsnelheid 5.
+2026-10-10 11:02:01.821  info    Wisseladressen 1 t/m 1. Dinamo-blokken: 10-12.
+2026-10-10 11:02:01.825  STAP    Stand van melder 1 t/m 64 opvragen…
+2026-10-10 11:02:15.944  VONDST  De loc staat op melder 144: dit is de startmelder.
+2026-10-10 11:02:15.952  STAP    Blokproef voor melder 144: elk Dinamo-blok krijgt om beurten een rijcommando.
+2026-10-10 11:02:15.958  rijden  Blokproef: blok 10, vooruit …
+2026-10-10 11:02:46.407  rijden  Blokproef: blok 11, vooruit …
+2026-10-10 11:03:16.855  rijden  Blokproef: blok 12, vooruit …
+2026-10-10 11:03:18.469  VONDST  Melder 144 krijgt rijstroom van Dinamo-blok 12.
+2026-10-10 11:03:23.194  rijden  Neerzetten op melder 144 (nu bezet: 144, 143), kruipen vooruit.
+2026-10-10 11:03:32.385  rijden  Neerzetten op melder 144: nu achteruit (bezet: 143).
+2026-10-10 11:03:43.345  STAP    Alle adressen in het bereik op rechtdoor zetten.
+2026-10-10 11:03:43.348  rijden  Adres 1 → rechtdoor
+2026-10-10 11:03:43.960  info    Nieuwe opdracht #1: vanaf melder 144 vooruit (alle wissels rechtdoor) - start, vooruit.
+2026-10-10 11:03:43.960  info    Nieuwe opdracht #2: vanaf melder 144 achteruit (alle wissels rechtdoor) - start, achteruit.
+2026-10-10 11:03:43.971  STAP    Opdracht #1: vanaf melder 144 vooruit (alle wissels rechtdoor) - start, vooruit.
+2026-10-10 11:03:43.984  rijden  Verkenningsrit vooruit vanaf melder 144 (alle wissels rechtdoor).
+2026-10-10 11:03:45.862  rijden    melder 143 bezet
+2026-10-10 11:03:53.170  STAP    Nieuwe sectie: melder 143. Blokproef (steeds een klein stukje achteruit).
+2026-10-10 11:03:57.656  VONDST  Melder 143 krijgt rijstroom van Dinamo-blok 12.
+2026-10-10 11:03:58.860  rijden  Neerzetten op melder 143 (nu bezet: 144, 143), kruipen vooruit.
+2026-10-10 11:04:01.466  rijden  Neerzetten op melder 143: nu achteruit (bezet: geen).
+2026-10-10 11:04:32.806  rijden  Neerzetten op melder 143: nu vooruit (bezet: 144).
+2026-10-10 11:05:37.072  info    Basisrit: 144, 143 - einde: doodlopend (geen nieuwe melder binnen de wachttijd).
+2026-10-10 11:05:37.073  VONDST  Doodlopend: na melder 143 (vooruit) kwam geen melder meer - kopspoor of stootjuk.
+2026-10-10 11:05:37.073  info    Nieuwe opdracht #3: vanaf melder 143 achteruit (alle wissels rechtdoor) - terug vanaf het einde bij melder 143.
+2026-10-10 11:05:37.077  rijden  Rijden achteruit van melder 143 naar melder 144.
+2026-10-10 11:05:42.686  rijden    melder 144 bezet
+2026-10-10 11:05:45.457  rijden  Verkenningsrit vooruit vanaf melder 144 (alle wissels rechtdoor).
+2026-10-10 11:05:47.881  rijden    melder 143 bezet
+2026-10-10 11:06:18.605  info    Basisrit: 144, 143 - einde: doodlopend (geen nieuwe melder binnen de wachttijd).
+2026-10-10 11:06:18.607  rijden  Rijden achteruit van melder 143 naar melder 144.
+2026-10-10 11:06:24.043  rijden    melder 144 bezet
+2026-10-10 11:06:26.864  rijden  Adres 1 → afbuigend
+2026-10-10 11:06:27.468  rijden  Verkenningsrit vooruit vanaf melder 144 (afbuigend: 1).
+2026-10-10 11:06:29.441  rijden    melder 143 bezet
+2026-10-10 11:06:30.345  rijden  Adres 1 → rechtdoor
+2026-10-10 11:06:30.944  rijden  Rijden achteruit van melder 143 naar melder 144.
+2026-10-10 11:06:33.245  rijden    melder 144 bezet
+2026-10-10 11:06:36.063  rijden  Adres 1: geen verschil.
+2026-10-10 11:06:36.066  STAP    Opdracht #2: vanaf melder 144 achteruit (alle wissels rechtdoor) - start, achteruit.
+2026-10-10 11:06:36.066  rijden  Verkenningsrit achteruit vanaf melder 144 (alle wissels rechtdoor).
+2026-10-10 11:06:53.038  rijden    melder 136 bezet
+2026-10-10 11:07:00.170  STAP    Nieuwe sectie: melder 136. Blokproef (steeds een klein stukje vooruit).
+2026-10-10 11:07:06.575  rijden  Blok 12: geen beweging.
+2026-10-10 11:07:12.980  rijden  Blok 10: geen beweging.
+2026-10-10 11:07:19.383  rijden  Blok 11: geen beweging.
+2026-10-10 11:07:19.387  info    Melder 136: terugrijden gaf bij geen enkel blok beweging; nu per blok doorrijden (achteruit).
+2026-10-10 11:07:49.803  rijden  Blok 10: geen beweging (achteruit).
+2026-10-10 11:08:20.252  rijden  Blok 11: geen beweging (achteruit).
+2026-10-10 11:08:50.704  rijden  Blok 12: geen beweging (achteruit).
+2026-10-10 11:08:50.705  LET OP  Voor melder 136 is (nog) geen Dinamo-blok gevonden - bij een volgende rit wordt het opnieuw geprobeerd; intussen gaat het rijcommando naar alle blokken.
+2026-10-10 11:08:52.871  info    Melder 136 is vrij maar melder 133 was al bezet (de loc stond met een deel al in die melder): melder 133 telt als bereikt.
+2026-10-10 11:08:52.872  rijden    melder 133 bezet
+2026-10-10 11:08:58.599  STAP    Nieuwe sectie: melder 133. Blokproef (steeds een klein stukje vooruit).
+2026-10-10 11:09:05.012  rijden  Blok 10: geen beweging.
+2026-10-10 11:09:08.849  VONDST  Melder 133 krijgt rijstroom van Dinamo-blok 11.
+2026-10-10 11:09:13.551  rijden  Neerzetten op melder 133 (nu bezet: 136, 133), kruipen achteruit.
+2026-10-10 11:09:31.065  rijden    melder 132 bezet
+2026-10-10 11:09:38.198  STAP    Nieuwe sectie: melder 132. Blokproef (steeds een klein stukje vooruit).
+2026-10-10 11:09:44.612  rijden  Blok 11: geen beweging.
+2026-10-10 11:09:47.482  VONDST  Melder 132 krijgt rijstroom van Dinamo-blok 10.
+2026-10-10 11:09:48.884  rijden  Neerzetten op melder 132 (nu bezet: 133), kruipen achteruit.
+2026-10-10 11:10:25.326  info    Basisrit: 144, 136, 133, 132 - einde: doodlopend (geen nieuwe melder binnen de wachttijd).
+2026-10-10 11:10:25.326  VONDST  Doodlopend: na melder 132 (achteruit) kwam geen melder meer - kopspoor of stootjuk.
+2026-10-10 11:10:25.326  info    Nieuwe opdracht #4: vanaf melder 132 vooruit (alle wissels rechtdoor) - terug vanaf het einde bij melder 132.
+2026-10-10 11:10:25.326  rijden  Rijden vooruit van melder 132 naar melder 144.
+2026-10-10 11:10:27.452  info    Melder 132 is vrij maar melder 133 was al bezet (de loc stond met een deel al in die melder): melder 133 telt als bereikt.
+2026-10-10 11:10:27.452  rijden    melder 133 bezet
+2026-10-10 11:10:38.682  rijden    melder 136 bezet (na 10,9 s)
+2026-10-10 11:10:45.973  STAP    Nieuwe sectie: melder 136. Blokproef (steeds een klein stukje achteruit).
+2026-10-10 11:10:52.389  rijden  Blok 11: geen beweging.
+2026-10-10 11:10:58.805  rijden  Blok 10: geen beweging.
+2026-10-10 11:11:00.870  VONDST  Melder 136 krijgt rijstroom van Dinamo-blok 12.
+2026-10-10 11:11:02.272  rijden  Neerzetten op melder 136 (nu bezet: 133), kruipen vooruit.
+2026-10-10 11:11:13.076  rijden    melder 144 bezet
+2026-10-10 11:11:15.853  rijden  Verkenningsrit achteruit vanaf melder 144 (alle wissels rechtdoor).
+2026-10-10 11:11:18.082  rijden    melder 136 bezet
+2026-10-10 11:11:21.267  rijden    melder 133 bezet (na 3,2 s)
+2026-10-10 11:11:34.465  rijden    melder 132 bezet (na 13,2 s)
+2026-10-10 11:11:37.654  rijden    melder 140 bezet (na 3,2 s)
+2026-10-10 11:11:44.996  STAP    Nieuwe sectie: melder 140. Blokproef (steeds een klein stukje vooruit).
+2026-10-10 11:11:49.238  VONDST  Melder 140 krijgt rijstroom van Dinamo-blok 10.
+2026-10-10 11:11:50.442  rijden  Neerzetten op melder 140 (nu bezet: 132, 140), kruipen achteruit.
+2026-10-10 11:12:16.086  rijden    melder 139 bezet
+2026-10-10 11:12:23.169  STAP    Nieuwe sectie: melder 139. Blokproef (steeds een klein stukje vooruit).
+2026-10-10 11:12:27.463  VONDST  Melder 139 krijgt rijstroom van Dinamo-blok 10.
+2026-10-10 11:12:28.665  rijden  Neerzetten op melder 139 (nu bezet: 140, 139), kruipen achteruit.
+2026-10-10 11:12:31.269  rijden  Neerzetten op melder 139: nu achteruit (bezet: 140).
+2026-10-10 11:13:08.892  info    Basisrit: 144, 136, 133, 132, 140, 139 - einde: doodlopend (geen nieuwe melder binnen de wachttijd).
+2026-10-10 11:13:08.892  VONDST  Doodlopend: na melder 139 (achteruit) kwam geen melder meer - kopspoor of stootjuk.
+2026-10-10 11:13:08.893  info    Nieuwe opdracht #5: vanaf melder 139 vooruit (alle wissels rechtdoor) - terug vanaf het einde bij melder 139.
+2026-10-10 11:13:08.893  rijden  Rijden vooruit van melder 139 naar melder 144.
+2026-10-10 11:13:14.453  rijden    melder 140 bezet
+2026-10-10 11:13:31.655  rijden    melder 132 bezet (na 17,2 s)
+2026-10-10 11:13:34.840  rijden    melder 133 bezet (na 3,2 s)
+2026-10-10 11:13:47.483  rijden    melder 136 bezet (na 12,6 s)
+2026-10-10 11:13:50.667  rijden    melder 144 bezet (na 3,2 s)
+2026-10-10 11:13:53.282  rijden  Verkenningsrit achteruit vanaf melder 144 (alle wissels rechtdoor).
+2026-10-10 11:13:55.653  rijden    melder 136 bezet
+2026-10-10 11:13:58.640  rijden    melder 133 bezet (na 3,0 s)
+2026-10-10 11:14:12.241  rijden    melder 132 bezet (na 13,6 s)
+2026-10-10 11:14:15.277  rijden    melder 140 bezet (na 3,0 s)
+2026-10-10 11:14:32.682  rijden    melder 139 bezet (na 17,4 s)
+2026-10-10 11:15:03.392  info    Basisrit: 144, 136, 133, 132, 140, 139 - einde: doodlopend (geen nieuwe melder binnen de wachttijd).
+2026-10-10 11:15:03.392  rijden  Rijden vooruit van melder 139 naar melder 144.
+2026-10-10 11:15:08.839  rijden    melder 140 bezet
+2026-10-10 11:15:26.089  rijden    melder 132 bezet (na 17,2 s)
+2026-10-10 11:15:29.273  rijden    melder 133 bezet (na 3,2 s)
+2026-10-10 11:15:41.876  rijden    melder 136 bezet (na 12,6 s)
+2026-10-10 11:15:44.862  rijden    melder 144 bezet (na 3,0 s)
+2026-10-10 11:15:47.482  LET OP  Basisrit vanaf melder 144 achteruit (alle wissels rechtdoor) gaf niet steeds dezelfde melders: 144, 136, 133, 132 / 144, 136, 133, 132, 140, 139 / 144, 136, 133, 132, 140, 139. Gebruikt: 144, 136, 133, 132, 140, 139. Controleer deze melders op spookmeldingen.
+2026-10-10 11:15:47.484  rijden  Adres 1 → afbuigend
+2026-10-10 11:15:48.083  rijden  Verkenningsrit achteruit vanaf melder 144 (afbuigend: 1).
+2026-10-10 11:15:50.057  rijden    melder 136 bezet
+2026-10-10 11:15:53.088  rijden    melder 133 bezet (na 3,0 s)
+2026-10-10 11:16:06.081  rijden    melder 132 bezet (na 13,0 s)
+2026-10-10 11:16:09.268  rijden    melder 140 bezet (na 3,2 s)
+2026-10-10 11:16:26.454  rijden    melder 139 bezet (na 17,2 s)
+2026-10-10 11:16:27.359  rijden  Adres 1 → rechtdoor
+2026-10-10 11:16:27.959  rijden  Rijden vooruit van melder 139 naar melder 144.
+2026-10-10 11:16:30.285  rijden    melder 140 bezet
+2026-10-10 11:16:47.272  rijden    melder 132 bezet (na 17,0 s)
+2026-10-10 11:16:50.056  rijden    melder 133 bezet (na 2,8 s)
+2026-10-10 11:17:02.862  rijden    melder 136 bezet (na 12,8 s)
+2026-10-10 11:17:05.838  rijden    melder 144 bezet (na 3,0 s)
+2026-10-10 11:17:08.460  rijden  Adres 1: geen verschil.
+2026-10-10 11:17:08.461  STAP    Opdracht #3: vanaf melder 143 achteruit (alle wissels rechtdoor) - terug vanaf het einde bij melder 143.
+2026-10-10 11:17:08.461  rijden  Rijden vooruit van melder 144 naar melder 143.
+2026-10-10 11:17:25.045  rijden    melder 143 bezet
+2026-10-10 11:17:27.864  rijden  Verkenningsrit achteruit vanaf melder 143 (alle wissels rechtdoor).
+2026-10-10 11:17:30.087  rijden    melder 144 bezet
+2026-10-10 11:17:47.271  rijden    melder 136 bezet (na 17,2 s)
+2026-10-10 11:17:50.258  rijden    melder 133 bezet (na 3,0 s)
+2026-10-10 11:18:03.447  rijden    melder 132 bezet (na 13,2 s)
+2026-10-10 11:18:06.482  rijden    melder 140 bezet (na 3,0 s)
+2026-10-10 11:18:23.839  rijden    melder 139 bezet (na 17,4 s)
+2026-10-10 11:18:54.574  info    Basisrit: 143, 144, 136, 133, 132, 140, 139 - einde: doodlopend (geen nieuwe melder binnen de wachttijd).
+2026-10-10 11:18:54.574  rijden  Rijden vooruit van melder 139 naar melder 143.
+2026-10-10 11:19:00.038  rijden    melder 140 bezet
+2026-10-10 11:19:17.078  rijden    melder 132 bezet (na 17,0 s)
+2026-10-10 11:19:20.063  rijden    melder 133 bezet (na 3,0 s)
+2026-10-10 11:19:32.654  rijden    melder 136 bezet (na 12,6 s)
+2026-10-10 11:19:35.638  rijden    melder 144 bezet (na 3,0 s)
+2026-10-10 11:19:52.667  rijden    melder 143 bezet (na 17,0 s)
+2026-10-10 11:19:55.484  rijden  Verkenningsrit achteruit vanaf melder 143 (alle wissels rechtdoor).
+2026-10-10 11:19:57.448  rijden    melder 144 bezet
+2026-10-10 11:20:14.646  rijden    melder 136 bezet (na 17,2 s)
+2026-10-10 11:20:17.679  rijden    melder 133 bezet (na 3,0 s)
+2026-10-10 11:20:30.848  rijden    melder 132 bezet (na 13,2 s)
+2026-10-10 11:20:34.037  rijden    melder 140 bezet (na 3,2 s)
+2026-10-10 11:20:51.438  rijden    melder 139 bezet (na 17,4 s)
+2026-10-10 11:21:22.181  info    Basisrit: 143, 144, 136, 133, 132, 140, 139 - einde: doodlopend (geen nieuwe melder binnen de wachttijd).
+2026-10-10 11:21:22.181  rijden  Rijden vooruit van melder 139 naar melder 143.
+2026-10-10 11:21:27.488  rijden    melder 140 bezet
+2026-10-10 11:21:44.488  rijden    melder 132 bezet (na 17,0 s)
+2026-10-10 11:21:47.679  rijden    melder 133 bezet (na 3,2 s)
+2026-10-10 11:22:00.061  rijden    melder 136 bezet (na 12,4 s)
+2026-10-10 11:22:03.045  rijden    melder 144 bezet (na 3,0 s)
+2026-10-10 11:22:20.067  rijden    melder 143 bezet (na 17,0 s)
+2026-10-10 11:22:22.884  rijden  Adres 1 → afbuigend
+2026-10-10 11:22:23.485  rijden  Verkenningsrit achteruit vanaf melder 143 (afbuigend: 1).
+2026-10-10 11:22:25.664  rijden    melder 144 bezet
+2026-10-10 11:22:42.648  rijden    melder 136 bezet (na 17,0 s)
+2026-10-10 11:22:45.687  rijden    melder 133 bezet (na 3,0 s)
+2026-10-10 11:22:58.677  rijden    melder 132 bezet (na 13,0 s)
+2026-10-10 11:23:02.063  rijden    melder 140 bezet (na 3,4 s)
+2026-10-10 11:23:19.267  rijden    melder 139 bezet (na 17,2 s)
+2026-10-10 11:23:20.171  rijden  Adres 1 → rechtdoor
+2026-10-10 11:23:20.771  rijden  Rijden vooruit van melder 139 naar melder 143.
+2026-10-10 11:23:22.640  rijden    melder 140 bezet
+2026-10-10 11:23:39.485  rijden    melder 132 bezet (na 16,8 s)
+2026-10-10 11:23:42.664  rijden    melder 133 bezet (na 3,2 s)
+2026-10-10 11:23:55.081  rijden    melder 136 bezet (na 12,4 s)
+2026-10-10 11:23:58.060  rijden    melder 144 bezet (na 3,0 s)
+2026-10-10 11:24:14.855  rijden    melder 143 bezet (na 16,8 s)
+2026-10-10 11:24:17.679  rijden  Adres 1: geen verschil.
+2026-10-10 11:24:17.679  rijden  Rijden achteruit van melder 143 naar melder 144.
+2026-10-10 11:24:19.649  rijden    melder 144 bezet
+2026-10-10 11:24:22.474  STAP    Opdracht #4: vanaf melder 132 vooruit (alle wissels rechtdoor) - terug vanaf het einde bij melder 132.
+2026-10-10 11:24:22.474  rijden  Rijden achteruit van melder 144 naar melder 132.
+2026-10-10 11:24:38.847  rijden    melder 136 bezet
+2026-10-10 11:24:41.880  rijden    melder 133 bezet (na 3,0 s)
+2026-10-10 11:24:55.039  rijden    melder 132 bezet (na 13,2 s)
+2026-10-10 11:24:58.262  rijden  Verkenningsrit vooruit vanaf melder 132 (alle wissels rechtdoor).
+2026-10-10 11:25:00.687  rijden    melder 133 bezet
+2026-10-10 11:25:12.868  rijden    melder 136 bezet (na 12,2 s)
+2026-10-10 11:25:15.854  rijden    melder 144 bezet (na 3,0 s)
+2026-10-10 11:25:32.661  rijden    melder 143 bezet (na 16,8 s)
+2026-10-10 11:26:03.399  info    Basisrit: 132, 133, 136, 144, 143 - einde: doodlopend (geen nieuwe melder binnen de wachttijd).
+2026-10-10 11:26:03.400  rijden  Rijden achteruit van melder 143 naar melder 132.
+2026-10-10 11:26:08.860  rijden    melder 144 bezet
+2026-10-10 11:26:26.076  rijden    melder 136 bezet (na 17,2 s)
+2026-10-10 11:26:29.062  rijden    melder 133 bezet (na 3,0 s)
+2026-10-10 11:26:41.870  rijden    melder 132 bezet (na 12,8 s)
+2026-10-10 11:26:44.640  rijden  Verkenningsrit vooruit vanaf melder 132 (alle wissels rechtdoor).
+2026-10-10 11:26:47.067  rijden    melder 133 bezet
+2026-10-10 11:26:59.453  rijden    melder 136 bezet (na 12,4 s)
+2026-10-10 11:27:02.484  rijden    melder 144 bezet (na 3,0 s)
+2026-10-10 11:27:19.272  rijden    melder 143 bezet (na 16,8 s)
+2026-10-10 11:27:50.007  info    Basisrit: 132, 133, 136, 144, 143 - einde: doodlopend (geen nieuwe melder binnen de wachttijd).
+2026-10-10 11:27:50.008  rijden  Rijden achteruit van melder 143 naar melder 132.
+2026-10-10 11:27:55.462  rijden    melder 144 bezet
+2026-10-10 11:28:12.662  rijden    melder 136 bezet (na 17,2 s)
+2026-10-10 11:28:15.642  rijden    melder 133 bezet (na 3,0 s)
+2026-10-10 11:28:28.638  rijden    melder 132 bezet (na 13,0 s)
+2026-10-10 11:28:31.654  rijden  Adres 1 → afbuigend
+2026-10-10 11:28:32.254  rijden  Verkenningsrit vooruit vanaf melder 132 (afbuigend: 1).
+2026-10-10 11:28:34.277  rijden    melder 133 bezet
+2026-10-10 11:28:46.668  rijden    melder 136 bezet (na 12,4 s)
+2026-10-10 11:28:49.649  rijden    melder 144 bezet (na 3,0 s)
+2026-10-10 11:29:06.654  rijden    melder 143 bezet (na 17,0 s)
+2026-10-10 11:29:07.558  rijden  Adres 1 → rechtdoor
+2026-10-10 11:29:08.159  rijden  Rijden achteruit van melder 143 naar melder 132.
+2026-10-10 11:29:09.879  rijden    melder 144 bezet
+2026-10-10 11:29:27.273  rijden    melder 136 bezet (na 17,4 s)
+2026-10-10 11:29:30.264  rijden    melder 133 bezet (na 3,0 s)
+2026-10-10 11:29:43.459  rijden    melder 132 bezet (na 13,2 s)
+2026-10-10 11:29:46.271  rijden  Adres 1: geen verschil.
+2026-10-10 11:29:46.272  rijden  Rijden vooruit van melder 132 naar melder 144.
+2026-10-10 11:29:48.846  rijden    melder 133 bezet
+2026-10-10 11:30:01.280  rijden    melder 136 bezet (na 12,4 s)
+2026-10-10 11:30:04.261  rijden    melder 144 bezet (na 3,0 s)
+2026-10-10 11:30:07.084  STAP    Opdracht #5: vanaf melder 139 vooruit (alle wissels rechtdoor) - terug vanaf het einde bij melder 139.
+2026-10-10 11:30:07.084  rijden  Rijden achteruit van melder 144 naar melder 139.
+2026-10-10 11:30:09.050  rijden    melder 136 bezet
+2026-10-10 11:30:12.286  rijden    melder 133 bezet (na 3,2 s)
+2026-10-10 11:30:25.469  rijden    melder 132 bezet (na 13,2 s)
+2026-10-10 11:30:29.057  rijden    melder 140 bezet (na 3,6 s)
+2026-10-10 11:30:46.460  rijden    melder 139 bezet (na 17,4 s)
+2026-10-10 11:30:49.082  rijden  Verkenningsrit vooruit vanaf melder 139 (alle wissels rechtdoor).
+2026-10-10 11:30:51.455  rijden    melder 140 bezet
+2026-10-10 11:31:08.242  rijden    melder 132 bezet (na 16,8 s)
+2026-10-10 11:31:11.274  rijden    melder 133 bezet (na 3,0 s)
+2026-10-10 11:31:24.076  rijden    melder 136 bezet (na 12,8 s)
+2026-10-10 11:31:27.056  rijden    melder 144 bezet (na 3,0 s)
+2026-10-10 11:31:44.052  rijden    melder 143 bezet (na 17,0 s)
+2026-10-10 11:32:14.785  info    Basisrit: 139, 140, 132, 133, 136, 144, 143 - einde: doodlopend (geen nieuwe melder binnen de wachttijd).
+2026-10-10 11:32:14.785  rijden  Rijden achteruit van melder 143 naar melder 139.
+2026-10-10 11:32:20.243  rijden    melder 144 bezet
+2026-10-10 11:32:37.663  rijden    melder 136 bezet (na 17,4 s)
+2026-10-10 11:32:40.645  rijden    melder 133 bezet (na 3,0 s)
+2026-10-10 11:32:53.645  rijden    melder 132 bezet (na 13,0 s)
+2026-10-10 11:32:56.676  rijden    melder 140 bezet (na 3,0 s)
+2026-10-10 11:33:14.079  rijden    melder 139 bezet (na 17,4 s)
+2026-10-10 11:33:17.046  rijden  Verkenningsrit vooruit vanaf melder 139 (alle wissels rechtdoor).
+2026-10-10 11:33:19.067  rijden    melder 140 bezet
+2026-10-10 11:33:36.064  rijden    melder 132 bezet (na 17,0 s)
+2026-10-10 11:33:39.049  rijden    melder 133 bezet (na 3,0 s)
+2026-10-10 11:33:51.856  rijden    melder 136 bezet (na 12,8 s)
+2026-10-10 11:33:54.841  rijden    melder 144 bezet (na 3,0 s)
+2026-10-10 11:34:12.066  rijden    melder 143 bezet (na 17,2 s)
+2026-10-10 11:34:42.783  info    Basisrit: 139, 140, 132, 133, 136, 144, 143 - einde: doodlopend (geen nieuwe melder binnen de wachttijd).
+2026-10-10 11:34:42.783  rijden  Rijden achteruit van melder 143 naar melder 139.
+2026-10-10 11:34:48.486  rijden    melder 144 bezet
+2026-10-10 11:35:05.644  rijden    melder 136 bezet (na 17,2 s)
+2026-10-10 11:35:08.651  rijden    melder 133 bezet (na 3,0 s)
+2026-10-10 11:35:21.658  rijden    melder 132 bezet (na 13,0 s)
+2026-10-10 11:35:24.850  rijden    melder 140 bezet (na 3,2 s)
+2026-10-10 11:35:42.487  rijden    melder 139 bezet (na 17,6 s)
+2026-10-10 11:35:45.264  rijden  Adres 1 → afbuigend
+2026-10-10 11:35:45.864  rijden  Verkenningsrit vooruit vanaf melder 139 (afbuigend: 1).
+2026-10-10 11:35:47.841  rijden    melder 140 bezet
+2026-10-10 11:36:04.881  rijden    melder 132 bezet (na 17,0 s)
+2026-10-10 11:36:07.865  rijden    melder 133 bezet (na 3,0 s)
+2026-10-10 11:36:20.450  rijden    melder 136 bezet (na 12,6 s)
+2026-10-10 11:36:23.487  rijden    melder 144 bezet (na 3,0 s)
+2026-10-10 11:36:40.668  rijden    melder 143 bezet (na 17,2 s)
+2026-10-10 11:36:41.572  rijden  Adres 1 → rechtdoor
+2026-10-10 11:36:42.173  rijden  Rijden achteruit van melder 143 naar melder 139.
+2026-10-10 11:36:44.044  rijden    melder 144 bezet
+2026-10-10 11:37:01.482  rijden    melder 136 bezet (na 17,4 s)
+2026-10-10 11:37:04.462  rijden    melder 133 bezet (na 3,0 s)
+2026-10-10 11:37:17.852  rijden    melder 132 bezet (na 13,4 s)
+2026-10-10 11:37:21.242  rijden    melder 140 bezet (na 3,4 s)
+2026-10-10 11:37:38.652  rijden    melder 139 bezet (na 17,4 s)
+2026-10-10 11:37:41.467  rijden  Adres 1: geen verschil.
+2026-10-10 11:37:41.468  rijden  Rijden vooruit van melder 139 naar melder 144.
+2026-10-10 11:37:43.642  rijden    melder 140 bezet
+2026-10-10 11:38:00.650  rijden    melder 132 bezet (na 17,0 s)
+2026-10-10 11:38:03.638  rijden    melder 133 bezet (na 3,0 s)
+2026-10-10 11:38:16.474  rijden    melder 136 bezet (na 12,8 s)
+2026-10-10 11:38:19.460  rijden    melder 144 bezet (na 3,0 s)
+2026-10-10 11:38:22.288  VONDST  Resultaat: 7 melders, 0 wissels, 2 doodlopende einden, 3 voorgestelde blokken, 1 adressen zonder gevonden effect.
+2026-10-10 11:38:22.288  STAP    Verkenning voltooid.
