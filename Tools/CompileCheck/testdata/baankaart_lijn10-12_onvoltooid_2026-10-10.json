@@ -1,0 +1,181 @@
+{
+  "FormaatVersie": 1,
+  "Programma": "Baanverkenner",
+  "Gestart": "2026-10-10T09:40:08.1696722+02:00",
+  "Bijgewerkt": "2026-10-10T09:50:00.4245818+02:00",
+  "Voltooid": false,
+  "Hardware": "VPEB Dinamo",
+  "LocAdres": 5408,
+  "LocStappen": 28,
+  "StartMelder": 144,
+  "WisselAdresVan": 1,
+  "WisselAdresTot": 1,
+  "Melders": [
+    {
+      "Nummer": 133,
+      "DinamoBlok": 11
+    },
+    {
+      "Nummer": 136,
+      "DinamoBlok": 12
+    },
+    {
+      "Nummer": 143,
+      "DinamoBlok": 12
+    },
+    {
+      "Nummer": 144,
+      "DinamoBlok": 10
+    }
+  ],
+  "Overgangen": [
+    {
+      "Van": 144,
+      "Naar": 143,
+      "Richting": "Vooruit",
+      "AantalKeer": 7,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        "",
+        "1"
+      ]
+    },
+    {
+      "Van": 143,
+      "Naar": 144,
+      "Richting": "Achteruit",
+      "AantalKeer": 7,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        "",
+        "1"
+      ]
+    },
+    {
+      "Van": 144,
+      "Naar": 136,
+      "Richting": "Achteruit",
+      "AantalKeer": 1,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        ""
+      ]
+    },
+    {
+      "Van": 136,
+      "Naar": 133,
+      "Richting": "Achteruit",
+      "AantalKeer": 1,
+      "GemiddeldeSeconden": 2.9996636,
+      "AantalMetingen": 1,
+      "GezienBijConfiguraties": [
+        ""
+      ]
+    },
+    {
+      "Van": 133,
+      "Naar": 136,
+      "Richting": "Vooruit",
+      "AantalKeer": 1,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        ""
+      ]
+    }
+  ],
+  "Wissels": [],
+  "Kopsporen": [
+    {
+      "Melder": 143,
+      "Richting": "Vooruit",
+      "Configuratie": "alle wissels rechtdoor"
+    },
+    {
+      "Melder": 133,
+      "Richting": "Achteruit",
+      "Configuratie": "alle wissels rechtdoor"
+    },
+    {
+      "Melder": 144,
+      "Richting": "Achteruit",
+      "Configuratie": "alle wissels rechtdoor"
+    }
+  ],
+  "Trajecten": [
+    {
+      "Configuratie": {
+        "Afbuigend": []
+      },
+      "Start": 144,
+      "Richting": "Vooruit",
+      "Reeks": [
+        144,
+        143
+      ],
+      "Einde": "Doodlopend"
+    },
+    {
+      "Configuratie": {
+        "Afbuigend": []
+      },
+      "Start": 143,
+      "Richting": "Achteruit",
+      "Reeks": [
+        143,
+        144
+      ],
+      "Einde": "Doodlopend"
+    }
+  ],
+  "Kortsluitpunten": [],
+  "AdressenZonderEffect": [],
+  "VoorgesteldeBlokken": [
+    {
+      "Nummer": 1,
+      "Melders": [
+        133
+      ],
+      "DinamoBlok": 11,
+      "Buren": [
+        2
+      ]
+    },
+    {
+      "Nummer": 2,
+      "Melders": [
+        136
+      ],
+      "DinamoBlok": 12,
+      "Buren": [
+        1,
+        4
+      ]
+    },
+    {
+      "Nummer": 3,
+      "Melders": [
+        143
+      ],
+      "DinamoBlok": 12,
+      "Buren": [
+        4
+      ]
+    },
+    {
+      "Nummer": 4,
+      "Melders": [
+        144
+      ],
+      "DinamoBlok": 10,
+      "Buren": [
+        2,
+        3
+      ]
+    }
+  ],
+  "Waarschuwingen": []
+}

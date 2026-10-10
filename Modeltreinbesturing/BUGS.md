@@ -1062,3 +1062,24 @@ in die richting (zelfde wisselstand) wel verder kan.
 **Let op voor je volgende test:** de verkeerde koppeling 144 -> blok 10 zit nog in je hervatte
 verkenning; begin met een nieuwe verkenning (of zet 144 terug op blok 12). NIET gecompileerd, NIET
 getest op de baan.
+
+## #56 - Baankaart uit de Baanverkenner importeren in de hoofdmodule
+Marco (10:10): bij een nieuwe baan alle melders met hun blokken leren in de Baanverkenner en die
+daarna meteen in de hoofdmodule laden.
+**Gebouwd:** menu "Baankaart importeren (Baanverkenner)..." (`BaankaartImporter.cs`, `MainWindow`).
+- Blok.Nummer = Dinamo-blok. Melders zonder Dinamo-blok worden overgeslagen (waarschuwing).
+- Bestaand blok krijgt ontbrekende melders; anders wordt een nieuw blok gemaakt. Melders die al in een
+  projectblok zitten (overloop, bv. melder 24) worden niet opnieuw toegevoegd.
+- Type Kopspoor alleen als een kopspoor-melder hoogstens 1 buurmelder heeft (anders vals kopspoor, zie #55).
+- Relaties (beide richtingen, keuze in dialoog) uit de overgangen, met RichtingsBezetmelding en
+  Rijrichting (#49/#53). Bestaande rijrichtingen, wisselstanden en blokken worden NOOIT overschreven.
+- Nieuwe blokken krijgen een plek op het schema (raster onder de bestaande), stootblok bij kopspoor,
+  uitgaand sein bij nieuwe relaties (afspraak: nieuw blok = ook seinen).
+- Eerst een overzicht van alle meldingen, dan "behouden?" (Nee = alles terug via `Momentopname`).
+**Wel getest (Tools/CompileCheck, `dotnet run --project Tools/CompileCheck`):** de importerlogica met de
+echte baankaart van 04-10: blokken 3-8, geen vals kopspoor, blok 3 = melders 5/13/14, 3->4 achteruit,
+3->8 vooruit, tweede import verandert niets, overloop-melder 24, vastgelegde richtingen blijven,
+ongedaan maken werkt.
+**NIET gedaan:** wissels worden alleen gemeld (niet getekend, kruiswisselstanden niet overgenomen,
+zie KRUISWISSEL.md); de dienstregeling wordt NIET bijgewerkt.
+**NIET gecompileerd:** de WPF-kant (MainWindow-handler, menu). NIET getest op de baan.

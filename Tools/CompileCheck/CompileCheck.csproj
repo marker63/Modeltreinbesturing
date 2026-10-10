@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Alleen een controle-hulpmiddel (NIET in de .sln): compileert de WPF-vrije delen van het project
+       met kleine stubs voor SerialPort/WPF-types, zonder NuGet. Draaien: dotnet run met als project Tools/CompileCheck. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings><EnableDefaultCompileItems>false</EnableDefaultCompileItems><NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="stub/*.cs" />
+    <Compile Include="Tests.cs" />
+    <Compile Include="../../Modeltreinbesturing.Hardware/*.cs" />
+    <Compile Include="../../Baanverkenner.Kern/**/*.cs" />
+    <Compile Include="../../Modeltreinbesturing/Model/*.cs" />
+    <Compile Include="../../Modeltreinbesturing/BlokBeheerder.cs" />
+    <Compile Include="../../Modeltreinbesturing/RijrichtingImporter.cs" />
+    <Compile Include="../../Modeltreinbesturing/BaankaartImporter.cs" />
+    <None Include="testdata/*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

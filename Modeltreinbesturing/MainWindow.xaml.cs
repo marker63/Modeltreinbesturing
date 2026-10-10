@@ -1587,6 +1587,93 @@ public partial class MainWindow : Window
         dialoog.ShowDialog();
     }
 
+    /// <summary>BUG #56: laadt een door de Baanverkenner geleerde baankaart in dit project: blokken met
+    /// melders, relaties en rijrichting per relatie. Bestaande gegevens worden nooit overschreven; na
+    /// het tonen van het verslag kan alles ongedaan gemaakt worden (Nee = herstel).</summary>
+    private void BaankaartImporteren_Click(object sender, RoutedEventArgs e)
+    {
+        var kies = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Kies een baankaart van de Baanverkenner",
+            Filter = "Baankaart (*.json)|*.json|Alle bestanden (*.*)|*.*"
+        };
+        if (kies.ShowDialog(this) != true) return;
+
+        Baanverkenner.Kern.Baankaart? kaart;
+        try
+        {
+            kaart = Baanverkenner.Kern.Baankaart.VanJson(System.IO.File.ReadAllText(kies.FileName));
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Dit bestand is geen geldige baankaart:\n{ex.Message}", "Baankaart importeren", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (kaart is null)
+        {
+            MessageBox.Show(this, "Het bestand is leeg.", "Baankaart importeren", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var beide = MessageBox.Show(this,
+            "Moeten voor elke gereden overgang relaties in BEIDE richtingen worden aangemaakt?\n\n" +
+            "Ja = ook de weg terug (nodig voor een lijn met kopsporen waar treinen heen en weer rijden).\n" +
+            "Nee = alleen de richting die de testloc 'vooruit' reed, plus de weg terug uit een kopspoor (bij een lus zonder terugrijden).",
+            "Baankaart importeren", MessageBoxButton.YesNoCancel, MessageBoxImage.Question, MessageBoxResult.Yes);
+        if (beide == MessageBoxResult.Cancel) return;
+
+        var momentopname = BaankaartImporter.Momentopname.Maak(_beheerder);
+        BaankaartImporter.Resultaat res;
+        try
+        {
+            res = new BaankaartImporter { BeideRichtingen = beide == MessageBoxResult.Yes }.Importeer(kaart, _beheerder);
+        }
+        catch (Exception ex)
+        {
+            momentopname.Herstel(_beheerder);
+            Redraw();
+            MessageBox.Show(this, $"De import is mislukt en is teruggedraaid:\n{ex.Message}", "Baankaart importeren", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
+        string samenvatting = $"{res.NieuweBlokken.Count} nieuw(e) blok(ken), {res.ToegevoegdeMelders.Count} melder(s) toegevoegd, {res.NieuweRelaties.Count} nieuwe relatie(s), {res.IngevuldeRichtingen} rijrichting(en) ingevuld.";
+        var dialoog = new BaanControleDialog("Baankaart importeren",
+            $"Resultaat voor '{System.IO.Path.GetFileName(kies.FileName)}': {samenvatting} Hierna kun je kiezen of je dit wilt behouden.",
+            res.Meldingen) { Owner = this };
+        dialoog.ShowDialog();
+
+        if (res.IsLeeg)
+        {
+            MessageBox.Show(this, "Er was niets toe te voegen: alles uit deze baankaart staat al in het project.", "Baankaart importeren", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var antw = MessageBox.Show(this, $"{samenvatting}\n\nDeze wijzigingen behouden? (Nee = alles terugdraaien.)\nDaarna: Opslaan, rijrichtingen controleren (Relaties beheren) en wissels tekenen. NIET getest op de baan.",
+            "Baankaart importeren", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
+        if (antw != MessageBoxResult.Yes)
+        {
+            momentopname.Herstel(_beheerder);
+            Redraw();
+            return;
+        }
+
+        // Nieuwe blokken netjes onder het bestaande schema plaatsen (geen overlap).
+        double startY = _beheerder.Blokken.Except(res.NieuweBlokken).Select(b => b.SchemaY + BlokGrootte * 2).DefaultIfEmpty(20).Max();
+        int i = 0;
+        foreach (var blok in res.NieuweBlokken.OrderBy(b => b.Nummer))
+        {
+            blok.SchemaX = 20 + (i % 8) * (BlokGrootte + 30);
+            blok.SchemaY = startY + (i / 8) * (BlokGrootte + 30);
+            i++;
+        }
+        // Seinen en stootblokken, zoals bij het handmatig aanmaken van een blok (nieuwe afspraak: in dezelfde ronde).
+        foreach (var blok in res.NieuweBlokken)
+            if (blok.Type == BlokType.Kopspoor) ZorgVoorStootblok(blok);
+        foreach (var van in res.NieuweRelaties.Select(r => r.Van).Distinct().ToList())
+            ZorgVoorUitgaandSein(van);
+        Redraw();
+    }
+
     private void HandmatigBezet_Click(object sender, RoutedEventArgs e)
     {
         if (_geselecteerdBlok is null)

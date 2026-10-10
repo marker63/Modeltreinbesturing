@@ -18,3 +18,5 @@ niet) en `Modeltreinbesturing/BLOKKENSCHEMA.md`.
   `%AppData%\Modeltreinbesturing\Logs`.
 - Levering: commit + push, sync project2, zip (bin/obj/.git uitgesloten) naar Marco sturen.
 - Commitberichten eindigen met de Co-Authored-By/Claude-Session regels.
+- Compile-controle zonder NuGet: `dotnet run --project Tools/CompileCheck` (dotnet-sdk-8.0 via apt) draait de
+  regressietests op Kern/Hardware/importers met stubs. Het WPF-project zelf kan hier niet gecompileerd worden.
