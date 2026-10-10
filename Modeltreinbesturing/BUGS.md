@@ -1278,3 +1278,7 @@ de loc stond na Herstel op 21 én 24 en reed niet meer weg. Daarna 2 x een volle
 (3) vertrekt de loc niet, is het blok bekend en was er <10 min geleden een kortsluiting, dan geen blokproef maar meteen de vraag de loc/wissels goed te zetten.
 **Test:** `PartnerVolgordeTest` (10 vooraan bij melder 24, geteste adres en al afbuigende wissels vallen af); alle bestaande scenario's groen. (2) en (3) zijn NIET in de simulator getest (vragen een loc die vastzit). NOG NIET GETEST OP DE BAAN.
 **Gezien in dezelfde logs (goed):** de wisselteller werkt (38 commando's in ~40 min, geen storing); wissel 10 correct gevonden; geen valse "geen vervolg" meer in het rapport (#64).
+
+## Leermateriaal 15:27 (Marco): stand van kruiswissel-motor 13 foutief, software keerde netjes
+Alleen om van te leren, geen nieuwe versie nodig. Opgeslagen als `Tools/CompileCheck/testdata/*kruiswissel13_fout_2026-10-10_1527.*` (kaart + log). Wat het laat zien: adres 13 afbuigend (10 rechtdoor = gemengde kruiswisselstand) geeft bij het binnenrijden van melder 24
+direct kortsluiting in blok 8 (en even blok 7); de centrale meldde het binnen 1 s, de noodstop en de herstelrit (kruipen terug naar melder 24) volgden meteen. Dit is het gedrag dat BUG #66 verder beschermt (geen blind doorproberen als de loc niet netjes staat).
