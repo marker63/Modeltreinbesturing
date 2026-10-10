@@ -946,6 +946,17 @@ public partial class TreinrouteWindow : Window
         bool rangeert = gekozenTrein?.Rangeren == true;
         var effectiefTreintype = BepaalEffectiefTreintype(gekozenTrein, route.Treintype, rangeert);
 
+        // BUG #51: op de echte baan niet starten als de eerste stap geen vastgelegde rijrichting heeft.
+        if (pad.Count > 1 && _hardwareBeheerder.Huidige is not SimulatieHardware
+            && _blokBeheerder.Relaties.FirstOrDefault(r => r.Van == pad[0] && r.Naar == pad[1])?.RijrichtingVooruit is null)
+        {
+            string melding = $"Geen rijrichting vastgelegd voor de relatie {pad[0].Nummer} -> {pad[1].Nummer}. De route is NIET gestart. Stel de rijrichting in via Beheren -> Relaties beheren -> 'Rijrichting (vooruit/achteruit/-)' en start opnieuw.";
+            Log($"[Route '{route.Omschrijving}'] FOUT: {melding}");
+            StatusTekst.Text = melding;
+            if (!stil) MessageBox.Show(this, melding, "Modeltreinbesturing", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
+
         var trein = new RijdendeTrein
         {
             Route = route,
@@ -2135,9 +2146,18 @@ public partial class TreinrouteWindow : Window
                 OnthoudRichting(trein);
                 Log($"[Route '{trein.Route.Omschrijving}'] Eerste stap {huidig.Nummer} -> {volgendBlok.Nummer}: rijrichting volgens de vastgelegde relatie = {(vastRichting ? "vooruit" : "achteruit")}{(wasVooruit != vastRichting ? " (wijkt af van de eerder gekozen startrichting - vastgelegde relatie wint)" : "")}.");
             }
+            else if (_hardwareBeheerder.Huidige is not SimulatieHardware)
+            {
+                // BUG #51: op de echte baan NOOIT raden bij de eerste stap.
+                string melding = $"Geen rijrichting vastgelegd voor de relatie {huidig.Nummer} -> {volgendBlok.Nummer}. De loc is NIET gestart (anders rijdt hij mogelijk de verkeerde kant op). Stel de rijrichting in via Beheren -> Relaties beheren -> 'Rijrichting (vooruit/achteruit/-)' en start opnieuw.";
+                Log($"[Route '{trein.Route.Omschrijving}'] FOUT: {melding}");
+                StopTrein(trein, melding, magHerhalen: false, langzaamAfremmen: false);
+                MessageBox.Show(this, melding, "Modeltreinbesturing", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
             else
             {
-                Log($"[Route '{trein.Route.Omschrijving}'] WAARSCHUWING: voor de relatie {huidig.Nummer} -> {volgendBlok.Nummer} is GEEN rijrichting vastgelegd (Beheren -> Relaties beheren -> Rijrichting). Startrichting nu: {(trein.RijdtVooruit ? "vooruit" : "achteruit")} (onthouden/geleerd/standaard) - kan fout zijn.");
+                Log($"[Route '{trein.Route.Omschrijving}'] WAARSCHUWING (simulatie): voor de relatie {huidig.Nummer} -> {volgendBlok.Nummer} is GEEN rijrichting vastgelegd. Startrichting nu: {(trein.RijdtVooruit ? "vooruit" : "achteruit")}.");
             }
         }
 

@@ -987,3 +987,18 @@ spiegel van 7 -> 3 bijgemaakt (BUG #23) zonder het als "niet getest" te markeren
 **Fix:** `KRUISWISSEL.md` (feiten, tabel met herkomst per rit, regels) en `CLAUDE.md` in de
 repo-root (wordt in elke nieuwe sessie automatisch gelezen) + geheugen bijgewerkt.
 **Open:** de werkelijke stand voor 3 -> 7 en 3 -> 4 moet nog fysiek bevestigd worden (zie #48).
+
+## #51 - Loc rijdt bij het opstarten nog steeds van blok 3 naar 4 de verkeerde kant op
+Marco (08:59): "nog steeds rijd hij bij het opstarten van blok 3 naar 4 de verkeerde kant op."
+**Oorzaak (aannemelijk, nog niet met een nieuw log bewezen):** `RijrichtingVooruit` (#49) staat
+standaard op "niet vastgelegd". Zolang dat voor 3 -> 4 niet is ingevuld, geldt nog de oude
+volgorde (onthouden/geleerde/standaard richting) en kwam er alleen een WAARSCHUWING in het log.
+Dus ook met de #49-versie rijdt hij fout zolang die data ontbreekt.
+**Fix:** op de echte baan (niet in simulatie) start een rit NIET meer als de eerste stap geen
+vastgelegde rijrichting heeft: vaste routes weigeren de start, automatisch rijden stopt de loc
+voordat er snelheid gegeven wordt; telkens met een melding + FOUT in het log. Geen gokken meer.
+**Te doen door Marco:** 3 -> 4 = achteruit, 3 -> 7 = vooruit (en andere blokken met meerdere
+uitgangen) invullen via Relaties beheren -> Rijrichting. Stuur anders het log van de start:
+daar staat de regel "Eerste stap ..." of "[Rit] Startrichting ... bron: ..." in.
+**NIET getest op de baan en NIET gecompileerd** (geen .NET in deze omgeving): bouw eerst even.
+Kruiswisselstanden blijven open (#48).
