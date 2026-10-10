@@ -871,12 +871,33 @@ adapter) nauwelijks data accepteert terwijl wij 100+ pakketjes stuurden; de nieu
 opstartvolgorde stuurt tijdens de fout alleen nog Reset Fault. Als dit bij een volgende
 test toch terugkomt, graag het log uit de map hierboven meesturen.
 
-**De verkeerde kant op in de eerste rit (3 naar 7, gereden 3 naar 4):** het log van die rit
-ontbreekt, dus dit is een VERMOEDEN, geen bewijs. Blok 3 heeft twee uitgangen (naar 4 en
-naar 7) en de stand van de wissel daar bepaalt de kant. De wissel-initialisatie van deze
-sessie liep zoals hierboven beschreven door elkaar en in foutstatus (Dinamo negeert dan
-wisselpulsen), dus de fysieke wisselstand kan afgeweken hebben van wat de software
-dacht. Melder 24 hoort bovendien bij de blokken 3, 4 en 7 tegelijk, waardoor een
-bezetmelding daarvan niet laat zien welke kant de trein op ging; pas melder 15/16 (blok
-4) of 21/29/30 (blok 7) onderscheidt dat. Opnieuw testen met het automatisch bewaarde
-log laat zien of het nog voorkomt.
+**De verkeerde kant op in de eerste rit (3 naar 7, gereden 3 naar 4):** zie BUG #46.
+(Een eerder opgeschreven vermoeden over een verkeerd staande wissel is door de gebruiker
+terecht verworpen en hier verwijderd: het ging om een ontbrekende richtingsbepaling.)
+
+## #46 - Startrichting van een rit werd niet per loc onthouden
+
+**Melding:** reservering 3 naar 7 (rijrichting vooruit) maar de loc reed de andere kant op;
+niets greep in. De software hoort de richting uit route/reservering te halen en op te slaan.
+
+**Oorzaak:** de startrichting was een enkele waarde per STARTBLOK (`Blok.GeleerdeStartrichtingVooruit`),
+niet per loc, niet in de backup per loc, en werd ook door AUTOMATISCHE keercorrecties
+(flikkerend meldpunt) overschreven. Blok 3 stond in de projecten op `achteruit` na ~7
+wisselende correcties binnen seconden. Na afloop van een rit of na een herstart was de
+werkelijke richting van de loc dus onbekend en viel de rit terug op die vervuilde waarde of op
+"vooruit".
+
+**Fix:**
+- `Trein.LaatsteRichtingVooruit` + `LaatsteRichtingBlokNummer`: de loc onthoudt zijn eigen
+  richting bij elk vertrek, elke blokovergang en elke keercorrectie; wordt met het project en
+  de backup opgeslagen. Alleen geldig zolang de loc nog in dat blok staat.
+- Nieuwe rit: eerst de richting van de loc zelf, dan de geleerde blokwaarde, dan vooruit.
+  Een eerste stap met Keer/kopspoor wordt door de bestaande `VereistKeren` omgedraaid.
+  De gekozen bron staat altijd in het log (`[Rit] Startrichting ... bron: ...`).
+- De per-blok geleerde waarde wordt alleen nog door een bewuste keer-actie van de gebruiker
+  bijgewerkt, niet meer door automatische correcties.
+
+**NIET bewezen:** niet op de baan getest. Een loc die je met de hand plaatst heeft nog geen
+onthouden richting; de eerste rit gebruikt dan de blokwaarde/vooruit. Staat de loc dan
+andersom, gebruik eenmalig de keer-knop: dat wordt vanaf dan onthouden. Blok 3 heeft nog de
+oude, mogelijk vervuilde waarde `achteruit` in bestaande projecten.

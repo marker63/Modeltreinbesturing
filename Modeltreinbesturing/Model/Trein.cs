@@ -36,6 +36,14 @@ public class Trein
     /// puur een correctie op het allerlaatste, uitgaande hardware-commando.</summary>
     public bool OmgekeerdeRijrichting { get; set; }
 
+    /// <summary>BUG #46: de laatst bekende rijrichting van deze loc (in het logische
+    /// blokkenframe, dus vóór de OmgekeerdeRijrichting-correctie) en het blok waar hij toen
+    /// stond. Wordt bij elke blokovergang/keercorrectie bijgewerkt en meegesaved in het
+    /// project/de backup, zodat een nieuwe rit vanaf dat blok de richting van de loc zelf
+    /// gebruikt i.p.v. één waarde per blok. Alleen geldig zolang de loc nog in dat blok staat.</summary>
+    public bool? LaatsteRichtingVooruit { get; set; }
+    public int? LaatsteRichtingBlokNummer { get; set; }
+
     /// <summary>Pad naar een foto van de fysieke loc, optioneel - handig om locs uit elkaar
     /// te houden in het overzicht als je er veel hebt. Net als GeluidsBestand hieronder een
     /// PAD, geen ingebedde afbeelding, om het projectbestand compact te houden.</summary>

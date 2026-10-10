@@ -740,8 +740,7 @@ public partial class TreinrouteWindow : Window
                 };
                 // Zie Blok.GeleerdeStartrichtingVooruit - dit IS de verse-start-situatie
                 // (route.Startblok, nog geen stap gezet) waar dat voor bedoeld is.
-                if (route.Startblok.GeleerdeStartrichtingVooruit is bool geleerdeStartrichtingAuto)
-                    autoTrein.RijdtVooruit = geleerdeStartrichtingAuto;
+                BepaalStartrichting(autoTrein, route.Startblok);
                 // Was dit blok "handmatig bezet" (een net geplaatste loc, zie BaanCanvas_Drop
                 // e.a.) - dat wordt het nu een GEWONE bezetting door deze automatische rit,
                 // dezelfde overgang als bij elke volgende stap onderweg.
@@ -961,8 +960,7 @@ public partial class TreinrouteWindow : Window
         // dit punt, trein.VorigBlok is nog nooit gezet) gebruikt de eerder geleerde,
         // door de gebruiker zelf bevestigde rijrichting voor dit specifieke startblok, als
         // die er is - anders blijft de standaardwaarde (vooruit) gewoon staan.
-        if (pad[0].GeleerdeStartrichtingVooruit is bool geleerdeStartrichting)
-            trein.RijdtVooruit = geleerdeStartrichting;
+        BepaalStartrichting(trein, pad[0]);
         _actieveTreinen.Add(trein);
 
         // Was het startblok "handmatig bezet" (een net geplaatste loc) - net als bij
@@ -1257,6 +1255,44 @@ public partial class TreinrouteWindow : Window
     /// Keer-relatie-variant, wat dezelfde soort inconsistentie gaf als bij de kopspoor-fix
     /// hiervoor: een gewoon blok met een Keer-relatie kreeg geen nette afremming bij
     /// aankomst, alleen een instant stop (via VerwerkEventueelKeren) vlak vóór vertrek.</summary>
+    /// <summary>BUG #46 (gebruiker: "er moet ergens een richtingsbepaling staan ... reserveren
+    /// van blok 3 naar blok 7 is rijrichting vooruit, en die heb je kennelijk niet opgeslagen
+    /// of genegeerd"): bepaalt de startrichting van een verse rit. Volgorde: (1) de door de
+    /// loc ZELF onthouden richting, mits hij nog in datzelfde blok staat (Trein.LaatsteRichting*,
+    /// bijgewerkt bij elke blokovergang en meegesaved in de backup); (2) de per-blok geleerde
+    /// richting (door de gebruiker bevestigd via de keer-knop); (3) de standaard (vooruit).
+    /// Een eerste stap met Keer-relatie/kopspoor wordt daarna gewoon door VereistKeren
+    /// omgedraaid. De gebruikte bron wordt altijd gelogd.</summary>
+    private void BepaalStartrichting(RijdendeTrein rit, Blok startblok)
+    {
+        var loc = rit.Trein;
+        string bron;
+        if (loc?.LaatsteRichtingVooruit is bool eigen && loc.LaatsteRichtingBlokNummer == startblok.Nummer)
+        {
+            rit.RijdtVooruit = eigen;
+            bron = "onthouden richting van de loc zelf";
+        }
+        else if (startblok.GeleerdeStartrichtingVooruit is bool geleerd)
+        {
+            rit.RijdtVooruit = geleerd;
+            bron = "geleerde startrichting van het blok (loc heeft hier nog geen eigen richting onthouden)";
+        }
+        else
+        {
+            bron = "standaard (nog niets onthouden of geleerd)";
+        }
+        Log($"[Rit] Startrichting '{loc?.Omschrijving}' in blok {startblok.Nummer}: {(rit.RijdtVooruit ? "vooruit" : "achteruit")} - bron: {bron}.");
+        OnthoudRichting(rit);
+    }
+
+    /// <summary>BUG #46: legt de huidige rijrichting + het blok vast op de loc zelf.</summary>
+    private static void OnthoudRichting(RijdendeTrein rit)
+    {
+        if (rit.Trein is null || rit.HuidigBlok is null) return;
+        rit.Trein.LaatsteRichtingVooruit = rit.RijdtVooruit;
+        rit.Trein.LaatsteRichtingBlokNummer = rit.HuidigBlok.Nummer;
+    }
+
     private bool VereistKeren(Blok? van, Blok naar)
     {
         var relatie = van != null ? _blokBeheerder.Relaties.FirstOrDefault(r => r.Van == van && r.Naar == naar) : null;
@@ -2229,6 +2265,7 @@ public partial class TreinrouteWindow : Window
         // boekhouding, eventueel afremmen, en de volgende stap plannen).
         trein.VorigBlok = huidig;
         trein.HuidigBlok = volgendBlok;
+        OnthoudRichting(trein); // BUG #46
         trein.Pad.Add(volgendBlok);
         trein.GereserveerdVolgendBlok = null;
         _blokBeheerder.ZetStaart(volgendBlok, false);
@@ -3529,6 +3566,7 @@ public partial class TreinrouteWindow : Window
         }
         var vorigBlokVoorLoc = trein.HuidigBlok;
         trein.HuidigBlok = blok;
+        OnthoudRichting(trein); // BUG #46
         _blokBeheerder.ZetStaart(blok, false); // mocht dit blok toevallig nog een staart van een eerdere passage zijn
         _blokBeheerder.ZetBezet(blok, true);
         if (trein.Trein != null)
@@ -4589,7 +4627,7 @@ public partial class TreinrouteWindow : Window
     /// automatische logica in de war brengen als de trein middenin een blok-overgang zit -
     /// bewust gebruikersinitiatief, niet iets wat de software zelf zou doen) als voor een
     /// stilstaande/gepauzeerde trein.</summary>
-    public string KeerTreinIndienActief(Trein trein)
+    public string KeerTreinIndienActief(Trein trein, bool doorGebruiker = true)
     {
         var rit = _actieveTreinen.FirstOrDefault(t => t.Trein == trein);
         if (rit is null) return $"'{trein.Omschrijving}' rijdt op dit moment geen route - er is niets te keren.";
@@ -4617,7 +4655,10 @@ public partial class TreinrouteWindow : Window
         // enkele manier had om de juiste richting te weten), dan wordt de zojuist door de
         // gebruiker bevestigde, NIEUWE richting vanaf nu onthouden voor dit startblok - een
         // feit, net bevestigd, niet een aanname.
-        if (rit.VorigBlok is null && rit.HuidigBlok != null)
+        OnthoudRichting(rit); // BUG #46: de loc onthoudt zijn eigen (gecorrigeerde) richting
+        // BUG #46: ALLEEN een bewuste keer-actie van de gebruiker leert de blokwaarde; een
+        // automatische correctie (flikkerend meldpunt e.d.) mag die niet vervuilen.
+        if (doorGebruiker && rit.VorigBlok is null && rit.HuidigBlok != null)
         {
             rit.HuidigBlok.GeleerdeStartrichtingVooruit = rit.RijdtVooruit;
             Log($"[Route '{rit.Route.Omschrijving}'] Startrichting voor blok {rit.HuidigBlok.Nummer} onthouden: voortaan {(rit.RijdtVooruit ? "vooruit" : "achteruit")} bij een verse start vanaf dit blok.");
@@ -4706,7 +4747,7 @@ public partial class TreinrouteWindow : Window
             return null;
         }
         rit.LaatsteAutomatischeRichtingCorrectie = DateTime.Now;
-        return KeerTreinIndienActief(trein);
+        return KeerTreinIndienActief(trein, doorGebruiker: false);
     }
 
     /// <summary>Pauzeert deze SPECIFIEKE trein (zonder de rit te annuleren) - het huidige
