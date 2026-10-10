@@ -862,7 +862,7 @@ public partial class BaanVerkenner
                 if (doel.StopBijMelders.Contains(m))
                 {
                     await StopLoc();
-                    _log.Rijden($"  gestopt: na melder {m} volgt een bekend kortsluitpunt.");
+                    _log.Rijden($"  gestopt op melder {m}: dit is het bekende kortsluitpunt (voorbij deze melder volgt de kortsluiting). De loc staat dus op het kortsluitpunt, niet ervoor.");
                     res.Einde = RitEinde.BekendKortsluitpunt;
                     return res;
                 }

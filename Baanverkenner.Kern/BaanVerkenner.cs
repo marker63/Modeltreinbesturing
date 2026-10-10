@@ -1266,7 +1266,7 @@ public partial class BaanVerkenner
         RitEinde.Doodlopend => "doodlopend (geen nieuwe melder binnen de wachttijd)",
         RitEinde.Lus => "lus (melder opnieuw bereikt)",
         RitEinde.Kortsluiting => "kortsluiting/ontsporing",
-        RitEinde.BekendKortsluitpunt => "gestopt vóór bekend kortsluitpunt",
+        RitEinde.BekendKortsluitpunt => "gestopt op het bekende kortsluitpunt (de loc staat op de laatste melder vóór de kortsluiting)",
         RitEinde.GelijkAanBasis => "zelfde als basisrit",
         RitEinde.AfwijkingGevonden => "afwijking gevonden",
         RitEinde.Maximum => "maximaal aantal melders",

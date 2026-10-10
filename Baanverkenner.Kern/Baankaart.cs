@@ -159,7 +159,7 @@ public enum RitEinde
     Doodlopend,          // geen nieuwe melder binnen de wachttijd: stootjuk/kopspoor
     Lus,                 // een eerder gepasseerde melder werd opnieuw bezet
     Kortsluiting,        // melders vielen weg / hardware meldde kortsluiting
-    BekendKortsluitpunt, // bewust gestopt vóór een al bekend kortsluitpunt
+    BekendKortsluitpunt, // bewust gestopt op de melder waarna een al bekend kortsluitpunt volgt
     GelijkAanBasis,      // proefrit volgde de basisrit tot het einde: niets nieuws
     AfwijkingGevonden,   // proefrit week af van de basisrit en reed nog even door
     Maximum,             // veiligheidsgrens aantal melders
