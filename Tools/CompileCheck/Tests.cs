@@ -209,6 +209,37 @@ public static class Tests
         Eis(v.Kaart.Overgangen.Any(o => o.Van == 1 && o.Naar == 2), "blokgrens: de rit komt daarna bij melder 2");
     }
 
+    // BUG #71 (log 16:48): navigatie begint vanaf een aangenomen melder terwijl de loc ergens anders staat. Dan geen valse overgang vastleggen.
+    static void NavigatieOnjuisteStartTest()
+    {
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
+        var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+        var s1 = sim.NieuweSectie(1, 80, 1); var s2 = sim.NieuweSectie(2, 80, 2); var s3 = sim.NieuweSectie(3, 80, 3);
+        sim.Verbind(s1, B, s2, A); sim.Verbind(s2, B, s3, A);
+        sim.PlaatsLoc(s2, 40, +1);
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 1, DinamoBlokken = "1-3" };
+        var status = new VerkenStatus { Instellingen = ins };
+        status.Kaart.StartMelder = 1; status.Kaart.Hardware = "Simulatie"; status.Kaart.RefSnelheid = 12;
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var log = new VerkenLog(klok);
+        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true), status);
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var monitor = (MelderMonitor)typeof(BaanVerkenner).GetField("_monitor", bf)!.GetValue(v)!;
+        sim.BezetmeldingGewijzigd += monitor.Ontvang;
+        foreach (var mm in new[] { 1, 2, 3 }) sim.VraagMelderStatusOp(mm);
+        klok.Wacht(TimeSpan.FromSeconds(1)).GetAwaiter().GetResult();
+        var rit = typeof(BaanVerkenner).GetMethod("Rit", bf)!;
+        // a) de loc staat al op het doel (melder 2), navigatie dacht vanaf 1
+        var res = ((Task<RitResultaat>)rit.Invoke(v, new object[] { 1, Richting.Vooruit, new RitDoel { DoelMelder = 2, VerwachtPad = new List<int> { 1, 2 } } })!).GetAwaiter().GetResult();
+        Eis(res.Einde == RitEinde.DoelBereikt && !v.Kaart.Overgangen.Any(o => o.Van == 1 && o.Naar == 2), "navigatie-startcontrole: loc al op het doel -> geen rit en geen overgang 1 -> 2");
+        // b) de loc staat niet op het verwachte pad -> navigatiefout, geen overgang
+        bool fout = false;
+        try { ((Task<RitResultaat>)rit.Invoke(v, new object[] { 1, Richting.Vooruit, new RitDoel { DoelMelder = 3, VerwachtPad = new List<int> { 1, 3 } } })!).GetAwaiter().GetResult(); }
+        catch (NavigatieFout) { fout = true; }
+        Eis(fout && !v.Kaart.Overgangen.Any(o => o.Van == 1), "navigatie-startcontrole: loc buiten het verwachte pad -> NavigatieFout, geen valse overgang");
+    }
+
     // De geslaagde, volledige rit van 10-10 11:38 (blokken 10, 11, 12): referentie voor importer en leerprofiel
     static void GeslaagdeRitTest()
     {
@@ -289,6 +320,7 @@ public static class Tests
         OmgekeerdeOvergangTest();
         PartnerVolgordeTest();
         BlokgrensTest();
+        NavigatieOnjuisteStartTest();
 
         Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)");
         return _fouten == 0 ? 0 : 1;

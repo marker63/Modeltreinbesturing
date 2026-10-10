@@ -619,6 +619,30 @@ public partial class BaanVerkenner
         res.Reeks.Add(start);
         _monitor.Bijwerken();
 
+        // BUG #71 (log 16:48): een navigatie begon vanaf melder 13 terwijl de loc na een herstel na kortsluiting op melder 8 stond.
+        // De rit "13 -> 8" werd daarna als echte overgang in de kaart gezet (13 achteruit -> 8, bestaat niet) en zo ook de omgekeerde
+        // (8 vooruit -> 13). Staat de loc niet op de startmelder maar op precies één andere melder, dan klopt de aanname niet:
+        // doel al bereikt, op het verwachte pad verder vanaf de werkelijke plek, anders een navigatiefout (loc terugzetten).
+        if (doel.IsNavigatie && _monitor.Bezet is { Count: 1 } werkelijkBezet && !werkelijkBezet.Contains(start))
+        {
+            int werkelijk = werkelijkBezet.First();
+            if (werkelijk == doel.DoelMelder)
+            {
+                _log.Waarschuwing($"De loc staat niet op melder {start} maar al op het doel, melder {werkelijk}. Geen rit nodig en er wordt geen overgang {start} -> {werkelijk} vastgelegd.");
+                res.Reeks[0] = werkelijk;
+                res.Einde = RitEinde.DoelBereikt;
+                return res;
+            }
+            if (doel.VerwachtPad is { } verwacht && verwacht.Contains(werkelijk))
+            {
+                _log.Waarschuwing($"De loc staat niet op melder {start} maar op melder {werkelijk} (op het verwachte pad): de rit begint daar.");
+                start = werkelijk;
+                res.Reeks[0] = werkelijk;
+            }
+            else
+                throw new NavigatieFout($"De loc moest vanaf melder {start} naar melder {doel.DoelMelder} rijden, maar staat op melder {werkelijk} (niet op het verwachte pad).");
+        }
+
         if (doel.IsNavigatie && start == doel.DoelMelder)
         {
             res.Einde = RitEinde.DoelBereikt;
