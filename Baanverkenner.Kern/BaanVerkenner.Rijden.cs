@@ -58,6 +58,16 @@ public partial class BaanVerkenner
 
     private bool BlokVereist => _hw.LocCommandoVereistBlok;
 
+    /// <summary>BUG #62: de Dinamo meldde kortsluiting tijdens een blokproef (bijv. de loc staat met een poot tegen een
+    /// verkeerd staande wisseltong). De proef houdt dan op; Rit() handelt het af als gewone kortsluiting.</summary>
+    private bool _proefKortsluiting;
+    private bool ProefKortsluitingGemeld()
+    {
+        if (!_kortsluitingGemeld || _klok.Nu < _negeerKortsluitingTot) return false;
+        _proefKortsluiting = true;
+        return true;
+    }
+
     private int? BlokVan(int melder) => _kaart.Melders.FirstOrDefault(m => m.Nummer == melder)?.DinamoBlok;
 
     // BUG #43: Dinamo meldt een kortsluiting ook PER BLOK (Block Alarm, zie IBlokAlarmBron),
@@ -243,12 +253,16 @@ public partial class BaanVerkenner
     // Blokproef (alleen Dinamo): welk blok voedt de sectie waar de loc staat?
     // =====================================================================
 
-    private List<int> BlokKandidaten(int? eerst)
+    private List<int> BlokKandidaten(int? eerst, int? melder = null)
     {
         var alle = _ins.DinamoBlokLijst();
         var gebruikt = _kaart.Melders.Where(m => m.DinamoBlok is not null).Select(m => m.DinamoBlok!.Value).ToHashSet();
         var res = new List<int>();
-        if (eerst is int e && alle.Contains(e)) res.Add(e);
+        // BUG #62: een blok dat uit een eerdere verkenning van deze baan bekend is voor deze melder, eerst proberen
+        // (een verkeerde hint kost hooguit één korte poging).
+        if (melder is int mm && Leerprofiel?.BlokHint(mm) is int hint && alle.Contains(hint)) res.Add(hint);
+        if (eerst is int e0 && alle.Contains(e0) && !res.Contains(e0)) { res.Add(e0); eerst = null; }
+        if (eerst is int e && alle.Contains(e) && !res.Contains(e)) res.Add(e);
         res.AddRange(alle.Where(b => !gebruikt.Contains(b) && !res.Contains(b)));
         res.AddRange(alle.Where(b => !res.Contains(b)));
         return res;
@@ -270,7 +284,7 @@ public partial class BaanVerkenner
         _log.Stap($"Blokproef voor melder {melder}: elk Dinamo-blok krijgt om beurten een rijcommando.");
         foreach (var r in new[] { Richting.Vooruit, Richting.Achteruit })
         {
-            foreach (var blok in BlokKandidaten(null))
+            foreach (var blok in BlokKandidaten(null, melder))
             {
                 _token.ThrowIfCancellationRequested();
                 _monitor.Bijwerken();
@@ -311,7 +325,7 @@ public partial class BaanVerkenner
     private async Task<bool> BlokZoekenNaInrijden(int melder, int vorige, Richting r)
     {
         _log.Stap($"Nieuwe sectie: melder {melder}. Blokproef (steeds een klein stukje {r.Om().Tekst()}).");
-        foreach (var blok in BlokKandidaten(BlokVan(vorige)))
+        foreach (var blok in BlokKandidaten(BlokVan(vorige), melder))
         {
             _token.ThrowIfCancellationRequested();
             _monitor.Bijwerken();
@@ -323,7 +337,9 @@ public partial class BaanVerkenner
             {
                 await Wacht(Poll);
                 if (_monitor.Bijwerken().Any(x => x.Tijd >= t0)) { gewijzigd = true; break; }
+                if (ProefKortsluitingGemeld()) break;
             }
+            if (_proefKortsluiting && !gewijzigd) { await StuurNaarBlok(blok, r.Om(), 0); return false; }
             if (gewijzigd)
             {
                 KoppelBlok(melder, blok);
@@ -345,7 +361,7 @@ public partial class BaanVerkenner
     private async Task<bool> BlokZoekenDoorrijdend(int melder, Richting r)
     {
         _log.Info($"Melder {melder}: terugrijden gaf bij geen enkel blok beweging; nu per blok doorrijden ({r.Tekst()}).");
-        foreach (var blok in BlokKandidaten(null))
+        foreach (var blok in BlokKandidaten(null, melder))
         {
             _token.ThrowIfCancellationRequested();
             _monitor.Bijwerken();
@@ -357,7 +373,9 @@ public partial class BaanVerkenner
             {
                 await Wacht(Poll);
                 if (_monitor.Bijwerken().Any(x => x.Tijd >= t0)) { gewijzigd = true; break; }
+                if (ProefKortsluitingGemeld()) break;
             }
+            if (_proefKortsluiting && !gewijzigd) { await StuurNaarBlok(blok, r, 0); return false; }
             if (gewijzigd)
             {
                 KoppelBlok(melder, blok);
@@ -796,10 +814,23 @@ public partial class BaanVerkenner
                     }
                 }
                 _proefPogingen[proefMelder] = _proefPogingen.GetValueOrDefault(proefMelder) + 1;
-                if (!await BlokZoekenNaInrijden(proefMelder, res.Reeks[^2], r) && !await BlokZoekenDoorrijdend(proefMelder, r))
-                    _log.Waarschuwing(_proefPogingen[proefMelder] < MaxProefPogingen
+                _proefKortsluiting = false;
+                bool proefGelukt = await BlokZoekenNaInrijden(proefMelder, res.Reeks[^2], r);
+                if (!proefGelukt && !_proefKortsluiting) proefGelukt = await BlokZoekenDoorrijdend(proefMelder, r);
+                if (_proefKortsluiting)
+                {
+                    // BUG #62: kortsluiting tijdens de proef (bijv. loc met een poot tegen een verkeerd staande wisseltong).
+                    // Niet blind alle blokken blijven proberen: stoppen en als gewone kortsluiting afhandelen.
+                    _proefKortsluiting = false;
+                    _proefPogingen[proefMelder]--;
+                    _log.Waarschuwing($"Kortsluiting tijdens de blokproef bij melder {proefMelder}. Staat de loc met een poot tegen een wisseltong die niet goed staat? Zet zo nodig de wissel bij melder {proefMelder} met de hand goed.");
+                    return await Kortsluiting(res, $"kortsluiting tijdens de blokproef bij melder {proefMelder}");
+                }
+                if (!proefGelukt)
+                    _log.Waarschuwing((_proefPogingen[proefMelder] < MaxProefPogingen
                         ? $"Voor melder {proefMelder} is (nog) geen Dinamo-blok gevonden - bij een volgende rit wordt het opnieuw geprobeerd; intussen gaat het rijcommando naar alle blokken."
-                        : $"Voor melder {proefMelder} is geen Dinamo-blok gevonden - de verkenner stuurt hier voortaan naar alle blokken.");
+                        : $"Voor melder {proefMelder} is geen Dinamo-blok gevonden - de verkenner stuurt hier voortaan naar alle blokken.")
+                        + $" Geen enkel blok gaf beweging: staat de loc stil door een kortsluiting of een wissel bij melder {proefMelder} die niet goed staat? Controleer dat.");
                 _monitor.Bijwerken();
                 await StuurSnelheid(r, doelInzicht ? _ins.Kruipsnelheid : snelheid);
                 laatsteWijziging = _klok.Nu;
@@ -818,9 +849,19 @@ public partial class BaanVerkenner
 
             // ---- Te lang geen nieuwe melder ----
             var grens = wachttijdVerlengd ? TimeSpan.FromSeconds(_ins.MaxSecondenTussenMelders) : WachttijdTussenMelders();
+            // BUG #60: bij een al bekend kopspoor (zelfde richting en wisselstand, en de loc is echt vertrokken) niet de hele
+            // wachttijd tegen het stootjuk blijven draaien: kort wachten, dan keren.
+            bool kopBekend = !doel.IsNavigatie && res.Reeks.Count >= 2
+                && _kaart.Kopsporen.Any(k => k.Melder == res.Reeks[^1] && k.Richting == r && k.Configuratie == doel.Configuratie.ToString());
+            if (kopBekend)
+            {
+                double kopSec = Math.Max(_ins.MinSecondenTussenMelders, 12.0 * RefSnelheid / Math.Max(1, _ins.Verkensnelheid));
+                if (kopSec < grens.TotalSeconds) grens = TimeSpan.FromSeconds(kopSec);
+            }
             if (_klok.Nu - laatsteWijziging > grens)
             {
-                if (!wachttijdVerlengd && grens < TimeSpan.FromSeconds(_ins.MaxSecondenTussenMelders))
+                if (kopBekend) _log.Info($"Melder {res.Reeks[^1]} is een bekend kopspoor: de loc keert zonder verder te wachten.");
+                if (!kopBekend && !wachttijdVerlengd && grens < TimeSpan.FromSeconds(_ins.MaxSecondenTussenMelders))
                 {
                     // BUG #55: nog niet concluderen dat dit een kopspoor/stootjuk is: een lange sectie
                     // kost meer tijd dan de geleerde wachttijd. Eenmalig doorrijden tot de maximale wachttijd.

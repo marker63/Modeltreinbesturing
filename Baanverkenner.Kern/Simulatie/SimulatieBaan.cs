@@ -78,6 +78,10 @@ public class SimulatieBaan : IHardwareInterface
     /// <summary>Gedrag van de echte baan (11:38-rit, BUG #61): een loc die vanuit stilstand met een deel in twee blokken staat, gaat alleen rijden als het rijcommando naar ALLE die blokken gaat (een voedend blok naast een onbekrachtigd blok remt de loc af). Een rijdende loc rolt gewoon door. Standaard uit.</summary>
     public bool StilstaanRemtOpGrens { get; set; }
     private readonly HashSet<int> _aangestuurd = new();
+    /// <summary>Alleen voor tests (BUG #62): het N-de rijcommando (snelheid > 0) naar dit blok doet niets en veroorzaakt een kortsluitmelding (zoals een loc met een poot tegen een verkeerd staande wisseltong).</summary>
+    public (int Blok, int Nummer)? KortsluitBijCommando { get; set; }
+    private int _kortCommandoTeller;
+    private DateTime? _kortMeldTijd;
     private bool _bewegend;
     /// <summary>Alleen voor tests (BUG #57): (melder waar het midden van de loc staat, blok, vooruit)-combinaties waarvoor een rijcommando met snelheid > 0 niets doet (waarde = hoe vaak het commando verloren gaat; daarna werkt het weer).</summary>
     public Dictionary<(int Melder, int Blok, bool Vooruit), int> GeblokkeerdeCommandos { get; } = new();
@@ -202,6 +206,11 @@ public class SimulatieBaan : IHardwareInterface
         if (decoderAdres != _locAdres) return;
         if (DinamoGedrag && !BlokkenVanLoc().Contains(blokNummer)) return; // komt niet aan
         if (DinamoGedrag && _element is Sectie huidig && stap > 0 && VerliesCommando((huidig.Melder, blokNummer, vooruit))) return; // test: dit commando gaat verloren
+        if (KortsluitBijCommando is { } kc && stap > 0 && blokNummer == kc.Blok && ++_kortCommandoTeller == kc.Nummer)
+        {
+            _kortMeldTijd = (_vorigeTik ?? DateTime.Now) + TimeSpan.FromMilliseconds(600);
+            return;
+        }
         _commandoBlok = blokNummer;
         if (stap > 0 && _decoderStap > 0 && _decoderVooruit == vooruit) _aangestuurd.Add(blokNummer);
         else { _aangestuurd.Clear(); if (stap > 0) _aangestuurd.Add(blokNummer); }
@@ -260,6 +269,7 @@ public class SimulatieBaan : IHardwareInterface
             }
         }
 
+        if (_kortMeldTijd is DateTime km && nu >= km) { _kortMeldTijd = null; KortsluitingStatusGewijzigd?.Invoke(true); }
         Beweeg(nu, dt);
         if (FlikkerMelder > 0 && _geflikkerd < FlikkerKeer && nu >= _flikkerVolgende && nu >= _flikkerTot)
         {

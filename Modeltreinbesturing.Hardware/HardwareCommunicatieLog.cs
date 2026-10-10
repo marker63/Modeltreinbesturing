@@ -16,7 +16,7 @@ public static class HardwareCommunicatieLog
     /// hierop voor een live weergave.</summary>
     public static event Action<LogRegel>? NieuweRegel;
 
-    private const int MaxRegels = 2000;
+    private const int MaxRegels = 20000; // BUG #62: een verkenning van een half uur paste niet meer in 2000 regels
     private static readonly object _vergrendeling = new();
     private static readonly List<LogRegel> _regels = new();
 

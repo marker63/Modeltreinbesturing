@@ -1,5 +1,99 @@
 {
   "FormaatVersie": 1,
+  "BlokHints": [
+    {
+      "Melder": 5,
+      "Blok": 3
+    },
+    {
+      "Melder": 8,
+      "Blok": 4
+    },
+    {
+      "Melder": 13,
+      "Blok": 3
+    },
+    {
+      "Melder": 14,
+      "Blok": 3
+    },
+    {
+      "Melder": 15,
+      "Blok": 4
+    },
+    {
+      "Melder": 16,
+      "Blok": 4
+    },
+    {
+      "Melder": 17,
+      "Blok": 5
+    },
+    {
+      "Melder": 20,
+      "Blok": 6
+    },
+    {
+      "Melder": 21,
+      "Blok": 7
+    },
+    {
+      "Melder": 24,
+      "Blok": 8
+    },
+    {
+      "Melder": 25,
+      "Blok": 5
+    },
+    {
+      "Melder": 26,
+      "Blok": 5
+    },
+    {
+      "Melder": 27,
+      "Blok": 6
+    },
+    {
+      "Melder": 28,
+      "Blok": 6
+    },
+    {
+      "Melder": 29,
+      "Blok": 7
+    },
+    {
+      "Melder": 30,
+      "Blok": 7
+    },
+    {
+      "Melder": 133,
+      "Blok": 11
+    },
+    {
+      "Melder": 136,
+      "Blok": 12
+    },
+    {
+      "Melder": 139,
+      "Blok": 10
+    },
+    {
+      "Melder": 140,
+      "Blok": 10
+    },
+    {
+      "Melder": 143,
+      "Blok": 12
+    },
+    {
+      "Melder": 144,
+      "Blok": 12
+    },
+    {
+      "Melder": 132,
+      "Blok": 10
+    }
+  ],
   "Overgangen": [
     {
       "Van": 144,
@@ -70,7 +164,112 @@
       "Richting": "Vooruit",
       "SecondenXStap": 204.00462108000002,
       "Aantal": 10
+    },
+    {
+      "Van": 14,
+      "Naar": 24,
+      "Richting": "Vooruit",
+      "SecondenXStap": 76.8047532,
+      "Aantal": 2
+    },
+    {
+      "Van": 24,
+      "Naar": 21,
+      "Richting": "Vooruit",
+      "SecondenXStap": 52.804797,
+      "Aantal": 2
+    },
+    {
+      "Van": 24,
+      "Naar": 14,
+      "Richting": "Achteruit",
+      "SecondenXStap": 32.3189496,
+      "Aantal": 1
+    },
+    {
+      "Van": 14,
+      "Naar": 13,
+      "Richting": "Achteruit",
+      "SecondenXStap": 79.2171876,
+      "Aantal": 1
+    },
+    {
+      "Van": 21,
+      "Naar": 29,
+      "Richting": "Vooruit",
+      "SecondenXStap": 37.194504,
+      "Aantal": 2
+    },
+    {
+      "Van": 29,
+      "Naar": 30,
+      "Richting": "Vooruit",
+      "SecondenXStap": 158.393808,
+      "Aantal": 1
+    },
+    {
+      "Van": 30,
+      "Naar": 20,
+      "Richting": "Vooruit",
+      "SecondenXStap": 38.400650399999996,
+      "Aantal": 1
+    },
+    {
+      "Van": 20,
+      "Naar": 27,
+      "Richting": "Vooruit",
+      "SecondenXStap": 36.000874800000005,
+      "Aantal": 1
+    },
+    {
+      "Van": 27,
+      "Naar": 28,
+      "Richting": "Vooruit",
+      "SecondenXStap": 172.803372,
+      "Aantal": 1
+    },
+    {
+      "Van": 28,
+      "Naar": 26,
+      "Richting": "Vooruit",
+      "SecondenXStap": 35.9999316,
+      "Aantal": 2
+    },
+    {
+      "Van": 26,
+      "Naar": 25,
+      "Richting": "Vooruit",
+      "SecondenXStap": 43.2038388,
+      "Aantal": 1
+    },
+    {
+      "Van": 25,
+      "Naar": 17,
+      "Richting": "Vooruit",
+      "SecondenXStap": 167.9959536,
+      "Aantal": 1
+    },
+    {
+      "Van": 17,
+      "Naar": 8,
+      "Richting": "Vooruit",
+      "SecondenXStap": 35.986426800000004,
+      "Aantal": 1
+    },
+    {
+      "Van": 8,
+      "Naar": 15,
+      "Richting": "Vooruit",
+      "SecondenXStap": 53.447084399999994,
+      "Aantal": 1
+    },
+    {
+      "Van": 15,
+      "Naar": 16,
+      "Richting": "Vooruit",
+      "SecondenXStap": 43.1976732,
+      "Aantal": 1
     }
   ],
-  "AantalMetingen": 116
+  "AantalMetingen": 135
 }

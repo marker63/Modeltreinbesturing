@@ -28,6 +28,12 @@ public static class Tests
         var tweede = PendelScenario(new Dictionary<(int, int, bool), int>(), "leren: tweede run met profiel", true, profiel: terug);
         Eis(tweede.Log.AlsTekst().Contains("Leerprofiel:"), "leerprofiel: tweede run meldt dat het profiel gebruikt wordt");
         Eis(tweede.Seconden <= eerste.Seconden * 1.05, "leerprofiel: tweede run is niet langzamer (" + tweede.Seconden.ToString("0") + " s tegen " + eerste.Seconden.ToString("0") + " s)");
+        int Geen(string t) => t.Split("geen beweging").Length - 1;
+        Console.WriteLine($"  (eerste run: {eerste.Seconden:0} s, {Geen(eerste.Log.AlsTekst())}x 'geen beweging'; tweede run: {tweede.Seconden:0} s, {Geen(tweede.Log.AlsTekst())}x)");
+        Eis(profiel.BlokHint(132) == 10 && profiel.BlokHint(133) == 11 && profiel.BlokHint(136) == 12, "blokhints: het leerprofiel onthoudt welk blok elke melder voedt");
+        Eis(LeerProfiel.VanJson("{\"FormaatVersie\":1,\"Overgangen\":[]}") is { } oud && oud.BlokHint(132) is null, "blokhints: een oud profielbestand zonder hints blijft laadbaar");
+        Eis(Geen(tweede.Log.AlsTekst()) < Geen(eerste.Log.AlsTekst()), "blokhints: tweede run met profiel heeft minder mislukte blokpogingen");
+        Eis(eerste.Log.AlsTekst().Contains("bekend kopspoor") || tweede.Log.AlsTekst().Contains("bekend kopspoor"), "kopspoor (#60): bekend kopspoor wordt herkend en de loc keert zonder de hele wachttijd");
         var echt = Laad("baankaart_pendel_2026-10-10_1025.json");
         var zaad = new LeerProfiel(); zaad.Leer(echt, 12);
         Eis(Math.Abs((zaad.Verwacht(144, 143, Richting.Vooruit, 12) ?? 0) - 17.04) < 0.1 && Math.Abs((zaad.Verwacht(136, 133, Richting.Achteruit, 12) ?? 0) - 3.02) < 0.1, "leerprofiel: tijden uit de echte kaart van 10-10 10:24 worden overgenomen");
@@ -42,6 +48,14 @@ public static class Tests
 
         PendelScenario(new Dictionary<(int, int, bool), int> { [(132, 10, true)] = 2, [(132, 10, false)] = 2 }, "pendel (proef blijft mislukken)", true);
 
+        // BUG #62: kortsluiting tijdens de blokproef wordt herkend (oude code bleef alle blokken blind proberen)
+        var ks = PendelScenario(new Dictionary<(int, int, bool), int>(), "kortsluiting tijdens de blokproef", false, kortsluit: (12, 5), controleer: false);
+        Console.WriteLine("  (kopsporen na kortsluiting: " + string.Join(",", ks.V.Kaart.Kopsporen.Select(x => x.Melder)) + ")");
+        Eis(ks.Log.AlsTekst().Contains("Kortsluiting tijdens de blokproef"), "kortsluiting in de blokproef: herkend en gemeld, met advies over de wissel");
+        Eis(ks.Log.AlsTekst().Contains("KORTSLUITING/ONTSPORING vermoed"), "kortsluiting in de blokproef: afgehandeld als gewone kortsluiting (noodstop en herstel)");
+        Eis(ks.V.Kaart.Melders.Count == 7 && ks.Seconden < 1000, "kortsluiting in de blokproef: verkenning loopt daarna door en is sneller dan zonder herkenning (" + ks.Seconden.ToString("0") + " s tegen 1044 s)");
+        var ks2 = PendelScenario(new Dictionary<(int, int, bool), int>(), "kortsluiting in blokproef (10, 1)", false, kortsluit: (10, 1), controleer: false);
+        Eis(ks2.Log.AlsTekst().Contains("Kortsluiting tijdens de blokproef"), "kortsluiting in de blokproef: ook herkend bij een ander blok en moment");
         // BUG #61 (11:38-rit): loc staat bij het stoppen met een deel in twee secties
         foreach (var fl in new[] { 133, 132, 136 })
             PendelScenario(new Dictionary<(int, int, bool), int>(), $"pendel (loc op grens, melder {fl} flikkert)", true, flikker: fl, grensRem: true);
@@ -53,9 +67,10 @@ public static class Tests
         }
     }
 
-    static (BaanVerkenner V, VerkenLog Log, VerkenInstellingen Ins, double Seconden) PendelScenario(Dictionary<(int, int, bool), int> blokkeringen, string naam, bool blokMoetBekendZijn, int proefKort = 6, int flikker = 0, LeerProfiel? profiel = null, double lengte136 = 80, bool autoSnelheid = false, bool grensRem = false)
+    static (BaanVerkenner V, VerkenLog Log, VerkenInstellingen Ins, double Seconden) PendelScenario(Dictionary<(int, int, bool), int> blokkeringen, string naam, bool blokMoetBekendZijn, int proefKort = 6, int flikker = 0, LeerProfiel? profiel = null, double lengte136 = 80, bool autoSnelheid = false, bool grensRem = false, (int, int)? kortsluit = null, bool controleer = true)
     {
         var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, StaatStilZonderBlokcommando = true, LocAdres = 5408, StilstaanRemtOpGrens = grensRem };
+        if (kortsluit is { } ks) sim.KortsluitBijCommando = ks;
         foreach (var gb in blokkeringen) sim.GeblokkeerdeCommandos[gb.Key] = gb.Value; // op de baan gaf het 'klein stukje terug' bij melder 132 geen beweging
         var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
         var s143 = sim.NieuweSectie(143, 100, 12); var s144 = sim.NieuweSectie(144, 400, 12); var s136 = sim.NieuweSectie(136, lengte136, 12);
@@ -74,6 +89,7 @@ public static class Tests
         try { v.VoerUit(cts.Token).GetAwaiter().GetResult(); } catch (Exception ex) { Console.WriteLine("  (verkenner stopte met: " + ex.Message + ")"); }
         if (Environment.GetEnvironmentVariable("PENDEL_LOG") == "1") Console.WriteLine(log.AlsTekst());
         var k = v.Kaart;
+        if (!controleer) return (v, log, ins, (klok.Nu - new DateTime(2026, 1, 1, 12, 0, 0)).TotalSeconds);
         Eis(k.Melders.Count == 7, naam + ": alle 7 melders gevonden (nu " + k.Melders.Count + ")");
         Eis(!blokMoetBekendZijn || k.Melders.All(m => m.DinamoBlok is not null), naam + ": elke melder heeft een Dinamo-blok (zonder: " + string.Join(",", k.Melders.Where(m => m.DinamoBlok is null).Select(m => m.Nummer)) + ")");
         Eis(!blokMoetBekendZijn || k.Melders.FirstOrDefault(m => m.Nummer == 132)?.DinamoBlok == 10, naam + ": melder 132 = Dinamo-blok 10");
@@ -100,12 +116,14 @@ public static class Tests
         Eis(new DienstAanvuller().Vul(bb.Blokken, rb, bb).Toegevoegd.Count > 0, "11:38-kaart: automatische dienst wordt aangemaakt");
         // alle 12 gemeten overgangen staan in het leerprofiel
         var lp = new LeerProfiel(); lp.Leer(Laad("baankaart_pendel_2026-10-10_1025.json"), 12); lp.Leer(k, 12);
+        var lpZaad = new LeerProfiel(); lpZaad.LeerBlokHints(Laad("baankaart_voltooid_2026-10-04.json")); lpZaad.Leer(Laad("baankaart_pendel_2026-10-10_1025.json"), 12); lpZaad.Leer(k, 12); lpZaad.Leer(Laad("baankaart_lijn_5-30_tussenstand_2026-10-10_1215.json"), 12);
+        Eis(lpZaad.BlokHint(16) == 4 && lpZaad.BlokHint(17) == 5 && lpZaad.BlokHint(28) == 6 && lpZaad.BlokHint(24) == 8, "blokhints: melders 16, 17 en 28 (nooit gevonden in de rit van 12:15) komen uit de kaart van 4 oktober");
         Eis(lp.Overgangen.Count == 10, "11:38-kaart: leerprofiel kent de 10 gemeten overgangen (143->144 en 139->140 zijn nooit gemeten: die ritten begonnen op het uiteinde) (nu " + lp.Overgangen.Count + ")");
         Eis(Math.Abs((lp.Verwacht(144, 143, Richting.Vooruit, 12) ?? 0) - 17.0) < 1.0, "11:38-kaart: 144 -> 143 duurt ongeveer 17 s bij snelheid 12");
         Eis((lp.Verwacht(136, 133, Richting.Achteruit, 12) ?? 99) < 5, "11:38-kaart: 136 -> 133 is een korte sectie (< 5 s)");
         Eis((lp.Verwacht(133, 136, Richting.Vooruit, 12) ?? 0) > 10, "11:38-kaart: 133 -> 136 duurt juist lang (12 s): heen en terug zijn NIET gelijk, dus niet spiegelen");
         var zaadPad = Environment.GetEnvironmentVariable("GENEREER_ZAAD");
-        if (!string.IsNullOrEmpty(zaadPad)) { File.WriteAllText(zaadPad, lp.AlsJson()); Console.WriteLine("  zaadprofiel geschreven naar " + zaadPad); }
+        if (!string.IsNullOrEmpty(zaadPad)) { File.WriteAllText(zaadPad, lpZaad.AlsJson()); Console.WriteLine("  zaadprofiel geschreven naar " + zaadPad); }
     }
 
     static void Eis(bool ok, string tekst) { Console.WriteLine((ok ? "OK    " : "FOUT  ") + tekst); if (!ok) _fouten++; }

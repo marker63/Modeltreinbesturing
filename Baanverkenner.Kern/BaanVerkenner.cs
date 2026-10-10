@@ -186,7 +186,7 @@ public partial class BaanVerkenner
 
             _fase = "Wissels in beginstand";
             MeldVoortgang();
-            _log.Stap("Alle adressen in het bereik op rechtdoor zetten.");
+            _log.Stap("Alle adressen in het bereik op rechtdoor zetten (commando gestuurd; de centrale meldt de werkelijke stand van de wisselmotoren niet terug).");
             foreach (var a in _ins.WisselAdressen()) await ZetWissel(a, false, forceer: true);
 
             if (!hervat)

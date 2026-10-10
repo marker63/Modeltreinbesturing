@@ -475,6 +475,9 @@ public partial class MainWindow : Window
         // Zelflerend: tijden uit eerdere verkenningen (of het meegeleverde beginprofiel) gebruiken en bijwerken.
         var profiel = LeerProfiel.Laad(LeerprofielPad);
         if (profiel.AantalMetingen == 0) profiel = LeerProfiel.Laad(LeerprofielZaadPad);
+        // BUG #62: blokhints uit het meegeleverde zaadprofiel aanvullen voor melders die het eigen profiel nog niet kent
+        foreach (var h in LeerProfiel.Laad(LeerprofielZaadPad).BlokHints)
+            if (profiel.BlokHint(h.Melder) is null) profiel.BlokHints.Add(new LeerProfiel.BlokHintItem { Melder = h.Melder, Blok = h.Blok });
         _verkenner.Leerprofiel = profiel;
         _verkenner.ProfielBijgewerkt = p => { try { p.Bewaar(LeerprofielPad); } catch { } };
         _verkenner.VoortgangGewijzigd += v => Dispatcher.InvokeAsync(() => ToonVoortgang(v));

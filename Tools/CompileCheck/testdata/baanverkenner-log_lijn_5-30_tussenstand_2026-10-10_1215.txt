@@ -1,0 +1,219 @@
+Baanverkenner - logboek
+============================================================
+2026-10-10 11:45:46.260  info    Hervat vanaf opgeslagen voortgang (0 opdrachten al afgerond).
+2026-10-10 11:45:46.262  STAP    Verkenning start.
+2026-10-10 11:45:46.262  info    Leerprofiel: 10 overgangen uit eerdere verkenningen (tijden worden omgerekend naar verkensnelheid 12).
+2026-10-10 11:45:46.262  info    Hardware: VPEB Dinamo. Testloc adres 5408 (28 stappen), verkensnelheid 12, kruipsnelheid 5.
+2026-10-10 11:45:46.262  info    Wisseladressen 1 t/m 20. Dinamo-blokken: 1-9.
+2026-10-10 11:45:46.262  STAP    Stand van melder 1 t/m 64 opvragen…
+2026-10-10 11:46:00.363  info    Geen bezette melder bekend (de centrale meldt alleen wijzigingen). De loc gaat zelf op zoek.
+2026-10-10 11:46:13.849  VONDST  Loc gevonden op melder 13 (blok 1 liet hem rijden).
+2026-10-10 11:46:14.350  STAP    Blokproef voor melder 13: elk Dinamo-blok krijgt om beurten een rijcommando.
+2026-10-10 11:46:14.350  rijden  Blokproef: blok 1, vooruit …
+2026-10-10 11:46:44.795  rijden  Blokproef: blok 2, vooruit …
+2026-10-10 11:47:15.217  rijden  Blokproef: blok 3, vooruit …
+2026-10-10 11:47:18.851  VONDST  Melder 13 krijgt rijstroom van Dinamo-blok 3.
+2026-10-10 11:47:24.754  rijden  Neerzetten op melder 13 (nu bezet: 13, 14), kruipen vooruit.
+2026-10-10 11:47:35.179  rijden  Neerzetten op melder 13: nu achteruit (bezet: 14).
+2026-10-10 11:47:46.166  STAP    Alle adressen in het bereik op rechtdoor zetten.
+2026-10-10 11:47:46.166  rijden  Adres 1 → rechtdoor
+2026-10-10 11:47:46.765  rijden  Adres 2 → rechtdoor
+2026-10-10 11:47:47.366  rijden  Adres 3 → rechtdoor
+2026-10-10 11:47:47.966  rijden  Adres 4 → rechtdoor
+2026-10-10 11:47:48.566  rijden  Adres 5 → rechtdoor
+2026-10-10 11:47:49.166  rijden  Adres 6 → rechtdoor
+2026-10-10 11:47:49.766  rijden  Adres 7 → rechtdoor
+2026-10-10 11:47:50.367  rijden  Adres 8 → rechtdoor
+2026-10-10 11:47:50.967  rijden  Adres 9 → rechtdoor
+2026-10-10 11:47:51.568  rijden  Adres 10 → rechtdoor
+2026-10-10 11:47:52.168  rijden  Adres 11 → rechtdoor
+2026-10-10 11:47:52.768  rijden  Adres 12 → rechtdoor
+2026-10-10 11:47:53.369  rijden  Adres 13 → rechtdoor
+2026-10-10 11:47:53.969  rijden  Adres 14 → rechtdoor
+2026-10-10 11:47:54.569  rijden  Adres 15 → rechtdoor
+2026-10-10 11:47:55.169  rijden  Adres 16 → rechtdoor
+2026-10-10 11:47:55.769  rijden  Adres 17 → rechtdoor
+2026-10-10 11:47:56.369  rijden  Adres 18 → rechtdoor
+2026-10-10 11:47:56.970  rijden  Adres 19 → rechtdoor
+2026-10-10 11:47:57.571  rijden  Adres 20 → rechtdoor
+2026-10-10 11:47:58.171  info    Nieuwe opdracht #1: vanaf melder 13 vooruit (alle wissels rechtdoor) - start, vooruit.
+2026-10-10 11:47:58.171  info    Nieuwe opdracht #2: vanaf melder 13 achteruit (alle wissels rechtdoor) - start, achteruit.
+2026-10-10 11:47:58.176  STAP    Opdracht #1: vanaf melder 13 vooruit (alle wissels rechtdoor) - start, vooruit.
+2026-10-10 11:47:58.176  rijden  Verkenningsrit vooruit vanaf melder 13 (alle wissels rechtdoor).
+2026-10-10 11:48:00.054  rijden    melder 14 bezet
+2026-10-10 11:48:08.584  STAP    Nieuwe sectie: melder 14. Blokproef (steeds een klein stukje achteruit).
+2026-10-10 11:48:13.085  VONDST  Melder 14 krijgt rijstroom van Dinamo-blok 3.
+2026-10-10 11:48:14.294  rijden  Neerzetten op melder 14 (nu bezet: 13, 14), kruipen vooruit.
+2026-10-10 11:48:17.048  rijden  Neerzetten op melder 14: nu achteruit (bezet: 13, 14).
+2026-10-10 11:48:22.850  rijden  Neerzetten op melder 14: nu vooruit (bezet: 13).
+2026-10-10 11:48:40.086  rijden    melder 24 bezet
+2026-10-10 11:48:48.571  STAP    Nieuwe sectie: melder 24. Blokproef (steeds een klein stukje achteruit).
+2026-10-10 11:48:54.987  rijden  Blok 3: geen beweging.
+2026-10-10 11:49:01.404  rijden  Blok 1: geen beweging.
+2026-10-10 11:49:07.813  rijden  Blok 2: geen beweging.
+2026-10-10 11:49:14.222  rijden  Blok 4: geen beweging.
+2026-10-10 11:49:20.642  rijden  Blok 5: geen beweging.
+2026-10-10 11:49:27.054  rijden  Blok 6: geen beweging.
+2026-10-10 11:49:33.466  rijden  Blok 7: geen beweging.
+2026-10-10 11:49:35.486  VONDST  Melder 24 krijgt rijstroom van Dinamo-blok 8.
+2026-10-10 11:49:36.888  rijden  Neerzetten op melder 24 (nu bezet: 14, 24), kruipen vooruit.
+2026-10-10 11:49:39.540  rijden  Neerzetten op melder 24: nu vooruit (bezet: 14).
+2026-10-10 11:49:50.248  rijden    melder 21 bezet
+2026-10-10 11:49:58.578  STAP    Nieuwe sectie: melder 21. Blokproef (steeds een klein stukje achteruit).
+2026-10-10 11:50:05.003  rijden  Blok 8: geen beweging.
+2026-10-10 11:50:11.419  rijden  Blok 1: geen beweging.
+2026-10-10 11:50:17.834  rijden  Blok 2: geen beweging.
+2026-10-10 11:50:24.250  rijden  Blok 4: geen beweging.
+2026-10-10 11:50:30.661  rijden  Blok 5: geen beweging.
+2026-10-10 11:50:37.069  rijden  Blok 6: geen beweging.
+2026-10-10 11:50:39.086  VONDST  Melder 21 krijgt rijstroom van Dinamo-blok 7.
+2026-10-10 11:50:40.488  rijden  Neerzetten op melder 21 (nu bezet: 24, 21), kruipen vooruit.
+2026-10-10 11:50:43.445  rijden  Neerzetten op melder 21: nu achteruit (bezet: 24, 21).
+2026-10-10 11:50:50.087  rijden  Neerzetten op melder 21: nu vooruit (bezet: 24).
+2026-10-10 11:51:42.268  info    Basisrit: 13, 14, 24, 21 - einde: doodlopend (geen nieuwe melder binnen de wachttijd).
+2026-10-10 11:51:42.268  VONDST  Doodlopend: na melder 21 (vooruit) kwam geen melder meer - kopspoor of stootjuk.
+2026-10-10 11:51:42.268  info    Nieuwe opdracht #3: vanaf melder 21 achteruit (alle wissels rechtdoor) - terug vanaf het einde bij melder 21.
+2026-10-10 11:51:42.268  rijden  Rijden achteruit van melder 21 naar melder 13.
+2026-10-10 11:51:45.043  info    Melder 21 is vrij maar melder 24 was al bezet (de loc stond met een deel al in die melder): melder 24 telt als bereikt.
+2026-10-10 11:51:45.043  rijden    melder 24 bezet
+2026-10-10 11:51:48.077  rijden    melder 14 bezet (na 2,7 s)
+2026-10-10 11:51:54.688  rijden    melder 13 bezet (na 6,6 s)
+2026-10-10 11:51:57.459  rijden  Verkenningsrit vooruit vanaf melder 13 (alle wissels rechtdoor).
+2026-10-10 11:51:59.481  rijden    melder 14 bezet
+2026-10-10 11:52:05.844  rijden    melder 24 bezet (na 6,4 s)
+2026-10-10 11:52:10.247  rijden    melder 21 bezet (na 4,4 s)
+2026-10-10 11:52:13.274  rijden    melder 29 bezet (na 3,0 s)
+2026-10-10 11:52:21.564  STAP    Nieuwe sectie: melder 29. Blokproef (steeds een klein stukje achteruit).
+2026-10-10 11:52:25.858  VONDST  Melder 29 krijgt rijstroom van Dinamo-blok 7.
+2026-10-10 11:52:27.060  rijden  Neerzetten op melder 29 (nu bezet: 21, 29), kruipen vooruit.
+2026-10-10 11:52:30.271  rijden  Neerzetten op melder 29: nu vooruit (bezet: 21).
+2026-10-10 11:52:48.241  rijden    melder 30 bezet
+2026-10-10 11:52:56.575  STAP    Nieuwe sectie: melder 30. Blokproef (steeds een klein stukje achteruit).
+2026-10-10 11:52:57.885  VONDST  Melder 30 krijgt rijstroom van Dinamo-blok 7.
+2026-10-10 11:53:03.291  LET OP  Na de volledige stop veranderden er nog melders - stop wordt herhaald.
+2026-10-10 11:53:08.458  rijden    melder 20 bezet
+2026-10-10 11:53:17.000  STAP    Nieuwe sectie: melder 20. Blokproef (steeds een klein stukje achteruit).
+2026-10-10 11:53:23.410  rijden  Blok 7: geen beweging.
+2026-10-10 11:53:29.820  rijden  Blok 1: geen beweging.
+2026-10-10 11:53:36.234  rijden  Blok 2: geen beweging.
+2026-10-10 11:53:42.651  rijden  Blok 4: geen beweging.
+2026-10-10 11:53:49.066  rijden  Blok 5: geen beweging.
+2026-10-10 11:53:51.082  VONDST  Melder 20 krijgt rijstroom van Dinamo-blok 6.
+2026-10-10 11:53:52.483  rijden  Neerzetten op melder 20 (nu bezet: 30, 20), kruipen vooruit.
+2026-10-10 11:54:01.656  rijden    melder 27 bezet
+2026-10-10 11:54:10.199  STAP    Nieuwe sectie: melder 27. Blokproef (steeds een klein stukje achteruit).
+2026-10-10 11:54:14.648  VONDST  Melder 27 krijgt rijstroom van Dinamo-blok 6.
+2026-10-10 11:54:15.850  rijden  Neerzetten op melder 27 (nu bezet: 20, 27), kruipen vooruit.
+2026-10-10 11:54:18.302  rijden  Neerzetten op melder 27: nu vooruit (bezet: 20).
+2026-10-10 11:54:38.855  rijden    melder 28 bezet
+2026-10-10 11:54:41.839  rijden    melder 26 bezet (na 3,0 s)
+2026-10-10 11:54:50.176  STAP    Nieuwe sectie: melder 26. Blokproef (steeds een klein stukje achteruit).
+2026-10-10 11:54:56.592  rijden  Blok 1: geen beweging.
+2026-10-10 11:55:03.001  rijden  Blok 2: geen beweging.
+2026-10-10 11:55:09.413  rijden  Blok 4: geen beweging.
+2026-10-10 11:55:11.686  VONDST  Melder 26 krijgt rijstroom van Dinamo-blok 5.
+2026-10-10 11:55:17.590  rijden  Neerzetten op melder 26 (nu bezet: 28, 26), kruipen vooruit.
+2026-10-10 11:55:27.271  rijden    melder 25 bezet
+2026-10-10 11:55:35.560  STAP    Nieuwe sectie: melder 25. Blokproef (steeds een klein stukje achteruit).
+2026-10-10 11:55:39.855  VONDST  Melder 25 krijgt rijstroom van Dinamo-blok 5.
+2026-10-10 11:55:41.058  rijden  Neerzetten op melder 25 (nu bezet: 26, 25), kruipen vooruit.
+2026-10-10 11:55:43.661  rijden  Neerzetten op melder 25: nu vooruit (bezet: 26).
+2026-10-10 11:56:03.850  rijden    melder 17 bezet
+2026-10-10 11:56:06.887  rijden    melder 8 bezet (na 3,0 s)
+2026-10-10 11:56:15.377  STAP    Nieuwe sectie: melder 8. Blokproef (steeds een klein stukje achteruit).
+2026-10-10 11:56:21.789  rijden  Blok 1: geen beweging.
+2026-10-10 11:56:28.207  rijden  Blok 2: geen beweging.
+2026-10-10 11:56:30.276  VONDST  Melder 8 krijgt rijstroom van Dinamo-blok 4.
+2026-10-10 11:56:36.181  rijden  Neerzetten op melder 8 (nu bezet: 17, 8), kruipen vooruit.
+2026-10-10 11:56:48.684  rijden    melder 15 bezet
+2026-10-10 11:56:57.170  STAP    Nieuwe sectie: melder 15. Blokproef (steeds een klein stukje achteruit).
+2026-10-10 11:56:59.087  VONDST  Melder 15 krijgt rijstroom van Dinamo-blok 4.
+2026-10-10 11:57:03.469  rijden    melder 16 bezet
+2026-10-10 11:57:11.753  STAP    Nieuwe sectie: melder 16. Blokproef (steeds een klein stukje achteruit).
+2026-10-10 11:57:18.154  rijden  Blok 4: geen beweging.
+2026-10-10 11:57:24.572  rijden  Blok 1: geen beweging.
+2026-10-10 11:57:30.980  rijden  Blok 2: geen beweging.
+2026-10-10 11:57:37.387  rijden  Blok 9: geen beweging.
+2026-10-10 11:57:43.799  rijden  Blok 3: geen beweging.
+2026-10-10 11:57:50.210  rijden  Blok 5: geen beweging.
+2026-10-10 11:57:56.626  rijden  Blok 6: geen beweging.
+2026-10-10 11:58:03.027  rijden  Blok 7: geen beweging.
+2026-10-10 11:58:09.442  rijden  Blok 8: geen beweging.
+2026-10-10 11:58:09.442  info    Melder 16: terugrijden gaf bij geen enkel blok beweging; nu per blok doorrijden (vooruit).
+2026-10-10 11:58:39.861  rijden  Blok 1: geen beweging (vooruit).
+2026-10-10 11:59:10.264  rijden  Blok 2: geen beweging (vooruit).
+2026-10-10 11:59:40.697  rijden  Blok 9: geen beweging (vooruit).
+2026-10-10 12:00:11.118  rijden  Blok 3: geen beweging (vooruit).
+2026-10-10 12:00:41.562  rijden  Blok 4: geen beweging (vooruit).
+2026-10-10 12:01:11.972  rijden  Blok 5: geen beweging (vooruit).
+2026-10-10 12:01:42.392  rijden  Blok 6: geen beweging (vooruit).
+2026-10-10 12:02:12.801  rijden  Blok 7: geen beweging (vooruit).
+2026-10-10 12:02:43.210  rijden  Blok 8: geen beweging (vooruit).
+2026-10-10 12:02:43.210  LET OP  Voor melder 16 is (nog) geen Dinamo-blok gevonden - bij een volgende rit wordt het opnieuw geprobeerd; intussen gaat het rijcommando naar alle blokken.
+2026-10-10 12:02:45.868  info    Melder 16 is vrij maar melder 5 was al bezet (de loc stond met een deel al in die melder): melder 5 telt als bereikt.
+2026-10-10 12:02:45.868  rijden    melder 5 bezet
+2026-10-10 12:02:52.791  STAP    Nieuwe sectie: melder 5. Blokproef (steeds een klein stukje achteruit).
+2026-10-10 12:02:59.194  rijden  Blok 1: geen beweging.
+2026-10-10 12:03:05.604  rijden  Blok 2: geen beweging.
+2026-10-10 12:03:12.020  rijden  Blok 9: geen beweging.
+2026-10-10 12:03:16.463  VONDST  Melder 5 krijgt rijstroom van Dinamo-blok 3.
+2026-10-10 12:03:22.367  rijden  Neerzetten op melder 5 (nu bezet: 16, 5), kruipen vooruit.
+2026-10-10 12:03:33.458  rijden    melder 13 bezet
+2026-10-10 12:03:34.361  info    Basisrit: 13, 14, 24, 21, 29, 30, 20, 27, 28, 26, 25, 17, 8, 15, 16, 5, 13 - einde: lus (melder opnieuw bereikt).
+2026-10-10 12:03:34.361  VONDST  Lus: melder 13 werd opnieuw bereikt (13, 14, 24, 21, 29, 30, 20, 27, 28, 26, 25, 17, 8, 15, 16, 5, 13).
+2026-10-10 12:03:34.862  rijden  Neerzetten op melder 13 (nu bezet: 13, 5), kruipen vooruit.
+2026-10-10 12:03:35.965  rijden  Verkenningsrit vooruit vanaf melder 13 (alle wissels rechtdoor).
+2026-10-10 12:03:41.265  rijden    melder 14 bezet
+2026-10-10 12:03:47.685  rijden    melder 24 bezet (na 6,4 s)
+2026-10-10 12:03:52.077  rijden    melder 21 bezet (na 4,4 s)
+2026-10-10 12:03:55.256  rijden    melder 29 bezet (na 3,2 s)
+2026-10-10 12:04:08.450  rijden    melder 30 bezet (na 13,2 s)
+2026-10-10 12:04:11.679  rijden    melder 20 bezet (na 3,2 s)
+2026-10-10 12:04:14.651  rijden    melder 27 bezet (na 3,0 s)
+2026-10-10 12:04:29.061  rijden    melder 28 bezet (na 14,4 s)
+2026-10-10 12:04:32.046  rijden    melder 26 bezet (na 3,0 s)
+2026-10-10 12:04:35.674  rijden    melder 25 bezet (na 3,6 s)
+2026-10-10 12:04:49.660  rijden    melder 17 bezet (na 14,0 s)
+2026-10-10 12:04:58.203  STAP    Nieuwe sectie: melder 17. Blokproef (steeds een klein stukje achteruit).
+2026-10-10 12:05:04.606  rijden  Blok 5: geen beweging.
+2026-10-10 12:05:11.014  rijden  Blok 1: geen beweging.
+2026-10-10 12:05:17.424  rijden  Blok 2: geen beweging.
+2026-10-10 12:05:23.826  rijden  Blok 9: geen beweging.
+2026-10-10 12:05:30.237  rijden  Blok 3: geen beweging.
+2026-10-10 12:05:36.646  rijden  Blok 4: geen beweging.
+2026-10-10 12:05:43.057  rijden  Blok 6: geen beweging.
+2026-10-10 12:05:49.474  rijden  Blok 7: geen beweging.
+2026-10-10 12:05:55.889  rijden  Blok 8: geen beweging.
+2026-10-10 12:05:55.889  info    Melder 17: terugrijden gaf bij geen enkel blok beweging; nu per blok doorrijden (vooruit).
+2026-10-10 12:06:26.324  rijden  Blok 1: geen beweging (vooruit).
+2026-10-10 12:06:56.731  rijden  Blok 2: geen beweging (vooruit).
+2026-10-10 12:07:27.153  rijden  Blok 9: geen beweging (vooruit).
+2026-10-10 12:07:57.569  rijden  Blok 3: geen beweging (vooruit).
+2026-10-10 12:08:28.001  rijden  Blok 4: geen beweging (vooruit).
+2026-10-10 12:08:58.439  rijden  Blok 5: geen beweging (vooruit).
+2026-10-10 12:09:28.845  rijden  Blok 6: geen beweging (vooruit).
+2026-10-10 12:09:59.264  rijden  Blok 7: geen beweging (vooruit).
+2026-10-10 12:10:29.671  rijden  Blok 8: geen beweging (vooruit).
+2026-10-10 12:10:29.671  LET OP  Voor melder 17 is (nog) geen Dinamo-blok gevonden - bij een volgende rit wordt het opnieuw geprobeerd; intussen gaat het rijcommando naar alle blokken.
+2026-10-10 12:10:32.484  info    Melder 17 is vrij maar melder 8 was al bezet (de loc stond met een deel al in die melder): melder 8 telt als bereikt.
+2026-10-10 12:10:32.484  rijden    melder 8 bezet
+2026-10-10 12:10:37.287  rijden    melder 15 bezet (na 4,5 s)
+2026-10-10 12:10:40.869  rijden    melder 16 bezet (na 3,6 s)
+2026-10-10 12:10:49.409  STAP    Nieuwe sectie: melder 16. Blokproef (steeds een klein stukje achteruit).
+2026-10-10 12:10:55.825  rijden  Blok 4: geen beweging.
+2026-10-10 12:11:02.233  rijden  Blok 1: geen beweging.
+2026-10-10 12:11:08.635  rijden  Blok 2: geen beweging.
+2026-10-10 12:11:15.047  rijden  Blok 9: geen beweging.
+2026-10-10 12:11:21.453  rijden  Blok 3: geen beweging.
+2026-10-10 12:11:27.858  rijden  Blok 5: geen beweging.
+2026-10-10 12:11:34.269  rijden  Blok 6: geen beweging.
+2026-10-10 12:11:40.683  rijden  Blok 7: geen beweging.
+2026-10-10 12:11:47.089  rijden  Blok 8: geen beweging.
+2026-10-10 12:11:47.089  info    Melder 16: terugrijden gaf bij geen enkel blok beweging; nu per blok doorrijden (vooruit).
+2026-10-10 12:12:17.537  rijden  Blok 1: geen beweging (vooruit).
+2026-10-10 12:12:47.943  rijden  Blok 2: geen beweging (vooruit).
+2026-10-10 12:13:18.382  rijden  Blok 9: geen beweging (vooruit).
+2026-10-10 12:13:48.815  rijden  Blok 3: geen beweging (vooruit).
+2026-10-10 12:14:19.224  rijden  Blok 4: geen beweging (vooruit).
+2026-10-10 12:14:49.645  rijden  Blok 5: geen beweging (vooruit).
+2026-10-10 12:15:20.062  rijden  Blok 6: geen beweging (vooruit).

@@ -22,6 +22,12 @@ public class LeerProfiel
     }
 
     public int FormaatVersie { get; set; } = 1;
+
+    /// <summary>BUG #62: welk Dinamo-blok een melder de vorige keer voedde. Alleen een hint voor de blokproef (die blijft
+    /// altijd gewoon controleren), zodat het eerste blok dat geprobeerd wordt meestal al goed is.</summary>
+    public class BlokHintItem { public int Melder { get; set; } public int Blok { get; set; } }
+    public List<BlokHintItem> BlokHints { get; set; } = new();
+    public int? BlokHint(int melder) => BlokHints.FirstOrDefault(h => h.Melder == melder)?.Blok;
     public List<Meting> Overgangen { get; set; } = new();
 
     /// <summary>Verwachte seconden voor deze overgang bij <paramref name="snelheid"/>, of null als onbekend.</summary>
@@ -40,9 +46,21 @@ public class LeerProfiel
     /// <summary>Neemt de gemeten overgangen van een baankaart over. De tijden in de kaart gelden voor
     /// <paramref name="kaartSnelheid"/>. Een bestaande waarde wordt alleen vervangen door een kaart met MEER metingen,
     /// zodat dezelfde kaart meermaals aanbieden niets dubbel telt.</summary>
+    /// <summary>Neemt alleen de melder-blokkoppelingen van een kaart over (ook van een kaart zonder bruikbare tijden).</summary>
+    public void LeerBlokHints(Baankaart kaart)
+    {
+        foreach (var mm in kaart.Melders.Where(x => x.DinamoBlok is not null))
+        {
+            var h = BlokHints.FirstOrDefault(x => x.Melder == mm.Nummer);
+            if (h is null) BlokHints.Add(new BlokHintItem { Melder = mm.Nummer, Blok = mm.DinamoBlok!.Value });
+            else h.Blok = mm.DinamoBlok!.Value;
+        }
+    }
+
     public void Leer(Baankaart kaart, int kaartSnelheid)
     {
         if (kaartSnelheid <= 0) return;
+        LeerBlokHints(kaart);
         foreach (var o in kaart.Overgangen.Where(o => o.AantalMetingen > 0 && o.GemiddeldeSeconden > 0))
         {
             var m = Overgangen.FirstOrDefault(x => x.Van == o.Van && x.Naar == o.Naar && x.Richting == o.Richting);

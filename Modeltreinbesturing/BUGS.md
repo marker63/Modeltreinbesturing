@@ -1193,3 +1193,30 @@ de OUDE code (blokproef mislukt) en slaagt de nieuwe; 15 sectielengtes + flikker
 **Eerlijk:** het tweede punt (flikkering bij 132) liet zich in de simulator niet afdwingen; de oorzaak komt uit de hardwarelog en de
 fix is in de simulator alleen op "geen verslechtering" getest. NOG NIET GETEST OP DE BAAN.
 **Nog open uit deze rit:** ~8 van de 36 minuten gingen op aan wachten bij bekende doodlopende einden (-> #60, gepland).
+
+## #62 - Baanverkenner: rit 11:45-12:15 (hoofdbaan, melders 5-30): kortsluiting niet herkend in de blokproef, blokken niet onthouden, wachten bij bekend kopspoor (+ #60 gebouwd)
+**Waarneming (Marco, logs 12:15 + eigen waarneming):** ~17 van de eerste 30 minuten gingen verloren. Melder 16, 17 en 28 kregen geen blok (BUG #61, nog niet
+in die rit aanwezig; in de hardwarelog teruggevonden: melder 16 bezet 11:57:03, melder 5 bezet 11:57:06, stop 11:57:06,5 = loc op twee secties; zelfde bij 17/8;
+bij melder 21 flikkerde 24 op het moment van het rijcommando). Daarna stond de loc vooruit rijdend met de achterkant nog op wissel 6 (afbuigend) en met de
+poot tegen de tong van wissel 5 (stond rechtdoor) = kortsluiting; hij wachtte tot Marco wissel 5 afbuigend zette. De route 15-16-5-13 gebruikt wissel 5 en 6 dus
+via hun afbuigende poot, terwijl de basisrit "alle wissels rechtdoor" is.
+**Onderzocht, géén bug:** wissel 10/13 (kruiswissel) WAREN geïnitialiseerd (11:47:46-58, 6 frames per adres, echo 0x90 = rechtdoor, geen enkel afbuigend-commando in
+de log t/m 12:15). De Dinamo meldt de echte stand van de motoren niet terug; de melding "alle adressen op rechtdoor" is een gestuurd commando (tekst aangepast).
+**Gebouwd (Baanverkenner.Kern):**
+1. Kortsluiting tijdens de blokproef (`BlokZoekenNaInrijden`/`BlokZoekenDoorrijdend`): `ProefKortsluitingGemeld()` stopt de proef direct; `Rit` handelt het af als gewone kortsluiting
+   (noodstop + herstel + Dinamo-blokalarm in de melding) met het advies de wissel bij die melder met de hand goed te zetten. Het proefpogingen-tellertje telt zo'n poging niet mee.
+   Niet gewijzigd: `BlokZoekenBijStart` (start van de verkenning).
+2. Blokhints: `LeerProfiel.BlokHints` (melder -> blok uit eerdere kaarten); de blokproef probeert dat blok EERST (een foute hint kost één korte poging). Oude profielbestanden blijven laadbaar.
+   Het zaadprofiel bevat nu de koppelingen van 4 oktober + de ritten van 10-10 (o.a. 16 = blok 4, 17 = 5, 28 = 6, 24 = 8) en de Baanverkenner vult een bestaand profiel daarmee aan.
+3. BUG #60 gebouwd: bij een al bekend kopspoor (zelfde richting en wisselstand, loc is echt vertrokken, geen navigatie-rit) wordt niet de hele wachttijd en niet de verlengde
+   wachttijd (#55) afgewacht maar max(MinSecondenTussenMelders, 12 s bij ref.snelheid); daarna keert hij. Een kopspoor dat later toch een volgende melder blijkt te hebben wordt nog steeds
+   uit de kaart gehaald (Baankaart regel ~220), dus een verkeerd geleerd kopspoor corrigeert zichzelf.
+4. Hardwarelog in het geheugen: 2000 -> 20000 regels (een half uur verkenning paste niet; de sessielog op schijf had alles al).
+5. Logregel bij de start: "commando gestuurd; de centrale meldt de werkelijke stand van de wisselmotoren niet terug". Waarschuwing bij een mislukte blokproef noemt kortsluiting/wissel als mogelijke oorzaak.
+**Test (CompileCheck, ALLES OK):** blokhints (tweede run 0 i.p.v. 3 mislukte blokpogingen; oud profiel laadbaar; hints van 16/17/28 uit de kaart van 4 oktober); #60: eerste volledige run
+1363 s i.p.v. 1474 s en tweede run 1283 s; kortsluiting in de blokproef met de simulator (nieuw: `KortsluitBijCommando`): herkend en gemeld, verkenning daarna 914 s i.p.v. 1044 s; een scan van 42
+kortsluit-momenten gaf met de nieuwe code nooit een slechtere uitkomst (zelfde aantal melders, altijd even snel of sneller).
+**Bewust NIET gebouwd (te riskant zonder baan):** automatisch wissels afbuigend zetten om een tongkortsluiting op te lossen. Wissel 5/6 moeten voor deze route afbuigend staan; de verkenner weet niet welke wissel
+bij welke melder hoort voordat hij die getest heeft. Tip bij een rit met zulke wissels: vooraf met de hand goed zetten, of het stuk eerst zonder die wissels verkennen. Ook niet gebouwd: een proef met
+het buurblok erbij (alternatief voor het terugkruipen uit #61).
+NOG NIET GETEST OP DE BAAN (alleen simulator). De WPF-aanpassing (zaadhints samenvoegen in Baanverkenner/MainWindow.xaml.cs) is niet gecompileerd.
