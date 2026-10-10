@@ -256,6 +256,23 @@ public static class Tests
         Eis(Rapport.AlsHtml(k).Contains("<h2>Blokkenschema</h2>") && Rapport.AlsHtml(k).Contains("<svg"), "blokkenschema: het HTML-rapport bevat de tekening");
     }
 
+    // Overdracht van de baankaart van de Baanverkenner naar Modeltreinbesturing
+    static void OverdrachtTest()
+    {
+        var oud = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME"); var tmp = Path.Combine(Path.GetTempPath(), "overdracht_" + Guid.NewGuid().ToString("N"));
+        Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", tmp);
+        try
+        {
+            var k = Laad("baankaart_lijn_5-30_voltooid_kruiswissel24_2026-10-10_1707.json");
+            Eis(BaankaartOverdracht.Klaar() is null, "overdracht: eerst niets klaargezet");
+            BaankaartOverdracht.Zet(k);
+            Eis(BaankaartOverdracht.Klaar() is not null && Baankaart.VanJson(File.ReadAllText(BaankaartOverdracht.Pad))!.Melders.Count == k.Melders.Count, "overdracht: klaargezette baankaart is te lezen en compleet");
+            BaankaartOverdracht.MarkeerVerwerkt();
+            Eis(BaankaartOverdracht.Klaar() is null, "overdracht: na verwerken wordt hij niet nog eens aangeboden");
+        }
+        finally { Environment.SetEnvironmentVariable("XDG_CONFIG_HOME", oud); try { Directory.Delete(tmp, true); } catch { } }
+    }
+
     // De geslaagde, volledige rit van 10-10 11:38 (blokken 10, 11, 12): referentie voor importer en leerprofiel
     static void GeslaagdeRitTest()
     {
@@ -338,6 +355,7 @@ public static class Tests
         BlokgrensTest();
         NavigatieOnjuisteStartTest();
         BlokkenschemaTest();
+        OverdrachtTest();
 
         Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)");
         return _fouten == 0 ? 0 : 1;

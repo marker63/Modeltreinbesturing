@@ -1592,17 +1592,32 @@ public partial class MainWindow : Window
     /// het tonen van het verslag kan alles ongedaan gemaakt worden (Nee = herstel).</summary>
     private void BaankaartImporteren_Click(object sender, RoutedEventArgs e)
     {
-        var kies = new Microsoft.Win32.OpenFileDialog
+        // De Baanverkenner zet via "Importeren in Modeltreinbesturing" een baankaart klaar: die eerst aanbieden.
+        string? bestand = null;
+        bool uitOverdracht = false;
+        if (Baanverkenner.Kern.BaankaartOverdracht.Klaar() is DateTime klaarOm)
         {
-            Title = "Kies een baankaart van de Baanverkenner",
-            Filter = "Baankaart (*.json)|*.json|Alle bestanden (*.*)|*.*"
-        };
-        if (kies.ShowDialog(this) != true) return;
+            var aanbod = MessageBox.Show(this,
+                $"De Baanverkenner heeft een baankaart klaargezet ({klaarOm:dd-MM-yyyy HH:mm}).\n\nJa = deze importeren\nNee = zelf een bestand kiezen",
+                "Baankaart importeren", MessageBoxButton.YesNoCancel, MessageBoxImage.Question, MessageBoxResult.Yes);
+            if (aanbod == MessageBoxResult.Cancel) return;
+            if (aanbod == MessageBoxResult.Yes) { bestand = Baanverkenner.Kern.BaankaartOverdracht.Pad; uitOverdracht = true; }
+        }
+        if (bestand is null)
+        {
+            var kies = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Kies een baankaart van de Baanverkenner",
+                Filter = "Baankaart (*.json)|*.json|Alle bestanden (*.*)|*.*"
+            };
+            if (kies.ShowDialog(this) != true) return;
+            bestand = kies.FileName;
+        }
 
         Baanverkenner.Kern.Baankaart? kaart;
         try
         {
-            kaart = Baanverkenner.Kern.Baankaart.VanJson(System.IO.File.ReadAllText(kies.FileName));
+            kaart = Baanverkenner.Kern.Baankaart.VanJson(System.IO.File.ReadAllText(bestand));
         }
         catch (Exception ex)
         {
@@ -1638,7 +1653,7 @@ public partial class MainWindow : Window
 
         string samenvatting = $"{res.NieuweBlokken.Count} nieuw(e) blok(ken), {res.ToegevoegdeMelders.Count} melder(s) toegevoegd, {res.NieuweRelaties.Count} nieuwe relatie(s), {res.IngevuldeRichtingen} rijrichting(en) ingevuld.";
         var dialoog = new BaanControleDialog("Baankaart importeren",
-            $"Resultaat voor '{System.IO.Path.GetFileName(kies.FileName)}': {samenvatting} Hierna kun je kiezen of je dit wilt behouden.",
+            $"Resultaat voor '{System.IO.Path.GetFileName(bestand)}': {samenvatting} Hierna kun je kiezen of je dit wilt behouden.",
             res.Meldingen) { Owner = this };
         dialoog.ShowDialog();
 
@@ -1656,6 +1671,8 @@ public partial class MainWindow : Window
             Redraw();
             return;
         }
+
+        if (uitOverdracht) Baanverkenner.Kern.BaankaartOverdracht.MarkeerVerwerkt();
 
         // Nieuwe blokken netjes onder het bestaande schema plaatsen (geen overlap).
         double startY = _beheerder.Blokken.Except(res.NieuweBlokken).Select(b => b.SchemaY + BlokGrootte * 2).DefaultIfEmpty(20).Max();

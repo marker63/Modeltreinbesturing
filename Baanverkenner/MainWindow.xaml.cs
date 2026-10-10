@@ -774,6 +774,58 @@ public partial class MainWindow : Window
         }
     }
 
+    private void Importeren_Click(object sender, RoutedEventArgs e)
+    {
+        var k = KaartOfMelding();
+        if (k is null) return;
+        if (!k.Voltooid)
+        {
+            var r = MessageBox.Show(this, "De verkenning is nog niet voltooid. De baankaart bevat alleen wat tot nu toe gevonden is. Toch klaarzetten voor Modeltreinbesturing?",
+                "Tussenstand", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (r != MessageBoxResult.Yes) return;
+        }
+        try { BaankaartOverdracht.Zet(k); }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Klaarzetten mislukt", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+        string? exe = ZoekModeltreinbesturing();
+        string uitleg = "De baankaart staat klaar voor Modeltreinbesturing.\n\nKies daar Beheren > Baankaart importeren (Baanverkenner)… en antwoord Ja op de vraag om de klaargezette baankaart te importeren. " +
+                        "Je kunt de import daar nog terugdraaien. Niet getest op de baan.";
+        if (exe is null)
+        {
+            MessageBox.Show(this, uitleg + "\n\nModeltreinbesturing is niet automatisch gevonden: open het zelf.", "Klaargezet", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        var start = MessageBox.Show(this, uitleg + "\n\nModeltreinbesturing nu openen?", "Klaargezet", MessageBoxButton.YesNo, MessageBoxImage.Information);
+        if (start != MessageBoxResult.Yes) return;
+        try { Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true, WorkingDirectory = Path.GetDirectoryName(exe)! }); }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Openen mislukt", MessageBoxButton.OK, MessageBoxImage.Error); }
+    }
+
+    /// <summary>Zoekt Modeltreinbesturing.exe naast of vlak bij de Baanverkenner.</summary>
+    private static string? ZoekModeltreinbesturing()
+    {
+        try
+        {
+            var basis = new DirectoryInfo(AppContext.BaseDirectory);
+            var kandidaten = new List<string> { Path.Combine(basis.FullName, "Modeltreinbesturing.exe") };
+            for (var d = basis; d is not null && kandidaten.Count < 12; d = d.Parent)
+            {
+                kandidaten.Add(Path.Combine(d.FullName, "Modeltreinbesturing.exe"));
+                kandidaten.Add(Path.Combine(d.FullName, "Modeltreinbesturing", "Modeltreinbesturing.exe"));
+                if (d.Parent is not null) break;
+            }
+            var ouder = basis.Parent;
+            if (ouder is not null)
+                foreach (var sub in ouder.GetDirectories())
+                    kandidaten.Add(Path.Combine(sub.FullName, "Modeltreinbesturing.exe"));
+            return kandidaten.FirstOrDefault(File.Exists);
+        }
+        catch { return null; }
+    }
+
     private void Blokkenschema_Click(object sender, RoutedEventArgs e)
     {
         if (KaartOfMelding() is null) return;
