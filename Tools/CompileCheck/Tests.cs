@@ -340,6 +340,26 @@ public static class Tests
         if (Environment.GetEnvironmentVariable("UITBREIDEN_LOG") == "1") Console.WriteLine(log2.AlsTekst());
     }
 
+    // BUG #75: de tweede bezette melder bij een kortsluiting wijst de betrokken wissel aan
+    static void TweedeMelderTest()
+    {
+        var k = new Baankaart();
+        // 24 -> 21 is gereden met wissel 10 rechtdoor en 5 rechtdoor; 24 -> 8 alleen met 5 en 10 afbuigend
+        k.RegistreerOvergang(24, 21, Richting.Vooruit, Configuratie.Basis, 3);
+        k.RegistreerOvergang(24, 8, Richting.Vooruit, new Configuratie(new[] { 5, 10 }), 3);
+        // kortsluiting na 24 met wissel 10 afbuigend, terwijl ook melder 8 bezet was
+        var stand = new Configuratie(new[] { 10 });
+        var h = k.HintsBijTweedeMelder(24, new[] { 8 }, stand);
+        Eis(h.Contains((5, true)) && !h.Contains((10, true)), "tweede melder: 8 bezet -> wissel 5 afbuigend is de verdachte (nu " + string.Join(";", h) + ")");
+        var h2 = k.HintsBijTweedeMelder(24, new[] { 21 }, stand);
+        Eis(h2.Contains((10, false)), "tweede melder: 21 bezet -> wissel 10 terug naar rechtdoor is de verdachte (nu " + string.Join(";", h2) + ")");
+        Eis(k.HintsBijTweedeMelder(24, new[] { 99 }, stand).Count == 0 && k.HintsBijTweedeMelder(24, Array.Empty<int>(), stand).Count == 0, "tweede melder: onbekende of ontbrekende tweede melder geeft geen hints");
+        var kp = new Kortsluitpunt { TweedeMelders = new List<int> { 8 } };
+        var kk = new Baankaart(); kk.Kortsluitpunten.Add(kp);
+        Eis(Baankaart.VanJson(kk.AlsJson())!.Kortsluitpunten[0].TweedeMelders.SequenceEqual(new[] { 8 }), "tweede melder: blijft na opslaan en laden");
+        Eis(Rapport.AlsTekst(kk).Contains("ook bezet: melder 8"), "tweede melder: staat in het rapport");
+    }
+
     // Blokkenschema-tekening (SVG) uit de baankaart van 17:07
     static void BlokkenschemaTest()
     {
@@ -458,6 +478,7 @@ public static class Tests
         OverdrachtTest();
         DoorgangTest();
         UitbreidenTest();
+        TweedeMelderTest();
 
         Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)");
         return _fouten == 0 ? 0 : 1;

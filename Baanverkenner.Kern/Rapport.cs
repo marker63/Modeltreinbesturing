@@ -239,7 +239,7 @@ ul{margin:6px 0 0 18px;padding:0}
                 string st = x.Opgelost ? $"<span class=\"ok\">opgelost: adres {x.OpgelostDoorAdres} op {(x.OpgelostMetAfbuigend == true ? "afbuigend" : "rechtdoor")}</span>"
                     : x.Opgegeven ? "<span class=\"fout\">opgegeven</span>" : "<span class=\"let\">open</span>";
                 string soort = x.Soort == KortsluitpuntSoort.OnverwachteTerugweg ? "onverwachte terugweg (geen kortsluiting, mogelijk geen wissel)" : "kortsluiting";
-                sb.Append($"<tr><td class=\"num\">{x.Id}</td><td>{soort}</td><td>na melder {x.NaMelder} ({x.Richting.Tekst()})</td><td>{E(x.Configuratie)}</td><td>{x.AantalKortsluitingen}</td><td>{(x.AlarmBlokken.Count > 0 ? "blok " + string.Join(", ", x.AlarmBlokken) : "-")}</td><td>{st}</td></tr>");
+                sb.Append($"<tr><td class=\"num\">{x.Id}</td><td>{soort}</td><td>na melder {x.NaMelder} ({x.Richting.Tekst()}){(x.TweedeMelders.Count > 0 ? "<br>ook bezet: melder " + string.Join(" en ", x.TweedeMelders) : "")}</td><td>{E(x.Configuratie)}</td><td>{x.AantalKortsluitingen}</td><td>{(x.AlarmBlokken.Count > 0 ? "blok " + string.Join(", ", x.AlarmBlokken) : "-")}</td><td>{st}</td></tr>");
             }
             sb.Append("</table>");
         }
@@ -318,7 +318,7 @@ ul{margin:6px 0 0 18px;padding:0}
 
         Kop("KORTSLUITPUNTEN EN ONVERWACHTE TERUGWEGEN");
         foreach (var x in k.Kortsluitpunten)
-            sb.AppendLine($"  #{x.Id} [{(x.Soort == KortsluitpuntSoort.OnverwachteTerugweg ? "onverwachte terugweg, geen kortsluiting" : "kortsluiting")}] na melder {x.NaMelder} ({x.Richting.Tekst()}), {x.Configuratie}" + (x.AlarmBlokken.Count > 0 ? $" [Dinamo-alarm in blok {string.Join(", ", x.AlarmBlokken)}]" : "") + ": " +
+            sb.AppendLine($"  #{x.Id} [{(x.Soort == KortsluitpuntSoort.OnverwachteTerugweg ? "onverwachte terugweg, geen kortsluiting" : "kortsluiting")}] na melder {x.NaMelder} ({x.Richting.Tekst()}), {x.Configuratie}" + (x.TweedeMelders.Count > 0 ? $" [ook bezet: melder {string.Join(" en ", x.TweedeMelders)}]" : "") + (x.AlarmBlokken.Count > 0 ? $" [Dinamo-alarm in blok {string.Join(", ", x.AlarmBlokken)}]" : "") + ": " +
                 (x.Opgelost ? $"opgelost met adres {x.OpgelostDoorAdres} op {(x.OpgelostMetAfbuigend == true ? "afbuigend" : "rechtdoor")}" : x.Opgegeven ? "opgegeven" : "open"));
         if (k.Kortsluitpunten.Count == 0) sb.AppendLine("  (geen)");
 

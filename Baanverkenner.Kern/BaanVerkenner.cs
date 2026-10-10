@@ -777,8 +777,10 @@ public partial class BaanVerkenner
         int x = reeks[^1];
         var bestaand = _kaart.Kortsluitpunten.FirstOrDefault(k => k.NaMelder == x && k.Richting == r && k.Configuratie.Equals(c));
         var alarmBlokken = soort == KortsluitpuntSoort.Kortsluiting ? _laatsteKortsluitBlokken.ToList() : new List<int>();
+        var tweede = soort == KortsluitpuntSoort.Kortsluiting ? _laatsteKortsluitMelders.Where(m => m != x).ToList() : new List<int>();
         if (bestaand is not null)
         {
+            foreach (var t in tweede) if (!bestaand.TweedeMelders.Contains(t)) bestaand.TweedeMelders.Add(t);
             bestaand.AantalKortsluitingen++;
             foreach (var b in alarmBlokken) if (!bestaand.AlarmBlokken.Contains(b)) bestaand.AlarmBlokken.Add(b);
             return;
@@ -791,13 +793,14 @@ public partial class BaanVerkenner
             Configuratie = c,
             Soort = soort,
             AlarmBlokken = alarmBlokken,
+            TweedeMelders = tweede,
             Route = RouteMet(route, c, r, reeks),
             AantalKortsluitingen = 1
         };
         _kaart.Kortsluitpunten.Add(k);
         _log.Vondst(soort == KortsluitpuntSoort.OnverwachteTerugweg
             ? $"Onverwachte terugweg #{k.Id}: direct na melder {x} ({r.Tekst()}, {c}) kwam de loc terug via een andere melder dan verwacht. Geen kortsluiting - mogelijk een wissel die van achteren in de verkeerde stand bereden wordt, mogelijk een melder die de eerste keer niet geregistreerd is; wordt zo mogelijk later opgelost."
-            : $"Kortsluitpunt #{k.Id}: direct na melder {x} ({r.Tekst()}, {c})." + (alarmBlokken.Count > 0 ? $" Dinamo meldde kortsluiting in blok {string.Join(" en ", alarmBlokken)}." : "") + " Waarschijnlijk een wissel die van achteren in de verkeerde stand bereden wordt; wordt later opgelost.");
+            : $"Kortsluitpunt #{k.Id}: direct na melder {x} ({r.Tekst()}, {c})." + (alarmBlokken.Count > 0 ? $" Dinamo meldde kortsluiting in blok {string.Join(" en ", alarmBlokken)}." : "") + (tweede.Count > 0 ? $" Ook bezet: melder {string.Join(" en ", tweede)}." : "") + " Waarschijnlijk een wissel die van achteren in de verkeerde stand bereden wordt; wordt later opgelost.");
     }
 
     private HashSet<int> KortsluitStops(Configuratie c, Richting r) =>
@@ -1008,9 +1011,17 @@ public partial class BaanVerkenner
                     if (obs.VolgendeBijAfbuigend == k.NaMelder) kandidaten.Add((w.Adres, true));
                     if (obs.VolgendeBijRechtdoor == k.NaMelder) kandidaten.Add((w.Adres, false));
                 }
+            // BUG #75: de tweede bezette melder op het moment van de kortsluiting wijst de verdachte wissels aan; die gaan eerst.
+            var hints = _kaart.HintsBijTweedeMelder(k.NaMelder, k.TweedeMelders, k.Configuratie);
             kandidaten = kandidaten.Distinct()
                 .Where(kd => k.Configuratie.Bevat(kd.Adres) != kd.Afbuigend && !k.GeprobeerdeAdressen.Contains(kd.Adres))
                 .ToList();
+            var hintKandidaten = hints.Where(h => k.Configuratie.Bevat(h.Adres) != h.Afbuigend && !k.GeprobeerdeAdressen.Contains(h.Adres) && _ins.WisselAdressen().Contains(h.Adres)).ToList();
+            if (hintKandidaten.Count > 0)
+            {
+                _log.Info($"Kortsluitpunt #{k.Id}: omdat ook melder {string.Join(" en ", k.TweedeMelders)} bezet was, gaan eerst deze wissels aan de beurt: {string.Join(", ", hintKandidaten.Select(h => $"{h.Adres} {(h.Afbuigend ? "afbuigend" : "rechtdoor")}"))}.");
+                kandidaten = hintKandidaten.Concat(kandidaten.Where(kd => !hintKandidaten.Any(h => h.Adres == kd.Adres))).ToList();
+            }
 
             // BUG #63: kan geen bekende wissel de kortsluiting verklaren (of lukte dat niet), dan
             // blijven de wissels uit de configuratie van dit kortsluitpunt afbuigend staan en worden alle

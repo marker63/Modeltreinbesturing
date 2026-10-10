@@ -144,6 +144,9 @@ public class Kortsluitpunt
     /// kortsluiting zelf een kortsluiting-alarm meldde (Block Alarm). Leeg als de
     /// hardware dit niet meldt (andere centrale, of alleen via het F-bit).</summary>
     public List<int> AlarmBlokken { get; set; } = new();
+    /// <summary>BUG #75: de andere melder(s) die op het moment van de kortsluiting bezet waren (naast NaMelder): daar stond de loc
+    /// met een deel al in. Wijst naar de wissel die erbij betrokken is.</summary>
+    public List<int> TweedeMelders { get; set; } = new();
     public bool Opgelost { get; set; }
     public bool Opgegeven { get; set; }
     public int? OpgelostDoorAdres { get; set; }
@@ -294,6 +297,23 @@ public class Baankaart
         if (kandidaten.Count == 0) return gewenst;
         int Verschil(Configuratie k) => k.Afbuigend.Except(gewenst.Afbuigend).Count() + gewenst.Afbuigend.Except(k.Afbuigend).Count();
         return kandidaten.OrderBy(Verschil).ThenBy(k => k.Sleutel, StringComparer.Ordinal).First();
+    }
+
+    /// <summary>BUG #75: bij een kortsluiting na <paramref name="naMelder"/> was ook <paramref name="tweede"/> bezet. Is de overgang tussen die
+    /// twee melders (in welke richting ook) eerder bij een andere wisselstand gereden, dan zijn de wissels die in die stand anders staan dan in
+    /// <paramref name="kortsluitStand"/> de eerste verdachten: (adres, afbuigend) = de stand die de kortsluiting zou kunnen oplossen.</summary>
+    public List<(int Adres, bool Afbuigend)> HintsBijTweedeMelder(int naMelder, IEnumerable<int> tweede, Configuratie kortsluitStand)
+    {
+        var res = new List<(int, bool)>();
+        foreach (var t in tweede.Where(t => t != naMelder))
+            foreach (var o in Overgangen.Where(o => (o.Van == naMelder && o.Naar == t) || (o.Van == t && o.Naar == naMelder)))
+                foreach (var sleutel in o.GezienBijConfiguraties)
+                {
+                    var gezien = Configuratie.VanSleutel(sleutel);
+                    foreach (var a in gezien.Afbuigend.Except(kortsluitStand.Afbuigend)) if (!res.Contains((a, true))) res.Add((a, true));
+                    foreach (var a in kortsluitStand.Afbuigend.Except(gezien.Afbuigend)) if (!res.Contains((a, false))) res.Add((a, false));
+                }
+        return res;
     }
 
     /// <summary>BUG #74: melders waar, in dezelfde richting, meer dan één combinatie ingangskant/vervolg is gezien (kruising, of een

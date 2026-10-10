@@ -50,6 +50,7 @@ public partial class BaanVerkenner
     private static readonly TimeSpan DinamoCyclus = TimeSpan.FromMilliseconds(200);
 
     private readonly Dictionary<int, bool> _wisselStand = new();
+    private List<int> _laatsteKortsluitMelders = new();
 
     /// <summary>BUG #74: de ingangskant van de melder waar de loc nu staat: hij kwam vanaf <c>Via</c> op <c>Melder</c> aan, rijdend in
     /// <c>Richting</c>. Null = onbekend (begin, na kortsluiting, na met de hand terugzetten).</summary>
@@ -1093,11 +1094,14 @@ public partial class BaanVerkenner
     {
         int x = res.Reeks[^1];
         _laatsteKortsluitBlokken = HuidigeAlarmBlokken();
+        // BUG #75: welke andere melder is nu ook bezet? Daar staat de loc met een deel al in: wijst naar de betrokken wissel.
+        _laatsteKortsluitMelders = _monitor.Bezet.Where(m => m != x).OrderBy(m => m).ToList();
         _hw.Noodstop();
         _laatsteKortsluitingOm = _klok.Nu;
         string alarmTekst = _laatsteKortsluitBlokken.Count > 0
             ? $" Dinamo meldt kortsluiting in blok {string.Join(" en ", _laatsteKortsluitBlokken)}."
             : "";
+        if (_laatsteKortsluitMelders.Count > 0) alarmTekst += $" Ook bezet op dat moment: melder {string.Join(" en ", _laatsteKortsluitMelders)} (daar zit de loc deels in)." ;
         _log.Waarschuwing($"KORTSLUITING/ONTSPORING vermoed na melder {x} ({res.Richting.Tekst()}): {reden}.{alarmTekst} Noodstop.");
         await VolledigeStop();
         res.Einde = RitEinde.Kortsluiting;
