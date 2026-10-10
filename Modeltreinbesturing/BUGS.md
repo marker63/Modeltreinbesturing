@@ -979,3 +979,11 @@ dat niet kloppen. Dit verklaart de 3 verkeerde starts van 10-10 beter dan een wi
 **Te doen in jouw project:** 3 naar 7 = vooruit, 3 naar 4 = achteruit invullen, en daarna de
 overige relaties van blokken met meerdere uitgangen (zie waarschuwingen in het log).
 **NIET getest op de baan.**
+
+## #50 - Vastgestelde kruiswisselgegevens gingen verloren tussen sessies
+Marco: de kruiswisselstanden per rit zijn eerder vastgesteld en moeten altijd meegenomen worden.
+Oorzaak: ze stonden alleen verspreid in oude chats/BUGS-regels, en 3 -> 7 was door mij als
+spiegel van 7 -> 3 bijgemaakt (BUG #23) zonder het als "niet getest" te markeren.
+**Fix:** `KRUISWISSEL.md` (feiten, tabel met herkomst per rit, regels) en `CLAUDE.md` in de
+repo-root (wordt in elke nieuwe sessie automatisch gelezen) + geheugen bijgewerkt.
+**Open:** de werkelijke stand voor 3 -> 7 en 3 -> 4 moet nog fysiek bevestigd worden (zie #48).
