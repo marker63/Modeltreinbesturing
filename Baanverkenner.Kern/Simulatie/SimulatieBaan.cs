@@ -115,6 +115,13 @@ public class SimulatieBaan : IHardwareInterface
     private readonly Dictionary<int, bool> _gemeld = new();
     private int _locAdres = 3;
     private int? _commandoBlok;
+    /// <summary>Alleen voor tests (BUG #58): melder die tijdens het neerzetten kort vrij meldt terwijl de loc er nog op staat (en ook op een andere melder).</summary>
+    public int FlikkerMelder { get; set; }
+    public int FlikkerKeer { get; set; } = 1;
+    private int _geflikkerd;
+    private bool _flikkerTotActief() => _vorigeTik is DateTime t && t < _flikkerTot;
+    private DateTime _flikkerTot = DateTime.MinValue;
+    private DateTime _flikkerVolgende = DateTime.MinValue;
     private bool VerliesCommando((int, int, bool) sleutel)
     {
         if (!GeblokkeerdeCommandos.TryGetValue(sleutel, out var n) || n <= 0) return false;
@@ -248,6 +255,16 @@ public class SimulatieBaan : IHardwareInterface
         }
 
         Beweeg(nu, dt);
+        if (FlikkerMelder > 0 && _geflikkerd < FlikkerKeer && nu >= _flikkerVolgende && nu >= _flikkerTot)
+        {
+            var echt = BezetteMelders();
+            if (echt.Contains(FlikkerMelder) && echt.Count > 1)
+            {
+                _flikkerTot = nu + TimeSpan.FromMilliseconds(900);
+                _flikkerVolgende = _flikkerTot;
+                _geflikkerd++;
+            }
+        }
         if (SpookpulsenPerMinuut > 0)
         {
             if (_spookTot is DateTime tot && nu >= tot) _spookTot = null;
@@ -391,6 +408,7 @@ public class SimulatieBaan : IHardwareInterface
         if (_spookTot is not null) res.Add(_spookMelder);
         foreach (var e in ElementenOnderLoc())
             if (e is Sectie sec && sec.Melder > 0) res.Add(sec.Melder);
+        if (FlikkerMelder > 0 && _flikkerTotActief()) res.Remove(FlikkerMelder);
         return res;
     }
 

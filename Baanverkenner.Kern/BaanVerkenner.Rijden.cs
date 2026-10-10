@@ -348,6 +348,21 @@ public partial class BaanVerkenner
     // Neerzetten op een melder
     // =====================================================================
 
+    /// <summary>BUG #58: richting waarin <paramref name="doel"/> ligt vanaf een van de bezette melders, volgens de al
+    /// gemeten overgangen op de baankaart (null = onbekend).</summary>
+    private Richting? RichtingNaarDoel(IEnumerable<int> bezet, int doel)
+    {
+        foreach (var m in bezet)
+        {
+            if (m == doel) continue;
+            var o = _kaart.Overgangen.FirstOrDefault(x => x.Van == m && x.Naar == doel);
+            if (o is not null) return o.Richting;
+            var t = _kaart.Overgangen.FirstOrDefault(x => x.Van == doel && x.Naar == m);
+            if (t is not null) return t.Richting.Om();
+        }
+        return null;
+    }
+
     /// <summary>Zorgt dat alleen <paramref name="doel"/> bezet is. De loc reed laatst in
     /// <paramref name="laatsteRichting"/>. Staat hij nog half op de melder erachter
     /// (<paramref name="achter"/>), dan rijdt hij verder; staat hij er deels voorbij
@@ -361,7 +376,9 @@ public partial class BaanVerkenner
         if (bezet.Count == 1 && bezet.Contains(doel)) return;
 
         Richting r;
-        if (!bezet.Contains(doel)) r = laatsteRichting.Om();
+        // BUG #58: staat de loc alleen op een melder waarvan de kaart al weet in welke richting het doel ligt
+        // (gemeten overgang), dan kruipt hij daarheen i.p.v. te gokken.
+        if (!bezet.Contains(doel)) r = RichtingNaarDoel(bezet, doel) ?? laatsteRichting.Om();
         else if (voor is int v && bezet.Contains(v)) r = laatsteRichting.Om();
         else if (achter is int a && bezet.Contains(a)) r = laatsteRichting;
         else r = laatsteRichting;
@@ -372,7 +389,9 @@ public partial class BaanVerkenner
             if (wissel > 0) _log.Rijden($"Neerzetten op melder {doel}: nu {r.Tekst()} (bezet: {Lijst(_monitor.Bezet)}).");
             bool doelWasBezet = _monitor.IsBezet(doel);
             await StuurSnelheid(r, _ins.Kruipsnelheid);
-            var eind = _klok.Nu + TimeSpan.FromSeconds(Math.Max(15, _ins.MinSecondenTussenMelders));
+            // BUG #58: bij kruipsnelheid kost een stuk spoor veel tijd; de tijd per poging verdubbelt (15, 30, 60 s)
+            // zodat de loc niet "net voor de melder" wordt afgebroken en daarna weer van richting wisselt.
+            var eind = _klok.Nu + TimeSpan.FromSeconds(Math.Max(15, _ins.MinSecondenTussenMelders) * (1 << wissel));
             bool omdraaien = false;
             while (_klok.Nu < eind)
             {
@@ -380,7 +399,16 @@ public partial class BaanVerkenner
                 _monitor.Bijwerken();
                 bezet = _monitor.Bezet;
                 if (bezet.Count == 1 && bezet.Contains(doel)) break;
-                if (doelWasBezet && !bezet.Contains(doel) && bezet.Count > 0) { omdraaien = true; break; } // doorgeschoten
+                if (doelWasBezet && !bezet.Contains(doel) && bezet.Count > 0)
+                {
+                    // Doorgeschoten? Een bezetmelder kan even wegvallen terwijl de loc er nog (deels) op staat:
+                    // eerst kort afwachten voordat de richting omgekeerd wordt.
+                    await Wacht(TimeSpan.FromMilliseconds(1500));
+                    _monitor.Bijwerken();
+                    bezet = _monitor.Bezet;
+                    if (bezet.Count == 1 && bezet.Contains(doel)) break;
+                    if (!bezet.Contains(doel) && bezet.Count > 0) { omdraaien = true; break; }
+                }
                 if (bezet.Contains(doel)) doelWasBezet = true;
             }
             await StopLoc();
@@ -388,7 +416,7 @@ public partial class BaanVerkenner
             bezet = _monitor.Bezet;
             if (bezet.Count == 1 && bezet.Contains(doel)) return;
             if (!omdraaien && bezet.Contains(doel) && bezet.Count > 1 && wissel > 0) break;
-            r = r.Om();
+            r = !bezet.Contains(doel) ? (RichtingNaarDoel(bezet, doel) ?? r.Om()) : r.Om();
         }
         if (!bezet.Contains(doel))
             throw new NavigatieFout($"De loc kon niet netjes op melder {doel} gezet worden (bezet: {Lijst(bezet)}).");

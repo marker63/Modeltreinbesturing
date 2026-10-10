@@ -1112,3 +1112,18 @@ echt niets deed weet ik niet; de simulator bootst alleen het gevolg na.
 **NIET getest op de baan.** De demobaan-simulatie heb ik NIET als regressietest kunnen opnemen (in mijn testopzet
 liep die ook zonder deze wijziging niet door).
 **Let op voor je volgende test:** begin een nieuwe verkenning (de bewaarde kaart bevat het valse kopspoor 132 en 132 zonder blok).
+
+## #58 - Baanverkenner: loc stopt net voor melder 143 ("kon niet netjes op melder 143 gezet worden"), verkenning gestopt
+Marco (10:45, nieuwe verkenning 10:41-10:43): "de loc moet van 144 naar 143, maar net voordat hij in 143 komt stopt hij en
+zegt dat 143 niet bereikt is; hij had iets langer moeten doorrijden, hij reed ook niet zo snel."
+**Oorzaak (uit verkenner- en hardwarelog 10:42:47-10:43:21):** na de geslaagde blokproef bij 143 moest de loc weer precies op 143
+gezet worden ("Neerzetten", kruipsnelheid 5). (1) Na 0,4 s kruipen vooruit meldde de verkenner 143 even vrij terwijl 144 bezet
+bleef; dat telde direct als "doorgeschoten" en de loc kroop 15 s ACHTERUIT (10:42:49-10:43:04), diep in de lange sectie 144. (2) De
+terugweg kreeg maar 15 s: bij kruipsnelheid is dat niet genoeg om dezelfde afstand terug te leggen, dus de loc stopte
+"net voor 143" (10:43:05-10:43:20) en de opdracht brak af met de foutmelding, waarna de hele verkenning stopte.
+**Fix:** (a) een wegvallende bezetmelding telt pas als doorgeschoten als ze 1,5 s later nog steeds weg is; (b) staat de loc alleen op
+een melder waarvan de baankaart al weet in welke richting het doel ligt (gemeten overgang, hier 144 -> 143 vooruit), dan kruipt hij
+die kant op i.p.v. te gokken (ook bij de richting van de volgende poging); (c) de tijd per poging verdubbelt (15, 30, 60 s).
+**Getest:** de bestaande simulatie-scenario's (nu ook met een lange proefrit terug en een flikkerende melder 143) blijven slagen.
+Het precieze foutgeval (melder valt even weg tijdens het kruipen) heb ik in de simulator NIET kunnen laten falen met de oude code,
+dus er is geen test die bewijst dat dit exact de fout was; de oorzaak komt uit de logs. NIET getest op de baan.
