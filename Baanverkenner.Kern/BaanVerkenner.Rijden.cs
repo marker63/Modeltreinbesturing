@@ -391,7 +391,10 @@ public partial class BaanVerkenner
             await StuurSnelheid(r, _ins.Kruipsnelheid);
             // BUG #58: bij kruipsnelheid kost een stuk spoor veel tijd; de tijd per poging verdubbelt (15, 30, 60 s)
             // zodat de loc niet "net voor de melder" wordt afgebroken en daarna weer van richting wisselt.
-            var eind = _klok.Nu + TimeSpan.FromSeconds(Math.Max(15, _ins.MinSecondenTussenMelders) * (1 << wissel));
+            double basisTijd = Math.Max(15, _ins.MinSecondenTussenMelders);
+            if (VerwachteTijd(_monitor.Bezet, doel) is double verwacht) // BUG #59: kruipend kost dezelfde afstand evenredig meer tijd
+                basisTijd = Math.Max(basisTijd, Math.Min(120, verwacht * _ins.Verkensnelheid / Math.Max(1, _ins.Kruipsnelheid) * 1.5));
+            var eind = _klok.Nu + TimeSpan.FromSeconds(Math.Min(180, basisTijd * (1 << wissel)));
             bool omdraaien = false;
             while (_klok.Nu < eind)
             {
@@ -431,15 +434,77 @@ public partial class BaanVerkenner
     /// <summary>BUG #55: langste tijd (s) die de loc nodig had om vanuit stilstand een nieuwe melder te halen.</summary>
     private double _langsteVertrekSeconden;
 
+    private int RefSnelheid => _kaart.RefSnelheid > 0 ? _kaart.RefSnelheid : _ins.Verkensnelheid;
+    private int _startVerkensnelheid;
+    private bool _snelheidVerlaagd;
+    private double _ritMinDt = double.MaxValue, _ritMaxDt;
+
+    /// <summary>BUG #59: verwachte tijd (s, bij de huidige verkensnelheid) om vanaf een van de bezette melders
+    /// bij <paramref name="doel"/> te komen: eerst de metingen van deze verkenning, anders het leerprofiel.</summary>
+    private double? VerwachteTijd(IEnumerable<int> bezet, int doel)
+    {
+        int v = Math.Max(1, _ins.Verkensnelheid);
+        foreach (var m in bezet)
+        {
+            if (m == doel) continue;
+            var o = _kaart.Overgangen.FirstOrDefault(x => x.AantalMetingen > 0 && ((x.Van == m && x.Naar == doel) || (x.Van == doel && x.Naar == m)));
+            if (o is not null) return o.GemiddeldeSeconden * RefSnelheid / v;
+            if (Leerprofiel is { } lp)
+            {
+                var richtingen = new[] { Richting.Vooruit, Richting.Achteruit };
+                foreach (var rr in richtingen)
+                {
+                    var t = lp.Verwacht(m, doel, rr, v) ?? lp.Verwacht(doel, m, rr, v);
+                    if (t is double tt) return tt;
+                }
+            }
+        }
+        return null;
+    }
+
+    /// <summary>BUG #59: na elke rit de verkensnelheid voorzichtig bijstellen. Alleen op basis van gemeten tijden tussen
+    /// melders tijdens het rijden (niet het vertrek vanuit stilstand): heel korte secties (&lt; 1,5 s) worden gemist of
+    /// geven te weinig tijd om te stoppen, dus iets langzamer; zijn alle secties lang (&gt; 4 s) en duurt de langste meer
+    /// dan de helft van de maximale wachttijd, dan iets sneller (nooit meer dan 1,5x de beginsnelheid).</summary>
+    private void PasSnelheidAutomatischAan()
+    {
+        if (!_ins.AutoSnelheid || _ritMinDt == double.MaxValue) return;
+        int v = _ins.Verkensnelheid;
+        int ondergrens = Math.Max(_ins.Kruipsnelheid + 2, 5);
+        int bovengrens = Math.Max(v, (int)Math.Round(_startVerkensnelheid * 1.5));
+        int nieuw = v;
+        string reden = "";
+        if (_ritMinDt < 1.5 && v > ondergrens)
+        {
+            nieuw = Math.Max(ondergrens, v - Math.Max(1, v / 4));
+            reden = $"kortste gemeten sectie {_ritMinDt:0.0} s is te kort";
+            _snelheidVerlaagd = true; // daarna nooit meer verhogen: voorkomt heen-en-weer pendelen van de snelheid
+        }
+        else if (!_snelheidVerlaagd && _ritMinDt > 4 && _ritMaxDt > 0.5 * _ins.MaxSecondenTussenMelders && v < bovengrens)
+        {
+            nieuw = Math.Min(bovengrens, v + 2);
+            reden = $"alle gemeten secties zijn lang (korste {_ritMinDt:0.0} s, langste {_ritMaxDt:0.0} s)";
+        }
+        if (nieuw == v) return;
+        _log.Info($"Snelheid automatisch aangepast ({reden}).");
+        PasSnelhedenAan(nieuw, Math.Min(_ins.Kruipsnelheid, Math.Max(2, nieuw - 2)));
+    }
+
     private TimeSpan WachttijdTussenMelders()
     {
         double max = _ins.MaxSecondenTussenMelders;
         if (!_ins.SlimmeTimeout) return TimeSpan.FromSeconds(max);
-        double langste = _kaart.LangsteReistijd();
+        double langste = _kaart.LangsteReistijd() * RefSnelheid / Math.Max(1, _ins.Verkensnelheid);
+        int geleerd = 0;
+        if (Leerprofiel is { AantalMetingen: > 0 } lp)
+        {
+            langste = Math.Max(langste, lp.LangsteVerwacht(_ins.Verkensnelheid)); // BUG #59
+            geleerd = Math.Min(3, lp.AantalMetingen);
+        }
         // BUG #55: pas slim worden na een paar echte metingen, en nooit korter dan de tijd die de
         // loc nodig had om vanuit stilstand de eerste melder te halen (een lange sectie zoals 144
         // kost ~15 s; met 1 meting van 3 s werd de wachttijd 10 s en volgde onterecht "doodlopend").
-        int metingen = _kaart.Overgangen.Sum(o => o.AantalMetingen);
+        int metingen = _kaart.Overgangen.Sum(o => o.AantalMetingen) + geleerd;
         if (langste <= 0 || metingen < 3) return TimeSpan.FromSeconds(max);
         double s = Math.Clamp(langste * 3, _ins.MinSecondenTussenMelders, max);
         s = Math.Min(max, Math.Max(s, _langsteVertrekSeconden * 2));
@@ -449,6 +514,19 @@ public partial class BaanVerkenner
     /// <summary>Rijdt vanaf de melder waar de loc nu staat in richting <paramref name="r"/>
     /// en legt elke nieuw bezette melder vast, tot een van de stopcondities optreedt.</summary>
     private async Task<RitResultaat> Rit(int start, Richting r, RitDoel doel)
+    {
+        _ritMinDt = double.MaxValue; _ritMaxDt = 0;
+        var uitkomst = await RitUitvoeren(start, r, doel);
+        PasSnelheidAutomatischAan();
+        try
+        {
+            if (Leerprofiel is { } lp) { lp.Leer(_kaart, RefSnelheid); ProfielBijgewerkt?.Invoke(lp); }
+        }
+        catch (Exception ex) { _log.Waarschuwing($"Leerprofiel bewaren mislukte: {ex.Message}"); }
+        return uitkomst;
+    }
+
+    private async Task<RitResultaat> RitUitvoeren(int start, Richting r, RitDoel doel)
     {
         var res = new RitResultaat { Richting = r };
         res.Reeks.Add(start);
@@ -563,7 +641,15 @@ public partial class BaanVerkenner
                 if (onderbroken && wijzigingen.Contains(w))
                     _langsteVertrekSeconden = Math.Max(_langsteVertrekSeconden, (_klok.Nu - laatsteWijziging).TotalSeconds);
                 wachttijdVerlengd = false;
-                _kaart.RegistreerOvergang(res.Reeks[^1], m, r, doel.Configuratie, dt);
+                // BUG #59: tijden altijd omgerekend naar de referentiesnelheid van de kaart, en niet vastleggen
+                // als de loc al kruipend het doel in zicht heeft (kruipsnelheid zegt niets over de sectielengte).
+                if (dt is double gemeten && !doelInzicht)
+                {
+                    _ritMinDt = Math.Min(_ritMinDt, gemeten);
+                    _ritMaxDt = Math.Max(_ritMaxDt, gemeten);
+                }
+                double? dtOpgeslagen = dt is double d1 && !doelInzicht ? d1 * _ins.Verkensnelheid / RefSnelheid : null;
+                _kaart.RegistreerOvergang(res.Reeks[^1], m, r, doel.Configuratie, dtOpgeslagen);
                 bool herhaling = res.Reeks.Contains(m);
                 res.Reeks.Add(m);
                 tijdVorigeMelder = w.Tijd;

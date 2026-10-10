@@ -1127,3 +1127,27 @@ die kant op i.p.v. te gokken (ook bij de richting van de volgende poging); (c) d
 **Getest:** de bestaande simulatie-scenario's (nu ook met een lange proefrit terug en een flikkerende melder 143) blijven slagen.
 Het precieze foutgeval (melder valt even weg tijdens het kruipen) heb ik in de simulator NIET kunnen laten falen met de oude code,
 dus er is geen test die bewijst dat dit exact de fout was; de oorzaak komt uit de logs. NIET getest op de baan.
+
+## #59 - Baanverkenner: zelflerend (geleerde tijden) en optioneel automatische snelheid
+Marco (10:50): "leer van de tijden uit eerdere logs, en pas eventueel de snelheden tijdens het testen automatisch aan."
+**Gebouwd:**
+- `LeerProfiel` (Baanverkenner.Kern): onthoudt per overgang de reistijd omgerekend naar snelheid (seconden x snelheidsstap),
+  dus bruikbaar bij elke verkensnelheid. Wordt na elke rit bijgewerkt en bewaard in `%AppData%\Baanverkenner\leerprofiel.json`
+  (zelfde map als voortgang.json). Zonder eigen profiel start de app met `leerprofiel_zaad.json` (de gemeten tijden uit jouw
+  verkenning van 10-10 09:57-10:24: o.a. 144->143 17 s, 144->136 17,4 s, 136->133 3,0 s bij snelheid 12).
+- Gebruik: (1) slimme wachttijd tussen melders is meteen bruikbaar (ook bij weinig metingen in deze verkenning, begrensd door Min/Max);
+  (2) bij het neerzetten op een melder (kruipen) krijgt de loc minimaal de verwachte tijd x (verkensnelheid / kruipsnelheid) x 1,5;
+  (3) tijden in de baankaart zijn nu altijd omgerekend naar de referentiesnelheid (`Baankaart.RefSnelheid`) en worden niet meer
+  vastgelegd als de loc al kruipend het doel in zicht heeft (dat gaf vroeger onzuivere gemiddelden).
+- Automatische snelheid (instelling "Verkensnelheid zelf bijstellen", STANDAARD UIT, experimenteel): na elke rit lager (-25%,
+  nooit onder kruipsnelheid+2) als de kortste gemeten sectie < 1,5 s is; hoger (+2, max 1,5x beginsnelheid) als alle secties > 4 s
+  zijn en de langste > helft van de maximale wachttijd; na een verlaging nooit meer verhogen (geen heen-en-weer).
+**Getest (Tools/CompileCheck):** profiel bewaren/laden, omrekenen bij andere snelheid (17 s bij 12 = 34 s bij 6), dezelfde kaart
+twee keer aanbieden telt niet dubbel, tweede run met profiel is niet langzamer, echte tijden uit de kaart van 10-10 10:24
+worden overgenomen, auto-snelheid verlaagt bij een extreem korte sectie en laat een normale baan op 12.
+**Bekende beperking:** in de simulator met een extreem korte sectie (30 cm) en auto-snelheid AAN mislukte de laatste terugrit
+("Loc kon niet op melder 144 gezet worden") terwijl dezelfde baan zonder auto-snelheid wel slaagde. Daarom staat het standaard uit.
+Het leerprofiel zelf is niet de oorzaak. Het profiel kan hooguit een wachttijd inkorten/verlengen (binnen Min/Max); een gewijzigde baan met
+dezelfde meldernummers geeft dan een onjuiste schatting, daarom verwijder je bij een andere baan `leerprofiel.json`.
+**NIET gecompileerd:** de WPF-kant van de Baanverkenner (vinkje, laden/bewaren van het profiel, csproj-regel voor het zaadbestand).
+NIET getest op de baan.

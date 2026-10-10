@@ -1,0 +1,47 @@
+{
+  "FormaatVersie": 1,
+  "Overgangen": [
+    {
+      "Van": 144,
+      "Naar": 143,
+      "Richting": "Vooruit",
+      "SecondenXStap": 204.489,
+      "Aantal": 9
+    },
+    {
+      "Van": 144,
+      "Naar": 136,
+      "Richting": "Achteruit",
+      "SecondenXStap": 208.264,
+      "Aantal": 9
+    },
+    {
+      "Van": 136,
+      "Naar": 133,
+      "Richting": "Achteruit",
+      "SecondenXStap": 36.288,
+      "Aantal": 16
+    },
+    {
+      "Van": 133,
+      "Naar": 136,
+      "Richting": "Vooruit",
+      "SecondenXStap": 138.47,
+      "Aantal": 10
+    },
+    {
+      "Van": 136,
+      "Naar": 144,
+      "Richting": "Vooruit",
+      "SecondenXStap": 35.683,
+      "Aantal": 14
+    },
+    {
+      "Van": 133,
+      "Naar": 132,
+      "Richting": "Achteruit",
+      "SecondenXStap": 157.68,
+      "Aantal": 10
+    }
+  ]
+}

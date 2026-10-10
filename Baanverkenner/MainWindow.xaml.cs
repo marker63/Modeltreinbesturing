@@ -45,6 +45,8 @@ public partial class MainWindow : Window
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Modeltreinbesturing", "Baanverkenner");
     private static readonly string VoortgangPad = Path.Combine(Map, "voortgang.json");
     private static readonly string InstellingenPad = Path.Combine(Map, "instellingen.json");
+    private static readonly string LeerprofielPad = Path.Combine(Map, "leerprofiel.json");
+    private static readonly string LeerprofielZaadPad = Path.Combine(AppContext.BaseDirectory, "leerprofiel_zaad.json");
 
     private class OpgeslagenKeuzes
     {
@@ -148,6 +150,7 @@ public partial class MainWindow : Window
         BlokInrijBox.Text = i.BlokproefInrijSeconden.ToString("0.0#");
         ExtraMeldersBox.Text = i.ExtraMeldersNaAfwijking.ToString();
         BasisHerhalenCheck.IsChecked = i.BasisritHerhalen;
+        AutoSnelheidCheck.IsChecked = i.AutoSnelheid;
     }
 
     private static int Geheel(TextBox box, string naam, int min, int max)
@@ -188,7 +191,8 @@ public partial class MainWindow : Window
             BlokproefKortSeconden = Geheel(BlokKortBox, "Blokproef onderweg", 2, 60),
             BlokproefInrijSeconden = Getal(BlokInrijBox, "Doorrijden vóór blokproef", 0, 20),
             ExtraMeldersNaAfwijking = Geheel(ExtraMeldersBox, "Extra melders na afwijking", 0, 10),
-            BasisritHerhalen = BasisHerhalenCheck.IsChecked == true
+            BasisritHerhalen = BasisHerhalenCheck.IsChecked == true,
+            AutoSnelheid = AutoSnelheidCheck.IsChecked == true
         };
         if (i.Kruipsnelheid > i.Verkensnelheid)
             throw new FormatException($"De kruipsnelheid ({i.Kruipsnelheid}) is hoger dan de verkensnelheid ({i.Verkensnelheid}). Verhoog ook de verkensnelheid, of kies een lagere kruipsnelheid.");
@@ -428,6 +432,7 @@ public partial class MainWindow : Window
         vast.BlokproefInrijSeconden = scherm.BlokproefInrijSeconden;
         vast.ExtraMeldersNaAfwijking = scherm.ExtraMeldersNaAfwijking;
         vast.BasisritHerhalen = scherm.BasisritHerhalen;
+        vast.AutoSnelheid = scherm.AutoSnelheid;
         if (vast.LocStappen <= 28 && (vast.Verkensnelheid > vast.LocStappen || vast.Kruipsnelheid > vast.LocStappen))
         {
             MessageBox.Show(this, $"De onderbroken verkenning gebruikt {vast.LocStappen} rijstappen; de snelheden mogen daar niet boven komen.", "Controleer de instellingen", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -467,6 +472,11 @@ public partial class MainWindow : Window
             _log.Info($"Hervat vanaf opgeslagen voortgang ({hervat.AfgerondeOpdrachten} opdrachten al afgerond).");
 
         _verkenner = new BaanVerkenner(hw, ins, klok, _log, VraagGebruiker, hervat);
+        // Zelflerend: tijden uit eerdere verkenningen (of het meegeleverde beginprofiel) gebruiken en bijwerken.
+        var profiel = LeerProfiel.Laad(LeerprofielPad);
+        if (profiel.AantalMetingen == 0) profiel = LeerProfiel.Laad(LeerprofielZaadPad);
+        _verkenner.Leerprofiel = profiel;
+        _verkenner.ProfielBijgewerkt = p => { try { p.Bewaar(LeerprofielPad); } catch { } };
         _verkenner.VoortgangGewijzigd += v => Dispatcher.InvokeAsync(() => ToonVoortgang(v));
         _verkenner.Bewaren = st =>
         {

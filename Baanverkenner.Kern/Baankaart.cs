@@ -183,6 +183,8 @@ public class Baankaart
     public string Hardware { get; set; } = "";
     public int LocAdres { get; set; }
     public int LocStappen { get; set; }
+    /// <summary>BUG #59: de verkensnelheid waarop de tijden in Overgangen (GemiddeldeSeconden) zijn omgerekend (0 = onbekend/oudere kaart).</summary>
+    public int RefSnelheid { get; set; }
     public int StartMelder { get; set; }
     public int WisselAdresVan { get; set; }
     public int WisselAdresTot { get; set; }

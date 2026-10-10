@@ -151,7 +151,10 @@
                         <TextBox x:Name="BlokInrijBox" Grid.Row="8" Grid.Column="1"/>
                         <TextBlock Grid.Row="9" Style="{StaticResource Label}" Text="Extra melders na afwijking"/>
                         <TextBox x:Name="ExtraMeldersBox" Grid.Row="9" Grid.Column="1"/>
-                        <CheckBox x:Name="BasisHerhalenCheck" Grid.Row="10" Grid.ColumnSpan="2" Margin="0,4" Content="Basisrit twee keer rijden ter controle"/>
+                        <StackPanel Grid.Row="10" Grid.ColumnSpan="2">
+                            <CheckBox x:Name="BasisHerhalenCheck" Margin="0,4" Content="Basisrit twee keer rijden ter controle"/>
+                            <CheckBox x:Name="AutoSnelheidCheck" Margin="0,4" Content="Verkensnelheid zelf bijstellen (lager bij heel korte secties) - experimenteel"/>
+                        </StackPanel>
                         <TextBlock Grid.Row="11" Grid.ColumnSpan="2" Style="{StaticResource Uitleg}"
                                    Text="Heeft je baan onbewaakte stukken (wissels zonder melder) waar de loc langer dan een paar seconden 'onzichtbaar' is, verhoog dan de kortsluittijd."/>
                     </Grid>

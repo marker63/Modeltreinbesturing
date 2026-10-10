@@ -103,6 +103,11 @@ public partial class BaanVerkenner
     public Action<VerkenStatus>? Bewaren { get; set; }
     public event Action<VerkenVoortgang>? VoortgangGewijzigd;
 
+    /// <summary>BUG #59: geleerde tijden uit eerdere verkenningen (mag null zijn).</summary>
+    public LeerProfiel? Leerprofiel { get; set; }
+    /// <summary>Wordt na elke rit aangeroepen zodat het programma het profiel kan bewaren.</summary>
+    public Action<LeerProfiel>? ProfielBijgewerkt { get; set; }
+
     public VerkenLog Log => _log;
     public Baankaart Kaart => _kaart;
     public VerkenStatus Status => _status;
@@ -170,7 +175,10 @@ public partial class BaanVerkenner
                 _kaart.WisselAdresVan = _ins.WisselAdressen().First();
                 _kaart.WisselAdresTot = _ins.WisselAdressen().Last();
             }
+            if (_kaart.RefSnelheid <= 0) _kaart.RefSnelheid = _ins.Verkensnelheid;
+            _startVerkensnelheid = _ins.Verkensnelheid;
             _log.Stap(hervat ? "Verkenning wordt hervat." : "Verkenning start.");
+            if (Leerprofiel is { AantalMetingen: > 0 } lp) _log.Info($"Leerprofiel: {lp.Overgangen.Count} overgangen uit eerdere verkenningen (tijden worden omgerekend naar verkensnelheid {_ins.Verkensnelheid}).");
             _log.Info($"Hardware: {_hw.Naam}. Testloc adres {_ins.LocAdres} ({_ins.LocStappen} stappen), verkensnelheid {_ins.Verkensnelheid}, kruipsnelheid {_ins.Kruipsnelheid}.");
             _log.Info($"Wisseladressen {_kaart.WisselAdresVan} t/m {_kaart.WisselAdresTot}." + (BlokVereist ? $" Dinamo-blokken: {_ins.DinamoBlokken}." : ""));
 

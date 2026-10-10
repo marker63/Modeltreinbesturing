@@ -14,6 +14,8 @@ public class VerkenInstellingen
     public int Verkensnelheid { get; set; } = 8;
     /// <summary>Lage snelheid voor het precies neerzetten op een melder.</summary>
     public int Kruipsnelheid { get; set; } = 3;
+    /// <summary>BUG #59: de verkenner past de verkensnelheid zelf voorzichtig aan (lager bij heel korte secties, iets hoger als alle secties lang zijn). Standaard UIT: in de simulator gaf een heel korte sectie na verlagen een mislukte terugrit.</summary>
+    public bool AutoSnelheid { get; set; } = false;
 
     // ---- Wissels ----
     /// <summary>Alle adressen in dit bereik worden één voor één geprobeerd.</summary>
