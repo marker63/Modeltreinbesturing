@@ -240,6 +240,22 @@ public static class Tests
         Eis(fout && !v.Kaart.Overgangen.Any(o => o.Van == 1), "navigatie-startcontrole: loc buiten het verwachte pad -> NavigatieFout, geen valse overgang");
     }
 
+    // Blokkenschema-tekening (SVG) uit de baankaart van 17:07
+    static void BlokkenschemaTest()
+    {
+        var k = Laad("baankaart_lijn_5-30_voltooid_kruiswissel24_2026-10-10_1707.json");
+        var t = SchemaTekening.Maak(k);
+        Eis(t.Vakken.Count == 7, "blokkenschema: 7 vakken (nu " + t.Vakken.Count + ")");
+        Eis(t.Verbindingen.Count >= 7, "blokkenschema: minstens 7 verbindingen (nu " + t.Verbindingen.Count + ")");
+        Eis(t.Vakken.All(v => v.X > 0 && v.Y > 0 && v.X < t.Breedte && v.Y < t.Hoogte), "blokkenschema: alle vakken liggen binnen de tekening");
+        var svg = t.AlsSvg(true);
+        Eis(svg.Contains("<svg") && svg.Contains("melders 24") && svg.Contains("Dinamo ?"), "blokkenschema: svg bevat melder 24 en het onbekende Dinamo-blok van melder 129");
+        Eis(t.Vakken.First(v => v.Melders == "24").Soort == "splitsing", "blokkenschema: melder 24 (kruiswissel) is een splitsing");
+        var uit = Environment.GetEnvironmentVariable("SCHEMA_UIT");
+        if (!string.IsNullOrEmpty(uit)) { File.WriteAllText(uit, svg); Console.WriteLine("  svg geschreven naar " + uit); }
+        Eis(Rapport.AlsHtml(k).Contains("<h2>Blokkenschema</h2>") && Rapport.AlsHtml(k).Contains("<svg"), "blokkenschema: het HTML-rapport bevat de tekening");
+    }
+
     // De geslaagde, volledige rit van 10-10 11:38 (blokken 10, 11, 12): referentie voor importer en leerprofiel
     static void GeslaagdeRitTest()
     {
@@ -321,6 +337,7 @@ public static class Tests
         PartnerVolgordeTest();
         BlokgrensTest();
         NavigatieOnjuisteStartTest();
+        BlokkenschemaTest();
 
         Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)");
         return _fouten == 0 ? 0 : 1;
