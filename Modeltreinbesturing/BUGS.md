@@ -1151,3 +1151,13 @@ Het leerprofiel zelf is niet de oorzaak. Het profiel kan hooguit een wachttijd i
 dezelfde meldernummers geeft dan een onjuiste schatting, daarom verwijder je bij een andere baan `leerprofiel.json`.
 **NIET gecompileerd:** de WPF-kant van de Baanverkenner (vinkje, laden/bewaren van het profiel, csproj-regel voor het zaadbestand).
 NIET getest op de baan.
+
+## #60 - GEPLAND (Marco, 11:34): bekend kopspoor = meteen keren, niet tegen het stootjuk laten doordraaien
+Marco: "als je al weet dat een melder echt doodlopend is, laat je de loc toch steeds langere tijd tegen het stootjuk doordraaien;
+dat is zonde van de loc. Weet je al dat de melder aan een stootjuk grenst (kopspoor), dan mag je meteen keren."
+**Nog NIET gebouwd** (bewust voor een volgende versie). Aanpak: in `Rit()` (Baanverkenner.Kern/BaanVerkenner.Rijden.cs): als de loc een melder
+bereikt die in `Baankaart.Kopsporen` staat voor deze richting en wisselconfiguratie (of in het leerprofiel als doodlopend is geleerd),
+dan niet wachten op "geen nieuwe melder binnen de wachttijd" maar direct stoppen en keren (res.Einde = Doodlopend zonder wachttijd).
+Let op: alleen bij een echt kopspoor (<= 1 buurmelder, zie #56) en bij dezelfde wisselconfiguratie; nooit voor een melder die alleen
+"doodlopend" leek door stilvallen (#55, #57). Eerste keer dat een einde ontdekt wordt blijft de wachttijd nodig. Ook de Nastellen-kruip
+tegen het stootjuk (#58) en de blokproef bij een bekend kopspoor kunnen dan korter.
