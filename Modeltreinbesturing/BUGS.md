@@ -952,3 +952,30 @@ rijdt; daarna afbuigend/afbuigend. Dan de wisselstraten 3 naar 4, 3 naar 7 (en 4
 3 naar 4: ook controleren.
 Opmerking bij #46: de "verkeerde kant op" van de 1e testrit is hiermee waarschijnlijk geen
 richtingsfout maar dit; #46 blijft als verbetering (richting per loc onthouden) staan.
+
+## #49 - Rijrichting per relatie (van blok A naar blok B) werd nergens vastgelegd
+
+**Melding:** "de loc reserveert van 3 naar 4 en moet volgens de baanindeling achteruit rijden"
+(3 naar 7 is vooruit). Controle van het projectbestand: `BlokRelatie` had alleen
+Van, Naar, Keer en Kans; er stond dus nergens vooruit/achteruit per overgang. De software
+begon met een standaard/geleerde richting en draaide die alleen om bij Keer-vinkjes. Voor een
+blok met twee uitgangen in tegengestelde richting (3 naar 7 vooruit, 3 naar 4 achteruit) kan
+dat niet kloppen. Dit verklaart de 3 verkeerde starts van 10-10 beter dan een wisselfout
+(#48 is daarmee waarschijnlijk deels achterhaald; de waarnemingen blijven staan).
+
+**Fix:**
+- `BlokRelatie.RijrichtingVooruit` (vooruit / achteruit / niet vastgelegd), opgeslagen in
+  project en backup.
+- Instellen: Beheren -> Relaties beheren -> knop "Rijrichting" (klik schakelt door:
+  niet vastgelegd, vooruit, achteruit).
+- Eerste stap van een rit: de vastgelegde richting van die relatie wint van onthouden/
+  geleerde/standaard richting (vaste routes: bij de start; automatisch rijden: bij het
+  vertrek zodra het eerste blok gekozen is). Het log zegt welke bron beslist heeft.
+- Is er niets vastgelegd voor die relatie dan staat er een WAARSCHUWING in het log.
+- Een bewuste keer-actie van jou bij de eerste stap legt de richting voor die relatie vast.
+- Verderop in de rit wordt een afwijking tussen vastgelegde richting en Keer-mechanisme alleen
+  gelogd (nooit midden in de rit omkeren).
+
+**Te doen in jouw project:** 3 naar 7 = vooruit, 3 naar 4 = achteruit invullen, en daarna de
+overige relaties van blokken met meerdere uitgangen (zie waarschuwingen in het log).
+**NIET getest op de baan.**

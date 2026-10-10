@@ -32,6 +32,20 @@ public partial class RelatiesDialog : Window
         RelatiesLijst.SelectedItem = relatie;
     }
 
+    /// <summary>BUG #49: legt de rijrichting vast voor de gekozen relatie (Van -> Naar):
+    /// elke klik schakelt door: niet vastgelegd -> vooruit -> achteruit -> niet vastgelegd.</summary>
+    private void RijrichtingWijzigen_Click(object sender, RoutedEventArgs e)
+    {
+        if (RelatiesLijst.SelectedItem is not BlokRelatie relatie)
+        {
+            MessageBox.Show(this, "Selecteer eerst een relatie in de lijst.", "Modeltreinbesturing", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        relatie.RijrichtingVooruit = relatie.RijrichtingVooruit switch { null => true, true => false, false => null };
+        VulLijst();
+        RelatiesLijst.SelectedItem = relatie;
+    }
+
     /// <summary>Koploper's "Kans"-kolom (Richtingen-tabblad) - zie Model.BlokRelatie.Kans
     /// voor de volledige achtergrond. Simpele invoerdialoog i.p.v. een inline-editable
     /// kolom, zelfde stijl als de rest van dit venster (één actie, één knop).</summary>

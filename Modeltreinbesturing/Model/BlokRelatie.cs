@@ -31,10 +31,21 @@ public class BlokRelatie
     /// (LegRelatieVast nooit aangeroepen voor dat Van/Naar-paar) telt ook als gewicht 1.</summary>
     public int Kans { get; set; } = 1;
 
+    /// <summary>BUG #49: de VASTGELEGDE rijrichting bij rijden van Van naar Naar, in het
+    /// blokkenframe van de baan (true = vooruit, false = achteruit, null = niet vastgelegd).
+    /// Gebruiker: "reserveren van blok 3 naar blok 7 is rijrichting vooruit, 3 naar 4 is
+    /// achteruit - dat is echt essentieel, zeker bij de eerste rit na het opstarten". Zonder
+    /// dit veld kende de software alleen een standaardrichting + Keer-vinkjes en kon een rit
+    /// vanaf een blok met twee uitgangen de verkeerde kant op vertrekken. Bij de eerste stap
+    /// van een rit bepaalt dit veld de richting; later wordt een afwijking met het lopende
+    /// Keer-mechanisme gelogd.</summary>
+    public bool? RijrichtingVooruit { get; set; }
+
     public override string ToString()
     {
         string basis = $"{Van.Nummer} -> {Naar.Nummer}";
         if (Keer) basis += " (keer)";
+        if (RijrichtingVooruit is bool rr) basis += rr ? " [vooruit]" : " [achteruit]";
         if (Kans != 1) basis += $" [kans {Kans}]";
         return basis;
     }

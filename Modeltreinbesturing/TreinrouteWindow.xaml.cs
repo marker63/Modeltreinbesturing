@@ -960,7 +960,7 @@ public partial class TreinrouteWindow : Window
         // dit punt, trein.VorigBlok is nog nooit gezet) gebruikt de eerder geleerde,
         // door de gebruiker zelf bevestigde rijrichting voor dit specifieke startblok, als
         // die er is - anders blijft de standaardwaarde (vooruit) gewoon staan.
-        BepaalStartrichting(trein, pad[0]);
+        BepaalStartrichting(trein, pad[0], pad.Count > 1 ? pad[1] : null);
         _actieveTreinen.Add(trein);
 
         // Was het startblok "handmatig bezet" (een net geplaatste loc) - net als bij
@@ -1268,11 +1268,17 @@ public partial class TreinrouteWindow : Window
     /// richting (door de gebruiker bevestigd via de keer-knop); (3) de standaard (vooruit).
     /// Een eerste stap met Keer-relatie/kopspoor wordt daarna gewoon door VereistKeren
     /// omgedraaid. De gebruikte bron wordt altijd gelogd.</summary>
-    private void BepaalStartrichting(RijdendeTrein rit, Blok startblok)
+    private void BepaalStartrichting(RijdendeTrein rit, Blok startblok, Blok? eerstvolgend = null)
     {
         var loc = rit.Trein;
         string bron;
-        if (loc?.LaatsteRichtingVooruit is bool eigen && loc.LaatsteRichtingBlokNummer == startblok.Nummer)
+        var eersteRelatie = eerstvolgend != null ? _blokBeheerder.Relaties.FirstOrDefault(r => r.Van == startblok && r.Naar == eerstvolgend) : null;
+        if (eersteRelatie?.RijrichtingVooruit is bool vastgelegd)
+        {
+            rit.RijdtVooruit = vastgelegd;
+            bron = $"vastgelegd op de relatie {startblok.Nummer} -> {eerstvolgend!.Nummer}";
+        }
+        else if (loc?.LaatsteRichtingVooruit is bool eigen && loc.LaatsteRichtingBlokNummer == startblok.Nummer)
         {
             rit.RijdtVooruit = eigen;
             bron = "onthouden richting van de loc zelf";
@@ -2116,6 +2122,25 @@ public partial class TreinrouteWindow : Window
     {
         VerwerkEventueelKeren(trein, trein.VorigBlok, huidig);
 
+        // BUG #49: de vastgelegde rijrichting van DEZE relatie (huidig -> volgendBlok).
+        var vertrekRelatie = _blokBeheerder.Relaties.FirstOrDefault(r => r.Van == huidig && r.Naar == volgendBlok);
+        bool richtingVastgelegdBijStart = false;
+        if (trein.VorigBlok is null)
+        {
+            if (vertrekRelatie?.RijrichtingVooruit is bool vastRichting)
+            {
+                bool wasVooruit = trein.RijdtVooruit;
+                trein.RijdtVooruit = vastRichting;
+                richtingVastgelegdBijStart = true;
+                OnthoudRichting(trein);
+                Log($"[Route '{trein.Route.Omschrijving}'] Eerste stap {huidig.Nummer} -> {volgendBlok.Nummer}: rijrichting volgens de vastgelegde relatie = {(vastRichting ? "vooruit" : "achteruit")}{(wasVooruit != vastRichting ? " (wijkt af van de eerder gekozen startrichting - vastgelegde relatie wint)" : "")}.");
+            }
+            else
+            {
+                Log($"[Route '{trein.Route.Omschrijving}'] WAARSCHUWING: voor de relatie {huidig.Nummer} -> {volgendBlok.Nummer} is GEEN rijrichting vastgelegd (Beheren -> Relaties beheren -> Rijrichting). Startrichting nu: {(trein.RijdtVooruit ? "vooruit" : "achteruit")} (onthouden/geleerd/standaard) - kan fout zijn.");
+            }
+        }
+
         // GEVONDEN GAT (gebruikerswaarneming: "reserveert terug naar blok 6 maar rijd
         // fysiek de andere kant op" - resulteerde in een noodstop): dit gebeurt specifiek
         // wanneer het enige overgebleven, haalbare kandidaat-blok toevallig het blok is
@@ -2141,12 +2166,14 @@ public partial class TreinrouteWindow : Window
         // Vereist WEL dat de gebruiker Keer=true zet op de relatie(s) waar echt gekeerd
         // moet worden (bijv. blok7->3 en blok7->1) - blijft dat ongezet, dan behandelt de
         // software elke terugkeer naar het vorige blok voortaan als een lus (geen keren).
-        bool ditIsEenOmkering = VereistKeren(huidig, volgendBlok);
+        bool ditIsEenOmkering = !richtingVastgelegdBijStart && VereistKeren(huidig, volgendBlok);
         if (ditIsEenOmkering)
         {
             trein.RijdtVooruit = !trein.RijdtVooruit;
             Log($"[Route '{trein.Route.Omschrijving}'] Volgende stap ({volgendBlok.Nummer}) vereist keren (Keer-relatie of kopspoor) - rijrichting omgekeerd naar {(trein.RijdtVooruit ? "vooruit" : "achteruit")}.");
         }
+        if (trein.VorigBlok != null && vertrekRelatie?.RijrichtingVooruit is bool verwacht && verwacht != trein.RijdtVooruit)
+            Log($"[Route '{trein.Route.Omschrijving}'] WAARSCHUWING: relatie {huidig.Nummer} -> {volgendBlok.Nummer} heeft vastgelegde rijrichting {(verwacht ? "vooruit" : "achteruit")}, maar de rit rijdt nu {(trein.RijdtVooruit ? "vooruit" : "achteruit")} - Keer-vinkjes en vastgelegde richtingen spreken elkaar tegen, controleer de relaties.");
         // GEVONDEN, KRITIEK GAT (bytes-analyse: melder15 - het meldpunt waar de trein
         // blok4 oorspronkelijk vanuit blok3 BINNENkwam - meldde zich na een omkering als
         // hierboven opnieuw bezet, PRECIES nadat de staart-fase van blok4 net had gemeld
@@ -4673,6 +4700,16 @@ public partial class TreinrouteWindow : Window
         OnthoudRichting(rit); // BUG #46: de loc onthoudt zijn eigen (gecorrigeerde) richting
         // BUG #46: ALLEEN een bewuste keer-actie van de gebruiker leert de blokwaarde; een
         // automatische correctie (flikkerend meldpunt e.d.) mag die niet vervuilen.
+        if (doorGebruiker && rit.VorigBlok is null && rit.HuidigBlok != null && rit.GereserveerdVolgendBlok != null)
+        {
+            // BUG #49: een bewuste keer-actie bij de eerste stap bevestigt de juiste richting voor DEZE relatie.
+            var geleerdeRelatie = _blokBeheerder.Relaties.FirstOrDefault(r => r.Van == rit.HuidigBlok && r.Naar == rit.GereserveerdVolgendBlok);
+            if (geleerdeRelatie != null)
+            {
+                geleerdeRelatie.RijrichtingVooruit = rit.RijdtVooruit;
+                Log($"[Route '{rit.Route.Omschrijving}'] Rijrichting voor relatie {geleerdeRelatie.Van.Nummer} -> {geleerdeRelatie.Naar.Nummer} vastgelegd: {(rit.RijdtVooruit ? "vooruit" : "achteruit")} (bevestigd door jouw keer-actie).");
+            }
+        }
         if (doorGebruiker && rit.VorigBlok is null && rit.HuidigBlok != null)
         {
             rit.HuidigBlok.GeleerdeStartrichtingVooruit = rit.RijdtVooruit;
