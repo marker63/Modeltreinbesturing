@@ -246,13 +246,15 @@ public partial class BaanVerkenner
                 _token.ThrowIfCancellationRequested();
                 _monitor.Bijwerken();
                 _log.Rijden($"Blokproef: blok {blok}, {r.Tekst()} …");
+                var t0 = _klok.Nu;
                 await StuurNaarBlok(blok, r, _ins.Verkensnelheid);
                 var eind = _klok.Nu + TimeSpan.FromSeconds(_ins.BlokproefLangSeconden);
                 bool gewijzigd = false;
                 while (_klok.Nu < eind)
                 {
                     await Wacht(Poll);
-                    if (_monitor.Bijwerken().Count > 0) { gewijzigd = true; break; }
+                    // BUG #55: alleen wijzigingen NA het commando tellen (een nasleep van de vorige rit gaf een verkeerde koppeling, 144 -> blok 10)
+                    if (_monitor.Bijwerken().Any(x => x.Tijd >= t0)) { gewijzigd = true; break; }
                 }
                 if (gewijzigd)
                 {
@@ -284,13 +286,14 @@ public partial class BaanVerkenner
         {
             _token.ThrowIfCancellationRequested();
             _monitor.Bijwerken();
+            var t0 = _klok.Nu;
             await StuurNaarBlok(blok, r.Om(), _ins.Verkensnelheid);
             var eind = _klok.Nu + TimeSpan.FromSeconds(_ins.BlokproefKortSeconden);
             bool gewijzigd = false;
             while (_klok.Nu < eind)
             {
                 await Wacht(Poll);
-                if (_monitor.Bijwerken().Count > 0) { gewijzigd = true; break; }
+                if (_monitor.Bijwerken().Any(x => x.Tijd >= t0)) { gewijzigd = true; break; }
             }
             if (gewijzigd)
             {
@@ -363,13 +366,21 @@ public partial class BaanVerkenner
     // De rit zelf
     // =====================================================================
 
+    /// <summary>BUG #55: langste tijd (s) die de loc nodig had om vanuit stilstand een nieuwe melder te halen.</summary>
+    private double _langsteVertrekSeconden;
+
     private TimeSpan WachttijdTussenMelders()
     {
         double max = _ins.MaxSecondenTussenMelders;
         if (!_ins.SlimmeTimeout) return TimeSpan.FromSeconds(max);
         double langste = _kaart.LangsteReistijd();
-        if (langste <= 0) return TimeSpan.FromSeconds(max);
+        // BUG #55: pas slim worden na een paar echte metingen, en nooit korter dan de tijd die de
+        // loc nodig had om vanuit stilstand de eerste melder te halen (een lange sectie zoals 144
+        // kost ~15 s; met 1 meting van 3 s werd de wachttijd 10 s en volgde onterecht "doodlopend").
+        int metingen = _kaart.Overgangen.Sum(o => o.AantalMetingen);
+        if (langste <= 0 || metingen < 3) return TimeSpan.FromSeconds(max);
         double s = Math.Clamp(langste * 3, _ins.MinSecondenTussenMelders, max);
+        s = Math.Min(max, Math.Max(s, _langsteVertrekSeconden * 2));
         return TimeSpan.FromSeconds(s);
     }
 
@@ -403,6 +414,7 @@ public partial class BaanVerkenner
         int? afwijkingIndex = null;
         bool doelInzicht = false;
         bool blokGecontroleerd = false;
+        bool wachttijdVerlengd = false;   // BUG #55: eenmalige bevestigingsronde voordat "doodlopend" geconcludeerd wordt
         DateTime? heelInNieuweSectieSinds = null;
         _kortsluitingGemeld = false;
 
@@ -486,6 +498,9 @@ public partial class BaanVerkenner
                 }
 
                 double? dt = onderbroken ? null : (w.Tijd - tijdVorigeMelder).TotalSeconds;
+                if (onderbroken && wijzigingen.Contains(w))
+                    _langsteVertrekSeconden = Math.Max(_langsteVertrekSeconden, (_klok.Nu - laatsteWijziging).TotalSeconds);
+                wachttijdVerlengd = false;
                 _kaart.RegistreerOvergang(res.Reeks[^1], m, r, doel.Configuratie, dt);
                 bool herhaling = res.Reeks.Contains(m);
                 res.Reeks.Add(m);
@@ -596,8 +611,17 @@ public partial class BaanVerkenner
             }
 
             // ---- Te lang geen nieuwe melder ----
-            if (_klok.Nu - laatsteWijziging > WachttijdTussenMelders())
+            var grens = wachttijdVerlengd ? TimeSpan.FromSeconds(_ins.MaxSecondenTussenMelders) : WachttijdTussenMelders();
+            if (_klok.Nu - laatsteWijziging > grens)
             {
+                if (!wachttijdVerlengd && grens < TimeSpan.FromSeconds(_ins.MaxSecondenTussenMelders))
+                {
+                    // BUG #55: nog niet concluderen dat dit een kopspoor/stootjuk is: een lange sectie
+                    // kost meer tijd dan de geleerde wachttijd. Eenmalig doorrijden tot de maximale wachttijd.
+                    wachttijdVerlengd = true;
+                    _log.Info($"Na melder {res.Reeks[^1]} al {grens.TotalSeconds:0} s geen nieuwe melder - nog niet 'doodlopend': de loc rijdt door tot de maximale wachttijd ({_ins.MaxSecondenTussenMelders} s).");
+                    continue;
+                }
                 await StopLoc();
                 if (BlokVereist && res.Reeks.Count == 1 && !blokGecontroleerd && !doelInzicht)
                 {
@@ -628,12 +652,13 @@ public partial class BaanVerkenner
                     if (bekendBlok is int bb)
                     {
                         _log.Rijden($"De loc vertrok niet van melder {start} - eerst het al bekende Dinamo-blok {bb} nog eens proberen voordat de volledige blokproef start.");
+                        var t0Herbevestiging = _klok.Nu;
                         await StuurNaarBlok(bb, r, _ins.Verkensnelheid);
                         var eindHerbevestiging = _klok.Nu + TimeSpan.FromSeconds(_ins.BlokproefKortSeconden);
                         while (_klok.Nu < eindHerbevestiging)
                         {
                             await Wacht(Poll);
-                            if (_monitor.Bijwerken().Count > 0) { bevestigd = true; break; }
+                            if (_monitor.Bijwerken().Any(x => x.Tijd >= t0Herbevestiging)) { bevestigd = true; break; }
                         }
                         if (bevestigd)
                         {

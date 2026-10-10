@@ -1042,3 +1042,23 @@ opgenomen melder bezet blijft, dan telt die als bereikt (gelogd). Bij meerdere: 
 **Niet opgelost / onbekend:** waarom bij 09:29-09:32 alle drie de blokken 10/11/12 "vooruit" geen
 beweging gaven terwijl daarna blok 11 achteruit wel reed, kan ik uit het log niet verklaren (is de
 loc tussendoor met de hand verplaatst?). NIET gecompileerd, NIET getest met de baan.
+
+## #55 - Baanverkenner: lange sectie => onterecht "doodlopend/kopspoor", verkeerde blokkoppeling
+Marco (09:52): "de tijd dat je in een blok rijdt is net iets te kort voor de bloklengte met deze
+snelheden; ik zie steeds dat een blok als kopspoor herkend wordt dat het niet is." Testbaan: alleen
+blok 10, 11, 12, geen wissels (melders 143-144-136-133).
+**Oorzaak (uit het log 09:40-09:50, jouw hypothese klopt):** de slimme wachttijd leerde van maar
+één meting (136 -> 133: 3,0 s) en werd dus 10 s (minimum). Sectie 144 is veel langer: de loc deed
+er 16 s over (09:43:39 -> 09:43:55). Na 10 s concludeerde de verkenner "doodlopend" (09:44:32,
+09:47:09), legde 144 en 133 als kopspoor vast en startte onnodig blokproeven. Die cascade gaf:
+"vertrok niet", "melder 133 niet bereikt" en een FOUTE koppeling melder 144 -> blok 10 (09:48:53,
+0,25 s na de start van de proef: een melderwijziging van de vorige beweging werd als reactie op het
+commando gezien). Jouw blokindeling zegt 144 = blok 12.
+**Fix:** (1) wachttijd pas 'slim' na 3 echte metingen, en nooit korter dan 2x de langste tijd om
+vanuit stilstand een melder te halen; (2) voor 'doodlopend' geldt eerst eenmalig de maximale
+wachttijd (30 s) als bevestiging (gelogd); (3) blokproeven tellen alleen melderwijzigingen NA het
+rijcommando; (4) een kopspoor-vondst wordt verwijderd zodra later blijkt dat de loc vanaf die melder
+in die richting (zelfde wisselstand) wel verder kan.
+**Let op voor je volgende test:** de verkeerde koppeling 144 -> blok 10 zit nog in je hervatte
+verkenning; begin met een nieuwe verkenning (of zet 144 terug op blok 12). NIET gecompileerd, NIET
+getest op de baan.

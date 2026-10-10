@@ -214,6 +214,8 @@ public class Baankaart
     public void RegistreerOvergang(int van, int naar, Richting r, Configuratie c, double? seconden)
     {
         Melder(van); Melder(naar);
+        // BUG #55: een overgang vanaf deze melder in deze richting bewijst dat het (bij deze wissels) geen kopspoor is.
+        Kopsporen.RemoveAll(k => k.Melder == van && k.Richting == r && k.Configuratie == c.ToString());
         var o = Overgangen.FirstOrDefault(x => x.Van == van && x.Naar == naar && x.Richting == r);
         if (o is null)
         {
