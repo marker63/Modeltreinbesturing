@@ -50,7 +50,11 @@ public partial class BaanVerkenner
     private readonly Dictionary<int, bool> _wisselStand = new();
     private DateTime _negeerKortsluitingTot = DateTime.MinValue;
     private volatile bool _kortsluitingGemeld;
-    private readonly HashSet<int> _blokproefMislukt = new();
+    /// <summary>BUG #57: aantal blokproeven per melder (een mislukte proef wordt nog één keer opnieuw
+    /// geprobeerd, bij een volgende rit; daarna stuurt de verkenner voor die melder naar alle blokken).</summary>
+    private readonly Dictionary<int, int> _proefPogingen = new();
+    private const int MaxProefPogingen = 2;
+    private bool ProefMogelijk(int melder) => BlokVan(melder) is null && _proefPogingen.GetValueOrDefault(melder) < MaxProefPogingen;
 
     private bool BlokVereist => _hw.LocCommandoVereistBlok;
 
@@ -306,7 +310,37 @@ public partial class BaanVerkenner
             await StuurNaarBlok(blok, r.Om(), 0);
             _log.Rijden($"Blok {blok}: geen beweging.");
         }
-        _log.Waarschuwing($"Voor melder {melder} is geen Dinamo-blok gevonden - de verkenner stuurt hier voortaan naar alle blokken.");
+        return false;
+    }
+
+    /// <summary>BUG #57: tweede poging als "een klein stukje terug" bij geen enkel blok beweging gaf
+    /// (op de baan: melder 132). De loc staat dan helemaal in de nieuwe sectie, dus elk blok dat hem
+    /// hier in de rijrichting laat bewegen, voedt deze sectie. De loc rijdt daarbij gewoon door en
+    /// de rit gaat verder.</summary>
+    private async Task<bool> BlokZoekenDoorrijdend(int melder, Richting r)
+    {
+        _log.Info($"Melder {melder}: terugrijden gaf bij geen enkel blok beweging; nu per blok doorrijden ({r.Tekst()}).");
+        foreach (var blok in BlokKandidaten(null))
+        {
+            _token.ThrowIfCancellationRequested();
+            _monitor.Bijwerken();
+            var t0 = _klok.Nu;
+            await StuurNaarBlok(blok, r, _ins.Verkensnelheid);
+            var eind = _klok.Nu + TimeSpan.FromSeconds(_ins.BlokproefLangSeconden);
+            bool gewijzigd = false;
+            while (_klok.Nu < eind)
+            {
+                await Wacht(Poll);
+                if (_monitor.Bijwerken().Any(x => x.Tijd >= t0)) { gewijzigd = true; break; }
+            }
+            if (gewijzigd)
+            {
+                KoppelBlok(melder, blok);
+                return true; // niet stoppen: de rit gaat door in dezelfde richting
+            }
+            await StuurNaarBlok(blok, r, 0);
+            _log.Rijden($"Blok {blok}: geen beweging ({r.Tekst()}).");
+        }
         return false;
     }
 
@@ -533,7 +567,10 @@ public partial class BaanVerkenner
                 // meer nodig is. Is het blok van deze melder nog NIET bekend, dan verandert er
                 // hier niets - dat blijft precies zoals voorheen via de blokproef hieronder
                 // lopen.
-                if (BlokVereist && BlokVan(m) is not null)
+                // BUG #57: ook voor een melder waarvan het blok onbekend is en waar GEEN blokproef meer komt:
+                // anders blijft de loc daar stilstaan (het oude blokcommando bereikt hem niet meer) en wordt
+                // dat ten onrechte als doodlopend/kopspoor gemeld. StuurSnelheid gaat dan naar alle blokken.
+                if (BlokVereist && (BlokVan(m) is not null || !ProefMogelijk(m)))
                     await StuurSnelheid(r, doelInzicht ? _ins.Kruipsnelheid : snelheid);
 
                 if (doel.IsNavigatie)
@@ -586,14 +623,19 @@ public partial class BaanVerkenner
 
             // ---- Helemaal in een nieuwe, nog onbekende sectie (Dinamo): blokproef ----
             bool heelInNieuwe = BlokVereist && res.Reeks.Count >= 2 && bezet.Count == 1 && bezet.Contains(res.Reeks[^1])
-                && BlokVan(res.Reeks[^1]) is null && !_blokproefMislukt.Contains(res.Reeks[^1]);
+                && ProefMogelijk(res.Reeks[^1]);
             if (!heelInNieuwe) heelInNieuweSectieSinds = null;
             else heelInNieuweSectieSinds ??= _klok.Nu;
             if (heelInNieuwe && _klok.Nu - heelInNieuweSectieSinds!.Value >= TimeSpan.FromSeconds(_ins.BlokproefInrijSeconden))
             {
                 heelInNieuweSectieSinds = null;
                 await VolledigeStop();
-                if (!await BlokZoekenNaInrijden(res.Reeks[^1], res.Reeks[^2], r)) _blokproefMislukt.Add(res.Reeks[^1]);
+                int proefMelder = res.Reeks[^1];
+                _proefPogingen[proefMelder] = _proefPogingen.GetValueOrDefault(proefMelder) + 1;
+                if (!await BlokZoekenNaInrijden(proefMelder, res.Reeks[^2], r) && !await BlokZoekenDoorrijdend(proefMelder, r))
+                    _log.Waarschuwing(_proefPogingen[proefMelder] < MaxProefPogingen
+                        ? $"Voor melder {proefMelder} is (nog) geen Dinamo-blok gevonden - bij een volgende rit wordt het opnieuw geprobeerd; intussen gaat het rijcommando naar alle blokken."
+                        : $"Voor melder {proefMelder} is geen Dinamo-blok gevonden - de verkenner stuurt hier voortaan naar alle blokken.");
                 _monitor.Bijwerken();
                 await StuurSnelheid(r, doelInzicht ? _ins.Kruipsnelheid : snelheid);
                 laatsteWijziging = _klok.Nu;

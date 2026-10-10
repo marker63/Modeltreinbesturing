@@ -1089,3 +1089,26 @@ ongedaan maken werkt.
   kruiswisselstanden uit KRUISWISSEL.md blijven leidend.
 **NIET gedaan:** wisselstraten/standen uit de verkenning; tijden in de dienstregeling.
 **NIET gecompileerd:** de WPF-kant (MainWindow-handler incl. routes en wissels, menu). NIET getest op de baan.
+
+## #57 - Baanverkenner: loc blijft op melder 132 staan, meldt onterecht kopspoor, 132 krijgt geen Dinamo-blok
+Marco (10:28, volledige testrit 09:57-10:24, melders 143-144-136-133-132-140-139): "hij komt niet in het
+einde van blok 10 maar stopt op melder 132; dat is niet het einde van dit pendeltraject."
+**Oorzaak (uit verkenner-log en hardwarelog):** (1) bij melder 132 gaf de blokproef "een klein stukje terug" bij
+blok 11, 10 en 12 geen beweging (10:05:16-10:05:36). Daarna werd 132 voorgoed als "proef mislukt" onthouden.
+(2) Voor een melder zonder bekend blok stuurde de verkenner bij aankomst GEEN nieuw rijcommando (het oude
+commando naar blok 11 bereikt de loc niet meer in blok 10 - zie #34). Alleen de allereerste rit reed door omdat de
+mislukte proef nog één keer naar alle blokken stuurde (10:05:39: 140, 10:06:16: 139). Bij elke volgende rit
+(10:08, 10:11, ... 10:24) bleef de loc op 132 staan, "doodlopend" en dus een vals kopspoor 132 + geen blok voor 132.
+**Fix:** (a) een melder zonder bekend blok waar geen blokproef meer komt krijgt het rijcommando alsnog naar alle
+blokken; (b) mislukte proef wordt bij een volgende rit nog één keer opnieuw geprobeerd (max. 2 pogingen per melder);
+(c) nieuwe tweede proef "doorrijden": als terugrijden bij geen enkel blok beweging geeft, rijdt de loc per blok in
+de rijrichting door (max. BlokproefLangSeconden per blok); het blok dat hem laat bewegen voedt die sectie, en de rit
+gaat gewoon verder.
+**Getest (Tools/CompileCheck, simulator met het pendeltraject van de baan, loc stopt zonder blokcommando, commando's bij 132
+gaan verloren):** vóór de fix precies Marco's symptomen (132 zonder blok, vals kopspoor 132, rit stopt); na de fix
+worden alle 7 melders gevonden, krijgt 132 blok 10, is 132 geen kopspoor en zijn 139 en 143 wel kopspoor
+(twee scenario's: commando eenmalig verloren, en proef twee keer mislukt). Waarom het "terug" bij 132 op de baan
+echt niets deed weet ik niet; de simulator bootst alleen het gevolg na.
+**NIET getest op de baan.** De demobaan-simulatie heb ik NIET als regressietest kunnen opnemen (in mijn testopzet
+liep die ook zonder deze wijziging niet door).
+**Let op voor je volgende test:** begin een nieuwe verkenning (de bewaarde kaart bevat het valse kopspoor 132 en 132 zonder blok).
