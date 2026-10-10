@@ -1027,3 +1027,18 @@ gekoppeld zijn. De verkenner mat de richting per melderovergang, maar niets nam 
   Zonder enige vastgelegde relatie: waarschuwing dat normale polariteit is aangenomen.
 **Niet gedekt:** kruiswissel- en wisselstanden uit de verkenner worden nog NIET overgenomen
 (blijft handmatig bevestigen, zie KRUISWISSEL.md / #48). NIET gecompileerd, NIET getest.
+
+## #54 - Baanverkenner: loc die deels in de volgende melder staat; baankaart niet actueel
+Marco (09:35, test Baanverkenner): "melder 133 wordt niet gezien, deze zit echt in blok 11, maar
+de loc stond met 1 draaistel nog in melder 144 en het andere in melder 133 en dat gaf een probleem."
+**Oorzaak 1 (uit de bestanden, zeker):** de baankaart/rapport werd alleen bewaard na een hele
+opdracht. Het log laat zien dat melder 136 (09:28:28) en 133 (09:28:31) wél bezet gemeld werden,
+maar de geëxporteerde baankaart stamt van 09:28:11 en kent ze niet. Daarom meldde de vergelijking
+"melder 133 niet gezien". **Fix:** bewaren bij elke nieuwe melder en elke blokkoppeling.
+**Oorzaak 2 (aannemelijk, niet bewezen):** staat de loc met een deel al in de volgende melder, dan
+komt voor die melder nooit een "bezet geworden"-melding (hij was al bezet). De verkenner zag dan
+geen vooruitgang. **Fix:** wordt de huidige melder vrij terwijl precies één andere, nog niet
+opgenomen melder bezet blijft, dan telt die als bereikt (gelogd). Bij meerdere: alleen waarschuwing.
+**Niet opgelost / onbekend:** waarom bij 09:29-09:32 alle drie de blokken 10/11/12 "vooruit" geen
+beweging gaven terwijl daarna blok 11 achteruit wel reed, kan ik uit het log niet verklaren (is de
+loc tussendoor met de hand verplaatst?). NIET gecompileerd, NIET getest met de baan.

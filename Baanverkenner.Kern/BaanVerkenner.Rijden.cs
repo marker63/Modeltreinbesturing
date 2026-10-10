@@ -229,6 +229,7 @@ public partial class BaanVerkenner
     {
         _kaart.Melder(melder).DinamoBlok = blok;
         _log.Vondst($"Melder {melder} krijgt rijstroom van Dinamo-blok {blok}.");
+        BewaarNu();
         MeldVoortgang();
     }
 
@@ -433,7 +434,25 @@ public partial class BaanVerkenner
             else leegSinds = null;
 
             // ---- Nieuwe melders ----
-            foreach (var w in wijzigingen.Where(w => w.Bezet))
+            // BUG #54: een loc die met één draaistel al in de VOLGENDE melder staat (bijv. deels in 144
+            // en deels in 133) geeft voor die volgende melder nooit een "bezet geworden"-melding:
+            // hij was al bezet. Daardoor zag de verkenner de vooruitgang niet ("vertrok niet",
+            // verkeerde doodlopend-conclusie, melder ontbreekt in de baankaart). Wordt de huidige
+            // melder VRIJ terwijl precies één andere, nog niet bekende melder bezet blijft, dan staat
+            // de loc daar duidelijk in: behandel die als zojuist bezet geworden.
+            var nieuweBezetten = wijzigingen.Where(w => w.Bezet).ToList();
+            if (bezet.Count > 0 && (wijzigingen.Any(w => !w.Bezet && w.Melder == res.Reeks[^1]) || !bezet.Contains(res.Reeks[^1])))
+            {
+                var verborgen = bezet.Where(x => !res.Reeks.Contains(x) && nieuweBezetten.All(n => n.Melder != x)).ToList();
+                if (verborgen.Count == 1)
+                {
+                    _log.Info($"Melder {res.Reeks[^1]} is vrij maar melder {verborgen[0]} was al bezet (de loc stond met een deel al in die melder): melder {verborgen[0]} telt als bereikt.");
+                    nieuweBezetten.Add(new MelderMonitor.Wijziging(verborgen[0], true, _klok.Nu));
+                }
+                else if (verborgen.Count > 1)
+                    _log.Waarschuwing($"Melder {res.Reeks[^1]} is vrij maar meerdere melders blijven bezet ({Lijst(verborgen)}): volgorde onduidelijk, niet automatisch toegevoegd.");
+            }
+            foreach (var w in nieuweBezetten)
             {
                 int m = w.Melder;
                 if (m == res.Reeks[^1]) continue;
@@ -474,6 +493,7 @@ public partial class BaanVerkenner
                 laatsteWijziging = _klok.Nu;
                 onderbroken = false;
                 _log.Rijden($"  melder {m} bezet{(dt is double s ? $" (na {s:0.0} s)" : "")}");
+                BewaarNu(); // BUG #54: baankaart/rapport meteen bijwerken (stond tot de opdracht klaar was op de oude stand)
 
                 // BUG #34 (gebruikerswaarneming: "je ziet de loc op bezet melder 5 en 16 en je
                 // gaat allerlei melders en blokken aansturen, dat moet beter kunnen" - en
