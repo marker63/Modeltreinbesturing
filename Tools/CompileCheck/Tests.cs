@@ -161,6 +161,20 @@ public static class Tests
         Eis(!System.Text.RegularExpressions.Regex.IsMatch(tekst, @"Melder 14\s.*achteruit → *\r?$", System.Text.RegularExpressions.RegexOptions.Multiline), "omgekeerde overgang: rapport toont geen leeg vervolg meer voor melder 14 achteruit");
     }
 
+    // BUG #66: partnervolgorde - de wissel die al bij deze melder is waargenomen (kruiswissel 10/13) eerst
+    static void PartnerVolgordeTest()
+    {
+        var k = new Baankaart();
+        k.Wissel(10).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.Splitsing, NaMelder = 24, Richting = Richting.Achteruit, VolgendeBijRechtdoor = 14, VolgendeBijAfbuigend = 129 });
+        var alle = Enumerable.Range(1, 20).ToList();
+        var v = BaanVerkenner.PartnerVolgorde(k, alle, 13, 24, Configuratie.Basis, 8);
+        Eis(v.Count == 8 && v[0] == 10, "partnervolgorde: kruiswissel-partner 10 (al waargenomen bij melder 24) staat vooraan (nu " + string.Join(",", v) + ")");
+        Eis(!v.Contains(13), "partnervolgorde: het geteste adres zelf valt af");
+        Eis(v.Skip(1).SequenceEqual(new[] { 12, 14, 11, 15, 9, 16, 8 }) || v.Skip(1).First() == 12, "partnervolgorde: daarna op afstand van het geteste adres");
+        var v2 = BaanVerkenner.PartnerVolgorde(k, alle, 13, 24, new Configuratie(new[] { 10 }), 3);
+        Eis(!v2.Contains(10) && v2.Count == 3, "partnervolgorde: een al afbuigend wissel wordt niet nog eens geprobeerd");
+    }
+
     // De geslaagde, volledige rit van 10-10 11:38 (blokken 10, 11, 12): referentie voor importer en leerprofiel
     static void GeslaagdeRitTest()
     {
@@ -239,6 +253,7 @@ public static class Tests
         OverloopTest();
         AfbuigendeTakTerugTest();
         OmgekeerdeOvergangTest();
+        PartnerVolgordeTest();
 
         Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)");
         return _fouten == 0 ? 0 : 1;

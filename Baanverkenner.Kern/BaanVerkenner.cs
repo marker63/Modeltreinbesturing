@@ -560,14 +560,20 @@ public partial class BaanVerkenner
     {
         int x = proef.Reeks[^1];
         var cA = o.Configuratie.Met(a);
-        var kandidaten = _ins.WisselAdressen()
-            .Where(b => b != a && !o.Configuratie.Bevat(b))
-            .OrderBy(b => Math.Abs(b - a)).ThenBy(b => b)
-            .Take(Math.Max(0, _ins.MaxPartnerProeven)).ToList();
+        var kandidaten = PartnerVolgorde(_kaart, _ins.WisselAdressen(), a, x, o.Configuratie, _ins.MaxPartnerProeven);
         _log.Info($"Kortsluiting na melder {x} met adres {a} op afbuigend: dat wissel blijft afbuigend staan en de andere wissels worden één voor één meegeschakeld ({kandidaten.Count} adressen) om te zien of de kortsluiting verdwijnt (overloopwissels).");
         foreach (var b in kandidaten)
         {
             await PauzeMoment();
+            // BUG #66: elke partnerproef begint met de loc netjes ALLEEN op melder x. Staat hij (na een kortsluiting op een
+            // kruiswissel) half op twee secties, dan rijden verdere proeven niet weg en kosten ze alleen tijd (log 15:14).
+            _monitor.Bijwerken();
+            var bezetNu = _monitor.Bezet;
+            if (!(bezetNu.Count == 1 && bezetNu.Contains(x)))
+            {
+                _log.Waarschuwing($"Partnerzoektocht voor adres {a} afgebroken: de loc staat niet netjes op melder {x} (bezet: {Lijst(bezetNu.OrderBy(m => m).ToList())}). Verder proberen heeft pas zin als de loc weer goed staat.");
+                return null;
+            }
             _bezig = $"opdracht #{o.Id}: adres {a} afbuigend laten staan, partner {b} proberen";
             MeldVoortgang();
             var cAb = cA.Met(b);
@@ -585,6 +591,17 @@ public partial class BaanVerkenner
         }
         _log.Info($"Geen enkele partner voor adres {a} gevonden die de kortsluiting na melder {x} oplost.");
         return null;
+    }
+
+    /// <summary>BUG #66: volgorde waarin partnerwissels geprobeerd worden. Eerst de wissels waarvan al een waarneming bij melder
+    /// <paramref name="x"/> bestaat (bijv. de tweede motor van een Engelse wissel/kruiswissel), daarna de rest op afstand van
+    /// adres <paramref name="a"/>. Al afbuigende wissels en <paramref name="a"/> zelf vallen af.</summary>
+    internal static List<int> PartnerVolgorde(Baankaart kaart, IEnumerable<int> alle, int a, int x, Configuratie c, int max)
+    {
+        bool BijMelder(int b) => kaart.Wissels.Any(w => w.Adres == b && w.Waarnemingen.Any(o => o.NaMelder == x || o.VolgendeBijRechtdoor == x || o.VolgendeBijAfbuigend == x));
+        return alle.Where(b => b != a && !c.Bevat(b))
+            .OrderBy(b => BijMelder(b) ? 0 : 1).ThenBy(b => Math.Abs(b - a)).ThenBy(b => b)
+            .Take(Math.Max(0, max)).ToList();
     }
 
     private void VerwerkPartner(Opdracht o, RitResultaat basis, RitResultaat proef, int a, int b, RitResultaat rit)

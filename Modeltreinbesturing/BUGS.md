@@ -1268,3 +1268,13 @@ werden de wissels weer geïnitialiseerd en reageerden ze (nog te bevestigen na d
 "wissel reageert niet, Dinamo opnieuw opstarten"; (2) aantal wisselcommando's tellen en loggen (hoeveel voor de storing begon); (3) eventueel minder herhalingen of meer pauze tussen wisselcommando's, alleen na bewijs uit de log.
 **Gebouwd (14:35, maatregel 2):** elke logregel "Adres N → afbuigend/rechtdoor" noemt nu "(wisselcommando X sinds het verbinden)". Wissels niet meer bewegen? Dan staat in het log na hoeveel commando's dat gebeurde.
 Maatregel 1 (effectcontrole) en 3 (rustiger sturen) nog niet gebouwd. NOG NIET GETEST OP DE BAAN.
+
+## #66 - Baanverkenner: vast op de kruiswissel na partnerzoektocht (logs 15:14, melder 24, blok 8)
+**Waarneming (Marco):** de loc staat al lange tijd vast in blok 7 net voor de kruiswissel. Log: wissel 10 gevonden (na melder 24 achteruit: rechtdoor -> 14, afbuigend -> 129, nieuwe melder). Daarna adres 13 afbuigend
+(zonder 10) -> kortsluiting in blok 8 op melder 24 (gemengde kruiswisselstand 13 afbuigend/10 rechtdoor, zie KRUISWISSEL.md). Mijn #63-partnerzoektocht probeerde als partner eerst 12, 14, 11, 15 (op afstand van 13) in plaats van 10;
+de loc stond na Herstel op 21 én 24 en reed niet meer weg. Daarna 2 x een volledige blokproef (18 blokken x 30 s = 9 min elk) terwijl blok 8 steeds weer kortsluiting meldde.
+**Oorzaak:** (1) partnervolgorde alleen op adresafstand; (2) doorgaan met proeven terwijl de loc niet netjes op één melder staat; (3) blokproef na een kortsluiting terwijl het blok van de melder al bekend is.
+**Gebouwd:** (1) `PartnerVolgorde`: wissels met een waarneming bij die melder (zoals 10 bij 24) eerst, dan op afstand; (2) elke partnerproef begint alleen als de loc precies op melder x staat, anders waarschuwing en stop;
+(3) vertrekt de loc niet, is het blok bekend en was er <10 min geleden een kortsluiting, dan geen blokproef maar meteen de vraag de loc/wissels goed te zetten.
+**Test:** `PartnerVolgordeTest` (10 vooraan bij melder 24, geteste adres en al afbuigende wissels vallen af); alle bestaande scenario's groen. (2) en (3) zijn NIET in de simulator getest (vragen een loc die vastzit). NOG NIET GETEST OP DE BAAN.
+**Gezien in dezelfde logs (goed):** de wisselteller werkt (38 commando's in ~40 min, geen storing); wissel 10 correct gevonden; geen valse "geen vervolg" meer in het rapport (#64).

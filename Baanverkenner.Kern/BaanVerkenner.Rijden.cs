@@ -80,6 +80,7 @@ public partial class BaanVerkenner
     private readonly object _alarmSlot = new();
     private readonly HashSet<int> _alarmBlokken = new();
     private List<int> _laatsteKortsluitBlokken = new();
+    private DateTime _laatsteKortsluitingOm = DateTime.MinValue;
 
     private void HardwareMeldtBlokAlarm(int blok, bool kortsluiting)
     {
@@ -940,6 +941,16 @@ public partial class BaanVerkenner
                             await StuurNaarBlok(bb, r, 0);
                         }
                     }
+                    // BUG #66: het blok van deze melder is bekend en er was kort geleden een kortsluiting: dan ligt het niet aan
+                    // de blokkoppeling maar staat de loc waarschijnlijk op een open gereden of verkeerd staande wissel (log 15:14:
+                    // 2 x 9 minuten blokproef met de loc vast op de kruiswissel, blok 8 bleef kortsluiting melden). Niet 18 blokken
+                    // x 30 s proberen maar direct de gebruiker vragen de loc terug te zetten.
+                    if (!bevestigd && bekendBlok is not null && _klok.Nu - _laatsteKortsluitingOm < TimeSpan.FromMinutes(10))
+                    {
+                        _log.Waarschuwing($"De loc vertrok niet van melder {start} terwijl het blok ({bekendBlok}) bekend is en er kort geleden een kortsluiting was: waarschijnlijk staat hij op een open gereden of verkeerd staande wissel (bijv. een kruiswissel met maar één van de twee motoren op afbuigend). De volledige blokproef wordt overgeslagen.");
+                        await VraagLocTerugTeZetten(start, $"De loc rijdt niet weg van melder {start}, kort na een kortsluiting. Staat er een wissel (kruiswissel?) open gereden of in een gemengde stand? Zet de wissels goed en de loc op melder {start}.");
+                        bevestigd = true;
+                    }
                     if (!bevestigd)
                     {
                         _log.Waarschuwing($"De loc vertrok niet van melder {start}. Blokkoppeling wordt gecontroleerd.");
@@ -980,6 +991,7 @@ public partial class BaanVerkenner
         int x = res.Reeks[^1];
         _laatsteKortsluitBlokken = HuidigeAlarmBlokken();
         _hw.Noodstop();
+        _laatsteKortsluitingOm = _klok.Nu;
         string alarmTekst = _laatsteKortsluitBlokken.Count > 0
             ? $" Dinamo meldt kortsluiting in blok {string.Join(" en ", _laatsteKortsluitBlokken)}."
             : "";
