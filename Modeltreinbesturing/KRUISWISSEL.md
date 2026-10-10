@@ -38,3 +38,7 @@ Stand: 0 = rechtdoor, 1 = afbuigend. Kruiswissel = (motor 13, motor 10).
 1. Een kruiswisselstand in een wisselstraat pas als "veldgetest" markeren als Marco het fysiek bevestigd heeft.
 2. Nooit een omgekeerde rit afleiden uit de heenrit (een lus gebruikt de kruiswissel in een andere richting).
 3. Rijrichting (vooruit/achteruit) hoort bij de relatie en is net zo belangrijk als de stand.
+
+
+## Baanverkenner
+De Baanverkenner meet rijrichting per melderovergang; `Beheren -> Baankaart vergelijken` kan daaruit lege `RijrichtingVooruit`-velden invullen (BUG #53). Kruiswissel-/wisselstanden uit de verkenner worden NIET automatisch overgenomen; jouw vastgestelde stands blijven leidend.

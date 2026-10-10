@@ -1014,3 +1014,16 @@ dat dezelfde melder heeft (`IsGedeeldeMelderVanAnderBlok`).
 **Ook uit dit log:** de start 3 -> 4 ging weer fout (oude build zonder ingevulde richting; je
 keerde handmatig en de relatie 3 -> 4 kreeg daardoor 'achteruit', daarna ging 4-5-6-7 goed).
 **NIET gecompileerd, NIET getest op de baan.**
+
+## #53 - Baanverkenner niet gekoppeld aan de rijrichting per blokrelatie
+Marco (09:19): de vastgestelde rijrichting/kruiswisselgegevens moeten ook aan de Baanverkenner
+gekoppeld zijn. De verkenner mat de richting per melderovergang, maar niets nam dat over.
+**Fix:** `RijrichtingImporter` in "Beheren -> Baankaart vergelijken": zet de overgangen om naar
+`BlokRelatie.RijrichtingVooruit` en biedt aan om ALLEEN lege relaties in te vullen.
+- Nooit overschrijven: een afwijking van wat jij vastlegde wordt alleen gemeld.
+- Melders in meerdere blokken (zoals 24) zijn niet ondubbelzinnig: alleen melding, niet invullen.
+- Polariteit van de test-loc: wordt afgeleid uit al vastgelegde relaties; zijn die allemaal
+  tegengesteld dan worden de verkenner-richtingen omgedraaid; zijn ze gemengd dan niets invullen.
+  Zonder enige vastgelegde relatie: waarschuwing dat normale polariteit is aangenomen.
+**Niet gedekt:** kruiswissel- en wisselstanden uit de verkenner worden nog NIET overgenomen
+(blijft handmatig bevestigen, zie KRUISWISSEL.md / #48). NIET gecompileerd, NIET getest.

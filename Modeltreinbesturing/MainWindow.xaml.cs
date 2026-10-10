@@ -1566,6 +1566,20 @@ public partial class MainWindow : Window
         }
 
         var meldingen = new BaankaartVergelijker().Vergelijk(kaart, _beheerder, _baanBeheerder);
+        // BUG #53: rijrichting per blokrelatie uit de verkenner (alleen leeg invullen, nooit overschrijven).
+        var richtingen = new RijrichtingImporter().Bepaal(kaart, _beheerder);
+        meldingen.AddRange(richtingen.Meldingen);
+        if (richtingen.Invullen.Count > 0)
+        {
+            var lijst = string.Join("\n", richtingen.Invullen.Select(v => $"  {v.Relatie.Van.Nummer} -> {v.Relatie.Naar.Nummer}: {(v.Vooruit ? "vooruit" : "achteruit")} ({v.Aantal}x gemeten)"));
+            var antw = MessageBox.Show(this, $"De verkenner heeft de rijrichting gemeten voor {richtingen.Invullen.Count} relatie(s) waar die nog niet was vastgelegd:\n\n{lijst}\n\nInvullen? Reeds vastgelegde richtingen worden NOOIT overschreven. Daarna Opslaan, en controleer ze (Relaties beheren). NIET getest op de baan.",
+                "Baankaart: rijrichting invullen", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
+            if (antw == MessageBoxResult.Yes)
+            {
+                RijrichtingImporter.Toepassen(richtingen);
+                meldingen.Add(new BaanControleMelding("Info", $"{richtingen.Invullen.Count} rijrichting(en) ingevuld - vergeet niet op te slaan."));
+            }
+        }
         var dialoog = new BaanControleDialog(
             "Baankaart vergelijken",
             $"Vergelijking van '{System.IO.Path.GetFileName(kies.FileName)}' ({kaart.Melders.Count} melders, {kaart.Wissels.Count} wissels met effect) met dit project. Puur signalerend - er wordt niets aangepast.",
