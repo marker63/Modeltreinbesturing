@@ -42,3 +42,12 @@ Stand: 0 = rechtdoor, 1 = afbuigend. Kruiswissel = (motor 13, motor 10).
 
 ## Baanverkenner
 De Baanverkenner meet rijrichting per melderovergang; `Beheren -> Baankaart vergelijken` kan daaruit lege `RijrichtingVooruit`-velden invullen (BUG #53). Kruiswissel-/wisselstanden uit de verkenner worden NIET automatisch overgenomen; jouw vastgestelde stands blijven leidend.
+
+## Uit de Koploper-export testbaan_002 (Marco, 10-10-2026; bron: Koploper_export_testbaan_002.xlsx, NIET veldgetest door Claude)
+Welke blok-overgangen gebruiken welke melder (Koploper-blokken 1-7, niet de Dinamo-blokken):
+- Melder 24: 1 -> 4, 4 -> 1, 4 -> 3, 7 -> 1, 7 -> 3 (dus niet 3 -> 4 of 3 -> 7).
+- Melder 129: 1 -> 2, 1 -> 4, 4 -> 1, 7 -> 1.
+- Melder 14: 2 -> 3, 4 -> 3, 7 -> 3 (14 hoort bij blok 3, aan de kruiswissel-kant).
+- Melder 8: 1 -> 4, 3 -> 4, 5 -> 4 (8 hoort bij blok 4); melder 21: 1 -> 7, 3 -> 7, 6 -> 7 (blok 7).
+- Wissels in Koploper: 1, 2, 5, 6, 9, 10 (hoort bij 13), 13, 14.
+Gevolgtrekking (voorlopig): melder 24 wordt ook voor blok 1 gebruikt (niet alleen 3, 4 en 7) en melder 129 hoort bij blok 1. De kruiswissel heeft vier benen: kant 8/21 (blok 4/7) en kant 14/129 (blok 3/1); de motoren 10 en 13 bepalen welk been bij welk been hoort. Het beschikbare vervolg vanaf melder 24 hangt dus af van de ingangskant en de motorstanden (zie BUG #71, punt 2).
