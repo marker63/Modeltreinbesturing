@@ -901,3 +901,31 @@ werkelijke richting van de loc dus onbekend en viel de rit terug op die vervuild
 onthouden richting; de eerste rit gebruikt dan de blokwaarde/vooruit. Staat de loc dan
 andersom, gebruik eenmalig de keer-knop: dat wordt vanaf dan onthouden. Blok 3 heeft nog de
 oude, mogelijk vervuilde waarde `achteruit` in bestaande projecten.
+
+## #47 - Rit 3 naar 7: kruiswissel te laat/fout, daarna terug naar blok 3 gesprongen
+
+**Melding (log 10-10 08:21):** de loc reed goed van 3 richting 7, maar beide kruiswisselmotoren
+stonden fout; pas toen de loc op de tongen stond schakelden ze. Na handmatig terugduwen reed
+hij blok 7 in, maar daarna ging het opnieuw fout (noodstop spookmelding blok 6).
+
+**Oorzaak 1 (bewezen in het log): sprong terug naar blok 3.** Melder 24 hoort bij de blokken
+3, 4 en 7 (de kruiswissel). Bij aankomst in blok 7 (melder 24) zocht `Bezetmelding_VanHardware`
+"het blok van melder 24" en vond blok 3. `ProbeerVroegeAankomstBevestiging` zag dat als bewijs
+dat de trein al in het volgende blok 3 stond (7 -> 3 is een geldige relatie), zette de rit
+terug naar blok 3 en plande 3 -> 4 (log: "Blok 3 meldt zich al bezet ..."; "wachtend op:
+15 (blok 3)"). De loc reed intussen gewoon door naar 6; melder 20 (blok 6) werd dus een
+spookmelding. Het zetten van de wissels naar blok 4 om 08:21:46 (13 en 10 naar rechtdoor)
+gebeurde daardoor midden onder de loc.
+**Fix:** een melder die ook bij het HUIDIGE blok hoort is geen onafhankelijk bewijs; die
+gebeurtenis is al de aankomst zelf. Geen stap, geen spookmelding, wel een logregel.
+
+**Oorzaak 2 (NIET bewezen): fysieke wisselstand.** Het log toont dat de wisselstraat 3 -> 7
+(wissel 5 rechtdoor, kruiswissel 13/10 afbuigend/afbuigend) overeenkwam met wat de software
+dacht (opstart-initialisatie stuurde precies die stand), dus de software stuurde bij vertrek
+terecht niets. Waarom de motoren fysiek toch anders stonden is uit het log niet te halen.
+**Maatregel:** bij de EERSTE stap van een rit vanuit stilstand (automatisch rijden en eerste
+stuk van een vaste route) wordt voor elke wissel en elke kruiswisselmotor op dat stuk altijd
+een commando gestuurd, ook als de software de stand al goed denkt. Verderop in de rit blijft
+het "alleen bij echte wijziging" (veiligheid bij wagons).
+Als het toch fout gaat: graag de fysieke stand van wissel 5, 13 en 10 noteren op het moment
+van vertrek en het log meesturen.

@@ -185,7 +185,7 @@ public partial class MainWindow : Window
             // fysiek bereiken vóórdat de software het als kandidaat gekozen/gereserveerd
             // had - dat is dan GEEN spookmelding maar een vroege, geldige bevestiging.
             // Wordt hier als eerste geprobeerd, vóór de spookmelding-check hieronder.
-            if (bezet && _treinrouteWindow != null && _treinrouteWindow.ProbeerVroegeAankomstBevestiging(blok, bezet))
+            if (bezet && _treinrouteWindow != null && _treinrouteWindow.ProbeerVroegeAankomstBevestiging(blok, bezet, meldernummer))
             {
                 _beheerder.ZetBezet(blok, bezet);
                 return;

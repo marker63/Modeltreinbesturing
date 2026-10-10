@@ -1114,7 +1114,12 @@ public partial class TreinrouteWindow : Window
     /// kregen (0 als er geen wissels op het pad zaten, of geen pad gevonden werd) - de
     /// aanroeper gebruikt dit om te bepalen of er gewacht moet worden voordat de trein mag
     /// vertrekken (zie GEVONDEN GAT hieronder bij de aanroepplekken).</summary>
-    private int ZetWisselsTussenBlokken(Blok van, Blok naar)
+    /// <summary>BUG #47: "forceer" stuurt voor elke wissel/kruiswissel-motor op dit pad ALTIJD een
+    /// commando, ook als de software denkt dat de stand al klopt. Alleen gebruikt voor de
+    /// EERSTE stap van een rit vanuit stilstand (de loc staat dan nog vóór de wissels): de
+    /// fysieke stand kan buiten de software om afwijken (log 10-10: beide kruiswisselmotoren
+    /// stonden fout terwijl de software "goed" dacht, geen enkel commando, loc op de tongen).</summary>
+    private int ZetWisselsTussenBlokken(Blok van, Blok naar, bool forceer = false)
     {
         // Zie PadIsFysiekHaalbaar hierboven voor de volledige toelichting: een expliciet
         // gedefinieerde Wisselstraat voor dit blokpaar wordt ALTIJD verkozen boven de
@@ -1142,7 +1147,7 @@ public partial class TreinrouteWindow : Window
                 // er nog een trein overheen rijdt. Dit maakt het verbindings-tijd
                 // initialiseren (dat de software-Stand met de fysieke stand synchroniseert)
                 // des te belangrijker: alleen dan is deze vergelijking betrouwbaar.
-                bool moetSchakelen = wissel.Stand != wisselInfo.GewensteStand;
+                bool moetSchakelen = forceer || wissel.Stand != wisselInfo.GewensteStand;
                 wissel.Stand = wisselInfo.GewensteStand;
                 if (wissel.GekoppeldeOverloopwissel != null) wissel.GekoppeldeOverloopwissel.Stand = wisselInfo.GewensteStand;
                 if (!moetSchakelen) continue;
@@ -1163,13 +1168,13 @@ public partial class TreinrouteWindow : Window
             {
                 var kruis = ActueleKruiswissel(kruiswisselInfo.Kruiswissel);
                 if (!kruis.IsEngels) continue; // passief - geen adres, niets te sturen
-                if (kruis.Adres > 0 && kruis.StandAdres != kruiswisselInfo.StandAdres)
+                if (kruis.Adres > 0 && (forceer || kruis.StandAdres != kruiswisselInfo.StandAdres))
                 {
                     kruis.StandAdres = kruiswisselInfo.StandAdres;
                     _hardwareBeheerder.StuurWisselCommando(kruis.Adres, kruiswisselInfo.StandAdres == WisselStand.Afbuigend);
                     viaWisselstraat++;
                 }
-                if (kruis.Adres2 > 0 && kruis.StandAdres2 != kruiswisselInfo.StandAdres2)
+                if (kruis.Adres2 > 0 && (forceer || kruis.StandAdres2 != kruiswisselInfo.StandAdres2))
                 {
                     kruis.StandAdres2 = kruiswisselInfo.StandAdres2;
                     _hardwareBeheerder.StuurWisselCommando(kruis.Adres2, kruiswisselInfo.StandAdres2 == WisselStand.Afbuigend);
@@ -1200,7 +1205,7 @@ public partial class TreinrouteWindow : Window
             // Zie de toelichting hierboven bij de wisselstraat-tak: alleen sturen bij een
             // ECHTE standwijziging, nooit "voor de zekerheid" een wissel opnieuw aansturen
             // die al goed staat - dat kan een trein die er nog overheen rijdt raken.
-            bool moetSchakelen = wissel.Stand != benodigdeStand;
+            bool moetSchakelen = forceer || wissel.Stand != benodigdeStand;
             wissel.Stand = benodigdeStand;
             if (wissel.GekoppeldeOverloopwissel != null) wissel.GekoppeldeOverloopwissel.Stand = benodigdeStand;
             if (!moetSchakelen) continue;
@@ -1399,6 +1404,7 @@ public partial class TreinrouteWindow : Window
         {
             var wisselstraat = _wisselstraatBeheerder.WisselstratenTussen(pad[i], pad[i + 1]).FirstOrDefault();
             if (wisselstraat is null || (wisselstraat.Wissels.Count == 0 && wisselstraat.Kruiswisselstanden.Count == 0)) continue;
+            bool forceer = i == 0; // BUG #47: eerste stap vanuit stilstand altijd echt sturen
 
             // ActueleWissel: zie de toelichting bij die methode - vergelijk/werk NOOIT de
             // (mogelijk verouderde) wisselstraat-kopie zelf bij, altijd de levende Wissel uit
@@ -1418,7 +1424,7 @@ public partial class TreinrouteWindow : Window
             foreach (var wisselInfo in teZetten)
             {
                 var wissel = ActueleWissel(wisselInfo.Wissel);
-                bool moetSchakelen = wissel.Stand != wisselInfo.GewensteStand;
+                bool moetSchakelen = forceer || wissel.Stand != wisselInfo.GewensteStand;
                 wissel.Stand = wisselInfo.GewensteStand;
                 // Overloopwissel: de gekoppelde partner altijd meebewegen, ook tijdens
                 // automatisch ingestelde wisselstraten - net als een echte fysieke koppeling.
@@ -1454,13 +1460,13 @@ public partial class TreinrouteWindow : Window
                 var kruis = ActueleKruiswissel(kruiswisselInfo.Kruiswissel);
                 if (!kruis.IsEngels) continue;
                 int kruiswisselGezet = 0;
-                if (kruis.Adres > 0 && kruis.StandAdres != kruiswisselInfo.StandAdres)
+                if (kruis.Adres > 0 && (forceer || kruis.StandAdres != kruiswisselInfo.StandAdres))
                 {
                     kruis.StandAdres = kruiswisselInfo.StandAdres;
                     _hardwareBeheerder.StuurWisselCommando(kruis.Adres, kruiswisselInfo.StandAdres == WisselStand.Afbuigend);
                     kruiswisselGezet++;
                 }
-                if (kruis.Adres2 > 0 && kruis.StandAdres2 != kruiswisselInfo.StandAdres2)
+                if (kruis.Adres2 > 0 && (forceer || kruis.StandAdres2 != kruiswisselInfo.StandAdres2))
                 {
                     kruis.StandAdres2 = kruiswisselInfo.StandAdres2;
                     _hardwareBeheerder.StuurWisselCommando(kruis.Adres2, kruiswisselInfo.StandAdres2 == WisselStand.Afbuigend);
@@ -2074,7 +2080,7 @@ public partial class TreinrouteWindow : Window
         var volgendBlok = KiesOptimaleKandidaat(huidig, kandidaten, trein.Trein?.Lengte ?? 0);
         _blokBeheerder.ZetGereserveerd(volgendBlok, true);
         trein.GereserveerdVolgendBlok = volgendBlok;
-        int aantalWisselsGezet = ZetWisselsTussenBlokken(huidig, volgendBlok);
+        int aantalWisselsGezet = ZetWisselsTussenBlokken(huidig, volgendBlok, forceer: trein.VorigBlok is null); // BUG #47
 
         // GEVONDEN GAT (gebruikersmelding: "ik zag enkele keren dat de wissel verkeerd stond
         // waardoor de trein verkeerd reed"): er zat geen enkele wachttijd tussen het
@@ -4470,13 +4476,22 @@ public partial class TreinrouteWindow : Window
     /// al bij vertrek, dus zo'n blok is dan al lang gereserveerd) - alleen relevant voor
     /// route.Automatisch. Retourneert true als dit event hiermee is afgehandeld (MainWindow
     /// moet dan geen spookmelding meer overwegen).</summary>
-    public bool ProbeerVroegeAankomstBevestiging(Blok blok, bool bezet)
+    public bool ProbeerVroegeAankomstBevestiging(Blok blok, bool bezet, int meldernummer = 0)
     {
         if (!bezet) return false;
         foreach (var trein in _actieveTreinen)
         {
             if (!trein.Route.Automatisch) continue; // vaste routes reserveren hun hele pad al vooraf, zie hierboven
             if (trein.HuidigBlok is null || trein.GereserveerdVolgendBlok != null) continue;
+            // BUG #47: een melder die OOK bij het huidige blok hoort (gedeelde melder, bijv. 24 voor de
+            // blokken 3, 4 en 7 bij de kruiswissel) is geen onafhankelijk bewijs dat de trein al in
+            // een ander blok is: het is dezelfde fysieke gebeurtenis als de aankomst in het huidige
+            // blok. Zonder deze controle sprong de rit na aankomst in blok 7 terug naar blok 3.
+            if (meldernummer > 0 && trein.HuidigBlok.Bezetmeldpunten.Any(m => m.MeldernNummer == meldernummer))
+            {
+                Log($"[Route '{trein.Route.Omschrijving}'] Melder {meldernummer} hoort ook bij het huidige blok {trein.HuidigBlok.Nummer} (gedeelde melder): geen vroege aankomst in blok {blok.Nummer} aangenomen en ook geen spookmelding - dezelfde fysieke gebeurtenis als de aankomst in blok {trein.HuidigBlok.Nummer}.");
+                return true; // afgehandeld: geen stap, geen spookmelding/noodstop
+            }
             if (blok == trein.VorigBlok && VereistKeren(trein.HuidigBlok, blok)) continue; // een terugrit naar een ECHT keerpunt is GEEN "vroege bevestiging" - laat VindTreinDieMogelijkTerugrijdt dit als rijrichting-signaal oppikken. Bij een lus (VereistKeren=false, zie VertrekVanBlokUitvoeren) is dit gewoon een normale, voorwaartse ronde - die WEL als vroege bevestiging mag gelden.
             if (!_blokBeheerder.VolgendeBlokken(trein.HuidigBlok).Contains(blok)) continue;
 
