@@ -59,6 +59,9 @@ public class VerkenInstellingen
     /// <summary>Maximaal aantal kortsluitingen op dezelfde plek tijdens het oplossen van
     /// een kortsluitpunt; daarna geeft de verkenner die plek op.</summary>
     public int MaxKortsluitingenPerPlek { get; set; } = 3;
+    /// <summary>BUG #63: na een kortsluiting met een net afbuigend gezet wissel: hoeveel andere
+    /// wissels er (naast dat wissel) één voor één ook op afbuigend worden geprobeerd (overloopwissels).</summary>
+    public int MaxPartnerProeven { get; set; } = 8;
     /// <summary>Een melder telt pas als bezet/vrij als hij zo lang stabiel is (filtert
     /// spookmeldingen/flikkeren).</summary>
     public int OntdenderMs { get; set; } = 300;

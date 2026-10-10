@@ -1220,3 +1220,21 @@ kortsluit-momenten gaf met de nieuwe code nooit een slechtere uitkomst (zelfde a
 bij welke melder hoort voordat hij die getest heeft. Tip bij een rit met zulke wissels: vooraf met de hand goed zetten, of het stuk eerst zonder die wissels verkennen. Ook niet gebouwd: een proef met
 het buurblok erbij (alternatief voor het terugkruipen uit #61).
 NOG NIET GETEST OP DE BAAN (alleen simulator). De WPF-aanpassing (zaadhints samenvoegen in Baanverkenner/MainWindow.xaml.cs) is niet gecompileerd.
+
+## #63 - Baanverkenner: overloopwissels (twee wissels achter elkaar) en terugrijden met de verkeerde wisselstand (Marco 13:34 en logs 13:40)
+**Waarneming (Marco):** na wissel 2 afbuigend kwam een kortsluiting; de verkenner zette wissel 2 meteen weer rechtdoor. Wissel 2 werd direct gevolgd door wissel 1 (rechtdoor), de loc reed
+tegen de tong van wissel 1. Op een overloopverbinding moeten BEIDE wissels afbuigend staan; wissels mogen niet opengereden worden. Regel van Marco: krijg je na het berijden van een net gezet
+wissel kortsluiting, laat dat wissel staan en schakel alle andere wissels één voor één en kijk of de kortsluiting weg is.
+**Tweede oorzaak (log 13:40, melder 12):** bij adres 2 afbuigend reed de loc van melder 5 naar melder 12 (afbuigende tak). Daarna werd wissel 2 teruggezet NAAR RECHTDOOR vóórdat de loc terugreed;
+hij stond met de achterkant tegen de tong en kwam niet van zijn plaats. De blokproef probeerde daarna 9 blokken x 2 richtingen x 30 s (ruim 9 min) en de verkenner gaf op (loc moest met de hand terug).
+**Gebouwd (Baanverkenner.Kern):**
+1. Terugrit na de proef: volgde de proef een andere weg dan de basisrit (`ProefWijktAf`), dan rijdt de loc met dezelfde wisselstand terug en wordt het adres pas daarna teruggezet.
+   Volgde de proef de basisrit, dan blijft BUG #35 gelden (eerst terugzetten, dan terug).
+2. `PartnerwisselZoeken` (adresloop in `VoerOpdrachtUit`): kortsluiting in de proef -> het geteste wissel blijft afbuigend, de andere wissels worden één voor één ook afbuigend geprobeerd
+   (dichtstbijzijnde adres eerst, `MaxPartnerProeven` = 8). Succes: kortsluitpunt opgelost door dat adres, waarneming `LostKortsluitingOp`, vervolgopdracht met beide afbuigend; de losse opdracht
+   voor alleen het eerste adres (zou weer kortsluiten) wordt uit de wachtrij gehaald.
+3. `LosKortsluitpuntenOp`: kan geen bekende wissel een kortsluitpunt (basisrit van een opdracht met wissels afbuigend) verklaren of lukt dat niet, dan blijven de wissels uit die configuratie
+   afbuigend en worden de overige adressen één voor één erbij geprobeerd (zelfde limiet). Dit is het geval uit Marco's waarneming (opdracht "afbuigende tak van adres 2").
+**Test (CompileCheck, ALLES OK):** `OverloopTest` (wissel 2 + 1 achter elkaar: melder 4 bereikt, kortsluitpunt opgelost door adres 1, beide wissels in het rapport) en `AfbuigendeTakTerugTest`
+(stomp spoor op de afbuigende tak, terug met afbuigend); beide FALEN met de oude code (loc niet terug op melder 1).
+NOG NIET GETEST OP DE BAAN (alleen simulator). Een proef met een partner kost per adres een extra rit; bij veel wissels is het maximum 8 per kortsluitpunt.

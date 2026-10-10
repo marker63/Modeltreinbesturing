@@ -484,25 +484,41 @@ public partial class BaanVerkenner
                     ExtraNaAfwijking = _ins.ExtraMeldersNaAfwijking,
                     StopBijMelders = kortsluitStops
                 });
-                // BUG #35 (gebruikerswaarneming: wissel 2 stond nog op afbuigend toen de loc
-                // achteruit van melder 5 terug naar melder 16 moest rijden; dat veroorzaakte een
-                // kortsluiting omdat de loc tegen de wisseltong aanreed die voor DIE rijrichting
-                // in de verkeerde stand stond). Vroeger werd het geteste adres pas NA
-                // TerugNaarMetControle (de terugrit) weer teruggezet - de terugrit werd dus
-                // altijd nog met de wissel in de testafstand (afbuigend) gereden, ook als de
-                // heenrit er helemaal niet echt doorheen kwam. De loc staat hier altijd stil
-                // (Rit() stopt hem voor elke return), dus de wissel nu al terugzetten - VOORDAT
-                // de terugrit begint - is een veilige, statische omzetting en laat de terugrit
-                // over exact dezelfde (bekende, werkende) wisselstand lopen als de basisrit.
-                // Blijkt de terugweg daardoor toch af te wijken (de heenrit ging écht via de
-                // afbuigende tak), dan vangt TerugNaarMetControle dat al op zoals voor elke
-                // andere wissel die van achteren verkeerd staat (NavigatieFout -> als
-                // kortsluitpunt/"opengereden wissel" geregistreerd) - dat pad bestond al en
-                // wordt hier niet aangeraakt.
-                await ZetWissel(a, false);
-                await TerugNaarMetControle(o, proef, o.Configuratie);
+
+                // BUG #63. Gebruikerswaarneming (13:34 en 13:40): (1) na wissel 2 afbuigend een
+                // kortsluiting, waarna wissel 2 meteen weer rechtdoor werd gezet: op een
+                // "overloopverbinding" liggen twee wissels achter elkaar en moeten er BEIDE
+                // afbuigend staan; de loc reed tegen de tong van de tweede aan. Een wissel die
+                // je net gezet hebt en waarna de loc kortsluiting krijgt, blijft dus staan en
+                // de andere wissels worden één voor één meegeschakeld (zie PartnerwisselZoeken).
+                // (2) In het log van 13:40 stond de loc op de afbuigende tak (melder 12) en werd
+                // wissel 2 teruggezet VOORDAT de loc terugreed: hij reed met de achterkant tegen
+                // de tong van een rechtdoor staande wissel, kwam niet van zijn plaats en de
+                // blokproef (9 blokken x 2 richtingen x 30 s) wachtte ruim 9 minuten.
+                // Regel: is de loc via een andere weg gereden dan de basisrit (de weg wijkt af),
+                // dan gaat hij ook met dezelfde wisselstand terug; pas daarna wordt teruggezet.
+                // Volgde de proefrit de basisrit, dan blijft BUG #35 gelden (eerst terugzetten).
+                var cA0 = o.Configuratie.Met(a);
+                bool afwijkendePad = ProefWijktAf(basis.Reeks, proef.Reeks);
+                bool zelfdeKortsluiting = basis.Einde == RitEinde.Kortsluiting && proef.Reeks.SequenceEqual(basis.Reeks);
+                (int Partner, RitResultaat Rit)? partner = null;
+                if (proef.Einde == RitEinde.Kortsluiting && !zelfdeKortsluiting && proef.Reeks.Count >= 1)
+                    partner = await PartnerwisselZoeken(o, a, proef);
+
+                if (afwijkendePad)
+                {
+                    await TerugNaarMetControle(o, proef, cA0);
+                    await ZetWissel(a, false);
+                }
+                else
+                {
+                    // BUG #35: de loc staat hier altijd stil; eerst terugzetten, dan de terugrit.
+                    await ZetWissel(a, false);
+                    await TerugNaarMetControle(o, proef, o.Configuratie);
+                }
 
                 Vergelijk(o, basis, proef, a);
+                if (partner is { } pp) VerwerkPartner(o, basis, proef, a, pp.Partner, pp.Rit);
             }
             o.VolgendAdres = int.MaxValue;
             foreach (var s in overgangen)
@@ -526,6 +542,87 @@ public partial class BaanVerkenner
                 _kaart.Waarschuwingen.Add($"Opdracht vanaf melder {o.Start} {o.Richting.Tekst()} ({o.Configuratie}) is overgeslagen: {nf.Message}");
             }
         }
+    }
+
+    private static bool ProefWijktAf(List<int> basis, List<int> proef)
+    {
+        for (int i = 0; i < proef.Count; i++)
+            if (i >= basis.Count || proef[i] != basis[i]) return true;
+        return false;
+    }
+
+    /// <summary>BUG #63: de loc stond (na een kortsluiting en herstel) op de laatste melder van
+    /// <paramref name="proef"/> met wissel <paramref name="a"/> afbuigend. Dat wissel blijft zo
+    /// staan; alle andere wissels worden één voor één ook op afbuigend gezet (dichtstbijzijnde
+    /// adres eerst, hoogstens MaxPartnerProeven) om te kijken of de kortsluiting weg is. Bij een
+    /// succes staat de loc weer op die laatste melder, met alleen <paramref name="a"/> afbuigend.</summary>
+    private async Task<(int Partner, RitResultaat Rit)?> PartnerwisselZoeken(Opdracht o, int a, RitResultaat proef)
+    {
+        int x = proef.Reeks[^1];
+        var cA = o.Configuratie.Met(a);
+        var kandidaten = _ins.WisselAdressen()
+            .Where(b => b != a && !o.Configuratie.Bevat(b))
+            .OrderBy(b => Math.Abs(b - a)).ThenBy(b => b)
+            .Take(Math.Max(0, _ins.MaxPartnerProeven)).ToList();
+        _log.Info($"Kortsluiting na melder {x} met adres {a} op afbuigend: dat wissel blijft afbuigend staan en de andere wissels worden één voor één meegeschakeld ({kandidaten.Count} adressen) om te zien of de kortsluiting verdwijnt (overloopwissels).");
+        foreach (var b in kandidaten)
+        {
+            await PauzeMoment();
+            _bezig = $"opdracht #{o.Id}: adres {a} afbuigend laten staan, partner {b} proberen";
+            MeldVoortgang();
+            var cAb = cA.Met(b);
+            await ZetWissel(b, true);
+            var rit = await Rit(x, o.Richting, new RitDoel { Configuratie = cAb, Basis = new List<int> { x }, ExtraNaAfwijking = 0 });
+            await TerugNaar(x, rit, cAb);
+            await ZetWissel(b, false);
+            if (rit.Einde == RitEinde.Kortsluiting || rit.Reeks.Count < 2)
+            {
+                _log.Rijden($"Adres {b} samen met {a}: {(rit.Einde == RitEinde.Kortsluiting ? "nog steeds kortsluiting" : "geen melder verder")}.");
+                continue;
+            }
+            _log.Vondst($"Kortsluiting opgelost: adres {a} én {b} samen op afbuigend (overloopwissels) → melder {rit.Reeks[1]} na melder {x}.");
+            return (b, rit);
+        }
+        _log.Info($"Geen enkele partner voor adres {a} gevonden die de kortsluiting na melder {x} oplost.");
+        return null;
+    }
+
+    private void VerwerkPartner(Opdracht o, RitResultaat basis, RitResultaat proef, int a, int b, RitResultaat rit)
+    {
+        var cA = o.Configuratie.Met(a);
+        var cAb = cA.Met(b);
+        int x = proef.Reeks[^1];
+        var kp = _kaart.Kortsluitpunten.FirstOrDefault(k => k.NaMelder == x && k.Richting == o.Richting && k.Configuratie.Equals(cA));
+        if (kp is null)
+        {
+            RegistreerKortsluitpunt(o, proef.Reeks, cA, o.Route, o.Richting);
+            kp = _kaart.Kortsluitpunten.FirstOrDefault(k => k.NaMelder == x && k.Richting == o.Richting && k.Configuratie.Equals(cA));
+        }
+        if (kp is null) return;
+        kp.Opgelost = true;
+        kp.OpgelostDoorAdres = b;
+        kp.OpgelostMetAfbuigend = true;
+        kp.GeprobeerdeAdressen.Add(b);
+        MarkeerGevonden(b, new WisselWaarneming
+        {
+            Soort = WaarnemingSoort.LostKortsluitingOp,
+            NaMelder = x,
+            Richting = o.Richting,
+            VolgendeBijRechtdoor = null,
+            VolgendeBijAfbuigend = rit.Reeks[1],
+            Configuratie = cA.ToString(),
+            Toelichting = $"Na melder {x} ({o.Richting.Tekst()}) alleen door te rijden als adres {a} én {b} afbuigend staan (overloopwissels, {b} wordt hier van achteren bereden) → melder {rit.Reeks[1]}."
+        });
+        // De losse opdracht "afbuigende tak van {a}" zou hier opnieuw kortsluiting geven.
+        _status.Wachtrij.RemoveAll(w => w.Configuratie.Equals(cA) && w.Reden.StartsWith($"afbuigende tak van adres {a} "));
+        Plan(new Opdracht
+        {
+            Configuratie = cAb,
+            Start = x,
+            Richting = o.Richting,
+            Route = kp.Route,
+            Reden = $"verder voorbij opgelost kortsluitpunt #{kp.Id} (adres {a} en {b} samen afbuigend)"
+        });
     }
 
     /// <summary>De basisrit (zonder omgezet adres), bij de instelling "herhalen" twee keer,
@@ -851,6 +948,18 @@ public partial class BaanVerkenner
                 .Where(kd => k.Configuratie.Bevat(kd.Adres) != kd.Afbuigend && !k.GeprobeerdeAdressen.Contains(kd.Adres))
                 .ToList();
 
+            // BUG #63: kan geen bekende wissel de kortsluiting verklaren (of lukte dat niet), dan
+            // blijven de wissels uit de configuratie van dit kortsluitpunt afbuigend staan en worden alle
+            // andere wissels één voor één ook op afbuigend gezet (overloopwissels: twee wissels
+            // achter elkaar, beide afbuigend). Dichtstbijzijnde adres eerst.
+            int anker = k.Configuratie.Afbuigend.Length > 0 ? k.Configuratie.Afbuigend.Max() : 0;
+            var partners = k.Configuratie.Afbuigend.Length == 0 ? new List<int>() : _ins.WisselAdressen()
+                .Where(b => !k.Configuratie.Bevat(b) && !k.GeprobeerdeAdressen.Contains(b) && !kandidaten.Any(kd => kd.Adres == b))
+                .OrderBy(b => Math.Abs(b - anker)).ThenBy(b => b)
+                .Take(Math.Max(0, _ins.MaxPartnerProeven)).ToList();
+            var partnerSet = partners.ToHashSet();
+            foreach (var b in partners) kandidaten.Add((b, true));
+
             if (kandidaten.Count == 0)
             {
                 _log.Info($"Kortsluitpunt #{k.Id} (na melder {k.NaMelder}): nog geen bekende wissel die het kan verklaren.");
@@ -862,7 +971,7 @@ public partial class BaanVerkenner
                 if (k.AantalKortsluitingen >= _ins.MaxKortsluitingenPerPlek) break;
                 k.GeprobeerdeAdressen.Add(adres);
                 var c = k.Configuratie.MetStand(adres, afb);
-                _log.Stap($"Kortsluitpunt #{k.Id}: proberen met adres {adres} op {(afb ? "afbuigend" : "rechtdoor")}.");
+                _log.Stap($"Kortsluitpunt #{k.Id}: proberen met adres {adres} op {(afb ? "afbuigend" : "rechtdoor")}" + (partnerSet.Contains(adres) ? $" (naast {k.Configuratie}, overloopwissel?)." : "."));
                 try
                 {
                     await NaarStartVan(k.Route);

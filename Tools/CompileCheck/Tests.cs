@@ -99,6 +99,57 @@ public static class Tests
         return (v, log, ins, (klok.Nu - new DateTime(2026, 1, 1, 12, 0, 0)).TotalSeconds);
     }
 
+    // BUG #63: overloopwissels (wissel 2 afbuigend -> verbindingsstuk -> wissel 1 van achteren): beide moeten afbuigend staan
+    static void OverloopTest()
+    {
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = false, LocAdres = 5408 };
+        var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+        var P = Baanverkenner.Kern.Simulatie.SimulatieBaan.Poort.Stam; var R = Baanverkenner.Kern.Simulatie.SimulatieBaan.Poort.Recht; var Af = Baanverkenner.Kern.Simulatie.SimulatieBaan.Poort.Af;
+        var s1 = sim.NieuweSectie(1, 90, 1); var s2 = sim.NieuweSectie(2, 80, 2); var sL = sim.NieuweSectie(3, 60, 3);
+        var s4 = sim.NieuweSectie(4, 80, 4); var s5 = sim.NieuweSectie(5, 60, 5);
+        var w2 = sim.NieuweWissel(2, true, 1); var w1 = sim.NieuweWissel(1, true, 3);
+        sim.Verbind(w2, P, s1, B); sim.Verbind(w2, R, s2, A); sim.Verbind(w2, Af, sL, A);
+        sim.Verbind(w1, Af, sL, B); sim.Verbind(w1, P, s4, A); sim.Verbind(w1, R, s5, A);
+        sim.PlaatsLoc(s1, 45, +1);
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 4 };
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var log = new VerkenLog(klok);
+        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true));
+        using var cts = new CancellationTokenSource();
+        try { v.VoerUit(cts.Token).GetAwaiter().GetResult(); } catch (Exception ex) { Console.WriteLine("  (overloop: verkenner stopte met: " + ex.Message + ")"); }
+        if (Environment.GetEnvironmentVariable("OVERLOOP_LOG") == "1") Console.WriteLine(log.AlsTekst());
+        var k = v.Kaart;
+        Console.WriteLine("  (overloop: melders " + string.Join(",", k.Melders.Select(m => m.Nummer)) + "; kortsluitpunten " + string.Join(" | ", k.Kortsluitpunten.Select(x => $"#{x.Id} na {x.NaMelder} {x.Configuratie} opgelost={x.Opgelost} door={x.OpgelostDoorAdres} geprobeerd={string.Join(",", x.GeprobeerdeAdressen)}")) + ")");
+        Eis(k.Melders.Any(m => m.Nummer == 4), "overloop: melder 4 (voorbij de tweede wissel) wordt bereikt");
+        Eis(k.Kortsluitpunten.Any(x => x.Opgelost && x.OpgelostDoorAdres == 1), "overloop: de kortsluiting na wissel 2 afbuigend wordt opgelost door wissel 1 er ook op afbuigend te zetten");
+        Eis(k.Wissels.Any(w => w.Adres == 1) && k.Wissels.Any(w => w.Adres == 2), "overloop: beide wissels staan als wissel in het rapport");
+    }
+
+    // BUG #63 (log 13:40): de proefrit eindigt op een afbuigende tak (stomp spoor); de loc moet met wissel nog afbuigend terug
+    static void AfbuigendeTakTerugTest()
+    {
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = false, LocAdres = 5408 };
+        var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+        var P = Baanverkenner.Kern.Simulatie.SimulatieBaan.Poort.Stam; var R = Baanverkenner.Kern.Simulatie.SimulatieBaan.Poort.Recht; var Af = Baanverkenner.Kern.Simulatie.SimulatieBaan.Poort.Af;
+        var s1 = sim.NieuweSectie(1, 90, 1); var s2 = sim.NieuweSectie(2, 80, 2); var sD = sim.NieuweSectie(3, 60, 3);
+        var w2 = sim.NieuweWissel(2, true, 1);
+        sim.Verbind(w2, P, s1, B); sim.Verbind(w2, R, s2, A); sim.Verbind(w2, Af, sD, A);
+        sim.PlaatsLoc(s1, 45, +1);
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 3 };
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var log = new VerkenLog(klok);
+        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true));
+        using var cts = new CancellationTokenSource();
+        try { v.VoerUit(cts.Token).GetAwaiter().GetResult(); } catch (Exception ex) { Console.WriteLine("  (afbuigende tak: verkenner stopte met: " + ex.Message + ")"); }
+        if (Environment.GetEnvironmentVariable("OVERLOOP_LOG") == "1") Console.WriteLine(log.AlsTekst());
+        var k = v.Kaart;
+        Eis(k.Melders.Select(m => m.Nummer).OrderBy(x => x).SequenceEqual(new[] { 1, 2, 3 }), "afbuigende tak: melders 1, 2 en 3 gevonden (nu " + string.Join(",", k.Melders.Select(m => m.Nummer)) + ")");
+        Eis(k.Wissels.Any(w => w.Adres == 2), "afbuigende tak: wissel 2 gevonden");
+        Eis(k.Voltooid, "afbuigende tak: verkenning voltooid zonder vastlopen");
+    }
+
     // De geslaagde, volledige rit van 10-10 11:38 (blokken 10, 11, 12): referentie voor importer en leerprofiel
     static void GeslaagdeRitTest()
     {
@@ -174,6 +225,8 @@ public static class Tests
 
         PendelTest();
         GeslaagdeRitTest();
+        OverloopTest();
+        AfbuigendeTakTerugTest();
 
         Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)");
         return _fouten == 0 ? 0 : 1;
