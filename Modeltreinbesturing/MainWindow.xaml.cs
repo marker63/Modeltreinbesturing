@@ -1648,7 +1648,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var antw = MessageBox.Show(this, $"{samenvatting}\n\nDeze wijzigingen behouden? (Nee = alles terugdraaien.)\nDaarna: Opslaan, rijrichtingen controleren (Relaties beheren) en wissels tekenen. NIET getest op de baan.",
+        var antw = MessageBox.Show(this, $"{samenvatting}\n\nDeze wijzigingen behouden? (Nee = alles terugdraaien.)\nDaarna: automatische routes en wissel-markeringen worden toegevoegd. Opslaan en rijrichtingen controleren (Relaties beheren). NIET getest op de baan.",
             "Baankaart importeren", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
         if (antw != MessageBoxResult.Yes)
         {
@@ -1671,7 +1671,26 @@ public partial class MainWindow : Window
             if (blok.Type == BlokType.Kopspoor) ZorgVoorStootblok(blok);
         foreach (var van in res.NieuweRelaties.Select(r => r.Van).Distinct().ToList())
             ZorgVoorUitgaandSein(van);
+
+        // Automatische route per nieuw blok (geen verzonnen vertrektijden) - zie DienstAanvuller.
+        var dienst = new DienstAanvuller().Vul(res.NieuweBlokken, _routeBeheerder, _beheerder);
+
+        // Wisseladressen uit de verkenning die nog niet op het baanontwerp staan: als losse wissels in een
+        // rij onderaan zetten, zodat ze bestaan en je ze op de goede plek kunt slepen. Standen en
+        // wisselstraten worden NIET aangemaakt (jouw vastgestelde standen blijven leidend).
+        var bekendeAdressen = _baanBeheerder.Symbolen.OfType<Wissel>().Select(w => w.Adres)
+            .Concat(_baanBeheerder.Symbolen.OfType<Kruiswissel>().SelectMany(k => new[] { k.Adres, k.Adres2 })).ToHashSet();
+        var teZetten = kaart.Wissels.Select(w => w.Adres).Distinct().Where(a => a > 0 && !bekendeAdressen.Contains(a)).OrderBy(a => a).ToList();
+        int tab = res.NieuweBlokken.Select(b => _baanBeheerder.TabbladVanBlok(b)).DefaultIfEmpty(1).First();
+        double wisselY = _baanBeheerder.Symbolen.Where(x => x.Tabblad == tab).Select(x => x.Y + 80).DefaultIfEmpty(40).Max();
+        for (int wi = 0; wi < teZetten.Count; wi++)
+            _baanBeheerder.VoegSymboolToe(new Wissel { X = 40 + wi * 60, Y = wisselY, Tabblad = tab, Adres = teZetten[wi] });
+
         Redraw();
+        var slot = new List<string>();
+        if (dienst.Toegevoegd.Count > 0) slot.Add($"{dienst.Toegevoegd.Count} automatische route(s) aangemaakt (zonder vertrektijd).");
+        if (teZetten.Count > 0) slot.Add($"{teZetten.Count} wissel(s) (adres {string.Join(", ", teZetten)}) onderaan het baanontwerp gezet; sleep ze naar de goede plek en leg de wisselstanden zelf vast.");
+        if (slot.Count > 0) MessageBox.Show(this, string.Join("\n\n", slot) + "\n\nNIET getest op de baan.", "Baankaart importeren", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void HandmatigBezet_Click(object sender, RoutedEventArgs e)

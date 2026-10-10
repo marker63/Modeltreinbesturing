@@ -210,9 +210,9 @@ public class BaankaartImporter
 
         // ---- wissels: niet getekend, wel gemeld ----
         foreach (var w in kaart.Wissels.OrderBy(w => w.Adres))
-            res.Meldingen.Add(new BaanControleMelding("Info", $"Wisseladres {w.Adres} heeft bij de verkenning een andere route gegeven. Wissels worden niet automatisch getekend: zet er een wissel met dit adres op de baan."));
+            res.Meldingen.Add(new BaanControleMelding("Info", $"Wisseladres {w.Adres} heeft bij de verkenning een andere route gegeven. Als er nog geen wissel met dit adres op het baanontwerp staat, wordt er na bevestigen een losse wissel onderaan gezet (stand en wisselstraat leg jij zelf vast)."));
 
-        res.Meldingen.Add(new BaanControleMelding("Info", "Dienstregeling/routes zijn niet aangepast. Seinen en stootblokken van nieuwe blokken worden door het hoofdscherm erbij gezet."));
+        res.Meldingen.Add(new BaanControleMelding("Info", "Na bevestigen krijgt elk nieuw blok een automatische route (zonder vertrektijd); bestaande routes en dienstregeling blijven ongewijzigd. Seinen en stootblokken van nieuwe blokken worden door het hoofdscherm erbij gezet."));
         return res;
     }
 

@@ -1080,6 +1080,12 @@ daarna meteen in de hoofdmodule laden.
 echte baankaart van 04-10: blokken 3-8, geen vals kopspoor, blok 3 = melders 5/13/14, 3->4 achteruit,
 3->8 vooruit, tweede import verandert niets, overloop-melder 24, vastgelegde richtingen blijven,
 ongedaan maken werkt.
-**NIET gedaan:** wissels worden alleen gemeld (niet getekend, kruiswisselstanden niet overgenomen,
-zie KRUISWISSEL.md); de dienstregeling wordt NIET bijgewerkt.
-**NIET gecompileerd:** de WPF-kant (MainWindow-handler, menu). NIET getest op de baan.
+**Vervolg (zelfde ronde, Marco 10:24 "zo veel mogelijk, zelflerend, een leek moet het kunnen gebruiken"):**
+- Dienst: elk NIEUW blok krijgt een automatische route (`DienstAanvuller`, Automatisch = true, GEEN verzonnen
+  vertrektijd). Bestaande routes blijven ongemoeid. Getest in Tools/CompileCheck (5 nieuwe routes, bestaande
+  route intact, tweede keer niets, herstel).
+- Wissels: wisseladressen uit de verkenning die nog niet op het baanontwerp staan worden als losse wissel in een
+  rij onderaan gezet (slepen naar de goede plek). Wisselstanden en wisselstraten worden NIET aangemaakt;
+  kruiswisselstanden uit KRUISWISSEL.md blijven leidend.
+**NIET gedaan:** wisselstraten/standen uit de verkenning; tijden in de dienstregeling.
+**NIET gecompileerd:** de WPF-kant (MainWindow-handler incl. routes en wissels, menu). NIET getest op de baan.
