@@ -234,12 +234,17 @@ public partial class BaanVerkenner
     // Wissels
     // =====================================================================
 
+    private int _wisselCommandos;
+
     private async Task ZetWissel(int adres, bool afbuigend, bool forceer = false)
     {
         if (!forceer && _wisselStand.TryGetValue(adres, out var huidig) && huidig == afbuigend) return;
         _hw.ZetWissel(adres, afbuigend);
         _wisselStand[adres] = afbuigend;
-        _log.Rijden($"Adres {adres} → {(afbuigend ? "afbuigend" : "rechtdoor")}");
+        // BUG #65: meten is weten - hoeveel wisselcommando's zijn er sinds het verbinden verstuurd? Valt de Dinamo ooit
+        // weer uit (wissels bewegen niet meer), dan is in het log te zien na hoeveel commando's dat gebeurde.
+        _wisselCommandos++;
+        _log.Rijden($"Adres {adres} → {(afbuigend ? "afbuigend" : "rechtdoor")} (wisselcommando {_wisselCommandos} sinds het verbinden)");
         await Wacht(TimeSpan.FromMilliseconds(Math.Max(100, _ins.WisselPauzeMs)));
         // Dinamo: pas verder als het commando echt de deur uit is
         for (int i = 0; i < 40 && !_hw.KlaarVoorVolgendeWisselCommando; i++) await Wacht(DinamoCyclus);

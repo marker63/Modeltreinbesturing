@@ -1266,3 +1266,5 @@ werden de wissels weer geïnitialiseerd en reageerden ze (nog te bevestigen na d
 **Hypothese (Marco, niet bewezen):** zoals in Koploper "Wissels niet gezet storing": een volgelopen buffer in de Dinamo. Wij sturen elk wisselcommando 3x (6 frames) en bij elke adrestest twee commando's.
 **Mogelijke maatregelen (nog NIET gebouwd, eerst Marco's akkoord):** (1) wissel-effectcontrole: een wissel met bewezen effect (bijv. adres 2 -> melder 12) die later geen effect meer heeft stopt de verkenner met de melding
 "wissel reageert niet, Dinamo opnieuw opstarten"; (2) aantal wisselcommando's tellen en loggen (hoeveel voor de storing begon); (3) eventueel minder herhalingen of meer pauze tussen wisselcommando's, alleen na bewijs uit de log.
+**Gebouwd (14:35, maatregel 2):** elke logregel "Adres N → afbuigend/rechtdoor" noemt nu "(wisselcommando X sinds het verbinden)". Wissels niet meer bewegen? Dan staat in het log na hoeveel commando's dat gebeurde.
+Maatregel 1 (effectcontrole) en 3 (rustiger sturen) nog niet gebouwd. NOG NIET GETEST OP DE BAAN.
