@@ -8,6 +8,8 @@ public class RitResultaat
     public List<int> Reeks { get; } = new();
     public RitEinde Einde { get; set; }
     public Richting Richting { get; set; }
+    /// <summary>BUG #64: de rit bleef hangen na een melder waarvan het vervolg (bij deze wisselstand) al bekend is: geen kopspoor.</summary>
+    public bool BekendVervolgGemist { get; set; }
 }
 
 /// <summary>Wat een rit moet doen. Zonder DoelMelder is het een verkenningsrit (rijden tot
@@ -598,6 +600,7 @@ public partial class BaanVerkenner
         bool doelInzicht = false;
         bool blokGecontroleerd = false;
         bool wachttijdVerlengd = false;   // BUG #55: eenmalige bevestigingsronde voordat "doodlopend" geconcludeerd wordt
+        bool vervolgHerhaald = false;     // BUG #64: bij een bekend vervolg eenmalig het rijcommando herhalen
         DateTime? heelInNieuweSectieSinds = null;
         _kortsluitingGemeld = false;
 
@@ -685,6 +688,7 @@ public partial class BaanVerkenner
                 if (onderbroken && wijzigingen.Contains(w))
                     _langsteVertrekSeconden = Math.Max(_langsteVertrekSeconden, (_klok.Nu - laatsteWijziging).TotalSeconds);
                 wachttijdVerlengd = false;
+                vervolgHerhaald = false;
                 // BUG #59: tijden altijd omgerekend naar de referentiesnelheid van de kaart, en niet vastleggen
                 // als de loc al kruipend het doel in zicht heeft (kruipsnelheid zegt niets over de sectielengte).
                 if (dt is double gemeten && !doelInzicht)
@@ -869,6 +873,19 @@ public partial class BaanVerkenner
                     _log.Info($"Na melder {res.Reeks[^1]} al {grens.TotalSeconds:0} s geen nieuwe melder - nog niet 'doodlopend': de loc rijdt door tot de maximale wachttijd ({_ins.MaxSecondenTussenMelders} s).");
                     continue;
                 }
+                // BUG #64: na deze melder is bij deze wisselstand al eens een vervolgmelder gevonden (ook de omgekeerde
+                // overgang telt). Dan is dit geen kopspoor maar blijft de loc hangen (slecht contact, tong, stroomonderbreking):
+                // één keer het rijcommando herhalen en nog een keer wachten voordat er iets uit geconcludeerd wordt.
+                var bekendVervolg = _kaart.BekendeVolgende(res.Reeks[^1], r, doel.Configuratie);
+                bool eersteBlokcontrole = BlokVereist && res.Reeks.Count == 1 && !blokGecontroleerd && !doelInzicht;
+                if (bekendVervolg.Count > 0 && !vervolgHerhaald && !eersteBlokcontrole && !kopBekend)
+                {
+                    vervolgHerhaald = true;
+                    _log.Info($"Na melder {res.Reeks[^1]} al {grens.TotalSeconds:0} s geen nieuwe melder, maar het vervolg ({Lijst(bekendVervolg)}) is bij deze wisselstand al eerder gevonden: de loc blijft waarschijnlijk hangen - rijcommando wordt herhaald.");
+                    await StuurSnelheid(r, snelheid);
+                    laatsteWijziging = _klok.Nu;
+                    continue;
+                }
                 await StopLoc();
                 if (BlokVereist && res.Reeks.Count == 1 && !blokGecontroleerd && !doelInzicht)
                 {
@@ -943,6 +960,7 @@ public partial class BaanVerkenner
                     throw new NavigatieFout($"Melder {doel.DoelMelder} werd niet bereikt: al {WachttijdTussenMelders().TotalSeconds:0} s geen nieuwe melder na melder {res.Reeks[^1]}.");
                 }
                 res.Einde = RitEinde.Doodlopend;
+                res.BekendVervolgGemist = bekendVervolg.Count > 0;
                 return res;
             }
         }

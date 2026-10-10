@@ -86,7 +86,7 @@ public static class Rapport
     }
 
     private static string Volgenden(Baankaart k, int melder, Richting r) =>
-        string.Join(", ", k.Overgangen.Where(o => o.Van == melder && o.Richting == r).Select(o => o.Naar).Distinct().OrderBy(x => x));
+        string.Join(", ", k.BekendeVolgende(melder, r));
 
     private static string Duur(Baankaart k)
     {

@@ -150,6 +150,17 @@ public static class Tests
         Eis(k.Voltooid, "afbuigende tak: verkenning voltooid zonder vastlopen");
     }
 
+    // BUG #64: een gevonden overgang geldt ook omgekeerd (zelfde wisselstand): geen lege "achteruit →" meer
+    static void OmgekeerdeOvergangTest()
+    {
+        var k = Laad("baankaart_lijn_5-30_tussenstand_2026-10-10_1340.json");
+        Eis(k.BekendeVolgende(14, Richting.Achteruit, Configuratie.Basis).SequenceEqual(new[] { 13 }), "omgekeerde overgang: 13 -> 14 vooruit geeft 14 -> 13 achteruit");
+        Eis(k.BekendeVolgende(27, Richting.Vooruit, Configuratie.Basis).Contains(28) && k.BekendeVolgende(28, Richting.Achteruit, Configuratie.Basis).Contains(27), "omgekeerde overgang: 27 -> 28 vooruit geeft 28 -> 27 achteruit");
+        Eis(k.BekendeVolgende(28, Richting.Achteruit, new Configuratie(new[] { 7 })).Count == 0, "omgekeerde overgang: bij een andere wisselstand niets afgeleid");
+        var tekst = Rapport.AlsTekst(k);
+        Eis(!System.Text.RegularExpressions.Regex.IsMatch(tekst, @"Melder 14\s.*achteruit → *\r?$", System.Text.RegularExpressions.RegexOptions.Multiline), "omgekeerde overgang: rapport toont geen leeg vervolg meer voor melder 14 achteruit");
+    }
+
     // De geslaagde, volledige rit van 10-10 11:38 (blokken 10, 11, 12): referentie voor importer en leerprofiel
     static void GeslaagdeRitTest()
     {
@@ -227,6 +238,7 @@ public static class Tests
         GeslaagdeRitTest();
         OverloopTest();
         AfbuigendeTakTerugTest();
+        OmgekeerdeOvergangTest();
 
         Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)");
         return _fouten == 0 ? 0 : 1;

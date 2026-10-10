@@ -1238,3 +1238,17 @@ hij stond met de achterkant tegen de tong en kwam niet van zijn plaats. De blokp
 **Test (CompileCheck, ALLES OK):** `OverloopTest` (wissel 2 + 1 achter elkaar: melder 4 bereikt, kortsluitpunt opgelost door adres 1, beide wissels in het rapport) en `AfbuigendeTakTerugTest`
 (stomp spoor op de afbuigende tak, terug met afbuigend); beide FALEN met de oude code (loc niet terug op melder 1).
 NOG NIET GETEST OP DE BAAN (alleen simulator). Een proef met een partner kost per adres een extra rit; bij veel wissels is het maximum 8 per kortsluitpunt.
+
+## #64 - Baanverkenner: geleerde vervolgmelders vasthouden (Marco 13:58)
+**Waarneming (Marco):** een blok/melder waarvan het vervolg al bekend is heeft in meldingen en rapport soms ineens "geen vervolg meer". Onnodig.
+**Oorzaak:** een gevonden overgang X→Y werd alleen in die ene richting onthouden. Dezelfde route omgekeerd (Y→X andersom, zelfde wisselstand) is fysiek altijd berijdbaar, maar werd nergens afgeleid:
+(1) het rapport toonde lege "achteruit →" bij melders die alleen vooruit gereden waren (bijv. 14, 24, 28); (2) hing de loc even (slecht contact, tong), dan werd dat meteen "doodlopend"
+(kopspoor opgeslagen, "terug vanaf het einde" gepland) of een navigatierit brak af, ook al was het vervolg al bekend.
+**Gebouwd (Baanverkenner.Kern):**
+1. `Baankaart.BekendeVolgende(van, richting, configuratie?)`: gereden overgangen + de omgekeerde ervan, alleen voor dezelfde wisselstand (zonder configuratie: alle standen, voor het rapport).
+   Wissel-tussen-twee-melders kan dit niet verstoren: de afleiding geldt alleen binnen één en dezelfde wisselstand. Gemeten tijden worden niet gespiegeld (heen en terug zijn niet gelijk).
+2. Rapport (tekst en html) gebruikt dit.
+3. `Rit`: blijft de loc hangen na een melder met bekend vervolg (zelfde wisselstand), dan wordt één keer het rijcommando herhaald en opnieuw gewacht (geldt ook voor navigatieritten) vóór er iets uit geconcludeerd wordt.
+4. Blijft het daarna uit: einde "doodlopend" met `BekendVervolgGemist`: GEEN kopspoor opgeslagen, geen "terug vanaf het einde" gepland, wel een waarschuwing.
+**Test:** `OmgekeerdeOvergangTest` met de kaart van 13:40 (14 achteruit → 13, 28 achteruit → 27, andere wisselstand niets afgeleid, rapport zonder lege regel); alle bestaande scenario's ongewijzigd groen.
+NIET in de simulator getest: het hangen van de loc zelf (sim kent geen hangende loc). NOG NIET GETEST OP DE BAAN.

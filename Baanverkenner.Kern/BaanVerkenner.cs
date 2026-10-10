@@ -673,6 +673,12 @@ public partial class BaanVerkenner
         switch (rit.Einde)
         {
             case RitEinde.Doodlopend:
+                if (rit.BekendVervolgGemist)
+                {
+                    // BUG #64: geen kopspoor registreren en geen "terug vanaf het einde" plannen.
+                    _log.Waarschuwing($"Na melder {laatste} ({o.Richting.Tekst()}) kwam geen melder, maar het vervolg ({Lijst(_kaart.BekendeVolgende(laatste, o.Richting, o.Configuratie))}) is bij deze wisselstand al eerder gevonden: de loc is waarschijnlijk blijven hangen. Dit is geen kopspoor en wordt zo niet opgeslagen.");
+                    break;
+                }
                 if (!_kaart.Kopsporen.Any(k => k.Melder == laatste && k.Richting == o.Richting))
                     _log.Vondst($"Doodlopend: na melder {laatste} ({o.Richting.Tekst()}) kwam geen melder meer - kopspoor of stootjuk.");
                 _kaart.RegistreerKopspoor(laatste, o.Richting, o.Configuratie);
@@ -850,7 +856,7 @@ public partial class BaanVerkenner
                     // Nieuw kortsluitpunt in de afbuigende tak
                     RegistreerKortsluitpunt(o, t.Skip(i - 1).ToList(), cA, routeTotX, o.Richting);
                 }
-                else if (proef.Einde == RitEinde.Doodlopend)
+                else if (proef.Einde == RitEinde.Doodlopend && !proef.BekendVervolgGemist)
                 {
                     _kaart.RegistreerKopspoor(t[^1], o.Richting, cA);
                 }

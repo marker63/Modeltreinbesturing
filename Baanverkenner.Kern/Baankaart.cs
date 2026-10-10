@@ -245,6 +245,17 @@ public class Baankaart
         return w;
     }
 
+    /// <summary>BUG #64: de melders die na <paramref name="van"/> in richting <paramref name="r"/> volgen, volgens wat al
+    /// eens is gereden. Een gevonden overgang X→Y (r) geldt met dezelfde wisselstand ook omgekeerd: Y→X (andersom). Zonder
+    /// <paramref name="c"/> telt elke wisselstand mee (rapport); met <paramref name="c"/> alleen die stand.</summary>
+    public List<int> BekendeVolgende(int van, Richting r, Configuratie? c = null)
+    {
+        bool Past(Overgang o) => c is null || o.GezienBijConfiguraties.Contains(c.Sleutel);
+        var res = Overgangen.Where(o => o.Van == van && o.Richting == r && Past(o)).Select(o => o.Naar)
+            .Concat(Overgangen.Where(o => o.Naar == van && o.Richting == r.Om() && Past(o)).Select(o => o.Van));
+        return res.Distinct().OrderBy(x => x).ToList();
+    }
+
     public void RegistreerKopspoor(int melder, Richting r, Configuratie c)
     {
         if (!Kopsporen.Any(k => k.Melder == melder && k.Richting == r))
