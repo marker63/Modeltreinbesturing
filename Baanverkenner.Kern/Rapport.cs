@@ -142,7 +142,7 @@ ul{margin:6px 0 0 18px;padding:0}
         sb.Append("<div class=\"meta\">");
         sb.Append($"<div><b>Hardware</b>{E(k.Hardware)}</div>");
         sb.Append($"<div><b>Testloc</b>adres {k.LocAdres} ({k.LocStappen} stappen)</div>");
-        sb.Append($"<div><b>Startmelder</b>{k.StartMelder}</div>");
+        sb.Append($"<div><b>Startmelder</b>{k.StartMelder}{(k.EerdereStartMelders.Count > 0 ? " (eerder: " + string.Join(", ", k.EerdereStartMelders) + ")" : "")}</div>");
         sb.Append($"<div><b>Geteste wisseladressen</b>{k.WisselAdresVan} t/m {k.WisselAdresTot}</div>");
         sb.Append($"<div><b>Gestart</b>{E(k.Gestart.ToString("dd-MM-yyyy HH:mm"))}</div>");
         sb.Append($"<div><b>Duur</b>{E(Duur(k))}</div>");
@@ -200,6 +200,18 @@ ul{margin:6px 0 0 18px;padding:0}
         foreach (var b in k.VoorgesteldeBlokken)
             sb.Append($"<tr><td class=\"num\">{b.Nummer}</td><td>{E(string.Join(" – ", b.Melders))}</td>" + (metBlok ? $"<td>{E(b.DinamoBlok?.ToString() ?? "?")}</td>" : "") + $"<td>{E(string.Join(", ", b.Buren))}</td></tr>");
         sb.Append("</table>");
+        // BUG #74: doorgangen (ingangskant -> vervolg) van melders met meer dan een mogelijkheid
+        var opvallend = k.OpvallendeDoorgangen();
+        if (opvallend.Count > 0)
+        {
+            sb.Append("<h2>Doorgangen (ingangskant)</h2><p class=\"uitleg\">Melders waar het vervolg afhangt van de kant waarvandaan de loc binnenkwam (en de wisselstand), bijvoorbeeld een kruiswissel in één melder. De verkenner gebruikt dit om na een handmatige verplaatsing of bij het terugnavigeren de juiste wisselstand te kiezen.</p>");
+            sb.Append("<table><tr><th>Melder</th><th>Richting</th><th>Vanaf melder</th><th>Vervolg</th><th>Wisselstand</th><th>Keer</th></tr>");
+            foreach (var g in opvallend)
+                foreach (var d in g.OrderBy(x => x.Richting).ThenBy(x => x.Via).ThenBy(x => x.Volgende))
+                    sb.Append($"<tr><td class=\"num\">{d.Melder}</td><td>{d.Richting.Tekst()}</td><td>{d.Via}</td><td>{d.Volgende}</td><td>{E(string.Join(" / ", d.Configuraties.Select(c => Configuratie.VanSleutel(c).ToString())))}</td><td>{d.AantalKeer}</td></tr>");
+            sb.Append("</table>");
+        }
+
         sb.Append("<h2>Blokkenschema</h2><p class=\"uitleg\">Automatisch getekend: de blokken staan in de volgorde waarin de testloc ze bereed. Een pijl betekent dat er in die richting gereden is; bij elke verbinding staan de melders, de rijrichting van de testloc en de wissel. Oranje = een melder met twee mogelijke vervolgen (bijv. de kruiswissel), stippellijn = Dinamo-blok onbekend.</p>");
         try { sb.Append("<div class=\"kaart\" style=\"overflow:auto\">" + SchemaTekening.Maak(k).AlsSvg() + "</div>"); }
         catch (Exception ex) { sb.Append("<p class=\"let\">Het blokkenschema kon niet getekend worden: " + E(ex.Message) + "</p>"); }
@@ -267,7 +279,7 @@ ul{margin:6px 0 0 18px;padding:0}
         sb.AppendLine($"Status        : {(k.Voltooid ? "voltooid" : "niet voltooid (tussenstand)")}");
         sb.AppendLine($"Hardware      : {k.Hardware}");
         sb.AppendLine($"Testloc       : adres {k.LocAdres} ({k.LocStappen} stappen)");
-        sb.AppendLine($"Startmelder   : {k.StartMelder}");
+        sb.AppendLine($"Startmelder   : {k.StartMelder}{(k.EerdereStartMelders.Count > 0 ? " (eerdere deelverkenningen: " + string.Join(", ", k.EerdereStartMelders) + ")" : "")}");
         sb.AppendLine($"Wisseladressen: {k.WisselAdresVan} t/m {k.WisselAdresTot}");
         sb.AppendLine($"Gestart       : {k.Gestart:dd-MM-yyyy HH:mm}   duur: {Duur(k)}");
         sb.AppendLine($"Gevonden      : {k.Melders.Count} melders, {k.Wissels.Count} wissels, {k.Kopsporen.Count} doodlopende einden, {k.VoorgesteldeBlokken.Count} voorgestelde blokken");
@@ -290,6 +302,15 @@ ul{margin:6px 0 0 18px;padding:0}
         Kop("VOORGESTELDE BLOKKEN");
         foreach (var b in k.VoorgesteldeBlokken)
             sb.AppendLine($"  Blok {b.Nummer,-3}: melders {string.Join(" - ", b.Melders)}" + (b.DinamoBlok is int d ? $" (Dinamo-blok {d})" : "") + $"   grenst aan: {string.Join(", ", b.Buren)}");
+
+        var opvallendT = k.OpvallendeDoorgangen();
+        if (opvallendT.Count > 0)
+        {
+            Kop("DOORGANGEN (INGANGSKANT)");
+            foreach (var g in opvallendT)
+                foreach (var d in g.OrderBy(x => x.Richting).ThenBy(x => x.Via).ThenBy(x => x.Volgende))
+                    sb.AppendLine($"  melder {d.Melder} ({d.Richting.Tekst()}): vanaf {d.Via} → {d.Volgende}   [{string.Join(" / ", d.Configuraties.Select(c => Configuratie.VanSleutel(c).ToString()))}]  {d.AantalKeer}x");
+        }
 
         Kop("DOODLOPENDE EINDEN");
         foreach (var e in k.Kopsporen) sb.AppendLine($"  na melder {e.Melder} ({e.Richting.Tekst()})");

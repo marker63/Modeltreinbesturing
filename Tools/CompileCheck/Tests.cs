@@ -245,6 +245,101 @@ public static class Tests
         Eis(fout2 && !v.Kaart.Overgangen.Any(o => o.Van == 1), "verkenningsrit-startcontrole: loc staat elders -> NavigatieFout, geen valse overgang");
     }
 
+    // BUG #74: doorgangen (ingangskant -> vervolg + wisselstand), kruiswissel in melder 24
+    static void DoorgangTest()
+    {
+        var k = new Baankaart();
+        var A = Configuratie.Basis; var B = new Configuratie(new[] { 13 }); var C = new Configuratie(new[] { 10, 13 });
+        k.RegistreerDoorgang(14, 24, 21, Richting.Vooruit, A);
+        k.RegistreerDoorgang(14, 24, 8, Richting.Vooruit, B);
+        k.RegistreerDoorgang(14, 24, 8, Richting.Vooruit, C);
+        Eis(k.Doorgangen.Count == 4, "doorgangen: 2 heen + 2 terug, standen samengenomen (nu " + k.Doorgangen.Count + ")");
+        Eis(k.Doorgangen.Any(d => d.Via == 21 && d.Melder == 24 && d.Volgende == 14 && d.Richting == Richting.Achteruit), "doorgangen: omgekeerde doorgang 21 -> 24 -> 14 (achteruit) bestaat");
+        // gewenste stand leidt (met deze ingang) elders heen -> bevestigde stand
+        Eis(k.KiesConfiguratieBijIngang(14, 24, Richting.Vooruit, 8, A).Equals(B), "doorgangen: vanaf 14 naar 8 met alles rechtdoor -> stand 'afbuigend 13' (dichtst bij gewenst)");
+        Eis(k.KiesConfiguratieBijIngang(14, 24, Richting.Vooruit, 8, B).Equals(B), "doorgangen: reeds bevestigde stand blijft");
+        Eis(k.KiesConfiguratieBijIngang(14, 24, Richting.Vooruit, 21, A).Equals(A), "doorgangen: vanaf 14 naar 21 met alles rechtdoor blijft");
+        Eis(k.KiesConfiguratieBijIngang(13, 24, Richting.Vooruit, 8, A).Equals(A), "doorgangen: onbekende ingangskant -> gewenste stand blijft (geen bewijs)");
+        Eis(k.KiesConfiguratieBijIngang(14, 24, Richting.Vooruit, 99, A).Equals(A), "doorgangen: onbekend vervolg -> gewenste stand blijft");
+        Eis(k.KiesConfiguratieBijIngang(21, 24, Richting.Achteruit, 14, B).Equals(B) || k.KiesConfiguratieBijIngang(21, 24, Richting.Achteruit, 14, B).Equals(A), "doorgangen: terugweg 21 -> 14 geeft een bevestigde stand");
+        Eis(k.KiesConfiguratieBijIngang(21, 24, Richting.Achteruit, 14, B).Equals(B), "doorgangen: vanaf 21 naar 14 met 'afbuigend 13': geen tegenbewijs, dus blijft zoals gewenst");
+        var o = k.OpvallendeDoorgangen();
+        Eis(o.Count == 1 && o[0].Key == 24, "doorgangen: alleen melder 24 is opvallend");
+        // JSON-rondgang en oudere kaart zonder veld
+        var k2 = Baankaart.VanJson(k.AlsJson())!;
+        Eis(k2.Doorgangen.Count == 4 && k2.KiesConfiguratieBijIngang(14, 24, Richting.Vooruit, 8, A).Equals(B), "doorgangen: blijven na opslaan en laden");
+        var oud = Laad("baankaart_lijn_5-30_voltooid_kruiswissel24_2026-10-10_1707.json");
+        Eis(oud.Doorgangen.Count == 0, "doorgangen: oudere kaart zonder doorgangen laadt met lege lijst");
+        // rapport met doorgangen
+        Eis(Rapport.AlsTekst(k).Contains("DOORGANGEN") && Rapport.AlsHtml(k).Contains("Doorgangen (ingangskant)"), "doorgangen: staan in het rapport (tekst en html)");
+
+        // een echte (gesimuleerde) rit legt doorgangen vast: lijn 1-2-3, loc op 1, vooruit
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
+        var E1 = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var E2 = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+        var s1 = sim.NieuweSectie(1, 80, 1); var s2 = sim.NieuweSectie(2, 80, 2); var s3 = sim.NieuweSectie(3, 80, 3); var s4 = sim.NieuweSectie(4, 80, 4);
+        sim.Verbind(s1, E2, s2, E1); sim.Verbind(s2, E2, s3, E1); sim.Verbind(s3, E2, s4, E1);
+        sim.PlaatsLoc(s1, 40, +1);
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 1, DinamoBlokken = "1-4" };
+        var status = new VerkenStatus { Instellingen = ins };
+        status.Kaart.StartMelder = 1; status.Kaart.Hardware = "Simulatie"; status.Kaart.RefSnelheid = 12;
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var log = new VerkenLog(klok);
+        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true), status);
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var monitor = (MelderMonitor)typeof(BaanVerkenner).GetField("_monitor", bf)!.GetValue(v)!;
+        sim.BezetmeldingGewijzigd += monitor.Ontvang;
+        foreach (var mm in new[] { 1, 2, 3, 4 }) sim.VraagMelderStatusOp(mm);
+        klok.Wacht(TimeSpan.FromSeconds(1)).GetAwaiter().GetResult();
+        var rit = typeof(BaanVerkenner).GetMethod("Rit", bf)!;
+        ((Task<RitResultaat>)rit.Invoke(v, new object[] { 1, Richting.Vooruit, new RitDoel { DoelMelder = 3, VerwachtPad = new List<int> { 1, 2, 3 } } })!).GetAwaiter().GetResult();
+        Eis(v.Kaart.Doorgangen.Any(d => d.Via == 1 && d.Melder == 2 && d.Volgende == 3 && d.Richting == Richting.Vooruit), "doorgangen: gereden rit 1-2-3 legt doorgang 1 -> 2 -> 3 vast");
+        // tweede rit in dezelfde richting: de ingangskant van melder 3 (vanaf 2) wordt onthouden over de ritgrens
+        ((Task<RitResultaat>)rit.Invoke(v, new object[] { 3, Richting.Vooruit, new RitDoel { DoelMelder = 4, VerwachtPad = new List<int> { 3, 4 } } })!).GetAwaiter().GetResult();
+        Eis(v.Kaart.Doorgangen.Any(d => d.Via == 2 && d.Melder == 3 && d.Volgende == 4 && d.Richting == Richting.Vooruit), "doorgangen: ingangskant blijft bekend over de ritgrens (2 -> 3 -> 4)");
+    }
+
+    // BUG #74: een voltooide verkenning uitbreiden met een tweede, fysiek los traject (twee losse stukken spoor: 1-2-3 en 4-5)
+    static void UitbreidenTest()
+    {
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
+        var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+        var s1 = sim.NieuweSectie(1, 80, 1); var s2 = sim.NieuweSectie(2, 80, 2); var s3 = sim.NieuweSectie(3, 80, 3);
+        var s4 = sim.NieuweSectie(4, 80, 4); var s5 = sim.NieuweSectie(5, 80, 5);
+        sim.Verbind(s1, B, s2, A); sim.Verbind(s2, B, s3, A); sim.Verbind(s4, B, s5, A);
+        sim.PlaatsLoc(s1, 40, +1);
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 2, DinamoBlokken = "1-5" };
+        var status = new VerkenStatus { Instellingen = ins };
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var log = new VerkenLog(klok);
+        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true), status);
+        using var cts = new CancellationTokenSource();
+        try { v.VoerUit(cts.Token).GetAwaiter().GetResult(); } catch (Exception ex) { Console.WriteLine("  (uitbreiden: eerste verkenning stopte met: " + ex.Message + ")"); }
+        var k1 = v.Kaart;
+        Eis(k1.Voltooid && k1.StartMelder == 1 && k1.Melders.Count == 3 && !k1.Melders.Any(m => m.Nummer == 4), "uitbreiden: eerste verkenning is voltooid met melders 1-3 (nu " + string.Join(",", k1.Melders.Select(m => m.Nummer)) + ")");
+        // de loc met de hand op het andere traject zetten en uitbreiden
+        status.VoorUitbreiding();
+        Eis(!status.Kaart.Voltooid && status.Uitbreiden, "uitbreiden: VoorUitbreiding zet de kaart op 'niet voltooid'");
+        sim.PlaatsLoc(s4, 40, +1);
+        var log2 = new VerkenLog(klok); // dezelfde klok: de simulatie rekent met absolute tijd
+        var v2 = new BaanVerkenner(sim, ins, klok, log2, (_, _) => Task.FromResult(true), status);
+        using var cts2 = new CancellationTokenSource();
+        try { v2.VoerUit(cts2.Token).GetAwaiter().GetResult(); } catch (Exception ex) { Console.WriteLine("  (uitbreiden: tweede verkenning stopte met: " + ex.Message + ")"); }
+        var k = v2.Kaart;
+        Eis(k.Voltooid, "uitbreiden: de uitgebreide kaart is voltooid");
+        Eis(k.Melders.Select(m => m.Nummer).OrderBy(x => x).SequenceEqual(new[] { 1, 2, 3, 4, 5 }), "uitbreiden: alle vijf melders staan in één kaart (nu " + string.Join(",", k.Melders.Select(m => m.Nummer)) + ")");
+        Eis(k.StartMelder == 4 && k.EerdereStartMelders.SequenceEqual(new[] { 1 }), "uitbreiden: nieuwe startmelder 4, eerdere startmelder 1 bewaard (nu " + k.StartMelder + " / " + string.Join(",", k.EerdereStartMelders) + ")");
+        Eis(k.Overgangen.Any(o => o.Van == 1 && o.Naar == 2) && k.Overgangen.Any(o => o.Van == 4 && o.Naar == 5), "uitbreiden: overgangen van beide trajecten aanwezig");
+        Eis(!k.Overgangen.Any(o => (o.Van <= 3 && o.Naar >= 4) || (o.Van >= 4 && o.Naar <= 3)), "uitbreiden: geen valse overgang tussen de twee trajecten");
+        Eis(!status.Uitbreiden, "uitbreiden: de vlag is na de start weer uit (gewone hervatting bij onderbreking)");
+        Eis(k.VoorgesteldeBlokken.Count >= 2, "uitbreiden: voorgestelde blokken voor beide trajecten (nu " + k.VoorgesteldeBlokken.Count + ")");
+        Eis(Rapport.AlsTekst(k).Contains("eerdere deelverkenningen: 1"), "uitbreiden: rapport noemt de eerdere startmelder");
+        var terug = Baankaart.VanJson(k.AlsJson())!;
+        Eis(terug.EerdereStartMelders.SequenceEqual(new[] { 1 }), "uitbreiden: eerdere startmelders blijven na opslaan en laden");
+        if (Environment.GetEnvironmentVariable("UITBREIDEN_LOG") == "1") Console.WriteLine(log2.AlsTekst());
+    }
+
     // Blokkenschema-tekening (SVG) uit de baankaart van 17:07
     static void BlokkenschemaTest()
     {
@@ -361,6 +456,8 @@ public static class Tests
         NavigatieOnjuisteStartTest();
         BlokkenschemaTest();
         OverdrachtTest();
+        DoorgangTest();
+        UitbreidenTest();
 
         Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)");
         return _fouten == 0 ? 0 : 1;

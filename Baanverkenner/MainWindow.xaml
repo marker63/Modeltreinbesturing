@@ -173,7 +173,7 @@
 
             <DockPanel Grid.Row="0" LastChildFill="False">
                 <Button x:Name="StartKnop" Content="▶  Start verkenning" Click="Start_Click" FontWeight="SemiBold" Background="#D9EFE7"/>
-                <Button x:Name="HervatVorigeKnop" Content="Vorige verkenning hervatten" Click="HervatVorige_Click"/>
+                <Button x:Name="HervatVorigeKnop" Content="Vorige verkenning hervatten / uitbreiden" Click="HervatVorige_Click"/>
                 <Button x:Name="PauzeKnop" Content="Pauze" Click="Pauze_Click" IsEnabled="False" MinWidth="80"/>
                 <Button x:Name="StopKnop" Content="Stoppen" Click="Stop_Click" IsEnabled="False"/>
                 <Button x:Name="NoodstopKnop" DockPanel.Dock="Right" Content="NOODSTOP" Click="Noodstop_Click"

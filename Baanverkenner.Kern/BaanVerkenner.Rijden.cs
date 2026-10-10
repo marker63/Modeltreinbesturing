@@ -50,6 +50,10 @@ public partial class BaanVerkenner
     private static readonly TimeSpan DinamoCyclus = TimeSpan.FromMilliseconds(200);
 
     private readonly Dictionary<int, bool> _wisselStand = new();
+
+    /// <summary>BUG #74: de ingangskant van de melder waar de loc nu staat: hij kwam vanaf <c>Via</c> op <c>Melder</c> aan, rijdend in
+    /// <c>Richting</c>. Null = onbekend (begin, na kortsluiting, na met de hand terugzetten).</summary>
+    private (int Via, int Melder, Richting Richting)? _ingang;
     private DateTime _negeerKortsluitingTot = DateTime.MinValue;
     private volatile bool _kortsluitingGemeld;
     /// <summary>BUG #57: aantal blokproeven per melder (een mislukte proef wordt nog één keer opnieuw
@@ -604,6 +608,10 @@ public partial class BaanVerkenner
     {
         _ritMinDt = double.MaxValue; _ritMaxDt = 0;
         var uitkomst = await RitUitvoeren(start, r, doel);
+        // BUG #74: waar kwam de loc vandaan? (Na een kortsluiting/herstel is dat niet meer te weten.)
+        if (uitkomst.Einde == RitEinde.Kortsluiting) _ingang = null;
+        else if (uitkomst.Reeks.Count >= 2) _ingang = (uitkomst.Reeks[^2], uitkomst.Reeks[^1], r);
+        else if (_ingang is { } oud && oud.Melder != uitkomst.Reeks[^1]) _ingang = null;
         PasSnelheidAutomatischAan();
         try
         {
@@ -769,6 +777,11 @@ public partial class BaanVerkenner
                 }
                 double? dtOpgeslagen = dt is double d1 && !doelInzicht ? d1 * _ins.Verkensnelheid / RefSnelheid : null;
                 _kaart.RegistreerOvergang(res.Reeks[^1], m, r, doel.Configuratie, dtOpgeslagen);
+                // BUG #74: ingangskant onthouden. Binnen de rit is het de melder daarvoor; bij de eerste stap van de rit de ingang van
+                // de vorige rit, mits de loc daar nog in dezelfde richting rijdt en niet met de hand verplaatst is.
+                int? ingangVia = res.Reeks.Count >= 2 ? res.Reeks[^2]
+                    : _ingang is { } ing0 && ing0.Melder == res.Reeks[0] && ing0.Richting == r ? ing0.Via : null;
+                if (ingangVia is int iv && iv != m) _kaart.RegistreerDoorgang(iv, res.Reeks[^1], m, r, doel.Configuratie);
                 bool herhaling = res.Reeks.Contains(m);
                 res.Reeks.Add(m);
                 tijdVorigeMelder = w.Tijd;
@@ -1145,6 +1158,11 @@ public partial class BaanVerkenner
                 $"{aanleiding}\n\nZet de testloc (adres {_ins.LocAdres}) met de hand op melder {melder}, zodat ALLEEN die melder bezet is. Controleer ook of de loc niet ontspoord is.\n\nKlik daarna op OK. (Annuleren stopt de verkenning.)");
             if (!verder) throw new OperationCanceledException("Gebruiker stopte bij het terugzetten van de loc.");
             _kortsluitingGemeld = false;
+            // BUG #74: de loc is met de hand verplaatst en de gebruiker heeft intussen vaak wissels gecontroleerd of rechtgezet; ook kan een
+            // open gereden wissel (kruiswissel!) fysiek anders staan dan we denken. Zonder terugmelding weet het programma dat niet, en
+            // ZetWissel stuurt niets als de onthouden stand al klopt. Daarom alle standen vergeten: de wissels worden opnieuw gestuurd.
+            _wisselStand.Clear();
+            _ingang = null;
             if (_hw.KanMelderStatusOpvragen)
             {
                 _hw.VraagMelderStatusOp(melder);

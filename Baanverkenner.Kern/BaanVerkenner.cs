@@ -46,6 +46,20 @@ public class VerkenStatus
     public int VolgendeKortsluitId { get; set; } = 1;
     public int AfgerondeOpdrachten { get; set; }
     public int KortsluitingenTotaal { get; set; }
+    /// <summary>BUG #74: de voltooide kaart wordt uitgebreid met een tweede, los traject: de volgende start bepaalt een nieuwe startmelder
+    /// (waar de loc nu staat) en laat alles wat al gevonden is staan.</summary>
+    public bool Uitbreiden { get; set; }
+
+    /// <summary>BUG #74: maakt van een (voltooide) verkenning een verkenning die verder gaat op een tweede, fysiek los traject. Alles wat
+    /// gevonden is (melders, overgangen, wissels, doorgangen, Dinamo-blokken, geïdentificeerde adressen) blijft staan. Alleen de wachtrij
+    /// wordt leeggemaakt en de kaart telt weer als 'niet voltooid' tot de nieuwe verkenning klaar is.</summary>
+    public void VoorUitbreiding()
+    {
+        Kaart.Voltooid = false;
+        Wachtrij.Clear();
+        Huidig = null;
+        Uitbreiden = true;
+    }
 
     public string AlsJson() => JsonSerializer.Serialize(this, Baankaart.JsonOpties);
     public static VerkenStatus? VanJson(string json) => JsonSerializer.Deserialize<VerkenStatus>(json, Baankaart.JsonOpties);
@@ -165,8 +179,9 @@ public partial class BaanVerkenner
         if (_hw is IBlokAlarmBron alarmBron) alarmBron.BlokAlarmGewijzigd += HardwareMeldtBlokAlarm;
         try
         {
-            bool hervat = _status.Kaart.StartMelder != 0;
-            if (!hervat)
+            bool uitbreiden = _status.Uitbreiden && _status.Kaart.StartMelder != 0;
+            bool hervat = _status.Kaart.StartMelder != 0 && !uitbreiden;
+            if (!hervat && !uitbreiden)
             {
                 _kaart.Gestart = _klok.Nu;
                 _kaart.Hardware = _hw.Naam;
@@ -177,12 +192,18 @@ public partial class BaanVerkenner
             }
             if (_kaart.RefSnelheid <= 0) _kaart.RefSnelheid = _ins.Verkensnelheid;
             _startVerkensnelheid = _ins.Verkensnelheid;
-            _log.Stap(hervat ? "Verkenning wordt hervat." : "Verkenning start.");
+            _log.Stap(uitbreiden ? "Voltooide verkenning wordt uitgebreid met een tweede traject." : hervat ? "Verkenning wordt hervat." : "Verkenning start.");
             if (Leerprofiel is { AantalMetingen: > 0 } lp) _log.Info($"Leerprofiel: {lp.Overgangen.Count} overgangen uit eerdere verkenningen (tijden worden omgerekend naar verkensnelheid {_ins.Verkensnelheid}).");
             _log.Info($"Hardware: {_hw.Naam}. Testloc adres {_ins.LocAdres} ({_ins.LocStappen} stappen), verkensnelheid {_ins.Verkensnelheid}, kruipsnelheid {_ins.Kruipsnelheid}.");
             _log.Info($"Wisseladressen {_kaart.WisselAdresVan} t/m {_kaart.WisselAdresTot}." + (BlokVereist ? $" Dinamo-blokken: {_ins.DinamoBlokken}." : ""));
 
             await BepaalStart(hervat);
+            if (uitbreiden)
+            {
+                _status.Uitbreiden = false; // een onderbreking hierna is een gewone hervatting vanaf de nieuwe startmelder
+                _kaart.Voltooid = false;
+                BewaarNu();
+            }
 
             _fase = "Wissels in beginstand";
             MeldVoortgang();
@@ -304,13 +325,16 @@ public partial class BaanVerkenner
 
         if (bezet.Count == 1)
         {
+            await ControleerUitbreiding(bezet.First());
             _kaart.StartMelder = bezet.First();
             _log.Vondst($"De loc staat op melder {_kaart.StartMelder}: dit is de startmelder.");
         }
         else if (bezet.Count == 0)
         {
             _log.Info("Geen bezette melder bekend (de centrale meldt alleen wijzigingen). De loc gaat zelf op zoek.");
-            _kaart.StartMelder = await ZoekEersteMelder();
+            int gevonden = await ZoekEersteMelder();
+            await ControleerUitbreiding(gevonden);
+            _kaart.StartMelder = gevonden;
         }
         else throw new InvalidOperationException($"Er zijn nog steeds meerdere melders bezet ({Lijst(bezet)}).");
 
@@ -319,6 +343,23 @@ public partial class BaanVerkenner
             if (!await BlokZoekenBijStart(_kaart.StartMelder))
                 throw new InvalidOperationException("Geen Dinamo-blok gevonden voor de startmelder.");
         BewaarNu();
+    }
+
+    /// <summary>BUG #74: bij het uitbreiden van een voltooide kaart is de nieuwe startmelder bijna altijd een melder die nog niet in de kaart
+    /// staat (een los traject). Is hij al bekend, dan wordt gevraagd of dat de bedoeling is. De oude startmelder blijft bewaard.</summary>
+    private async Task ControleerUitbreiding(int nieuw)
+    {
+        if (!_status.Uitbreiden) return;
+        if (_kaart.Melders.Any(m => m.Nummer == nieuw))
+        {
+            _log.Waarschuwing($"Melder {nieuw} is al bekend uit de vorige verkenning.");
+            bool door = await _vraag("Melder al bekend",
+                $"De loc staat op melder {nieuw}, en die is al bekend uit de vorige verkenning. Voor het tweede, losse traject moet de loc op dat andere traject staan.\n\nToch doorgaan met melder {nieuw} als nieuwe startmelder?");
+            if (!door) throw new OperationCanceledException("Uitbreiden gestopt: de loc staat nog op het eerste traject.");
+        }
+        if (_kaart.StartMelder != 0 && _kaart.StartMelder != nieuw && !_kaart.EerdereStartMelders.Contains(_kaart.StartMelder))
+            _kaart.EerdereStartMelders.Add(_kaart.StartMelder);
+        _log.Vondst($"Uitbreiding: de kaart behoudt {_kaart.Melders.Count} melders en {_kaart.Wissels.Count} wissels; er komt een tweede traject bij vanaf melder {nieuw}.");
     }
 
     private async Task<int> ZoekEersteMelder()
@@ -1074,12 +1115,25 @@ public partial class BaanVerkenner
     // Navigeren
     // =====================================================================
 
+    /// <summary>BUG #74: staat de loc op een melder waar hij vanaf een bekende kant binnenkwam (kruiswissel-sectie) en rijdt hij in dezelfde
+    /// richting door, dan telt die ingangskant mee bij de keuze van de wisselstand voor de eerste stap (zie
+    /// <see cref="Baankaart.KiesConfiguratieBijIngang"/>).</summary>
+    private Configuratie KiesBijIngang(int melder, Richting r, List<int> pad, Configuratie gewenst)
+    {
+        if (_ingang is not { } ing || ing.Melder != melder || ing.Richting != r || pad.Count < 2 || pad[0] != melder) return gewenst;
+        var kies = _kaart.KiesConfiguratieBijIngang(ing.Via, melder, r, pad[1], gewenst);
+        if (!kies.Equals(gewenst))
+            _log.Info($"Ingangskant: de loc kwam vanaf melder {ing.Via} op melder {melder} aan. Daarbij leidde '{gewenst}' eerder naar een andere melder dan {pad[1]}; voor de eerste stap geldt nu '{kies}'.");
+        return kies;
+    }
+
     private async Task NaarStartVan(List<Etappe> route)
     {
         foreach (var e in route)
         {
-            await ZetConfiguratie(e.Configuratie);
-            await Rit(e.Van, e.Richting, new RitDoel { Configuratie = e.Configuratie, DoelMelder = e.Naar, VerwachtPad = e.Pad });
+            var cfg = KiesBijIngang(e.Van, e.Richting, e.Pad, e.Configuratie);
+            await ZetConfiguratie(cfg);
+            await Rit(e.Van, e.Richting, new RitDoel { Configuratie = cfg, DoelMelder = e.Naar, VerwachtPad = e.Pad });
         }
     }
 
@@ -1091,9 +1145,10 @@ public partial class BaanVerkenner
         {
             var e = route[i];
             var cfg = i == route.Count - 1 && eersteConfiguratie is not null ? eersteConfiguratie : e.Configuratie;
-            await ZetConfiguratie(cfg);
             var pad = e.Pad.ToList();
             pad.Reverse();
+            cfg = KiesBijIngang(e.Naar, e.Richting.Om(), pad, cfg);
+            await ZetConfiguratie(cfg);
             await Rit(e.Naar, e.Richting.Om(), new RitDoel { Configuratie = cfg, DoelMelder = e.Van, VerwachtPad = pad });
         }
         await ZetConfiguratie(Configuratie.Basis);

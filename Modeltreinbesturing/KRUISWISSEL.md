@@ -63,3 +63,6 @@ Gevolgtrekking (voorlopig): melder 24 wordt ook voor blok 1 gebruikt (niet allee
 ## Marco 10-10-2026 17:56
 - De kruiswissel (motoren 13 en 10) ligt IN de sectie van melder 24. De loc fysiek "terugschuiven naar melder 24" is dus maar een paar cm in die sectie: hij staat dan nog (deels) op het kruiswissel.
 - Hypothese uit het log 17:18-17:54 (NIET veldgetest): motor 13 rechtdoor verbindt 21 <-> 14, motor 13 afbuigend verbindt 8 <-> 14 (melder 24 ertussen). Een loc die vanaf 8 in 24 komt en naar 14 wil, heeft dus 13 afbuigend nodig.
+
+## Marco 10-10-2026 18:09 - ingangskant
+Marco bevestigt dat het onthouden van de ingangskant (voorgaande melder + melder + volgende melder + wisselstand) belangrijk is. Gebouwd als BUG #74 (`Baankaart.Doorgangen`). Voor de kruiswissel in sectie 24: de verkenner leert uit de gereden ritten welke ingangskant bij welke stand hoort en kiest die stand voor de eerste stap bij het terugnavigeren; bewijs ontbreekt = niets veranderen. Nog niet getest op de baan.

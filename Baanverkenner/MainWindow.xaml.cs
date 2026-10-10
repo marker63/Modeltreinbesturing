@@ -390,15 +390,23 @@ public partial class MainWindow : Window
             MessageBox.Show(this, "Er is geen bewaarde verkenning gevonden.", "Hervatten", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
+        // BUG #74: een voltooide verkenning kan worden uitgebreid met een tweede, fysiek los traject (alles blijft in dezelfde kaart).
+        bool uitbreiden = false;
         if (st.Kaart.Voltooid)
         {
-            MessageBox.Show(this, "De laatste verkenning is al voltooid. Het resultaat kun je nog steeds bekijken en opslaan.", "Hervatten", MessageBoxButton.OK, MessageBoxImage.Information);
             ToonResultaat(st);
-            return;
+            var keuze = MessageBox.Show(this,
+                $"De laatste verkenning is voltooid ({st.Kaart.Melders.Count} melders, {st.Kaart.Wissels.Count} wissels).\n\n" +
+                "Wil je die uitbreiden met een tweede traject, bijvoorbeeld een los stuk spoor dat niet met het eerste verbonden is? " +
+                "Alles wat al gevonden is blijft staan; het nieuwe traject komt in dezelfde baankaart, zodat je later alles in één keer kunt importeren.\n\n" +
+                "Kies Nee om alleen het resultaat te bekijken.",
+                "Voltooide verkenning uitbreiden", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (keuze != MessageBoxResult.Yes) return;
+            uitbreiden = true;
         }
         if (_hw is null || !_hw.Verbonden)
         {
-            MessageBox.Show(this, "Maak eerst verbinding met dezelfde centrale als bij de onderbroken verkenning.", "Niet verbonden", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(this, uitbreiden ? "Maak eerst verbinding met dezelfde centrale als bij de vorige verkenning." : "Maak eerst verbinding met dezelfde centrale als bij de onderbroken verkenning.", "Niet verbonden", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
         // Snelheden en tijden: wat NU in het scherm staat (die mag je tussendoor aanpassen).
@@ -443,11 +451,15 @@ public partial class MainWindow : Window
         string behoudenTekst = behouden.Count == 0 ? ""
             : $"\n\nLet op: {string.Join(", ", behouden)} blijven zoals bij de start van deze verkenning (anders klopt de bewaarde voortgang niet).";
         var ok = MessageBox.Show(this,
-            $"De onderbroken verkenning (gestart {st.Kaart.Gestart:dd-MM-yyyy HH:mm}, {st.Kaart.Wissels.Count} wissels en {st.Kaart.Melders.Count} melders gevonden) wordt hervat met verkensnelheid {vast.Verkensnelheid} en kruipsnelheid {vast.Kruipsnelheid}.{behoudenTekst}\n\n" +
-            $"Zet de testloc (adres {vast.LocAdres}) op startmelder {st.Kaart.StartMelder}, met dezelfde kant vooruit als de vorige keer.\n\nHervatten?",
-            "Verkenning hervatten", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            uitbreiden
+                ? $"De voltooide verkenning ({st.Kaart.Wissels.Count} wissels en {st.Kaart.Melders.Count} melders) wordt uitgebreid met een tweede traject, met verkensnelheid {vast.Verkensnelheid} en kruipsnelheid {vast.Kruipsnelheid}.{behoudenTekst}\n\n" +
+                  $"Zet de testloc (adres {vast.LocAdres}) op het ANDERE traject, helemaal binnen één melder (alleen die melder bezet). Die melder wordt de nieuwe startmelder.\n\nUitbreiden?"
+                : $"De onderbroken verkenning (gestart {st.Kaart.Gestart:dd-MM-yyyy HH:mm}, {st.Kaart.Wissels.Count} wissels en {st.Kaart.Melders.Count} melders gevonden) wordt hervat met verkensnelheid {vast.Verkensnelheid} en kruipsnelheid {vast.Kruipsnelheid}.{behoudenTekst}\n\n" +
+                  $"Zet de testloc (adres {vast.LocAdres}) op startmelder {st.Kaart.StartMelder}, met dezelfde kant vooruit als de vorige keer.\n\nHervatten?",
+            uitbreiden ? "Verkenning uitbreiden" : "Verkenning hervatten", MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (ok != MessageBoxResult.Yes) return;
-        if (_sim is not null) _sim.ZetLocOpMelder(st.Kaart.StartMelder);
+        if (uitbreiden) st.VoorUitbreiding();
+        else if (_sim is not null) _sim.ZetLocOpMelder(st.Kaart.StartMelder);
         await VoerVerkenningUit(st.Instellingen, st);
     }
 

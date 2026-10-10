@@ -25,6 +25,10 @@ public sealed class Configuratie
     [JsonConstructor]
     public Configuratie(int[] afbuigend) { Afbuigend = afbuigend.Distinct().OrderBy(a => a).ToArray(); }
 
+    /// <summary>Maakt de configuratie terug uit een Sleutel (BUG #74).</summary>
+    public static Configuratie VanSleutel(string sleutel) =>
+        new(sleutel.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(int.Parse).ToArray());
+
     public bool Bevat(int adres) => Array.BinarySearch(Afbuigend, adres) >= 0;
     public Configuratie Met(int adres) => new(Afbuigend.Append(adres).ToArray());
     public Configuratie Zonder(int adres) => new(Afbuigend.Where(a => a != adres).ToArray());
@@ -58,6 +62,21 @@ public class Overgang
     public double GemiddeldeSeconden { get; set; }
     public int AantalMetingen { get; set; }
     public List<string> GezienBijConfiguraties { get; set; } = new();
+}
+
+/// <summary>BUG #74: een DOORGANG door een melder: de loc kwam vanaf melder <see cref="Via"/> melder <see cref="Melder"/> binnen
+/// (rijdend in <see cref="Richting"/>) en reed daarna door naar <see cref="Volgende"/>, met de wissels in
+/// <see cref="Configuraties"/>. Bij een gewone melder is dat altijd hetzelfde; bij een kruiswissel-sectie (Engelse wissel in één melder)
+/// hangt het vervolg af van de ingangskant (Via) én de wisselstanden. Een doorgang geldt ook omgekeerd (Volgende -> Melder -> Via,
+/// andere richting), met dezelfde wisselstanden.</summary>
+public class Doorgang
+{
+    public int Via { get; set; }
+    public int Melder { get; set; }
+    public int Volgende { get; set; }
+    public Richting Richting { get; set; }
+    public int AantalKeer { get; set; }
+    public List<string> Configuraties { get; set; } = new();
 }
 
 public enum WaarnemingSoort
@@ -186,6 +205,9 @@ public class Baankaart
     /// <summary>BUG #59: de verkensnelheid waarop de tijden in Overgangen (GemiddeldeSeconden) zijn omgerekend (0 = onbekend/oudere kaart).</summary>
     public int RefSnelheid { get; set; }
     public int StartMelder { get; set; }
+    /// <summary>BUG #74: startmelders van eerdere deelverkenningen als de kaart is uitgebreid met een tweede, los traject
+    /// (zie <see cref="VerkenStatus.VoorUitbreiding"/>). <see cref="StartMelder"/> is altijd de meest recente.</summary>
+    public List<int> EerdereStartMelders { get; set; } = new();
     public int WisselAdresVan { get; set; }
     public int WisselAdresTot { get; set; }
 
@@ -195,6 +217,9 @@ public class Baankaart
     public List<Eindpunt> Kopsporen { get; set; } = new();
     public List<Traject> Trajecten { get; set; } = new();
     public List<Kortsluitpunt> Kortsluitpunten { get; set; } = new();
+    /// <summary>BUG #74: per melder welke ingangskant (Via) bij welk vervolg (Volgende) hoort, met de wisselstanden. Oudere kaarten hebben
+    /// dit veld niet (leeg).</summary>
+    public List<Doorgang> Doorgangen { get; set; } = new();
     public List<int> AdressenZonderEffect { get; set; } = new();
     public List<VoorgesteldBlok> VoorgesteldeBlokken { get; set; } = new();
     public List<string> Waarschuwingen { get; set; } = new();
@@ -232,6 +257,50 @@ public class Baankaart
             o.AantalMetingen++;
         }
     }
+
+    /// <summary>BUG #74: legt de doorgang via -> melder -> volgende vast, en meteen ook de omgekeerde (volgende -> melder -> via).</summary>
+    public void RegistreerDoorgang(int via, int melder, int volgende, Richting r, Configuratie c)
+    {
+        Zet(via, melder, volgende, r);
+        Zet(volgende, melder, via, r.Om());
+
+        void Zet(int v, int m, int n, Richting richting)
+        {
+            var d = Doorgangen.FirstOrDefault(x => x.Via == v && x.Melder == m && x.Volgende == n && x.Richting == richting);
+            if (d is null)
+            {
+                d = new Doorgang { Via = v, Melder = m, Volgende = n, Richting = richting };
+                Doorgangen.Add(d);
+            }
+            d.AantalKeer++;
+            if (!d.Configuraties.Contains(c.Sleutel)) d.Configuraties.Add(c.Sleutel);
+        }
+    }
+
+    /// <summary>BUG #74: welke wisselstand (configuratie) moet de loc voor de EERSTE stap hebben als hij op <paramref name="melder"/> staat,
+    /// daar vanaf <paramref name="via"/> binnenkwam en in <paramref name="r"/> naar <paramref name="volgende"/> wil rijden? Is voor deze
+    /// ingangskant gezien dat <paramref name="gewenst"/> ergens ANDERS heen leidt, en is er een andere stand waarvan bevestigd is dat hij naar
+    /// <paramref name="volgende"/> leidt, dan komt die stand terug (de stand die het dichtst bij de gewenste ligt). In alle andere gevallen
+    /// blijft <paramref name="gewenst"/> gelden: zonder bewijs verandert er niets.</summary>
+    public Configuratie KiesConfiguratieBijIngang(int via, int melder, Richting r, int volgende, Configuratie gewenst)
+    {
+        var bij = Doorgangen.Where(d => d.Via == via && d.Melder == melder && d.Richting == r).ToList();
+        if (bij.Count == 0) return gewenst;
+        bool gewenstLeidtElders = bij.Any(d => d.Volgende != volgende && d.Configuraties.Contains(gewenst.Sleutel));
+        bool gewenstBevestigd = bij.Any(d => d.Volgende == volgende && d.Configuraties.Contains(gewenst.Sleutel));
+        if (!gewenstLeidtElders || gewenstBevestigd) return gewenst;
+        var kandidaten = bij.Where(d => d.Volgende == volgende).SelectMany(d => d.Configuraties).Distinct()
+            .Select(Configuratie.VanSleutel).ToList();
+        if (kandidaten.Count == 0) return gewenst;
+        int Verschil(Configuratie k) => k.Afbuigend.Except(gewenst.Afbuigend).Count() + gewenst.Afbuigend.Except(k.Afbuigend).Count();
+        return kandidaten.OrderBy(Verschil).ThenBy(k => k.Sleutel, StringComparer.Ordinal).First();
+    }
+
+    /// <summary>BUG #74: melders waar, in dezelfde richting, meer dan één combinatie ingangskant/vervolg is gezien (kruising, of een
+    /// wissel die van twee kanten bereden is). Voor het rapport.</summary>
+    public List<IGrouping<int, Doorgang>> OpvallendeDoorgangen() =>
+        Doorgangen.GroupBy(d => (d.Melder, d.Richting)).Where(g => g.Count() > 1)
+            .SelectMany(g => g).GroupBy(d => d.Melder).OrderBy(g => g.Key).ToList();
 
     public WisselVondst Wissel(int adres)
     {
