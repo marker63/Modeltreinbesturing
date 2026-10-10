@@ -929,3 +929,26 @@ een commando gestuurd, ook als de software de stand al goed denkt. Verderop in d
 het "alleen bij echte wijziging" (veiligheid bij wagons).
 Als het toch fout gaat: graag de fysieke stand van wissel 5, 13 en 10 noteren op het moment
 van vertrek en het log meesturen.
+
+## #48 - Kruiswissel 13/10: de loc gaat de andere kant op dan de wisselstraat zegt (OPEN, data)
+
+**Waarnemingen (3 ritten vanaf blok 3, kruiswissel = motor 13 en 10):**
+| Rit | Wisselstraat stuurde | Loc reed naar |
+|---|---|---|
+| 1e testrit (log kwijt) | 3 naar 7: 13/10 = afbuigend/afbuigend | blok 4 |
+| 08:21 | 3 naar 7: afbuigend/afbuigend (opstart-stand, geen commando) | bleef op de tongen staan, kortsluiting blok 8; na omzetten naar rechtdoor/rechtdoor + terugduwen: blok 7 |
+| 08:35 | 3 naar 4: rechtdoor/rechtdoor (13 en 10 beide gestuurd) | blok 7 (spookmelding, noodstop) |
+
+Alle drie komen overeen met: vanuit blok 3 leidt rechtdoor/rechtdoor fysiek naar blok 7 en
+afbuigend/afbuigend naar blok 4, dus omgekeerd aan wat de wisselstraten 3 naar 4 (0/0) en
+3 naar 7 (1/1) zeggen. De wisselstraat 3 naar 7 is in v24 door MIJ toegevoegd als kopie van
+7 naar 3 (aanname dat het omgekeerde pad dezelfde stand heeft); 3 naar 4 stond er al. Dat de
+omgekeerde wisselstraten 7 naar 3 (1/1) en 4 naar 3 (0/0) wel getest zouden zijn, past hier
+niet bij: mogelijk is er sindsdien iets aan de motoren/adressen veranderd.
+**Status:** NIET opgelost en niet bewezen. Eenvoudige test: in het baanontwerp de Engelse
+wissel handmatig op rechtdoor/rechtdoor zetten en kijken waar een loc vanuit blok 3 heen
+rijdt; daarna afbuigend/afbuigend. Dan de wisselstraten 3 naar 4, 3 naar 7 (en 4 naar 3,
+7 naar 3) corrigeren. Wissel 5 hoort bij 3 naar 7, 7 naar 3 en 4 naar 3 maar niet bij
+3 naar 4: ook controleren.
+Opmerking bij #46: de "verkeerde kant op" van de 1e testrit is hiermee waarschijnlijk geen
+richtingsfout maar dit; #46 blijft als verbetering (richting per loc onthouden) staan.
