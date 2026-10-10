@@ -1252,3 +1252,9 @@ NOG NIET GETEST OP DE BAAN (alleen simulator). Een proef met een partner kost pe
 4. Blijft het daarna uit: einde "doodlopend" met `BekendVervolgGemist`: GEEN kopspoor opgeslagen, geen "terug vanaf het einde" gepland, wel een waarschuwing.
 **Test:** `OmgekeerdeOvergangTest` met de kaart van 13:40 (14 achteruit → 13, 28 achteruit → 27, andere wisselstand niets afgeleid, rapport zonder lege regel); alle bestaande scenario's ongewijzigd groen.
 NIET in de simulator getest: het hangen van de loc zelf (sim kent geen hangende loc). NOG NIET GETEST OP DE BAAN.
+
+## OPEN VRAAG voor de volgende versie (Marco, 14:14)
+Controleren of alles wat de Baanverkenner (#61-#64) heeft geleerd ook in het Modeltreinbesturing-programma zelf (`BaankaartImporter`, `BaankaartVergelijker`, `RijrichtingImporter`) verwerkt wordt:
+- Overloopwissels (twee wissels samen afbuigend, `LostKortsluitingOp` met partner, kortsluitpunt opgelost door adres b): de importer gebruikt wisselwaarnemingen nog niet.
+- Omgekeerde overgangen (#64): importer leest overgangen al in beide richtingen (Van of Naar), dus waarschijnlijk al goed - nog bevestigen met de kaart van 13:40.
+- Blokhints/leerprofiel hoeven niet naar het hoofdprogramma.
