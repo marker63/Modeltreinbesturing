@@ -1,0 +1,98 @@
+Baanverkenner - logboek
+============================================================
+2026-10-10 18:57:49.715  info    Hervat vanaf opgeslagen voortgang (4 opdrachten al afgerond).
+2026-10-10 18:57:49.737  STAP    Verkenning wordt hervat.
+2026-10-10 18:57:49.738  info    Leerprofiel: 47 overgangen uit eerdere verkenningen (tijden worden omgerekend naar verkensnelheid 12).
+2026-10-10 18:57:49.738  info    Hardware: VPEB Dinamo. Testloc adres 5408 (28 stappen), verkensnelheid 12, kruipsnelheid 5.
+2026-10-10 18:57:49.738  info    Wisseladressen 1 t/m 20. Dinamo-blokken: 1-9.
+2026-10-10 18:57:49.743  STAP    Stand van melder 1 t/m 64 opvragen…
+2026-10-10 18:58:03.860  STAP    Alle adressen in het bereik op rechtdoor zetten (commando gestuurd; de centrale meldt de werkelijke stand van de wisselmotoren niet terug).
+2026-10-10 18:58:03.865  rijden  Adres 1 → rechtdoor (wisselcommando 1 sinds het verbinden)
+2026-10-10 18:58:04.465  rijden  Adres 2 → rechtdoor (wisselcommando 2 sinds het verbinden)
+2026-10-10 18:58:05.065  rijden  Adres 3 → rechtdoor (wisselcommando 3 sinds het verbinden)
+2026-10-10 18:58:05.666  rijden  Adres 4 → rechtdoor (wisselcommando 4 sinds het verbinden)
+2026-10-10 18:58:06.266  rijden  Adres 5 → rechtdoor (wisselcommando 5 sinds het verbinden)
+2026-10-10 18:58:06.866  rijden  Adres 6 → rechtdoor (wisselcommando 6 sinds het verbinden)
+2026-10-10 18:58:07.467  rijden  Adres 7 → rechtdoor (wisselcommando 7 sinds het verbinden)
+2026-10-10 18:58:08.067  rijden  Adres 8 → rechtdoor (wisselcommando 8 sinds het verbinden)
+2026-10-10 18:58:08.668  rijden  Adres 9 → rechtdoor (wisselcommando 9 sinds het verbinden)
+2026-10-10 18:58:09.269  rijden  Adres 10 → rechtdoor (wisselcommando 10 sinds het verbinden)
+2026-10-10 18:58:09.869  rijden  Adres 11 → rechtdoor (wisselcommando 11 sinds het verbinden)
+2026-10-10 18:58:10.469  rijden  Adres 12 → rechtdoor (wisselcommando 12 sinds het verbinden)
+2026-10-10 18:58:11.070  rijden  Adres 13 → rechtdoor (wisselcommando 13 sinds het verbinden)
+2026-10-10 18:58:11.670  rijden  Adres 14 → rechtdoor (wisselcommando 14 sinds het verbinden)
+2026-10-10 18:58:12.270  rijden  Adres 15 → rechtdoor (wisselcommando 15 sinds het verbinden)
+2026-10-10 18:58:12.871  rijden  Adres 16 → rechtdoor (wisselcommando 16 sinds het verbinden)
+2026-10-10 18:58:13.472  rijden  Adres 17 → rechtdoor (wisselcommando 17 sinds het verbinden)
+2026-10-10 18:58:14.072  rijden  Adres 18 → rechtdoor (wisselcommando 18 sinds het verbinden)
+2026-10-10 18:58:14.672  rijden  Adres 19 → rechtdoor (wisselcommando 19 sinds het verbinden)
+2026-10-10 18:58:15.273  rijden  Adres 20 → rechtdoor (wisselcommando 20 sinds het verbinden)
+2026-10-10 18:58:15.932  STAP    Opdracht #5: vanaf melder 21 achteruit (afbuigend: 10) - andere tak van adres 10 verkennen (vanaf melder 21, andersom).
+2026-10-10 18:58:15.955  rijden  Rijden vooruit van melder 13 naar melder 21.
+2026-10-10 18:58:20.377  rijden    melder 14 bezet
+2026-10-10 18:58:26.937  info    De loc staat op meerdere melders (14, 24); rijcommando ook naar blok 8.
+2026-10-10 18:58:27.138  rijden    melder 24 bezet (na 6,6 s)
+2026-10-10 18:58:31.332  info    De loc staat op meerdere melders (24, 21); rijcommando ook naar blok 7.
+2026-10-10 18:58:31.533  rijden    melder 21 bezet (na 4,4 s)
+2026-10-10 18:58:34.154  rijden  Adres 10 → afbuigend (wisselcommando 21 sinds het verbinden)
+2026-10-10 18:58:34.763  rijden  Verkenningsrit achteruit vanaf melder 21 (afbuigend: 10).
+2026-10-10 18:58:37.543  info    De loc staat op meerdere melders (24, 21); rijcommando ook naar blok 8.
+2026-10-10 18:58:37.745  rijden    melder 24 bezet
+2026-10-10 18:58:40.125  info    De loc staat op meerdere melders (24, 129); rijcommando ook naar blok 9.
+2026-10-10 18:58:40.327  rijden    melder 129 bezet (na 2,6 s)
+2026-10-10 18:58:43.724  info    De loc staat op meerdere melders (14, 129); rijcommando ook naar blok 3.
+2026-10-10 18:58:43.924  rijden    melder 14 bezet (na 3,6 s)
+2026-10-10 18:58:45.228  rijden    gestopt: na melder 14 volgt een bekend kortsluitpunt.
+2026-10-10 18:58:45.230  info    Basisrit: 21, 24, 129, 14 - einde: gestopt vóór bekend kortsluitpunt.
+2026-10-10 18:58:45.234  rijden  Rijden vooruit van melder 14 naar melder 21.
+2026-10-10 18:58:51.051  LET OP  KORTSLUITING/ONTSPORING vermoed na melder 14 (vooruit): de centrale meldt een kortsluiting/fout. Dinamo meldt kortsluiting in blok 3 en 9. Ook bezet op dat moment: melder 129 (daar zit de loc deels in). Noodstop.
+2026-10-10 18:58:57.458  rijden  Herstel: loc achteruit terug naar melder 14 (poging 1).
+2026-10-10 18:59:15.208  rijden  Neerzetten op melder 14 (nu bezet: 14, 129), kruipen achteruit.
+2026-10-10 18:59:33.832  rijden  Neerzetten op melder 14: nu vooruit (bezet: 14, 129).
+2026-10-10 19:00:09.731  LET OP  Loc staat op melder 14 maar ook nog op 129 - verder zo goed mogelijk.
+2026-10-10 19:00:09.731  info    Loc staat weer op melder 14.
+2026-10-10 19:00:09.924  LET OP  Opdracht #5: Op de terugweg naar melder 21 volgde een kortsluiting: de loc staat niet op melder 21.
+2026-10-10 19:00:09.924  rijden  Adres 10 → rechtdoor (wisselcommando 22 sinds het verbinden)
+2026-10-10 19:01:00.941  info    Gebruiker heeft de loc op melder 13 gezet.
+2026-10-10 19:01:00.941  info    Opdracht #5 wordt later nog één keer geprobeerd.
+2026-10-10 19:01:00.947  STAP    Opdracht #6: vanaf melder 24 vooruit (afbuigend: 5, 10) - verder voorbij opgelost kortsluitpunt #1 (adres 10 en 5 samen afbuigend).
+2026-10-10 19:01:00.950  rijden  Adres 1 → rechtdoor (wisselcommando 23 sinds het verbinden)
+2026-10-10 19:01:01.550  rijden  Adres 2 → rechtdoor (wisselcommando 24 sinds het verbinden)
+2026-10-10 19:01:02.151  rijden  Adres 3 → rechtdoor (wisselcommando 25 sinds het verbinden)
+2026-10-10 19:01:02.751  rijden  Adres 4 → rechtdoor (wisselcommando 26 sinds het verbinden)
+2026-10-10 19:01:03.352  rijden  Adres 5 → rechtdoor (wisselcommando 27 sinds het verbinden)
+2026-10-10 19:01:03.952  rijden  Adres 6 → rechtdoor (wisselcommando 28 sinds het verbinden)
+2026-10-10 19:01:04.553  rijden  Adres 7 → rechtdoor (wisselcommando 29 sinds het verbinden)
+2026-10-10 19:01:05.153  rijden  Adres 8 → rechtdoor (wisselcommando 30 sinds het verbinden)
+2026-10-10 19:01:05.753  rijden  Adres 9 → rechtdoor (wisselcommando 31 sinds het verbinden)
+2026-10-10 19:01:06.354  rijden  Adres 10 → afbuigend (wisselcommando 32 sinds het verbinden)
+2026-10-10 19:01:06.955  rijden  Adres 11 → rechtdoor (wisselcommando 33 sinds het verbinden)
+2026-10-10 19:01:07.555  rijden  Adres 12 → rechtdoor (wisselcommando 34 sinds het verbinden)
+2026-10-10 19:01:08.156  rijden  Adres 13 → rechtdoor (wisselcommando 35 sinds het verbinden)
+2026-10-10 19:01:08.756  rijden  Adres 14 → rechtdoor (wisselcommando 36 sinds het verbinden)
+2026-10-10 19:01:09.356  rijden  Adres 15 → rechtdoor (wisselcommando 37 sinds het verbinden)
+2026-10-10 19:01:09.956  rijden  Adres 16 → rechtdoor (wisselcommando 38 sinds het verbinden)
+2026-10-10 19:01:10.556  rijden  Adres 17 → rechtdoor (wisselcommando 39 sinds het verbinden)
+2026-10-10 19:01:11.156  rijden  Adres 18 → rechtdoor (wisselcommando 40 sinds het verbinden)
+2026-10-10 19:01:11.756  rijden  Adres 19 → rechtdoor (wisselcommando 41 sinds het verbinden)
+2026-10-10 19:01:12.356  rijden  Adres 20 → rechtdoor (wisselcommando 42 sinds het verbinden)
+2026-10-10 19:01:12.957  rijden  Rijden vooruit van melder 13 naar melder 24.
+2026-10-10 19:01:15.336  rijden    melder 14 bezet
+2026-10-10 19:01:22.028  info    De loc staat op meerdere melders (14, 24); rijcommando ook naar blok 8.
+2026-10-10 19:01:22.229  rijden    melder 24 bezet (na 6,7 s)
+2026-10-10 19:01:24.944  rijden  Adres 5 → afbuigend (wisselcommando 43 sinds het verbinden)
+2026-10-10 19:01:25.545  rijden  Verkenningsrit vooruit vanaf melder 24 (afbuigend: 5, 10).
+2026-10-10 19:01:56.461  rijden  De loc vertrok niet van melder 24 - eerst het al bekende Dinamo-blok 8 nog eens proberen voordat de volledige blokproef start.
+2026-10-10 19:02:02.872  rijden  De loc vertrok niet met blok 8 - nu één korte poging met het rijcommando naar alle Dinamo-blokken tegelijk (staat hij met een draaistel op een blokgrens?).
+2026-10-10 19:02:16.090  LET OP  De loc vertrok niet van melder 24 terwijl het blok (8) bekend is en er kort geleden een kortsluiting was: waarschijnlijk staat hij op een open gereden of verkeerd staande wissel (bijv. een kruiswissel met maar één van de twee motoren op afbuigend). De volledige blokproef wordt overgeslagen.
+2026-10-10 19:02:53.287  info    Gebruiker heeft de loc op melder 24 gezet.
+2026-10-10 19:02:55.768  info    De loc staat op meerdere melders (24, 8); rijcommando ook naar blok 4.
+2026-10-10 19:02:55.968  rijden    melder 8 bezet
+2026-10-10 19:02:59.249  LET OP  KORTSLUITING/ONTSPORING vermoed na melder 8 (vooruit): de centrale meldt een kortsluiting/fout. Dinamo meldt kortsluiting in blok 4. Noodstop.
+2026-10-10 19:03:05.650  rijden  Herstel: loc achteruit terug naar melder 8 (poging 1).
+2026-10-10 19:03:13.402  info    Loc staat weer op melder 8.
+2026-10-10 19:03:13.404  info    Basisrit: 24, 8 - einde: kortsluiting/ontsporing.
+2026-10-10 19:03:13.409  VONDST  Kortsluitpunt #6: direct na melder 8 (vooruit, afbuigend: 5, 10). Dinamo meldde kortsluiting in blok 4. Waarschijnlijk een wissel die van achteren in de verkeerde stand bereden wordt; wordt later opgelost.
+2026-10-10 19:03:13.409  rijden  Rijden achteruit van melder 8 naar melder 24.
+2026-10-10 19:03:44.340  rijden  De loc vertrok niet van melder 8 - eerst het al bekende Dinamo-blok 4 nog eens proberen voordat de volledige blokproef start.
+2026-10-10 19:03:50.751  rijden  De loc vertrok niet met blok 4 - nu één korte poging met het rijcommando naar alle Dinamo-blokken tegelijk (staat hij met een draaistel op een blokgrens?).

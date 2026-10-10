@@ -360,6 +360,20 @@ public static class Tests
         Eis(Rapport.AlsTekst(kk).Contains("ook bezet: melder 8"), "tweede melder: staat in het rapport");
     }
 
+    // BUG #77 (log 18:58): terugweg 14 -> 129 vereist wissel 5 afbuigend
+    static void WisselEisenTest()
+    {
+        var k = Laad("baankaart_2026-10-10_1903_doorgangen.json");
+        var c = new Configuratie(new[] { 10 });
+        var n = k.MetWisselEisen(new List<int> { 14, 129, 24, 21 }, Richting.Vooruit, c, out var w);
+        Eis(n.Equals(new Configuratie(new[] { 5, 10 })), "wisselEisen: pad 14-129-24-21 vooruit met 10 afbuigend krijgt ook wissel 5 afbuigend (nu " + n + ")");
+        var n2 = k.MetWisselEisen(new List<int> { 21, 24, 129, 14 }, Richting.Achteruit, new Configuratie(new[] { 10 }), out _);
+        Eis(n2.Equals(new Configuratie(new[] { 5, 10 })), "wisselEisen: van achteren 129 -> 14 vraagt wissel 5 afbuigend (nu " + n2 + ")");
+        var n3 = k.MetWisselEisen(new List<int> { 14, 24, 21 }, Richting.Vooruit, new Configuratie(new[] { 5 }), out _);
+        Eis(n3.Equals(Configuratie.Basis), "wisselEisen: 14 -> 24 vooruit vraagt wissel 5 rechtdoor (nu " + n3 + ")");
+        Eis(k.MetWisselEisen(new List<int> { 30, 20, 27 }, Richting.Vooruit, c, out var w5).Equals(c) && w5.Count == 0, "wisselEisen: gewoon spoor zonder wissels verandert niets");
+    }
+
     // Blokkenschema-tekening (SVG) uit de baankaart van 17:07
     static void BlokkenschemaTest()
     {
@@ -479,6 +493,7 @@ public static class Tests
         DoorgangTest();
         UitbreidenTest();
         TweedeMelderTest();
+        WisselEisenTest();
 
         Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)");
         return _fouten == 0 ? 0 : 1;

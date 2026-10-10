@@ -1138,11 +1138,21 @@ public partial class BaanVerkenner
         return kies;
     }
 
+    /// <summary>BUG #77: bij navigeren over een bekend pad moet elke stap de wisselstand hebben die uit de gevonden splitsingen volgt (zie
+    /// <see cref="Baankaart.WisselEisenVoorStap"/>), ook als de stand van de etappe of van een proef iets anders zegt.</summary>
+    private Configuratie MetEisen(List<int> pad, Richting r, Configuratie c)
+    {
+        var nieuw = _kaart.MetWisselEisen(pad, r, c, out var wijz);
+        if (wijz.Count > 0)
+            _log.Info($"Wisselstand voor het pad {string.Join("-", pad)} ({r.Tekst()}) aangepast aan wat over de wissels bekend is: {string.Join(", ", wijz)}. Nieuwe stand: {nieuw}.");
+        return nieuw;
+    }
+
     private async Task NaarStartVan(List<Etappe> route)
     {
         foreach (var e in route)
         {
-            var cfg = KiesBijIngang(e.Van, e.Richting, e.Pad, e.Configuratie);
+            var cfg = MetEisen(e.Pad, e.Richting, KiesBijIngang(e.Van, e.Richting, e.Pad, e.Configuratie));
             await ZetConfiguratie(cfg);
             await Rit(e.Van, e.Richting, new RitDoel { Configuratie = cfg, DoelMelder = e.Naar, VerwachtPad = e.Pad });
         }
@@ -1158,7 +1168,7 @@ public partial class BaanVerkenner
             var cfg = i == route.Count - 1 && eersteConfiguratie is not null ? eersteConfiguratie : e.Configuratie;
             var pad = e.Pad.ToList();
             pad.Reverse();
-            cfg = KiesBijIngang(e.Naar, e.Richting.Om(), pad, cfg);
+            cfg = MetEisen(pad, e.Richting.Om(), KiesBijIngang(e.Naar, e.Richting.Om(), pad, cfg));
             await ZetConfiguratie(cfg);
             await Rit(e.Naar, e.Richting.Om(), new RitDoel { Configuratie = cfg, DoelMelder = e.Van, VerwachtPad = pad });
         }
@@ -1222,6 +1232,10 @@ public partial class BaanVerkenner
             var extra = bezet.FirstOrDefault(m => !pad.Contains(m));
             if (extra != 0) { pad.Insert(0, extra); vanaf = extra; }
         }
+        // BUG #77 (log 18:58): de terugweg 14 -> 129 -> 24 -> 21 werd met wissel 5 rechtdoor gereden terwijl 14 -> 129 alleen met wissel 5
+        // afbuigend bestaat: kortsluiting. Voor de terugweg gelden de bekende wisselstanden per stap.
+        c = MetEisen(pad, rit.Richting.Om(), KiesBijIngang(vanaf, rit.Richting.Om(), pad, c));
+        await ZetConfiguratie(c);
         var terug = await Rit(vanaf, rit.Richting.Om(), new RitDoel { Configuratie = c, DoelMelder = start, VerwachtPad = pad });
         // BUG #73 (log 17:48 en 17:54): kreeg de loc op de terugweg kortsluiting, dan was hij NIET terug op de startmelder. Het resultaat werd
         // genegeerd, de volgende proefrit begon vanaf een verkeerd aangenomen plek en de loc werd steeds opnieuw handmatig verplaatst.

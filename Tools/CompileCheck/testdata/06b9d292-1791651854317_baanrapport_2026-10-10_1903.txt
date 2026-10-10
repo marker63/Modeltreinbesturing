@@ -1,0 +1,103 @@
+BAANVERKENNER - RAPPORT
+============================================================
+Status        : niet voltooid (tussenstand)
+Hardware      : VPEB Dinamo
+Testloc       : adres 5408 (28 stappen)
+Startmelder   : 13
+Wisseladressen: 1 t/m 20
+Gestart       : 10-10-2026 17:18   duur: 1 u 44 min
+Gevonden      : 18 melders, 5 wissels, 0 doodlopende einden, 8 voorgestelde blokken
+(Richtingen zijn die van de testloc zelf.)
+
+WISSELS
+-------
+  Adres 2    na melder 5 (vooruit), van achteren bereden
+             rechtdoor: melder 13   afbuigend: kortsluiting
+  Adres 5    na melder 14 (vooruit), puntzijde
+             rechtdoor: melder 24   afbuigend: melder 129
+  Adres 5    na melder 24 (vooruit), van achteren bereden
+             rechtdoor: –   afbuigend: melder 8
+  Adres 10   na melder 24 (vooruit), van achteren bereden
+             rechtdoor: melder 21   afbuigend: kortsluiting
+  Adres 11   na melder 13 (vooruit), puntzijde
+             rechtdoor: melder 14   afbuigend: melder 24
+  Adres 12   na melder 13 (vooruit), puntzijde
+             rechtdoor: melder 14   afbuigend: melder 24
+
+GEREDEN TRAJECTEN
+-----------------
+  [vooruit, alle wissels rechtdoor]
+     13 → [W11 rechtdoor, W12 rechtdoor] → 14 → [W5 rechtdoor] → 24 → [W10 rechtdoor] → 21 → 29 → 30 → 20 → 27 → 28 → 26 → 25 → 17 → 8 → 15 → 16 → 5 → [W2 rechtdoor] → 13  ↺ lus
+  [achteruit, alle wissels rechtdoor]
+     13 → 5 → 16 → 15 → 8 → 17 → 25 → 26 → 28 → 27 → 20 → 30 → 29 → 21 → 24 → [W5 rechtdoor (achterkant)] → 14 → [W11 rechtdoor (achterkant), W12 rechtdoor (achterkant)] → 13  ↺ lus
+  [achteruit, alle wissels rechtdoor]
+     13 → 5 → 16 → 15 → 8 → 17 → 25 → 26 → 28 → 27 → 20 → 30 → 29 → 21 → 24 → [W5 rechtdoor (achterkant)] → 14 → [W11 rechtdoor (achterkant), W12 rechtdoor (achterkant)] → 13  ↺ lus
+  [achteruit, alle wissels rechtdoor]
+     13 → 5 → 16 → 15 → 8 → 17 → 25 → 26 → 28 → 27 → 20 → 30 → 29 → 21 → 24 → [W5 rechtdoor (achterkant)] → 14 → [W11 rechtdoor (achterkant), W12 rechtdoor (achterkant)] → 13  ↺ lus
+
+MELDERS
+-------
+  Melder 5    blok 3     vooruit → 13         achteruit → 12, 16
+  Melder 8    blok 4     vooruit → 15         achteruit → 17, 24
+  Melder 12   blok ?     vooruit → 5          achteruit → 
+  Melder 13   blok 3     vooruit → 14, 24     achteruit → 5
+  Melder 14   blok 3     vooruit → 24, 129    achteruit → 13
+  Melder 15   blok 4     vooruit → 16         achteruit → 8
+  Melder 16   blok 4     vooruit → 5          achteruit → 15
+  Melder 17   blok 5     vooruit → 8          achteruit → 25
+  Melder 20   blok 6     vooruit → 27         achteruit → 30
+  Melder 21   blok 7     vooruit → 29         achteruit → 24
+  Melder 24   blok 8     vooruit → 8, 21      achteruit → 13, 14, 129
+  Melder 25   blok 5     vooruit → 17         achteruit → 26
+  Melder 26   blok 5     vooruit → 25         achteruit → 28
+  Melder 27   blok 6     vooruit → 28         achteruit → 20
+  Melder 28   blok 6     vooruit → 26         achteruit → 27
+  Melder 29   blok 7     vooruit → 30         achteruit → 21
+  Melder 30   blok 7     vooruit → 20         achteruit → 29
+  Melder 129  blok 9     vooruit → 24         achteruit → 14
+
+VOORGESTELDE BLOKKEN
+--------------------
+  Blok 1  : melders 5 - 13 - 14 (Dinamo-blok 3)   grenst aan: 2, 3, 7, 8
+  Blok 2  : melders 8 - 15 - 16 (Dinamo-blok 4)   grenst aan: 1, 4, 7
+  Blok 3  : melders 12   grenst aan: 1
+  Blok 4  : melders 17 - 25 - 26 (Dinamo-blok 5)   grenst aan: 2, 5
+  Blok 5  : melders 20 - 27 - 28 (Dinamo-blok 6)   grenst aan: 4, 6
+  Blok 6  : melders 21 - 29 - 30 (Dinamo-blok 7)   grenst aan: 5, 7
+  Blok 7  : melders 24 (Dinamo-blok 8)   grenst aan: 1, 2, 6, 8
+  Blok 8  : melders 129 (Dinamo-blok 9)   grenst aan: 1, 7
+
+DOORGANGEN (INGANGSKANT)
+------------------------
+  melder 5 (vooruit): vanaf 12 → 13   [afbuigend: 2]  1x
+  melder 5 (vooruit): vanaf 16 → 13   [afbuigend: 2 / afbuigend: 5]  2x
+  melder 5 (achteruit): vanaf 13 → 12   [afbuigend: 2]  1x
+  melder 5 (achteruit): vanaf 13 → 16   [afbuigend: 2 / afbuigend: 5]  2x
+  melder 14 (vooruit): vanaf 13 → 24   [afbuigend: 2 / afbuigend: 5 / alle wissels rechtdoor / afbuigend: 10]  5x
+  melder 14 (vooruit): vanaf 13 → 129   [afbuigend: 5]  1x
+  melder 14 (achteruit): vanaf 24 → 13   [afbuigend: 2 / afbuigend: 5 / alle wissels rechtdoor / afbuigend: 10]  5x
+  melder 14 (achteruit): vanaf 129 → 13   [afbuigend: 5]  1x
+  melder 24 (vooruit): vanaf 14 → 21   [afbuigend: 2 / afbuigend: 5 / alle wissels rechtdoor]  4x
+  melder 24 (vooruit): vanaf 129 → 21   [afbuigend: 10]  2x
+  melder 24 (achteruit): vanaf 21 → 14   [afbuigend: 2 / afbuigend: 5 / alle wissels rechtdoor]  4x
+  melder 24 (achteruit): vanaf 21 → 129   [afbuigend: 10]  2x
+
+DOODLOPENDE EINDEN
+------------------
+  (geen)
+
+KORTSLUITPUNTEN EN ONVERWACHTE TERUGWEGEN
+-----------------------------------------
+  #1 [kortsluiting] na melder 24 (vooruit), afbuigend: 10 [Dinamo-alarm in blok 8]: opgelost met adres 5 op afbuigend
+  #2 [onverwachte terugweg, geen kortsluiting] na melder 13 (vooruit), afbuigend: 13: open
+  #3 [kortsluiting] na melder 12 (achteruit), afbuigend: 2 [Dinamo-alarm in blok 2]: open
+  #4 [kortsluiting] na melder 24 (vooruit), afbuigend: 5 [Dinamo-alarm in blok 8, 9]: open
+  #5 [kortsluiting] na melder 14 (achteruit), afbuigend: 10 [Dinamo-alarm in blok 3, 9]: open
+
+ADRESSEN ZONDER GEVONDEN EFFECT
+-------------------------------
+  (geen)
+
+AANDACHTSPUNTEN
+---------------
+  - Onverwachte terugweg na melder 13/24 (vooruit, afbuigend: 13): heen ging de loc van 13 naar 24, terug ging hij na 24 naar 14 - niet terug naar 13. Geen kortsluiting. Mogelijk ligt hier een wissel die van achteren in de verkeerde stand bereden wordt, mogelijk is dit een gewoon recht stuk spoor en is een melder bij de heenrit niet geregistreerd. Deze overgang is niet in de kaart opgenomen.

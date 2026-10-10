@@ -316,6 +316,49 @@ public class Baankaart
         return res;
     }
 
+    /// <summary>BUG #77: welke wisselstanden zijn nodig voor de stap <paramref name="van"/> -> <paramref name="naar"/> in richting <paramref name="r"/>?
+    /// Uit de gevonden splitsingen (puntzijde na melder N, rechtdoor naar R, afbuigend naar A): rijdend van N naar R of A (kop) moet de wissel op
+    /// die tak staan; rijdend van R of A terug naar N (van achteren, andere richting) moet hij ook op die tak staan, anders wordt hij open gereden
+    /// of volgt kortsluiting. Een omgekeerde overgang uit de kaart (X->Y gezien, dus Y->X ook) zegt hier niets over: die zegt niet in welke stand
+    /// de wissel stond toen er van achteren doorheen gereden werd.</summary>
+    public List<(int Adres, bool Afbuigend)> WisselEisenVoorStap(int van, int naar, Richting r)
+    {
+        var res = new List<(int, bool)>();
+        foreach (var w in Wissels)
+            foreach (var o in w.Waarnemingen.Where(x => x.Soort == WaarnemingSoort.Splitsing))
+            {
+                bool kop = van == o.NaMelder && r == o.Richting;
+                bool achter = naar == o.NaMelder && r == o.Richting.Om();
+                if (kop && o.VolgendeBijRechtdoor == naar) res.Add((w.Adres, false));
+                else if (kop && o.VolgendeBijAfbuigend == naar) res.Add((w.Adres, true));
+                else if (achter && o.VolgendeBijRechtdoor == van) res.Add((w.Adres, false));
+                else if (achter && o.VolgendeBijAfbuigend == van) res.Add((w.Adres, true));
+            }
+        return res.Distinct().ToList();
+    }
+
+    /// <summary>BUG #77: de wisselstand <paramref name="c"/> aangevuld met de eisen van alle stappen van <paramref name="pad"/>. Tegenstrijdige
+    /// eisen voor een adres (twee stappen willen het tegenovergestelde) worden niet toegepast; dat adres blijft zoals het was.</summary>
+    public Configuratie MetWisselEisen(List<int> pad, Richting r, Configuratie c, out List<string> wijzigingen)
+    {
+        wijzigingen = new List<string>();
+        var eisen = new Dictionary<int, bool>(); var strijdig = new HashSet<int>();
+        for (int i = 0; i + 1 < pad.Count; i++)
+            foreach (var (a, afb) in WisselEisenVoorStap(pad[i], pad[i + 1], r))
+            {
+                if (eisen.TryGetValue(a, out var bestaand) && bestaand != afb) strijdig.Add(a);
+                eisen[a] = afb;
+            }
+        var nieuw = c;
+        foreach (var (a, afb) in eisen)
+        {
+            if (strijdig.Contains(a) || nieuw.Bevat(a) == afb) continue;
+            nieuw = nieuw.MetStand(a, afb);
+            wijzigingen.Add($"{a} {(afb ? "afbuigend" : "rechtdoor")}");
+        }
+        return nieuw;
+    }
+
     /// <summary>BUG #74: melders waar, in dezelfde richting, meer dan één combinatie ingangskant/vervolg is gezien (kruising, of een
     /// wissel die van twee kanten bereden is). Voor het rapport.</summary>
     public List<IGrouping<int, Doorgang>> OpvallendeDoorgangen() =>
