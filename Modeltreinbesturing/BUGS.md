@@ -1336,3 +1336,13 @@ Fix (gebouwd, getest in de simulator, NIET getest op de baan): in `RitUitvoeren`
 Test: `NavigatieOnjuisteStartTest` (oude code faalt beide controles, nieuwe code slaagt).
 Handmatig opschonen in de lopende voortgang.json (programma gesloten): verwijder in Overgangen de regel met Van 13, Naar 8, Richting Achteruit. Het leerprofiel kan hierdoor ook een verkeerde looptijd 13 -> 8 hebben.
 Leermateriaal: `Tools/CompileCheck/testdata/*kleine_cirkels*_2026-10-10_1655.*`.
+
+## #72 - Baanverkenner: een gelukte proef bij een kortsluitpunt ging verloren doordat de weg terug mislukte (Marco 17:07, log 16:40-17:01)
+Waarneming: kortsluitpunt #2 (na melder 24 achteruit, wissel 14 afbuigend) werd "opgegeven na 3 kortsluitingen", terwijl de proef met adres 13 afbuigend om 16:48:29-35 WEL slaagde (loc reed 24 -> 14, geen kortsluiting).
+Oorzaak: in `LosKortsluitpuntenOp` werd de uitkomst van de proef pas beoordeeld NA `TerugNaar` en `TerugNaarHuis`. Die weg terug zette motor 13 weer op rechtdoor terwijl de loc in de kruiswissel-sectie 24 stond, de loc reed vervolgens naar een andere melder/kortsluiting (16:48:46), er kwam een `NavigatieFout`, en de uitkomst werd nooit vastgelegd.
+Fix (gebouwd, regressietests OK, geen eigen test voor de mislukte terugweg, NIET getest op de baan): de uitkomst (kortsluiting of opgelost, inclusief wisselwaarneming en vervolgopdracht) wordt eerst vastgelegd en bewaard; mislukt daarna de weg terug, dan volgt een waarschuwing en de vraag de loc terug te zetten, maar de uitkomst blijft staan.
+Leermateriaal: `Tools/CompileCheck/testdata/*voltooid_kruiswissel24_2026-10-10_1707.*` (oude run voor #71: bevat de valse overgang 13 -> 8).
+Waargenomen maar NIET opgelost (open):
+- Alle vijf de kortsluitingen "na melder 8 vooruit" (16:48:05, 16:55:16, 16:57:53, 16:58:55, 17:00:58) volgden op "Adres 14 -> rechtdoor" direct nadat de loc van melder 24 naar melder 8 was gereden (melder 24 was dan al vrij, 1,7 s na "melder 8 bezet"). Waar wissel 14 afbuigend bleef staan (16:41:24, 16:58:22, 16:59:24) reed dezelfde rit 8 -> 15 zonder kortsluiting. Sterke aanwijzing dat wissel 14 omgezet wordt terwijl de staart van de loc nog op het wissel staat (het wissel heeft geen melder). Mogelijke maatregel: na aankomst via een wissel eerst een korte afstand doorrijden voordat dat wissel omgezet wordt.
+- Kortsluitpunt #3 "opgelost: adres 13 afbuigend -> melder 15" is een misleidende registratie: 13 bepaalt of de loc vanaf melder 14 via de kruiswissel naar 8 of naar 21 gaat. Het echte probleem was dat de rit 24 -> 8 via 21 ... 17 naar 8 liep en 8 van de verkeerde kant (17) binnenkwam. Hoort bij het ingangskant-probleem van melder 24.
+- Ingangskant ("via-melder") voor de kruiswissel-sectie 24 is nog steeds niet gebouwd. Zie KRUISWISSEL.md.

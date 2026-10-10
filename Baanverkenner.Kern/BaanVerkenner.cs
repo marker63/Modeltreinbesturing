@@ -1000,15 +1000,16 @@ public partial class BaanVerkenner
                     await NaarStartVan(k.Route);
                     await ZetConfiguratie(c);
                     var rit = await Rit(k.NaMelder, k.Richting, new RitDoel { Configuratie = c, Basis = new List<int> { k.NaMelder }, ExtraNaAfwijking = 0 });
-                    await TerugNaar(k.NaMelder, rit, c);
-                    await TerugNaarHuis(k.Route);
-                    if (rit.Einde == RitEinde.Kortsluiting)
+                    // BUG #72 (log 16:48): de uitkomst van de proef wordt EERST vastgelegd, daarna pas gaat de loc terug. Mislukte de weg terug
+                    // (NavigatieFout), dan ging het gelukte resultaat (adres 13 afbuigend -> melder 14) verloren en telde het kortsluitpunt als opgegeven.
+                    bool proefKortsluiting = rit.Einde == RitEinde.Kortsluiting;
+                    bool proefOpgelost = !proefKortsluiting && rit.Reeks.Count >= 2;
+                    if (proefKortsluiting)
                     {
                         k.AantalKortsluitingen++;
                         _log.Info($"Adres {adres} lost kortsluitpunt #{k.Id} niet op.");
-                        continue;
                     }
-                    if (rit.Reeks.Count >= 2)
+                    else if (proefOpgelost)
                     {
                         k.Opgelost = true;
                         k.OpgelostDoorAdres = adres;
@@ -1033,8 +1034,21 @@ public partial class BaanVerkenner
                             Reden = $"verder voorbij opgelost kortsluitpunt #{k.Id}"
                         });
                         nieuwWerk = true;
-                        break;
                     }
+                    if (proefKortsluiting || proefOpgelost) BewaarNu();
+                    try
+                    {
+                        await TerugNaar(k.NaMelder, rit, c);
+                        await TerugNaarHuis(k.Route);
+                    }
+                    catch (NavigatieFout nf) when (proefKortsluiting || proefOpgelost)
+                    {
+                        _log.Waarschuwing($"Kortsluitpunt #{k.Id}: de uitkomst van de proef met adres {adres} is vastgelegd, maar de weg terug mislukte: {nf.Message}");
+                        await ZetConfiguratie(Configuratie.Basis);
+                        await VraagLocTerugTeZetten(_kaart.StartMelder, $"{nf.Message}\n\nDe uitkomst van de proef is bewaard. De verkenner gaat terug naar de startmelder.");
+                    }
+                    if (proefKortsluiting) continue;
+                    if (proefOpgelost) break;
                 }
                 catch (NavigatieFout nf)
                 {

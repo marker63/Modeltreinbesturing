@@ -51,3 +51,11 @@ Welke blok-overgangen gebruiken welke melder (Koploper-blokken 1-7, niet de Dina
 - Melder 8: 1 -> 4, 3 -> 4, 5 -> 4 (8 hoort bij blok 4); melder 21: 1 -> 7, 3 -> 7, 6 -> 7 (blok 7).
 - Wissels in Koploper: 1, 2, 5, 6, 9, 10 (hoort bij 13), 13, 14.
 Gevolgtrekking (voorlopig): melder 24 wordt ook voor blok 1 gebruikt (niet alleen 3, 4 en 7) en melder 129 hoort bij blok 1. De kruiswissel heeft vier benen: kant 8/21 (blok 4/7) en kant 14/129 (blok 3/1); de motoren 10 en 13 bepalen welk been bij welk been hoort. Het beschikbare vervolg vanaf melder 24 hangt dus af van de ingangskant en de motorstanden (zie BUG #71, punt 2).
+
+## Marco 10-10-2026 17:12
+- Melder 24 zit aan de afbuigende poot van wissel 14 (wissel 14 afbuigend: melder 8 <-> melder 24; rechtdoor: melder 8 <-> melder 17). De loc past helemaal in de melder-sectie van 24.
+## Afgeleid uit het log 16:40-17:01 (hypothese, NIET veldgetest)
+- 21 -> 24 -> 14 en 14 -> 24 -> 21 lukken met motor 13 en 10 beide rechtdoor.
+- 8 -> 24 -> 14 lukt alleen met motor 13 afbuigend (16:48:29); met 13 rechtdoor (ook met 12 of 15 erbij) volgt kortsluiting. 14 -> 24 -> 8 (16:59-17:00) lukte met 13 afbuigend.
+- 21 -> 24 -> 129 lukte met motor 10 afbuigend.
+- Conclusie: het vervolg na melder 24 hangt af van de kant waar de loc binnenkwam EN de standen van motor 13 en 10 (Engelse wissel met vier benen).

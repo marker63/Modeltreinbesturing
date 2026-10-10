@@ -1,0 +1,1450 @@
+{
+  "FormaatVersie": 1,
+  "Programma": "Baanverkenner",
+  "Gestart": "2026-10-10T13:54:12.6108355+02:00",
+  "Bijgewerkt": "2026-10-10T17:01:12.9257393+02:00",
+  "Voltooid": true,
+  "Hardware": "VPEB Dinamo",
+  "LocAdres": 5408,
+  "LocStappen": 28,
+  "RefSnelheid": 12,
+  "StartMelder": 13,
+  "WisselAdresVan": 1,
+  "WisselAdresTot": 20,
+  "Melders": [
+    {
+      "Nummer": 5,
+      "DinamoBlok": 3
+    },
+    {
+      "Nummer": 8,
+      "DinamoBlok": 4
+    },
+    {
+      "Nummer": 13,
+      "DinamoBlok": 3
+    },
+    {
+      "Nummer": 14,
+      "DinamoBlok": 3
+    },
+    {
+      "Nummer": 15,
+      "DinamoBlok": 4
+    },
+    {
+      "Nummer": 16,
+      "DinamoBlok": 4
+    },
+    {
+      "Nummer": 17,
+      "DinamoBlok": 5
+    },
+    {
+      "Nummer": 20,
+      "DinamoBlok": 6
+    },
+    {
+      "Nummer": 21,
+      "DinamoBlok": 7
+    },
+    {
+      "Nummer": 24,
+      "DinamoBlok": 8
+    },
+    {
+      "Nummer": 25,
+      "DinamoBlok": 5
+    },
+    {
+      "Nummer": 26,
+      "DinamoBlok": 5
+    },
+    {
+      "Nummer": 27,
+      "DinamoBlok": 6
+    },
+    {
+      "Nummer": 28,
+      "DinamoBlok": 6
+    },
+    {
+      "Nummer": 29,
+      "DinamoBlok": 7
+    },
+    {
+      "Nummer": 30,
+      "DinamoBlok": 7
+    },
+    {
+      "Nummer": 129,
+      "DinamoBlok": null
+    }
+  ],
+  "Overgangen": [
+    {
+      "Van": 13,
+      "Naar": 14,
+      "Richting": "Vooruit",
+      "AantalKeer": 30,
+      "GemiddeldeSeconden": 5.33335555,
+      "AantalMetingen": 6,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20",
+        "1,14",
+        "13,14"
+      ]
+    },
+    {
+      "Van": 14,
+      "Naar": 24,
+      "Richting": "Vooruit",
+      "AantalKeer": 9,
+      "GemiddeldeSeconden": 6.485868785714286,
+      "AantalMetingen": 7,
+      "GezienBijConfiguraties": [
+        "",
+        "14",
+        "1,14",
+        "13,14"
+      ]
+    },
+    {
+      "Van": 24,
+      "Naar": 21,
+      "Richting": "Vooruit",
+      "AantalKeer": 6,
+      "GemiddeldeSeconden": 3.3005305,
+      "AantalMetingen": 2,
+      "GezienBijConfiguraties": [
+        "",
+        "10",
+        "14"
+      ]
+    },
+    {
+      "Van": 21,
+      "Naar": 29,
+      "Richting": "Vooruit",
+      "AantalKeer": 6,
+      "GemiddeldeSeconden": 2.8127925399999993,
+      "AantalMetingen": 5,
+      "GezienBijConfiguraties": [
+        "",
+        "10",
+        "14"
+      ]
+    },
+    {
+      "Van": 29,
+      "Naar": 30,
+      "Richting": "Vooruit",
+      "AantalKeer": 6,
+      "GemiddeldeSeconden": 13.00042058,
+      "AantalMetingen": 5,
+      "GezienBijConfiguraties": [
+        "",
+        "10",
+        "14"
+      ]
+    },
+    {
+      "Van": 30,
+      "Naar": 20,
+      "Richting": "Vooruit",
+      "AantalKeer": 6,
+      "GemiddeldeSeconden": 3.27921798,
+      "AantalMetingen": 5,
+      "GezienBijConfiguraties": [
+        "",
+        "10",
+        "14"
+      ]
+    },
+    {
+      "Van": 20,
+      "Naar": 27,
+      "Richting": "Vooruit",
+      "AantalKeer": 5,
+      "GemiddeldeSeconden": 3.000184975,
+      "AantalMetingen": 4,
+      "GezienBijConfiguraties": [
+        "",
+        "10",
+        "14"
+      ]
+    },
+    {
+      "Van": 27,
+      "Naar": 28,
+      "Richting": "Vooruit",
+      "AantalKeer": 5,
+      "GemiddeldeSeconden": 14.349614599999999,
+      "AantalMetingen": 4,
+      "GezienBijConfiguraties": [
+        "",
+        "10",
+        "14"
+      ]
+    },
+    {
+      "Van": 28,
+      "Naar": 26,
+      "Richting": "Vooruit",
+      "AantalKeer": 5,
+      "GemiddeldeSeconden": 3.00036842,
+      "AantalMetingen": 5,
+      "GezienBijConfiguraties": [
+        "",
+        "10",
+        "14"
+      ]
+    },
+    {
+      "Van": 26,
+      "Naar": 25,
+      "Richting": "Vooruit",
+      "AantalKeer": 5,
+      "GemiddeldeSeconden": 3.1999365,
+      "AantalMetingen": 4,
+      "GezienBijConfiguraties": [
+        "",
+        "10",
+        "14"
+      ]
+    },
+    {
+      "Van": 25,
+      "Naar": 17,
+      "Richting": "Vooruit",
+      "AantalKeer": 5,
+      "GemiddeldeSeconden": 14.049774699999999,
+      "AantalMetingen": 4,
+      "GezienBijConfiguraties": [
+        "",
+        "10",
+        "14"
+      ]
+    },
+    {
+      "Van": 17,
+      "Naar": 8,
+      "Richting": "Vooruit",
+      "AantalKeer": 5,
+      "GemiddeldeSeconden": 3.2000821,
+      "AantalMetingen": 4,
+      "GezienBijConfiguraties": [
+        "",
+        "10",
+        "14"
+      ]
+    },
+    {
+      "Van": 8,
+      "Naar": 15,
+      "Richting": "Vooruit",
+      "AantalKeer": 13,
+      "GemiddeldeSeconden": 7.466812588888889,
+      "AantalMetingen": 9,
+      "GezienBijConfiguraties": [
+        "",
+        "10",
+        "14",
+        "1,14",
+        "2,14",
+        "13,14"
+      ]
+    },
+    {
+      "Van": 15,
+      "Naar": 16,
+      "Richting": "Vooruit",
+      "AantalKeer": 12,
+      "GemiddeldeSeconden": 3.6181322090909096,
+      "AantalMetingen": 11,
+      "GezienBijConfiguraties": [
+        "",
+        "10",
+        "14",
+        "1,14",
+        "2,14",
+        "13,14"
+      ]
+    },
+    {
+      "Van": 16,
+      "Naar": 5,
+      "Richting": "Vooruit",
+      "AantalKeer": 12,
+      "GemiddeldeSeconden": 3.1093053272727276,
+      "AantalMetingen": 11,
+      "GezienBijConfiguraties": [
+        "",
+        "10",
+        "14",
+        "1,14",
+        "2,14",
+        "13,14"
+      ]
+    },
+    {
+      "Van": 5,
+      "Naar": 13,
+      "Richting": "Vooruit",
+      "AantalKeer": 12,
+      "GemiddeldeSeconden": 5.239768270000001,
+      "AantalMetingen": 10,
+      "GezienBijConfiguraties": [
+        "",
+        "10",
+        "14",
+        "1,14",
+        "1,2,14",
+        "13,14"
+      ]
+    },
+    {
+      "Van": 14,
+      "Naar": 13,
+      "Richting": "Achteruit",
+      "AantalKeer": 47,
+      "GemiddeldeSeconden": 6.463983503999999,
+      "AantalMetingen": 25,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "11",
+        "12",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20"
+      ]
+    },
+    {
+      "Van": 13,
+      "Naar": 5,
+      "Richting": "Achteruit",
+      "AantalKeer": 38,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20",
+        "1,2,14"
+      ]
+    },
+    {
+      "Van": 5,
+      "Naar": 16,
+      "Richting": "Achteruit",
+      "AantalKeer": 38,
+      "GemiddeldeSeconden": 5.205512878378377,
+      "AantalMetingen": 37,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20"
+      ]
+    },
+    {
+      "Van": 16,
+      "Naar": 15,
+      "Richting": "Achteruit",
+      "AantalKeer": 38,
+      "GemiddeldeSeconden": 3.1216538157894735,
+      "AantalMetingen": 38,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20"
+      ]
+    },
+    {
+      "Van": 15,
+      "Naar": 8,
+      "Richting": "Achteruit",
+      "AantalKeer": 39,
+      "GemiddeldeSeconden": 3.6044841263157905,
+      "AantalMetingen": 38,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20",
+        "13,14"
+      ]
+    },
+    {
+      "Van": 8,
+      "Naar": 17,
+      "Richting": "Achteruit",
+      "AantalKeer": 32,
+      "GemiddeldeSeconden": 6.356391193749999,
+      "AantalMetingen": 32,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20"
+      ]
+    },
+    {
+      "Van": 17,
+      "Naar": 25,
+      "Richting": "Achteruit",
+      "AantalKeer": 32,
+      "GemiddeldeSeconden": 3.1186757375000007,
+      "AantalMetingen": 32,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20"
+      ]
+    },
+    {
+      "Van": 25,
+      "Naar": 26,
+      "Richting": "Achteruit",
+      "AantalKeer": 32,
+      "GemiddeldeSeconden": 14.046196143749999,
+      "AantalMetingen": 32,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20"
+      ]
+    },
+    {
+      "Van": 26,
+      "Naar": 28,
+      "Richting": "Achteruit",
+      "AantalKeer": 32,
+      "GemiddeldeSeconden": 3.243539262500001,
+      "AantalMetingen": 32,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20"
+      ]
+    },
+    {
+      "Van": 28,
+      "Naar": 27,
+      "Richting": "Achteruit",
+      "AantalKeer": 32,
+      "GemiddeldeSeconden": 5.955691893548387,
+      "AantalMetingen": 31,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20"
+      ]
+    },
+    {
+      "Van": 27,
+      "Naar": 20,
+      "Richting": "Achteruit",
+      "AantalKeer": 32,
+      "GemiddeldeSeconden": 14.611924399999996,
+      "AantalMetingen": 32,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20"
+      ]
+    },
+    {
+      "Van": 20,
+      "Naar": 30,
+      "Richting": "Achteruit",
+      "AantalKeer": 32,
+      "GemiddeldeSeconden": 3.1061349843749997,
+      "AantalMetingen": 32,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20"
+      ]
+    },
+    {
+      "Van": 30,
+      "Naar": 29,
+      "Richting": "Achteruit",
+      "AantalKeer": 32,
+      "GemiddeldeSeconden": 3.206225728125,
+      "AantalMetingen": 32,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20"
+      ]
+    },
+    {
+      "Van": 29,
+      "Naar": 21,
+      "Richting": "Achteruit",
+      "AantalKeer": 32,
+      "GemiddeldeSeconden": 13.231466221875003,
+      "AantalMetingen": 32,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20"
+      ]
+    },
+    {
+      "Van": 21,
+      "Naar": 24,
+      "Richting": "Achteruit",
+      "AantalKeer": 31,
+      "GemiddeldeSeconden": 3.083843432258064,
+      "AantalMetingen": 31,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20"
+      ]
+    },
+    {
+      "Van": 24,
+      "Naar": 14,
+      "Richting": "Achteruit",
+      "AantalKeer": 26,
+      "GemiddeldeSeconden": 4.274796816666669,
+      "AantalMetingen": 24,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "11",
+        "12",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20",
+        "13,14"
+      ]
+    },
+    {
+      "Van": 24,
+      "Naar": 129,
+      "Richting": "Achteruit",
+      "AantalKeer": 1,
+      "GemiddeldeSeconden": 2.5999319,
+      "AantalMetingen": 1,
+      "GezienBijConfiguraties": [
+        "10"
+      ]
+    },
+    {
+      "Van": 129,
+      "Naar": 24,
+      "Richting": "Vooruit",
+      "AantalKeer": 1,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        "10"
+      ]
+    },
+    {
+      "Van": 8,
+      "Naar": 24,
+      "Richting": "Achteruit",
+      "AantalKeer": 47,
+      "GemiddeldeSeconden": 8.2007458,
+      "AantalMetingen": 1,
+      "GezienBijConfiguraties": [
+        "14",
+        "1,14",
+        "2,14",
+        "3,14",
+        "4,14",
+        "5,14",
+        "6,14",
+        "7,14",
+        "8,14",
+        "9,14",
+        "11,14",
+        "12,14",
+        "14,15",
+        "14,16",
+        "14,17",
+        "14,18",
+        "14,19",
+        "14,20"
+      ]
+    },
+    {
+      "Van": 24,
+      "Naar": 8,
+      "Richting": "Vooruit",
+      "AantalKeer": 51,
+      "GemiddeldeSeconden": 7.3003260999999995,
+      "AantalMetingen": 2,
+      "GezienBijConfiguraties": [
+        "14",
+        "1,14",
+        "2,14",
+        "3,14",
+        "4,14",
+        "5,14",
+        "6,14",
+        "7,14",
+        "8,14",
+        "9,14",
+        "11,14",
+        "12,14",
+        "14,15",
+        "14,16",
+        "14,17",
+        "14,18",
+        "14,19",
+        "14,20",
+        "13,14"
+      ]
+    },
+    {
+      "Van": 13,
+      "Naar": 8,
+      "Richting": "Achteruit",
+      "AantalKeer": 5,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        ""
+      ]
+    }
+  ],
+  "Wissels": [
+    {
+      "Adres": 10,
+      "Waarnemingen": [
+        {
+          "Soort": "Splitsing",
+          "NaMelder": 24,
+          "Richting": "Achteruit",
+          "VolgendeBijRechtdoor": 14,
+          "VolgendeBijAfbuigend": 129,
+          "Configuratie": "alle wissels rechtdoor",
+          "Toelichting": "Na melder 24 (achteruit): rechtdoor \u2192 melder 14, afbuigend \u2192 melder 129."
+        }
+      ]
+    },
+    {
+      "Adres": 13,
+      "Waarnemingen": [
+        {
+          "Soort": "KortsluitingBijOmzetten",
+          "NaMelder": 24,
+          "Richting": "Achteruit",
+          "VolgendeBijRechtdoor": 14,
+          "VolgendeBijAfbuigend": null,
+          "Configuratie": "alle wissels rechtdoor",
+          "Toelichting": "Op afbuigend: kortsluiting tussen melder 24 en 14. Deze wissel wordt hier waarschijnlijk van achteren (samenvoegend) bereden."
+        },
+        {
+          "Soort": "LostKortsluitingOp",
+          "NaMelder": 8,
+          "Richting": "Vooruit",
+          "VolgendeBijRechtdoor": null,
+          "VolgendeBijAfbuigend": 15,
+          "Configuratie": "afbuigend: 14",
+          "Toelichting": "Na melder 8 (vooruit) alleen door te rijden met adres 13 op afbuigend (van achteren bereden) \u2192 melder 15."
+        }
+      ]
+    },
+    {
+      "Adres": 14,
+      "Waarnemingen": [
+        {
+          "Soort": "Splitsing",
+          "NaMelder": 8,
+          "Richting": "Achteruit",
+          "VolgendeBijRechtdoor": 17,
+          "VolgendeBijAfbuigend": 24,
+          "Configuratie": "alle wissels rechtdoor",
+          "Toelichting": "Na melder 8 (achteruit): rechtdoor \u2192 melder 17, afbuigend \u2192 melder 24."
+        }
+      ]
+    }
+  ],
+  "Kopsporen": [
+    {
+      "Melder": 24,
+      "Richting": "Achteruit",
+      "Configuratie": "afbuigend: 14"
+    }
+  ],
+  "Trajecten": [
+    {
+      "Configuratie": {
+        "Afbuigend": []
+      },
+      "Start": 13,
+      "Richting": "Vooruit",
+      "Reeks": [
+        13,
+        14
+      ],
+      "Einde": "BekendKortsluitpunt"
+    },
+    {
+      "Configuratie": {
+        "Afbuigend": []
+      },
+      "Start": 13,
+      "Richting": "Achteruit",
+      "Reeks": [
+        13,
+        5,
+        16,
+        15,
+        8,
+        17,
+        25,
+        26,
+        28,
+        27,
+        20,
+        30,
+        29,
+        21,
+        24,
+        14,
+        13
+      ],
+      "Einde": "Lus"
+    },
+    {
+      "Configuratie": {
+        "Afbuigend": []
+      },
+      "Start": 13,
+      "Richting": "Achteruit",
+      "Reeks": [
+        13,
+        5,
+        16,
+        15,
+        8,
+        17,
+        25,
+        26,
+        28,
+        27,
+        20,
+        30,
+        29,
+        21,
+        24,
+        14,
+        13
+      ],
+      "Einde": "Lus"
+    },
+    {
+      "Configuratie": {
+        "Afbuigend": []
+      },
+      "Start": 13,
+      "Richting": "Achteruit",
+      "Reeks": [
+        13,
+        5,
+        16,
+        15,
+        8,
+        17,
+        25,
+        26,
+        28,
+        27,
+        20,
+        30,
+        29,
+        21,
+        24,
+        14,
+        13
+      ],
+      "Einde": "Lus"
+    },
+    {
+      "Configuratie": {
+        "Afbuigend": []
+      },
+      "Start": 13,
+      "Richting": "Achteruit",
+      "Reeks": [
+        13,
+        5,
+        16,
+        15,
+        8,
+        17,
+        25,
+        26,
+        28,
+        27,
+        20,
+        30,
+        29,
+        21,
+        24,
+        14,
+        13
+      ],
+      "Einde": "Lus"
+    },
+    {
+      "Configuratie": {
+        "Afbuigend": [
+          10
+        ]
+      },
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Reeks": [
+        24
+      ],
+      "Einde": "Doodlopend"
+    },
+    {
+      "Configuratie": {
+        "Afbuigend": [
+          14
+        ]
+      },
+      "Start": 8,
+      "Richting": "Achteruit",
+      "Reeks": [
+        8,
+        24
+      ],
+      "Einde": "Kortsluiting"
+    },
+    {
+      "Configuratie": {
+        "Afbuigend": [
+          14
+        ]
+      },
+      "Start": 24,
+      "Richting": "Vooruit",
+      "Reeks": [
+        24,
+        8,
+        15,
+        16,
+        5,
+        13,
+        14,
+        24
+      ],
+      "Einde": "Lus"
+    },
+    {
+      "Configuratie": {
+        "Afbuigend": [
+          14
+        ]
+      },
+      "Start": 24,
+      "Richting": "Vooruit",
+      "Reeks": [
+        24,
+        8,
+        15,
+        16,
+        5,
+        13,
+        14,
+        24
+      ],
+      "Einde": "Lus"
+    },
+    {
+      "Configuratie": {
+        "Afbuigend": [
+          13,
+          14
+        ]
+      },
+      "Start": 8,
+      "Richting": "Vooruit",
+      "Reeks": [
+        8,
+        15,
+        16,
+        5,
+        13,
+        14,
+        24,
+        8
+      ],
+      "Einde": "Lus"
+    }
+  ],
+  "Kortsluitpunten": [
+    {
+      "Id": 1,
+      "NaMelder": 14,
+      "Richting": "Vooruit",
+      "Soort": "Kortsluiting",
+      "Configuratie": {
+        "Afbuigend": []
+      },
+      "Route": [
+        {
+          "Configuratie": {
+            "Afbuigend": []
+          },
+          "Richting": "Vooruit",
+          "Van": 13,
+          "Naar": 14,
+          "Pad": [
+            13,
+            14
+          ]
+        }
+      ],
+      "AantalKortsluitingen": 1,
+      "AlarmBlokken": [
+        3
+      ],
+      "Opgelost": false,
+      "Opgegeven": false,
+      "OpgelostDoorAdres": null,
+      "OpgelostMetAfbuigend": null,
+      "GeprobeerdeAdressen": []
+    },
+    {
+      "Id": 2,
+      "NaMelder": 24,
+      "Richting": "Achteruit",
+      "Soort": "Kortsluiting",
+      "Configuratie": {
+        "Afbuigend": [
+          14
+        ]
+      },
+      "Route": [
+        {
+          "Configuratie": {
+            "Afbuigend": []
+          },
+          "Richting": "Achteruit",
+          "Van": 13,
+          "Naar": 8,
+          "Pad": [
+            13,
+            5,
+            16,
+            15,
+            8
+          ]
+        },
+        {
+          "Configuratie": {
+            "Afbuigend": [
+              14
+            ]
+          },
+          "Richting": "Achteruit",
+          "Van": 8,
+          "Naar": 24,
+          "Pad": [
+            8,
+            24
+          ]
+        }
+      ],
+      "AantalKortsluitingen": 3,
+      "AlarmBlokken": [
+        8
+      ],
+      "Opgelost": false,
+      "Opgegeven": true,
+      "OpgelostDoorAdres": null,
+      "OpgelostMetAfbuigend": null,
+      "GeprobeerdeAdressen": [
+        13,
+        15,
+        12
+      ]
+    },
+    {
+      "Id": 3,
+      "NaMelder": 8,
+      "Richting": "Vooruit",
+      "Soort": "Kortsluiting",
+      "Configuratie": {
+        "Afbuigend": [
+          14
+        ]
+      },
+      "Route": [
+        {
+          "Configuratie": {
+            "Afbuigend": []
+          },
+          "Richting": "Achteruit",
+          "Van": 13,
+          "Naar": 8,
+          "Pad": [
+            13,
+            5,
+            16,
+            15,
+            8
+          ]
+        },
+        {
+          "Configuratie": {
+            "Afbuigend": [
+              14
+            ]
+          },
+          "Richting": "Achteruit",
+          "Van": 8,
+          "Naar": 24,
+          "Pad": [
+            8,
+            24
+          ]
+        },
+        {
+          "Configuratie": {
+            "Afbuigend": [
+              14
+            ]
+          },
+          "Richting": "Vooruit",
+          "Van": 24,
+          "Naar": 8,
+          "Pad": [
+            24,
+            21,
+            29,
+            30,
+            20,
+            27,
+            28,
+            26,
+            25,
+            17,
+            8
+          ]
+        }
+      ],
+      "AantalKortsluitingen": 1,
+      "AlarmBlokken": [
+        4
+      ],
+      "Opgelost": true,
+      "Opgegeven": false,
+      "OpgelostDoorAdres": 13,
+      "OpgelostMetAfbuigend": true,
+      "GeprobeerdeAdressen": [
+        13
+      ]
+    }
+  ],
+  "AdressenZonderEffect": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    11,
+    12,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20
+  ],
+  "VoorgesteldeBlokken": [
+    {
+      "Nummer": 1,
+      "Melders": [
+        5,
+        13,
+        14
+      ],
+      "DinamoBlok": 3,
+      "Buren": [
+        2,
+        6
+      ]
+    },
+    {
+      "Nummer": 2,
+      "Melders": [
+        8,
+        15,
+        16
+      ],
+      "DinamoBlok": 4,
+      "Buren": [
+        1,
+        3,
+        6
+      ]
+    },
+    {
+      "Nummer": 3,
+      "Melders": [
+        17,
+        25,
+        26
+      ],
+      "DinamoBlok": 5,
+      "Buren": [
+        2,
+        4
+      ]
+    },
+    {
+      "Nummer": 4,
+      "Melders": [
+        20,
+        27,
+        28
+      ],
+      "DinamoBlok": 6,
+      "Buren": [
+        3,
+        5
+      ]
+    },
+    {
+      "Nummer": 5,
+      "Melders": [
+        21,
+        29,
+        30
+      ],
+      "DinamoBlok": 7,
+      "Buren": [
+        4,
+        6
+      ]
+    },
+    {
+      "Nummer": 6,
+      "Melders": [
+        24
+      ],
+      "DinamoBlok": 8,
+      "Buren": [
+        1,
+        2,
+        5,
+        7
+      ]
+    },
+    {
+      "Nummer": 7,
+      "Melders": [
+        129
+      ],
+      "DinamoBlok": null,
+      "Buren": [
+        6
+      ]
+    }
+  ],
+  "Waarschuwingen": [
+    "Opdracht vanaf melder 14 vooruit (afbuigend: 13) is overgeslagen: Melder 14 werd niet bereikt: al 30 s geen nieuwe melder na melder 8.",
+    "Basisrit vanaf melder 24 vooruit (afbuigend: 14) gaf niet steeds dezelfde melders: 24, 8, 15, 16, 5, 13, 14, 24 / 24, 21, 29, 30, 20, 27, 28, 26, 25, 17, 8 / 24, 8. Gebruikt: 24, 8, 15, 16, 5, 13, 14, 24. Controleer deze melders op spookmeldingen.",
+    "Kortsluitpunt na melder 24 (achteruit) opgegeven na 3 kortsluitingen."
+  ]
+}
