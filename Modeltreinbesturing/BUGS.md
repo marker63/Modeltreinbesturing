@@ -1304,3 +1304,18 @@ Aanvulling op suggestie (1) van het leermateriaal 16:03. Marco wil, na de meldin
 - **Ja** -> de verkenning gaat verder (de laatst gegeven opdracht opnieuw proberen met dezelfde wisselstand; geen blokproef).
 - **Nee** -> vraag: "Moet de rit worden afgebroken?" Bij ja: rit afbreken en de verkenning hervatten vanaf het startpunt (loc terugzetten op de startmelder, zoals bij een hervatting).
 Ontwerpnotities (NIET gebouwd; Marco: eerst onthouden): geldt voor de situatie "loc vertrekt niet van een melder met bekend Dinamo-blok terwijl in deze rit net een wissel is geschakeld"; de wacht tijdens de vraag mag onbeperkt zijn (geen blokproef van 20 minuten); de vraag hoort bij #67 en leermateriaal 16:03 (blokproef mag bekend blok niet wissen). Nog niet getest op de baan.
+
+## #69 - Baanverkenner: loc blijft steken op een blokgrens, en een mislukte blokproef wist een bekend Dinamo-blok (Marco 16:24, log 16:22)
+Waarneming: de loc bleef steken terwijl hij van blok 7 naar blok 3 reed, precies op de blokscheiding: een draaistel in blok 7, een draaistel in blok 3 op de kruiswissel; het wissel stond goed.
+Oorzaak uit het log (twee dingen achter elkaar):
+1. Om 15:41:48 (loc vertrok niet door de verkeerd staande wisselmotor 10) werd het bekende blok 8 van melder 24 gewist (`DinamoBlok = null`) en de volledige blokproef mislukte twee keer (2 x 9 min). Het blok kwam nooit terug.
+2. Om 16:05 kwam de loc bij melder 24 aan, het blok was onbekend, dus een nieuwe blokproef met de loc op de blokgrens. Een Dinamo-loc rijdt vanuit stilstand alleen als ELK blok onder hem het rijcommando krijgt (BUG #61), dus blok 8, 7 en 1 gaven "geen beweging"; blok 2 gaf een toevallige melderwijziging en werd vastgelegd als blok van melder 24 (fout! was 8). Daarna 30 s geen beweging, opdracht #4 mislukt, 13 minuten wachten tot Marco de loc terugzette (16:22).
+Fix (gebouwd, getest in de simulator, NIET getest op de baan):
+- Een mislukte volledige blokproef zet het eerder vastgestelde blok terug (de koppeling gaat alleen verloren als de proef een ander blok vindt).
+- Rijdt de loc niet weg van een melder met bekend blok: na de snelle herbevestiging nu één korte poging met het rijcommando naar ALLE Dinamo-blokken tegelijk (`ProbeerAlleBlokken`). Rijdt hij dan wel, dan staat hij op een blokgrens: melding, het bekende blok blijft bewaard, de rit gaat verder met het commando naar alle blokken (geen volledige blokproef van 18 blokken).
+- Het herhaalde rijcommando bij een bekend vervolg (#64) gaat nu ook naar alle blokken.
+- `StopLoc` zet ook blokken op snelheid 0 die eerder een rijcommando kregen maar niet meer onder de loc liggen (anders kon een "alle blokken"-commando blijven staan).
+Test: `BlokgrensTest` in Tools/CompileCheck (loc met zijn kop in een wisselstuk zonder melder, blok 9): oude code faalt, nieuwe code rijdt door en houdt blok 1 bewaard; alle andere regressietests blijven OK.
+Niet gebouwd: het herstel-pad zelf (blok terugzetten na mislukte proef) heeft geen eigen test; de blokgrens-situatie bij de blokproef zelf (loc nog niet vertrokken, blok onbekend) is niet aangepast.
+Leermateriaal: `Tools/CompileCheck/testdata/*blok24_fout_blok2_2026-10-10_1622.*` (kaart: melder 24 staat daar ten onrechte op blok 2, moet blok 8 zijn - handmatig herstellen in de lopende baankaart is niet mogelijk; bij hervatten laadt hij blok 2).
+Let op voor Marco: de lopende baankaart van 16:22 bevat nog het FOUTE blok 2 voor melder 24. De nieuwe versie corrigeert dat niet vanzelf; zie de vraag in het antwoord.

@@ -171,10 +171,43 @@ public partial class BaanVerkenner
         await Wacht(DinamoCyclus);
     }
 
+    /// <summary>BUG #69: rijcommando naar ALLE Dinamo-blokken tegelijk (er staat maar één loc op de baan, dus dat is veilig).
+    /// Voor een loc die met een draaistel in een ander blok staat dan de melder aangeeft (log 16:22: een draaistel in blok 7,
+    /// een draaistel in blok 3 op de kruiswissel): hij gaat alleen rijden als ELK blok onder hem het commando krijgt.</summary>
+    private async Task StuurSnelheidAlleBlokken(Richting r, int stap)
+    {
+        _voedingBlokken.Clear();
+        if (!BlokVereist) { await StuurSnelheid(r, stap); return; }
+        var blokken = _ins.DinamoBlokLijst();
+        foreach (var b in blokken) _hw.ZetLocSnelheid(_ins.LocAdres, stap, r == Richting.Vooruit, b, _ins.LocStappen);
+        if (stap > 0) _voedingBlokken.UnionWith(blokken);
+        await Wacht(DinamoCyclus * blokken.Count);
+    }
+
+    /// <summary>BUG #69: één korte poging met het rijcommando naar alle blokken tegelijk. True als er daarna een melder
+    /// veranderde (de loc stond dus op een blokgrens en is nu gaan rijden). De loc wordt daarna volledig gestopt.</summary>
+    private async Task<bool> ProbeerAlleBlokken(Richting r)
+    {
+        if (!BlokVereist) return false;
+        _monitor.Bijwerken();
+        var t0 = _klok.Nu;
+        await StuurSnelheidAlleBlokken(r, _ins.Verkensnelheid);
+        var eind = _klok.Nu + TimeSpan.FromSeconds(_ins.BlokproefKortSeconden);
+        bool bewogen = false;
+        while (_klok.Nu < eind)
+        {
+            await Wacht(Poll);
+            if (_monitor.Bijwerken().Any(x => x.Tijd >= t0)) { bewogen = true; break; }
+        }
+        await VolledigeStop();
+        return bewogen;
+    }
+
     /// <summary>Loc stoppen. Waar mogelijk snel (snelheid 0 via het bekende blok); anders
     /// de volledige stop.</summary>
     private async Task StopLoc()
     {
+        var oudeVoeding = _voedingBlokken.ToList();
         _voedingBlokken.Clear();
         if (!BlokVereist)
         {
@@ -188,8 +221,11 @@ public partial class BaanVerkenner
             await VolledigeStop();
             return;
         }
+        // BUG #69: blokken die eerder een rijcommando kregen (bijv. alle blokken na een blokgrens-poging) ook op 0 zetten
+        var extra = oudeVoeding.Where(b => !blokken.Contains(b)).ToList();
         foreach (var b in blokken) _hw.ZetLocSnelheid(_ins.LocAdres, 0, true, b, _ins.LocStappen);
-        await Wacht(DinamoCyclus * blokken.Count + TimeSpan.FromMilliseconds(500));
+        foreach (var b in extra) _hw.ZetLocSnelheid(_ins.LocAdres, 0, true, b, _ins.LocStappen);
+        await Wacht(DinamoCyclus * (blokken.Count + extra.Count) + TimeSpan.FromMilliseconds(500));
     }
 
     /// <summary>Stop als niet bekend is via welk blok de loc bereikbaar is: de noodstop van
@@ -887,8 +923,8 @@ public partial class BaanVerkenner
                 if (bekendVervolg.Count > 0 && !vervolgHerhaald && !eersteBlokcontrole && !kopBekend)
                 {
                     vervolgHerhaald = true;
-                    _log.Info($"Na melder {res.Reeks[^1]} al {grens.TotalSeconds:0} s geen nieuwe melder, maar het vervolg ({Lijst(bekendVervolg)}) is bij deze wisselstand al eerder gevonden: de loc blijft waarschijnlijk hangen - rijcommando wordt herhaald.");
-                    await StuurSnelheid(r, snelheid);
+                    _log.Info($"Na melder {res.Reeks[^1]} al {grens.TotalSeconds:0} s geen nieuwe melder, maar het vervolg ({Lijst(bekendVervolg)}) is bij deze wisselstand al eerder gevonden: de loc blijft waarschijnlijk hangen - rijcommando wordt herhaald, nu naar alle Dinamo-blokken (BUG #69: de loc kan op een blokgrens staan).");
+                    await StuurSnelheidAlleBlokken(r, snelheid);
                     laatsteWijziging = _klok.Nu;
                     continue;
                 }
@@ -919,6 +955,7 @@ public partial class BaanVerkenner
                     // stap.
                     int? bekendBlok = BlokVan(start);
                     bool bevestigd = false;
+                    bool alleBlokken = false;       // BUG #69: de loc stond op een blokgrens: verder rijden met het commando naar alle blokken
                     if (bekendBlok is int bb)
                     {
                         _log.Rijden($"De loc vertrok niet van melder {start} - eerst het al bekende Dinamo-blok {bb} nog eens proberen voordat de volledige blokproef start.");
@@ -941,6 +978,21 @@ public partial class BaanVerkenner
                             await StuurNaarBlok(bb, r, 0);
                         }
                     }
+                    // BUG #69 (log 16:22): de loc stond met een draaistel in blok 7 en een draaistel in blok 3 (kruiswissel)
+                    // en reed niet weg met alleen het bekende blok. Eerst één korte poging naar ALLE blokken tegelijk; rijdt hij
+                    // dan wel, dan staat hij op een blokgrens en blijft de koppeling van deze melder gewoon bewaard.
+                    if (!bevestigd && bekendBlok is not null)
+                    {
+                        _log.Rijden($"De loc vertrok niet met blok {bekendBlok} - nu één korte poging met het rijcommando naar alle Dinamo-blokken tegelijk (staat hij met een draaistel op een blokgrens?).");
+                        if (await ProbeerAlleBlokken(r))
+                        {
+                            _log.Waarschuwing($"De loc reed pas weg toen alle Dinamo-blokken het rijcommando kregen: hij stond waarschijnlijk met een draaistel op een blokgrens (bijv. in twee blokken op een kruiswissel). De koppeling van melder {start} (blok {bekendBlok}) blijft bewaard.");
+                            // Niet terugzetten (dan staat hij zo weer op de grens): de rit gaat gewoon verder vanaf waar hij nu staat,
+                            // met het commando naar alle blokken.
+                            bevestigd = true;
+                            alleBlokken = true;
+                        }
+                    }
                     // BUG #66: het blok van deze melder is bekend en er was kort geleden een kortsluiting: dan ligt het niet aan
                     // de blokkoppeling maar staat de loc waarschijnlijk op een open gereden of verkeerd staande wissel (log 15:14:
                     // 2 x 9 minuten blokproef met de loc vast op de kruiswissel, blok 8 bleef kortsluiting melden). Niet 18 blokken
@@ -955,10 +1007,19 @@ public partial class BaanVerkenner
                     {
                         _log.Waarschuwing($"De loc vertrok niet van melder {start}. Blokkoppeling wordt gecontroleerd.");
                         _kaart.Melder(start).DinamoBlok = null;
-                        await BlokZoekenBijStart(start);
+                        // BUG #69: een mislukte blokproef mag een eerder vastgesteld blok niet wissen (log 15:41-16:01: 2 x 9 minuten
+                        // geen beweging door een verkeerd staande wissel, daarna was blok 8 van melder 24 weg en kreeg de melder
+                        // later het verkeerde blok 2).
+                        if (!await BlokZoekenBijStart(start) && bekendBlok is int behoud)
+                        {
+                            _kaart.Melder(start).DinamoBlok = behoud;
+                            _log.Waarschuwing($"De blokproef gaf geen resultaat: het eerder vastgestelde blok {behoud} van melder {start} blijft bewaard.");
+                            BewaarNu();
+                        }
                     }
                     _monitor.Bijwerken();
-                    await StuurSnelheid(r, snelheid);
+                    if (alleBlokken) await StuurSnelheidAlleBlokken(r, snelheid);
+                    else await StuurSnelheid(r, snelheid);
                     laatsteWijziging = _klok.Nu;
                     onderbroken = true;
                     continue;

@@ -175,6 +175,40 @@ public static class Tests
         Eis(!v2.Contains(10) && v2.Count == 3, "partnervolgorde: een al afbuigend wissel wordt niet nog eens geprobeerd");
     }
 
+
+    // BUG #69 (log 16:22): de loc staat met een draaistel in een ander (niet door een melder bewaakt) blok dan de melder aangeeft
+    // (sectie 1 = blok 1, wisselstuk zonder melder = blok 9) en rijdt alleen met commando's naar ALLE die blokken.
+    static void BlokgrensTest()
+    {
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, StaatStilZonderBlokcommando = true, StilstaanRemtOpGrens = true, LocAdres = 5408 };
+        var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+        var P = Baanverkenner.Kern.Simulatie.SimulatieBaan.Poort.Stam; var R = Baanverkenner.Kern.Simulatie.SimulatieBaan.Poort.Recht;
+        var s1 = sim.NieuweSectie(1, 80, 1); var s2 = sim.NieuweSectie(2, 80, 2);
+        var w = sim.NieuweWissel(1, false, 9);
+        sim.Verbind(w, P, s1, B); sim.Verbind(w, R, s2, A);
+        sim.PlaatsLoc(s1, 60, +1);
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 1, DinamoBlokken = "1-9" };
+        var status = new VerkenStatus { Instellingen = ins };
+        status.Kaart.StartMelder = 1; status.Kaart.Hardware = "Simulatie"; status.Kaart.RefSnelheid = 12;
+        status.Kaart.Melder(1).DinamoBlok = 1; status.Kaart.Melder(2).DinamoBlok = 2;
+        status.Wachtrij.Add(new Opdracht { Id = 1, Configuratie = Configuratie.Basis, Start = 1, Richting = Richting.Vooruit, Reden = "test" });
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        // eerst de loc zo neerzetten dat hij met zijn kop in het wisselstuk (blok 9, geen melder) staat: bezet = alleen melder 1
+        sim.ZetLocSnelheid(5408, 6, true, 1, 28); klok.Wacht(TimeSpan.FromSeconds(1.3)).GetAwaiter().GetResult();
+        sim.ZetLocSnelheid(5408, 0, true, 1, 28); klok.Wacht(TimeSpan.FromSeconds(1)).GetAwaiter().GetResult();
+        var log = new VerkenLog(klok);
+        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true), status);
+        using var cts = new CancellationTokenSource();
+        try { v.VoerUit(cts.Token).GetAwaiter().GetResult(); } catch (Exception ex) { Console.WriteLine("  (blokgrens: verkenner stopte met: " + ex.Message + ")"); }
+        if (Environment.GetEnvironmentVariable("GRENS_LOG") == "1") Console.WriteLine(log.AlsTekst());
+        var t = log.AlsTekst();
+        Eis(t.Contains("alle Dinamo-blokken tegelijk"), "blokgrens: de loc die niet vertrekt krijgt een poging met alle blokken tegelijk");
+        Eis(v.Kaart.Melder(1).DinamoBlok == 1, "blokgrens: het bekende blok 1 van melder 1 blijft bewaard (nu " + v.Kaart.Melder(1).DinamoBlok + ")");
+        Eis(!t.Contains("Blokkoppeling wordt gecontroleerd"), "blokgrens: geen volledige blokproef van 18 blokken");
+        Eis(v.Kaart.Overgangen.Any(o => o.Van == 1 && o.Naar == 2), "blokgrens: de rit komt daarna bij melder 2");
+    }
+
     // De geslaagde, volledige rit van 10-10 11:38 (blokken 10, 11, 12): referentie voor importer en leerprofiel
     static void GeslaagdeRitTest()
     {
@@ -254,6 +288,7 @@ public static class Tests
         AfbuigendeTakTerugTest();
         OmgekeerdeOvergangTest();
         PartnerVolgordeTest();
+        BlokgrensTest();
 
         Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)");
         return _fouten == 0 ? 0 : 1;
