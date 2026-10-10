@@ -1298,3 +1298,9 @@ Wat het laat zien:
 - Na het herstellen van de wissel (16:03) ging de software zelf verder: adres 10 terug naar rechtdoor, loc rijdt vooruit naar melder 13. Geen handmatig ingrijpen in de software nodig.
 - Neveneffect: door de mislukte blokproef is het eerder gevonden Dinamo-blok 8 van melder 24 in de kaart weggevallen (kaart: DinamoBlok null, rapport "Melders zonder gevonden Dinamo-blok: 24, 129"). Kennis die al vaststond ging verloren.
 Suggesties voor een latere versie (NIET gebouwd, alleen op verzoek): (1) bij een melder met bekend Dinamo-blok en een net geschakelde wissel niet 2x18 blokken proberen maar na het eerste mislukte herhalen stoppen/pauzeren met een duidelijke vraag "controleer de stand van wisselmotor 10"; (2) een mislukte blokproef mag een eerder vastgesteld Dinamo-blok niet wissen (zelfde lijn als #64); (3) samen met #67 (onnodige locadres-melding). Nog niet getest op de baan.
+
+## #68 - OPEN (Marco 16:09): vraag-dialoog bij loc die niet vertrekt door vermoedelijk verkeerd staande wisselmotor
+Aanvulling op suggestie (1) van het leermateriaal 16:03. Marco wil, na de melding "controleer de stand van wisselmotor N", een vraag: "Heb je de wisselmotor met de hand omgezet?"
+- **Ja** -> de verkenning gaat verder (de laatst gegeven opdracht opnieuw proberen met dezelfde wisselstand; geen blokproef).
+- **Nee** -> vraag: "Moet de rit worden afgebroken?" Bij ja: rit afbreken en de verkenning hervatten vanaf het startpunt (loc terugzetten op de startmelder, zoals bij een hervatting).
+Ontwerpnotities (NIET gebouwd; Marco: eerst onthouden): geldt voor de situatie "loc vertrekt niet van een melder met bekend Dinamo-blok terwijl in deze rit net een wissel is geschakeld"; de wacht tijdens de vraag mag onbeperkt zijn (geen blokproef van 20 minuten); de vraag hoort bij #67 en leermateriaal 16:03 (blokproef mag bekend blok niet wissen). Nog niet getest op de baan.
