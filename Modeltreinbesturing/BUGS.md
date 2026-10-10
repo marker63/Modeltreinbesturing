@@ -1002,3 +1002,15 @@ uitgangen) invullen via Relaties beheren -> Rijrichting. Stuur anders het log va
 daar staat de regel "Eerste stap ..." of "[Rit] Startrichting ... bron: ..." in.
 **NIET getest op de baan en NIET gecompileerd** (geen .NET in deze omgeving): bouw eerst even.
 Kruiswisselstanden blijven open (#48).
+
+## #52 - Op blok 7 wordt blok 3 niet gekozen: loc rijdt "7 naar 6" de verkeerde kant op
+Marco (09:01, log 08:58): na 3 -> 4 -> 5 -> 6 -> 7 reserveert de loc 7 naar 6 en rijdt fout.
+**Oorzaak (uit het log):** melder 24 hoort bij blok 3, 4 en 7. Bij aankomst in blok 7 koppelt de
+software melder 24 aan het EERSTE blok met die melder (blok 3) en zette blok 3 BEZET (mijn
+#47-fix liet die ZetBezet staan). Dus was 7 -> 3 geen kandidaat, "Geen bruikbare vooruit-optie
+vanaf blok 7", terugval naar 6 met keren.
+**Fix:** een gedeelde melder zet het blok niet meer bezet als de trein in een ander blok staat
+dat dezelfde melder heeft (`IsGedeeldeMelderVanAnderBlok`).
+**Ook uit dit log:** de start 3 -> 4 ging weer fout (oude build zonder ingevulde richting; je
+keerde handmatig en de relatie 3 -> 4 kreeg daardoor 'achteruit', daarna ging 4-5-6-7 goed).
+**NIET gecompileerd, NIET getest op de baan.**

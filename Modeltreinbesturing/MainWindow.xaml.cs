@@ -187,7 +187,12 @@ public partial class MainWindow : Window
             // Wordt hier als eerste geprobeerd, vóór de spookmelding-check hieronder.
             if (bezet && _treinrouteWindow != null && _treinrouteWindow.ProbeerVroegeAankomstBevestiging(blok, bezet, meldernummer))
             {
-                _beheerder.ZetBezet(blok, bezet);
+                // BUG #52: een gedeelde melder (bijv. 24 van blok 3/4/7) mag het blok waar de melder
+                // toevallig als EERSTE bij staat NIET bezet zetten als de trein in een ANDER blok
+                // staat dat dezelfde melder heeft. Anders was blok 3 na aankomst in blok 7 "bezet",
+                // viel de keuze 7 -> 3 weg en reed de loc terug naar blok 6 (log 08:58:54).
+                if (!_treinrouteWindow.IsGedeeldeMelderVanAnderBlok(blok, meldernummer))
+                    _beheerder.ZetBezet(blok, bezet);
                 return;
             }
 

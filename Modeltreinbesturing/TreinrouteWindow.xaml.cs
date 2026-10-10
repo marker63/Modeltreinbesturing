@@ -4523,6 +4523,11 @@ public partial class TreinrouteWindow : Window
     /// al bij vertrek, dus zo'n blok is dan al lang gereserveerd) - alleen relevant voor
     /// route.Automatisch. Retourneert true als dit event hiermee is afgehandeld (MainWindow
     /// moet dan geen spookmelding meer overwegen).</summary>
+    /// <summary>BUG #52: staat een actieve trein in een ander blok dan "blok" dat ook deze melder heeft?</summary>
+    public bool IsGedeeldeMelderVanAnderBlok(Blok blok, int meldernummer)
+        => meldernummer > 0 && _actieveTreinen.Any(t => t.HuidigBlok != null && t.HuidigBlok != blok
+               && t.HuidigBlok.Bezetmeldpunten.Any(m => m.MeldernNummer == meldernummer));
+
     public bool ProbeerVroegeAankomstBevestiging(Blok blok, bool bezet, int meldernummer = 0)
     {
         if (!bezet) return false;
