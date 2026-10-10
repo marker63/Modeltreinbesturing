@@ -11,10 +11,15 @@ public partial class HardwareDialog : Window
     private readonly HardwareBeheerder _hardwareBeheerder;
     private readonly BaanOntwerpBeheerder _baanBeheerder;
     private readonly BlokBeheerder _blokBeheerder;
+    // BUG #45: stopt alle bekende locs (via de voorrangs-wachtrij) direct na het verbinden,
+    // VÓÓR wissel-initialisatie en melderopvraag. Wordt door MainWindow aangeleverd (die kent
+    // de treinen); zonder deze hook (andere aanroeper) blijft het oude gedrag.
+    private readonly Action? _stopLocsNaVerbinden;
 
-    public HardwareDialog(HardwareBeheerder hardwareBeheerder, BaanOntwerpBeheerder baanBeheerder, BlokBeheerder blokBeheerder)
+    public HardwareDialog(HardwareBeheerder hardwareBeheerder, BaanOntwerpBeheerder baanBeheerder, BlokBeheerder blokBeheerder, Action? stopLocsNaVerbinden = null)
     {
         InitializeComponent();
+        _stopLocsNaVerbinden = stopLocsNaVerbinden;
         _hardwareBeheerder = hardwareBeheerder;
         _baanBeheerder = baanBeheerder;
         _blokBeheerder = blokBeheerder;
@@ -71,7 +76,7 @@ public partial class HardwareDialog : Window
 
     private void Bericht_Ontvangen(string bericht)
     {
-        Dispatcher.Invoke(() => StatusTekst.Text = bericht);
+        Dispatcher.BeginInvoke(new Action(() => StatusTekst.Text = bericht)); // BUG #45: seriële thread wacht niet op de UI
     }
 
     private async void Verbinden_Click(object sender, RoutedEventArgs e)
@@ -102,6 +107,7 @@ public partial class HardwareDialog : Window
             _hardwareBeheerder.WisselHardware(nieuw);
             HardwareInstellingen.Bewaar(HardwareInstellingen.TypeVan(nieuw), comPoort);
             StatusTekst.Text = $"Verbonden: {nieuw.Naam} op {comPoort}.";
+            _stopLocsNaVerbinden?.Invoke(); // BUG #45: eerst stoppen, dan pas wissels en melders
             InitialiseerWisselsMetVlag();
             VraagAlleMelderStatusOp();
         }

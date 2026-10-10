@@ -68,6 +68,11 @@ public interface IHardwareInterface
     /// zodat de ingestelde pauze alsnog echt op de kabel terechtkomt.</summary>
     bool KlaarVoorVolgendeWisselCommando => true;
 
+    /// <summary>BUG #45: een STOP-commando dat NIET achter ander verkeer in een wachtrij mag
+    /// blijven hangen (noodstop, stop bij het (her)verbinden of afsluiten). Standaard gewoon
+    /// ZetLocSnelheid; DinamoHardware heeft een eigen voorrangs-wachtrij en vervangt dit.</summary>
+    void ZetLocSnelheidUrgent(int decoderAdres, int stap, bool vooruit, int blokNummer = 0, int stappen = 126) => ZetLocSnelheid(decoderAdres, stap, vooruit, blokNummer, stappen);
+
     /// <summary>BAANVERKENNER: true als ZetLocSnelheid/ZetFunctie een blokNummer nodig
     /// hebben om de loc te bereiken (Dinamo: DCC-commando's gaan altijd via een blok).
     /// DCC-EX/LocoNet/Simulatie adresseren de decoder rechtstreeks - standaard false.</summary>

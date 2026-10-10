@@ -305,6 +305,22 @@ public class HardwareBeheerder
     public void StuurLocSnelheidCommandoGepauzeerd(int decoderAdres, int stap, bool vooruit, int blokNummer = 0, int stappen = 126) =>
         InWachtrijZetten(() => Huidige.ZetLocSnelheid(decoderAdres, stap, vooruit, blokNummer, stappen));
 
+    /// <summary>BUG #45: stuurt een STOP (snelheid 0) voor één loc naar elk opgegeven blok, via de
+    /// voorrangs-wachtrij van de hardware (Dinamo: gaat bij de eerstvolgende stuur-tik de deur
+    /// uit, vóór melderopvraag, wissels en snelheidsramp). Voor koppelingen waarbij een
+    /// loc-commando geen blok nodig heeft (Intellibox, DCC-EX, Z21, simulatie) volstaat één
+    /// commando. Gebruiken voor: noodstop, stop bij (her)verbinden en stop bij afsluiten.</summary>
+    public void StuurStopNaarAlleBlokken(int decoderAdres, bool vooruit, IEnumerable<int> blokNummers, int stappen)
+    {
+        if (!Huidige.LocCommandoVereistBlok)
+        {
+            Huidige.ZetLocSnelheidUrgent(decoderAdres, 0, vooruit, 0, stappen);
+            return;
+        }
+        foreach (int blokNummer in blokNummers.Distinct())
+            Huidige.ZetLocSnelheidUrgent(decoderAdres, 0, vooruit, blokNummer, stappen);
+    }
+
     /// <summary>Een loc-functie (F0-F28) daadwerkelijk naar de decoder sturen - net als
     /// StuurLocSnelheidCommando hierboven BEWUST NIET via de wissel/sein-wachtrij (directe
     /// respons nodig, geen zin om op een rustpauze te wachten voor bijv. een lichtje).</summary>

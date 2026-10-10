@@ -794,3 +794,89 @@ Keepalive elke 15 s. Beschikbaar in Hardware-dialoog (IP-adres) en in de Baanver
   Z21 zelf uit en wordt niet automatisch weer ingeschakeld.
 - Melderstatus-opvraag (`KanMelderStatusOpvragen`) werkt nu voor elke koppeling die
   dat meldt, niet meer alleen Dinamo.
+
+---
+
+## #45 - Bij het opstarten rijdt de trein al voordat je iets doet; stopcommando's kwamen 40 s te laat; wissels schakelen twee keer; hardwarelog ging verloren
+
+**Gemeld (10-10-2026, 07:57):** "Voordat ik ook maar iets gedaan heb begint de trein al te
+rijden en blijven de wissels maar schakelen, ook na het initialiseren." Daarbij: in de
+eerste testrit reed de trein de andere kant op (gereserveerd 3 naar 7, gereden 3 naar 4),
+en er werd niet ingegrepen. Het log van die eerste rit was niet bewaard.
+
+**Bewijs uit het log van 07:57:39 - 07:59:00 (alles nagerekend op de ruwe regels):**
+- 07:57:39.9 verbonden, 07:57:40.5 meldt melder 13 (blok 3) bezet met Dinamo's F-bit aan:
+  Dinamo stond bij het verbinden nog in foutstatus van de vorige sessie (we hadden net
+  daarvoor afgesloten: backup 07:57:33, herstart 07:57:40).
+- Direct daarna spookmelding blok 3 -> NOODSTOP, met een modale MessageBox midden in de
+  verwerking die op de seriële-poort-thread draaide (`Dispatcher.Invoke`).
+- Er ging in 40 s maar EEN Reset Fault uit (07:57:40.2); de tweede pas om 07:58:20.6. In
+  eerdere, goede logs (bv. 03-10 09:47:34) waren twee Reset Faults vlak achter elkaar
+  genoeg en was de fout binnen een halve seconde gewist.
+- De stopcommando's (snelheid 0, 22 stuks voor 2 locs) gingen pas uit om 07:58:20.8 tot
+  07:58:26.8, dus 40,8 s na het verbinden. Zodra de foutstatus gewist is hervat Dinamo
+  meteen de oude snelheid van de vorige sessie: dat is de trein die "uit zichzelf" ging
+  rijden.
+- Van 07:57:40 tot 07:57:58 was de verbinding vrijwel dood: 18 s lang kwam er niets binnen
+  en ging er hooguit een pakketje per seconde uit; om 07:57:58.2 volgde een vloedgolf van
+  ~60 binnenkomende datagrammen. Tegelijk stonden 96 wisselpakketjes (8 wissels x 12) in
+  een verkeerde, door elkaar lopende volgorde (toggle-bits wisselden niet netjes af:
+  4B,4B,0B,0B...) - een teken dat meerdere verstuur-tikken tegelijk liepen.
+- Om 07:58:20.66 volgde een TWEEDE volledige wisselronde (nog eens 96 pakketjes): de
+  BUG #28-regel "foutstatus opgeheven -> alle wissels opnieuw sturen" ging af voor de
+  opstartfout, bovenop de wissel-initialisatie die al gedaan was. Dat is het "wissels
+  blijven schakelen, ook na het initialiseren".
+- "Dinamo meldt zelf een foutstatus" en "foutstatus is opgeheven" stonden steeds DUBBEL
+  in het log, met 1 ms ertussen: de ontvangst liep op twee threads tegelijk.
+
+**Oorzaken (vier, die elkaar versterkten):**
+1. Reset Fault, stopcommando's en melderopvraag zaten in dezelfde gewone wachtrij (of
+   achter de wisselwachtrij). Een stopcommando kon zo achter 30 melderopvragen en een
+   hele wissel-initialisatie blijven hangen.
+2. Na het verbinden werd meteen alles gestuurd (wissels, 30 melderopvragen) terwijl
+   Dinamo nog in foutstatus zat en alles negeerde/vertraagde.
+3. Verstuur-tikken konden overlappen (`System.Threading.Timer`) en ontvangst kon op
+   meerdere threads tegelijk lopen: pakketjes door elkaar, dubbele meldingen.
+4. De spookmelding-MessageBox draaide binnen `Dispatcher.Invoke` op de seriële thread, en
+   de BUG #28-herinitialisatie ook: de hardwarelaag wachtte op de gebruiker/UI.
+
+**Fix:**
+- `DinamoHardware`: nieuwe URGENTE wachtrij, bij elke tik als eerste volledig geleegd.
+  Reset Fault en alle stopcommando's lopen daarover (`ZetLocSnelheidUrgent`); een urgent
+  stopcommando haalt ook nog niet verstuurde, verouderde snelheidscommando's voor
+  dezelfde loc+blok weg. Urgente pakketjes dragen zelf nooit het PC-F-bit.
+- `DinamoHardware.VerbindenAsync` wacht nu (max. 4 s) tot Reset Fault gewerkt heeft
+  (twee schone leesbeurten) voordat de aanroeper iets anders mag sturen. Tijdens die
+  opstartfase worden geen bezetmeldingen doorgegeven en geen kortsluiting-events gevuurd
+  (de opstartfout is geen kortsluiting en mag de BUG #28-herinitialisatie niet starten).
+- Verzenden: `Monitor.TryEnter` - een tik die nog loopt wordt niet ingehaald. Ontvangen:
+  `lock`. Ontkoppelen stuurt eerst nog de klaarstaande stopcommando's, en sluit de poort
+  op een aparte thread (voorkomt de bekende SerialPort-Close/Dispatcher-deadlock).
+- `MainWindow`: volgorde na verbinden is nu STOP -> wissels -> melderopvraag (ook in de
+  Hardware-dialoog bij handmatig verbinden). Hardware-events gaan via `BeginInvoke`; de
+  spookmelding-MessageBox wordt pas na de verwerking getoond (Background-prioriteit).
+- Bij afsluiten van het programma worden alle bekende locs eerst gestopt en wordt de
+  verbinding netjes gesloten, zodat Dinamo geen oude snelheid onthoudt.
+- `TreinrouteWindow.VoerNoodstopUit` gebruikt dezelfde urgente stop (stond in de gewone
+  wachtrij).
+- Voor koppelingen zonder blokadressering (Intellibox, DCC-EX, Z21, simulatie) is nu een
+  stopcommando per loc genoeg in plaats van een per blok.
+- `HardwareCommunicatieLog` bewaart elke sessie automatisch in
+  `%AppData%\Modeltreinbesturing\Logs\hardwarelog_*.txt` (de 20 nieuwste), inclusief de
+  ritlog-regels ("reserveert 3 naar 7", NOODSTOP, enz.). Nooit meer een log kwijt.
+
+**NIET bewezen / nog open:** waarom de seriële verbinding 18 s lang vrijwel stilviel.
+De waarschijnlijkste verklaring is dat Dinamo in foutstatus (en/of de USB-seriële
+adapter) nauwelijks data accepteert terwijl wij 100+ pakketjes stuurden; de nieuwe
+opstartvolgorde stuurt tijdens de fout alleen nog Reset Fault. Als dit bij een volgende
+test toch terugkomt, graag het log uit de map hierboven meesturen.
+
+**De verkeerde kant op in de eerste rit (3 naar 7, gereden 3 naar 4):** het log van die rit
+ontbreekt, dus dit is een VERMOEDEN, geen bewijs. Blok 3 heeft twee uitgangen (naar 4 en
+naar 7) en de stand van de wissel daar bepaalt de kant. De wissel-initialisatie van deze
+sessie liep zoals hierboven beschreven door elkaar en in foutstatus (Dinamo negeert dan
+wisselpulsen), dus de fysieke wisselstand kan afgeweken hebben van wat de software
+dacht. Melder 24 hoort bovendien bij de blokken 3, 4 en 7 tegelijk, waardoor een
+bezetmelding daarvan niet laat zien welke kant de trein op ging; pas melder 15/16 (blok
+4) of 21/29/30 (blok 7) onderscheidt dat. Opnieuw testen met het automatisch bewaarde
+log laat zien of het nog voorkomt.

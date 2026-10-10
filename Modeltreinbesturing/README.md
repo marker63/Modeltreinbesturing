@@ -39,6 +39,9 @@ venster) voor een volledig overzicht van alle functies, sneltoetsen en tips.
   bewerk-scherm te hoeven gebruiken.
 - Hardware-ondersteuning voor **Dinamo/VPEB**, **Uhlenbrock Intellibox
   (LocoNet)**, **DCC-EX** en **Roco/Fleischmann Z21** (LAN/UDP; nog niet getest).
+- Het hardware-communicatielog wordt per sessie automatisch bewaard in
+  `%AppData%\Modeltreinbesturing\Logs` (de 20 nieuwste), zodat een testrit nooit
+  meer zonder log is.
 - Automatische, tijdgestempelde backups bij het afsluiten, met de mogelijkheid
   om een eerdere versie terug te openen.
 

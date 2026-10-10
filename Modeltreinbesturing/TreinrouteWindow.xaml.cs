@@ -372,6 +372,10 @@ public partial class TreinrouteWindow : Window
     public void Log(string bericht)
     {
         string regel = $"[{DateTime.Now:HH:mm:ss}] {bericht}";
+        // BUG #45: ook in het (automatisch bewaarde) hardwarelog zetten, zodat beslissingen van de
+        // software ("reserveert 3 naar 7", "NOODSTOP ...") op schijf naast de bytes staan en na
+        // afsluiten niet verloren zijn.
+        HardwareCommunicatieLog.Log("Info", "[Rit] " + bericht);
         _log.Add(regel);
         LogLijst.Items.Add(regel);
         if (LogLijst.Items.Count > 0)
@@ -3658,10 +3662,11 @@ public partial class TreinrouteWindow : Window
             bool vooruitVoorHardware = actieveRit != null
                 ? (trein.OmgekeerdeRijrichting ? !actieveRit.RijdtVooruit : actieveRit.RijdtVooruit)
                 : true;
-            foreach (var blok in _blokBeheerder.Blokken)
-                _hardwareBeheerder.StuurLocSnelheidCommando(trein.DecoderAdres, 0, vooruitVoorHardware, blok.Nummer, trein.DecoderStappen);
-            foreach (int kruiswisselAdres in AlleKruiswisselRijAdressen())
-                _hardwareBeheerder.StuurLocSnelheidCommando(trein.DecoderAdres, 0, vooruitVoorHardware, kruiswisselAdres, trein.DecoderStappen);
+            // BUG #45: via de voorrangs-wachtrij (urgent) i.p.v. de gewone wachtrij - in het log
+            // van 10-10-2026 bleef dit stopcommando 40 s achter melderopvraag en wissel-
+            // initialisatie hangen terwijl de loc gewoon doorreed.
+            _hardwareBeheerder.StuurStopNaarAlleBlokken(trein.DecoderAdres, vooruitVoorHardware,
+                _blokBeheerder.Blokken.Select(b => b.Nummer).Concat(AlleKruiswisselRijAdressen()), trein.DecoderStappen);
         }
 
         int aantal = _actieveTreinen.Count;

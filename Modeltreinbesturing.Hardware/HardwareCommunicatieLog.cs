@@ -66,6 +66,7 @@ public static class HardwareCommunicatieLog
             {
                 _regels.Add(regel);
                 while (_regels.Count > MaxRegels) _regels.RemoveAt(0);
+                SchrijfNaarSessieBestand(regel);
             }
         }
         NieuweRegel?.Invoke(regel);
@@ -73,6 +74,44 @@ public static class HardwareCommunicatieLog
 
     public static void Wissen()
     {
-        lock (_vergrendeling) _regels.Clear();
+        lock (_vergrendeling) _regels.Clear(); // het sessiebestand op schijf blijft bewust ongemoeid
+    }
+
+    // BUG #45 (gebruikersmelding 10-10-2026: "de logging van de eerste testrit heb ik niet
+    // opgeslagen"): het log leefde alleen in het geheugen (max. 2000 regels) en ging verloren
+    // bij het afsluiten of crashen. Nu schrijft elke niet-keepalive-regel meteen ook naar een
+    // sessiebestand in %AppData%\Modeltreinbesturing\Logs (zelfde opmaak als de handmatige
+    // export). Per start van het programma een nieuw bestand; de 20 nieuwste blijven bewaard.
+    private static StreamWriter? _sessieBestand;
+    private static bool _sessieBestandPogingGedaan;
+
+    /// <summary>Pad van het sessielogbestand van deze start (null als aanmaken niet lukte).</summary>
+    public static string? SessieLogPad { get; private set; }
+
+    private static void SchrijfNaarSessieBestand(LogRegel regel)
+    {
+        try
+        {
+            if (_sessieBestand is null)
+            {
+                if (_sessieBestandPogingGedaan) return; // één poging per start; loggen mag nooit het programma hinderen
+                _sessieBestandPogingGedaan = true;
+                string proces = Path.GetFileNameWithoutExtension(Environment.ProcessPath ?? "programma");
+                string map = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Modeltreinbesturing", "Logs");
+                Directory.CreateDirectory(map);
+                foreach (var oud in new DirectoryInfo(map).GetFiles($"hardwarelog_{proces}_*.txt").OrderByDescending(f => f.CreationTimeUtc).Skip(19))
+                {
+                    try { oud.Delete(); } catch { /* in gebruik of al weg - maakt niet uit */ }
+                }
+                SessieLogPad = Path.Combine(map, $"hardwarelog_{proces}_{DateTime.Now:yyyy-MM-dd_HHmmss}.txt");
+                _sessieBestand = new StreamWriter(new FileStream(SessieLogPad, FileMode.Create, FileAccess.Write, FileShare.ReadWrite), new System.Text.UTF8Encoding(false)) { AutoFlush = true };
+                _sessieBestand.WriteLine($"# {proces} - hardware-communicatielog van deze sessie (automatisch bewaard, elke regel direct weggeschreven)");
+            }
+            _sessieBestand.WriteLine($"{regel.Tijdstip:yyyy-MM-dd HH:mm:ss.fff} [{regel.Richting,4}] {regel.Tekst}");
+        }
+        catch
+        {
+            _sessieBestand = null; // schijf vol / geen rechten: stil doorgaan zonder bestand
+        }
     }
 }

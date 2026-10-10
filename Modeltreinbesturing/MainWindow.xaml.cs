@@ -61,6 +61,12 @@ public partial class MainWindow : Window
         _melderHerbevestigingsTimer.Tick += (_, _) => { if (_hardwareBeheerder.Huidige is DinamoHardware) VraagVolgendeMelderStatusOp(); };
         _melderHerbevestigingsTimer.Start();
         Closing += (_, _) => VensterInstellingen.Bewaren(this, "MainWindow");
+        // BUG #45: bij afsluiten eerst alle bekende locs stoppen en de verbinding netjes sluiten.
+        // Anders blijft Dinamo het laatst gegeven snelheidscommando onthouden en hervat hij dat
+        // bij de volgende verbinding meteen (log 10-10-2026: "de trein begint al te rijden
+        // voordat ik iets gedaan heb"). Closed (niet Closing): de backup en eventuele
+        // bevestigingsvragen zijn dan al afgehandeld.
+        Closed += (_, _) => StopHardwareBijAfsluiten();
         Closing += (_, _) => BackupBeheerder.MaakBackup(_beheerder, _baanBeheerder, _wisselstraatBeheerder, _routeBeheerder, _treintypeBeheerder, _richtingsverbodBeheerder, _stopverbodBeheerder, _stopverbodStilstandBeheerder, _treinBeheerder, _gebruikersBeheerder, _actieBeheerder, _snelheidsMetingBeheerder, _onderhoudsBeheerder, _snelleKlokBeheerder);
         _routeBeheerder = new TreinrouteBeheerder(_richtingsverbodBeheerder);
         _beheerder.BezettingGewijzigd += Redraw;
@@ -90,12 +96,13 @@ public partial class MainWindow : Window
         _hardwareBeheerder.KortsluitingStatusGewijzigd += actief =>
         {
             if (actief) return;
-            Dispatcher.Invoke(() =>
+            // BUG #45: BeginInvoke i.p.v. Invoke - de seriële thread mag nooit op de UI-thread wachten.
+            Dispatcher.BeginInvoke(new Action(() =>
             {
                 int aantal = _hardwareBeheerder.HerinitialiseerAlleWissels(_baanBeheerder);
                 if (aantal > 0)
                     HardwareCommunicatieLog.Log("Info", $"Kortsluiting/foutstatus opgeheven - voor de zekerheid {aantal} wissel(s)/driewegwissel(s)/kruiswissel(s) opnieuw hun stand gestuurd (zie BUG #28).");
-            });
+            }));
         };
 
         // Automatisch de meest recente backup laden bij het opstarten, zodat je nooit
@@ -160,7 +167,13 @@ public partial class MainWindow : Window
     /// wijziging aan dezelfde lijst.</summary>
     private void Bezetmelding_VanHardware(int meldernummer, bool bezet)
     {
-        Dispatcher.Invoke(() =>
+        // BUG #45: BeginInvoke i.p.v. Invoke. Deze methode draait op de seriële-poort-thread;
+        // die mocht hier op de UI-thread WACHTEN, en daarbinnen stond een modale MessageBox
+        // (spookmelding). Zolang die open stond hing de hele ontvangst/verzending van de
+        // hardware (log 10-10-2026: bij het opstarten een spookmelding voor blok 3, daarna
+        // ~40 s vertraging in alles en stopcommando's die te laat kwamen). De volgorde van
+        // meldingen blijft behouden: de Dispatcher handelt ze af in binnenkomstvolgorde.
+        Dispatcher.BeginInvoke(new Action(() =>
         {
             var blok = _beheerder.Blokken.FirstOrDefault(b => b.Bezetmeldpunten.Any(m => m.MeldernNummer == meldernummer));
             _beheerder.MeldRuweMelderStatus(meldernummer, bezet, blok); // ALTIJD, ook zonder blok - zie Meldpuntenverkenner
@@ -280,9 +293,15 @@ public partial class MainWindow : Window
                 ZorgVoorOpenTreinrouteWindow();
                 _treinrouteWindow!.VoerNoodstopUit($"spookmelding blok {blok.Nummer}");
 
-                MessageBox.Show(this,
-                    $"Spookmelding: blok {blok.Nummer} (melder {meldernummer}) meldt zich bezet, terwijl er geen rit of handmatige bezetting op dit blok bekend is.\n\nAlle rijdende treinen zijn direct gestopt (NOODSTOP), net als het echte Koploper bij een spookmelding doet. Meestal een hardware-glitch (railcontact/decoder) - controleer de baan. Het blok knippert nu totdat je de foutmelding zelf opheft.",
-                    "Modeltreinbesturing - spookmelding", MessageBoxButton.OK, MessageBoxImage.Warning);
+                // BUG #45: de melding zelf pas TONEN nadat deze verwerking klaar is (Background-
+                // prioriteit): de modale MessageBox draait een eigen berichtenlus, en de rest
+                // van deze methode (blok bezet/vrij zetten) mag daar niet op wachten.
+                int spookBlokNummer = blok.Nummer;
+                Dispatcher.BeginInvoke(new Action(() =>
+                    MessageBox.Show(this,
+                        $"Spookmelding: blok {spookBlokNummer} (melder {meldernummer}) meldt zich bezet, terwijl er geen rit of handmatige bezetting op dit blok bekend is.\n\nAlle rijdende treinen zijn direct gestopt (NOODSTOP), net als het echte Koploper bij een spookmelding doet. Meestal een hardware-glitch (railcontact/decoder) - controleer de baan. Het blok knippert nu totdat je de foutmelding zelf opheft.",
+                        "Modeltreinbesturing - spookmelding", MessageBoxButton.OK, MessageBoxImage.Warning)),
+                    System.Windows.Threading.DispatcherPriority.Background);
             }
 
             // GEVONDEN, STRUCTUREEL GAT (bytes-analyse: een blok met MEERDERE meldpunten -
@@ -305,7 +324,7 @@ public partial class MainWindow : Window
                 m.MeldernNummer != meldernummer && (_beheerder.MelderIsBezet(m.MeldernNummer) ?? true));
             if (!anderMeldpuntNogBezet)
                 _beheerder.ZetBezet(blok, bezet);
-        });
+        }));
     }
 
     // --- Muis-interactie -------------------------------------------------
@@ -909,14 +928,29 @@ public partial class MainWindow : Window
             // eenmalige, niet-urgente veiligheidsbroadcast (10-30+ commando's ineens) ging
             // voorheen ongepauzeerd de deur uit en verdrong daarmee de wissel-initialisatie
             // die hier vlak voor plaatsvindt.
-            foreach (var blok in alleBlokken)
-                _hardwareBeheerder.StuurLocSnelheidCommandoGepauzeerd(trein.DecoderAdres, 0, true, blok.Nummer, trein.DecoderStappen);
-            foreach (int kruiswisselAdres in kruiswisselAdressen)
-                _hardwareBeheerder.StuurLocSnelheidCommandoGepauzeerd(trein.DecoderAdres, 0, true, kruiswisselAdres, trein.DecoderStappen);
+            // BUG #45: NIET meer via de gepauzeerde wachtrij (die zette de stopcommando's
+            // ACHTER de hele wissel-initialisatie: bij 8 wissels x 2 x 600 ms bijna 10 s, in
+            // het log van 10-10-2026 zelfs 40 s) maar via de voorrangs-wachtrij van de hardware.
+            // Een stopcommando is veiligheidskritisch; de wissel-initialisatie mag wachten.
+            _hardwareBeheerder.StuurStopNaarAlleBlokken(trein.DecoderAdres, true,
+                alleBlokken.Select(b => b.Nummer).Concat(kruiswisselAdressen), trein.DecoderStappen);
             aantal++;
         }
         if (aantal > 0)
             HardwareCommunicatieLog.Log("Info", $"Expliciet snelheid=0 gestuurd naar {aantal} bekende loc(s), naar ALLE {alleBlokken.Count} blokken in het project (niet alleen de onthouden positie) {reden} - voorkomt dat een 'vergeten' commando van een vorige sessie blijft doorlopen, ook als de onthouden positie niet meer klopt.");
+    }
+
+    /// <summary>BUG #45: zie de aanroep (Closed) in de constructor.</summary>
+    private void StopHardwareBijAfsluiten()
+    {
+        try
+        {
+            if (!_hardwareBeheerder.Huidige.Verbonden) return;
+            if (_hardwareBeheerder.Huidige is SimulatieHardware) return;
+            StopAlleBekendeGeplaatsteLocs("bij het afsluiten");
+            _hardwareBeheerder.Huidige.Ontkoppelen(); // Dinamo: verstuurt eerst nog de klaarstaande stopcommando's
+        }
+        catch { /* afsluiten mag hier nooit op stuklopen */ }
     }
 
     /// <summary>Zie de aanroep in de constructor hierboven - probeert eenmalig, bij het
@@ -932,7 +966,8 @@ public partial class MainWindow : Window
         var nieuw = HardwareInstellingen.MaakInterface(keuze.InterfaceType);
         if (nieuw is null) return; // onbekend/verouderd type-label, gewoon in Simulatie blijven
 
-        nieuw.StatusBericht += bericht => Dispatcher.Invoke(() => HardwareCommunicatieLog.Log("Info", bericht));
+        // BUG #45: BeginInvoke - de seriële thread mag nooit op de UI-thread wachten.
+        nieuw.StatusBericht += bericht => Dispatcher.BeginInvoke(new Action(() => HardwareCommunicatieLog.Log("Info", bericht)));
         try
         {
             await nieuw.VerbindenAsync(keuze.ComPoort);
@@ -957,6 +992,10 @@ public partial class MainWindow : Window
             // BUG #28: deze drie foreach-lussen stonden hier EN (apart onderhouden, dus
             // vatbaar voor uit-elkaar-lopen) in HardwareDialog.InitialiseerWisselsMetVlag -
             // nu één gedeelde implementatie, zie HardwareBeheerder.HerinitialiseerAlleWissels.
+            // BUG #45: EERST de stopcommando's (Dinamo hervat na Reset Fault meteen de oude
+            // snelheid van de vorige sessie), pas daarna de wissels en de melderopvraag.
+            StopAlleBekendeGeplaatsteLocs("bij het (opnieuw) verbinden");
+
             int totaalGeinitialiseerd = _hardwareBeheerder.HerinitialiseerAlleWissels(_baanBeheerder);
             if (totaalGeinitialiseerd > 0)
                 HardwareCommunicatieLog.Log("Info", $"{totaalGeinitialiseerd} wissel(s)/driewegwissel(s)/kruiswissel(s) geïnitialiseerd (opnieuw hun stand verstuurd) bij het verbinden.");
@@ -974,8 +1013,6 @@ public partial class MainWindow : Window
             // wordt.
             if (_hardwareBeheerder.Huidige.KanMelderStatusOpvragen)
                 VraagAlleMelderStatusOp("bij het verbinden");
-
-            StopAlleBekendeGeplaatsteLocs("bij het (opnieuw) verbinden");
         }
         catch (Exception ex)
         {
@@ -1277,7 +1314,7 @@ public partial class MainWindow : Window
 
     private void HardwareInterface_Click(object sender, RoutedEventArgs e)
     {
-        var dialoog = new HardwareDialog(_hardwareBeheerder, _baanBeheerder, _beheerder) { Owner = this };
+        var dialoog = new HardwareDialog(_hardwareBeheerder, _baanBeheerder, _beheerder, () => StopAlleBekendeGeplaatsteLocs("bij het handmatig verbinden")) { Owner = this };
         dialoog.ShowDialog();
     }
 

@@ -96,6 +96,23 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron
     // achter een snelheidsrefresh-backlog te wachten.
     private readonly Queue<byte[]> _teVersturenPrioriteit = new();
     private readonly object _vergrendeling = new();
+    // BUG #45: derde, hoogste voorrangs-wachtrij - ALLEEN voor Reset Fault en stopcommando's
+    // (noodstop / stop bij verbinden of afsluiten). Wordt bij elke stuur-tik als EERSTE en
+    // volledig leeggetrokken, dus een stopcommando hoeft nooit meer achter melderstatus-
+    // aanvragen, wissel-initialisatie of een snelheidsramp te wachten. Log 10-10-2026: de
+    // stop-opdrachten voor de locs kwamen pas 40 s na het verbinden de deur uit, terwijl
+    // Dinamo (na Reset Fault) meteen de oude snelheid van de vorige sessie hervatte.
+    private readonly Queue<byte[]> _teVersturenUrgent = new();
+    // BUG #45: serialiseert het VERSTUREN. System.Threading.Timer start een nieuwe tik ook
+    // als de vorige nog loopt (trage schrijfactie naar de poort): twee tikken schreven dan
+    // door elkaar (toggle-bit race, pakketjes in verkeerde volgorde - zichtbaar in het log
+    // als niet-wisselende toggle-bits en wissel 1 "afbuigend/rechtdoor" door elkaar).
+    private readonly object _verzendSlot = new();
+    // BUG #45: serialiseert het ONTVANGEN (DataReceived kan op meerdere threads tegelijk
+    // lopen; _ontvangstBuffer is geen thread-safe lijst, en de foutstatus werd dubbel gemeld).
+    private readonly object _ontvangstSlot = new();
+    private volatile bool _opstartFaseActief;
+    private volatile int _schoneLeesbeurten;
     private bool _toggleBit;
     private int _faultBitResterendeCycli;
     private bool _dinamoMeldeFoutVorigeKeer; // voor het loggen van alleen de OVERGANG (aan/uit), niet elke 200ms opnieuw
@@ -166,6 +183,8 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron
                     WriteTimeout = 500
                 };
                 _poort.DataReceived += Poort_DataReceived;
+                _opstartFaseActief = true;
+                _schoneLeesbeurten = 0;
                 _poort.Open();
                 Verbonden = true;
                 StatusBericht?.Invoke($"Verbonden met Dinamo op {comPoort} (19200 baud, odd pariteit).");
@@ -188,9 +207,26 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron
                 // EIGEN, tijdelijke PC->Dinamo F-bit via Noodstop() hierboven, die na een
                 // paar cycli vanzelf weer loslaat).
                 StuurResetFault();
+
+                // BUG #45 - STARTHANDSHAKE: Dinamo staat na (her)verbinden bijna altijd nog in
+                // foutstatus (de vorige sessie stopte met sturen, dus hij viel na 2 s in Fault).
+                // Zolang F=1 negeert/vertraagt hij ALLES wat we sturen (log 10-10-2026: 40 s
+                // lang 1 pakketje per seconde, daarna een vloedgolf). Daarom hier eerst WACHTEN
+                // (max. 4 s) tot Reset Fault gewerkt heeft - pas dan geeft de aanroeper
+                // wissel-initialisatie, melderopvraag en stopcommando's vrij. Reset Fault zelf
+                // gaat via de urgente wachtrij en wordt bij elk ontvangen F-bit herhaald.
+                var wachtStart = Environment.TickCount64;
+                while (Environment.TickCount64 - wachtStart < 4000 && _schoneLeesbeurten < 2)
+                    Thread.Sleep(50);
+                long wachtMs = Environment.TickCount64 - wachtStart;
+                StatusBericht?.Invoke(_schoneLeesbeurten >= 2
+                    ? $"Dinamo: foutstatus na het verbinden gewist na {wachtMs} ms - klaar voor wissel-initialisatie en stopcommando's."
+                    : "Dinamo: na 4 s nog steeds geen schone status (foutstatus blijft of Dinamo antwoordt niet) - ga toch verder; Reset Fault blijft automatisch herhaald worden.");
+                _opstartFaseActief = false;
             }
             catch (Exception ex)
             {
+                _opstartFaseActief = false;
                 Verbonden = false;
                 throw new InvalidOperationException($"Kon niet verbinden met Dinamo op {comPoort}: {ex.Message}", ex);
             }
@@ -202,11 +238,39 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron
         if (_poort is null) return; // nog nooit verbonden geweest - niets te ontkoppelen, geen misleidende melding nodig
         _stuurTimer?.Dispose();
         _stuurTimer = null;
+        // BUG #45: wat er nog aan URGENTE pakketjes (stopcommando's) klaarstaat nog even echt
+        // versturen vóór de poort dicht gaat - anders blijft de loc met zijn laatste snelheid
+        // doorrijden en hervat Dinamo die bij de volgende verbinding.
+        try
+        {
+            lock (_verzendSlot)
+            {
+                bool nogUrgent;
+                lock (_vergrendeling) nogUrgent = _teVersturenUrgent.Count > 0;
+                if (nogUrgent && _poort.IsOpen)
+                {
+                    List<byte[]> rest;
+                    lock (_vergrendeling) { rest = new List<byte[]>(_teVersturenUrgent); _teVersturenUrgent.Clear(); }
+                    foreach (var p in rest) VerstuurEnkelPakket(p, urgent: true);
+                    Thread.Sleep(250); // 19200 baud = ~1900 B/s: laat de laatste bytes echt de kabel op gaan
+                }
+            }
+        }
+        catch { /* poort was mogelijk al weg */ }
         _poort.DataReceived -= Poort_DataReceived;
-        try { _poort.Close(); } catch { /* poort was mogelijk al weg */ }
-        _poort.Dispose();
+        var teSluitenPoort = _poort;
         _poort = null;
         Verbonden = false;
+        // BUG #45: SerialPort.Close() wacht tot een lopende DataReceived-handler klaar is; zit
+        // die handler op de UI-thread te wachten (Dispatcher.Invoke) terwijl de UI-thread hier
+        // zelf Close() aanroept, dan hangt het programma (klassieke deadlock). Sluiten daarom
+        // op een aparte thread, met een maximale wachttijd.
+        var sluitTaak = Task.Run(() =>
+        {
+            try { teSluitenPoort.Close(); } catch { /* poort was mogelijk al weg */ }
+            try { teSluitenPoort.Dispose(); } catch { }
+        });
+        sluitTaak.Wait(2000);
         StatusBericht?.Invoke("Dinamo ontkoppeld.");
     }
 
@@ -216,7 +280,7 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron
     /// automatisch herhaald zolang Poort_DataReceived Dinamo's eigen F-bit=1 blijft zien
     /// (zie hieronder) - zodat de verbinding ook herstelt van een latere, ECHTE Dinamo-
     /// fout (bijv. kortsluiting), niet alleen van de opstartstatus.</summary>
-    private void StuurResetFault() => VerstuurDatagram(new byte[] { 0x01, 0x00 });
+    private void StuurResetFault() => VerstuurDatagram(new byte[] { 0x01, 0x00 }, urgent: true);
 
     /// <summary>Magneetartikel-commando (§3.3): "(0010CMM) (mmmmmmm) [(tijd)]" - zet een
     /// puls op een wisselspoel. MMmmmmmmm (9 bits, 0..511) is het spoelnummer, C is de
@@ -371,7 +435,18 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron
     /// Vereist een BLOK (zie IHardwareInterface): zonder bekend blok kan Dinamo het
     /// commando niet routeren naar de juiste rail-sectie, dus wordt dan duidelijk gemeld
     /// i.p.v. blok 0 (een geldig, ander blok) te gebruiken.</summary>
-    public void ZetLocSnelheid(int decoderAdres, int stap, bool vooruit, int blokNummer = 0, int stappen = 126)
+    public void ZetLocSnelheid(int decoderAdres, int stap, bool vooruit, int blokNummer = 0, int stappen = 126) =>
+        ZetLocSnelheidIntern(decoderAdres, stap, vooruit, blokNummer, stappen, urgent: false);
+
+    /// <summary>BUG #45: zelfde commando als ZetLocSnelheid, maar via de urgente wachtrij (gaat
+    /// bij de eerstvolgende stuur-tik de deur uit, vóór al het andere verkeer) en met
+    /// verwijdering van nog niet verstuurde, inmiddels verouderde snelheidscommando's voor
+    /// dezelfde loc+blok. Bedoeld voor stop-commando's: noodstop, stop bij (her)verbinden en
+    /// bij afsluiten van het programma.</summary>
+    public void ZetLocSnelheidUrgent(int decoderAdres, int stap, bool vooruit, int blokNummer = 0, int stappen = 126) =>
+        ZetLocSnelheidIntern(decoderAdres, stap, vooruit, blokNummer, stappen, urgent: true);
+
+    private void ZetLocSnelheidIntern(int decoderAdres, int stap, bool vooruit, int blokNummer, int stappen, bool urgent)
     {
         if (blokNummer <= 0)
         {
@@ -397,7 +472,18 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron
         // Zie _teVersturen/VerstuurDatagram hierboven: coalesce-sleutel zodat een vers
         // snelheidscommando voor deze loc+blok nooit achter een stapel verouderde,
         // nog niet verstuurde commando's voor DEZELFDE combinatie hoeft te wachten.
-        VerstuurDatagram(payload.ToArray(), snelheidsSleutel: (decoderAdres, blokNummer));
+        if (urgent)
+        {
+            lock (_vergrendeling)
+            {
+                _teVersturen.RemoveAll(item => item.SnelheidsSleutel.HasValue
+                    && item.SnelheidsSleutel.Value.DecoderAdres == decoderAdres
+                    && item.SnelheidsSleutel.Value.BlokNummer == blokNummer);
+            }
+            VerstuurDatagram(payload.ToArray(), urgent: true);
+        }
+        else
+            VerstuurDatagram(payload.ToArray(), snelheidsSleutel: (decoderAdres, blokNummer));
     }
 
     // Functies worden per GROEP verstuurd (§3.4 "DCC Functiegroep 1,2a,2b" en §3.4 "DCC
@@ -547,12 +633,20 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron
     /// zie klasse-commentaar) en zet het in de verstuur-wachtrij; de stuur-timer haalt
     /// het er op tijd weer uit. Rechtstreeks versturen zou de 200ms-cadans van de PC-als-
     /// Master kunnen verstoren.</summary>
-    private void VerstuurDatagram(byte[] payload, bool prioriteit = false, (int DecoderAdres, int BlokNummer)? snelheidsSleutel = null)
+    private void VerstuurDatagram(byte[] payload, bool prioriteit = false, (int DecoderAdres, int BlokNummer)? snelheidsSleutel = null, bool urgent = false)
     {
         if (payload.Length > 7)
             throw new ArgumentException("Normaal Dinamo-datagram ondersteunt max. 7 databytes (jumbo-datagrammen zijn hier niet geïmplementeerd).");
         lock (_vergrendeling)
         {
+            if (urgent)
+            {
+                // Byte-identiek en nog niet verstuurd = geen nieuws (o.a. Reset Fault die bij
+                // elk ontvangen F-bit opnieuw wordt aangevraagd).
+                if (!_teVersturenUrgent.Any(p => p.AsSpan().SequenceEqual(payload)))
+                    _teVersturenUrgent.Enqueue(payload);
+                return;
+            }
             if (prioriteit)
             {
                 _teVersturenPrioriteit.Enqueue(payload);
@@ -620,36 +714,57 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron
     {
         if (_poort is null || !Verbonden) return;
 
-        List<byte[]> teVersturenPakketten;
-        lock (_vergrendeling)
+        // BUG #45: nooit twee tikken tegelijk. Loopt de vorige tik nog (trage schrijfactie),
+        // dan slaan we deze tik over - de volgende komt over 200 ms vanzelf. Voorheen schreven
+        // overlappende tikken door elkaar (toggle-bit race, pakketjes in verkeerde volgorde).
+        if (!Monitor.TryEnter(_verzendSlot)) return;
+        try
         {
-            if (_teVersturenPrioriteit.Count > 0)
+            List<(byte[] Payload, bool Urgent)> teVersturenPakketten = new();
+            lock (_vergrendeling)
             {
-                // Alle klaarstaande prioriteits-commando's (de 3 herhalingen van dezelfde
-                // ZetWissel/ZetSein-aanroep) in één keer, achter elkaar - zie toelichting
-                // hierboven.
-                teVersturenPakketten = new List<byte[]>(_teVersturenPrioriteit);
-                _teVersturenPrioriteit.Clear();
+                // 1. URGENT (Reset Fault, stopcommando's): altijd volledig, altijd als eerste.
+                if (_teVersturenUrgent.Count > 0)
+                {
+                    foreach (var p in _teVersturenUrgent) teVersturenPakketten.Add((p, true));
+                    _teVersturenUrgent.Clear();
+                }
+                if (_teVersturenPrioriteit.Count > 0)
+                {
+                    // Alle klaarstaande prioriteits-commando's (de herhalingen van dezelfde
+                    // ZetWissel/ZetSein-aanroep) in één keer, achter elkaar - zie toelichting
+                    // hierboven.
+                    foreach (var p in _teVersturenPrioriteit) teVersturenPakketten.Add((p, false));
+                    _teVersturenPrioriteit.Clear();
+                }
+                else if (_teVersturen.Count > 0)
+                {
+                    teVersturenPakketten.Add((_teVersturen[0].Payload, false));
+                    _teVersturen.RemoveAt(0);
+                }
+                if (teVersturenPakketten.Count == 0)
+                    teVersturenPakketten.Add((Array.Empty<byte>(), false)); // leeg = NULL-datagram (keepalive)
             }
-            else if (_teVersturen.Count > 0)
-            {
-                teVersturenPakketten = new List<byte[]> { _teVersturen[0].Payload };
-                _teVersturen.RemoveAt(0);
-            }
-            else
-                teVersturenPakketten = new List<byte[]> { Array.Empty<byte>() }; // leeg = NULL-datagram (keepalive)
-        }
 
-        foreach (var payload in teVersturenPakketten)
-            VerstuurEnkelPakket(payload);
+            foreach (var (payload, urgent) in teVersturenPakketten)
+                VerstuurEnkelPakket(payload, urgent);
+        }
+        finally
+        {
+            Monitor.Exit(_verzendSlot);
+        }
     }
 
-    private void VerstuurEnkelPakket(byte[] payload)
+    private void VerstuurEnkelPakket(byte[] payload, bool urgent = false)
     {
         try
         {
             _toggleBit = !_toggleBit;
-            bool faultBit = _faultBitResterendeCycli > 0;
+            // BUG #45: urgente pakketjes (Reset Fault, stopcommando's) dragen nooit zelf het
+            // PC->Dinamo F-bit en verbruiken ook geen noodstop-cycli: een datagram met F=1 zou
+            // door Dinamo als "alles gestopt" kunnen worden behandeld en de inhoud (het stop-
+            // commando zelf!) kunnen negeren. De F-bit-cycli blijven voor de gewone pakketjes.
+            bool faultBit = !urgent && _faultBitResterendeCycli > 0;
             if (faultBit) _faultBitResterendeCycli--;
             byte header = (byte)(((_toggleBit ? 1 : 0) << 6) | ((faultBit ? 1 : 0) << 5) | (1 << 3) | (payload.Length & 0x07)); // bit7=0 (header), bit6=Toggle, bit5=Fault (noodstop), bit3=1 (protocol 3.x normaal)
             var pakket = new byte[1 + payload.Length + 1];
@@ -755,7 +870,16 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron
     /// werken.</summary>
     private readonly Dictionary<int, bool> _laatstDoorgegevenStatus = new();
 
+    /// <summary>BUG #45: DataReceived kan op meerdere threads tegelijk binnenkomen. Zonder slot
+    /// raceden die om _ontvangstBuffer en _dinamoMeldeFoutVorigeKeer - zichtbaar in het log
+    /// als twee keer dezelfde "foutstatus gemeld/opgeheven"-regel binnen 1 ms. Nu strikt
+    /// één voor één, in binnenkomstvolgorde.</summary>
     private void Poort_DataReceived(object sender, SerialDataReceivedEventArgs e)
+    {
+        lock (_ontvangstSlot) VerwerkOntvangenData();
+    }
+
+    private void VerwerkOntvangenData()
     {
         try
         {
@@ -764,6 +888,7 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron
             for (int t = 0; t < gelezen; t++) _ontvangstBuffer.Add(tijdelijk[t]);
 
             bool dinamoMeldtFout = false;
+            int framesDezeKeer = 0;
             int i = 0;
             while (i < _ontvangstBuffer.Count)
             {
@@ -782,9 +907,14 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron
                 bool ditIsKeepalive = aantalDataBytes == 0;
                 HardwareCommunicatieLog.Log("In", $"[Dinamo] {Convert.ToHexString(_ontvangstBuffer.GetRange(i, berichtLengte).ToArray())}", keepalive: ditIsKeepalive);
 
+                framesDezeKeer++;
                 if ((_ontvangstBuffer[i] & 0x20) != 0) dinamoMeldtFout = true; // Dinamo's eigen F-bit
 
-                if (aantalDataBytes >= 2)
+                // BUG #45: tijdens de starthandshake (VerbindenAsync) heeft nog niemand zich op
+                // onze events geabonneerd en worden alle melders daarna toch opnieuw opgevraagd.
+                // Een event nu "doorgeven" zou alleen _laatstDoorgegevenStatus vullen en het
+                // latere antwoord op de statusopvraag dan als "ongewijzigd" onderdrukken.
+                if (aantalDataBytes >= 2 && !_opstartFaseActief)
                 {
                     byte data1 = (byte)(_ontvangstBuffer[i + 1] & 0x7F);
                     byte data2 = (byte)(_ontvangstBuffer[i + 2] & 0x7F);
@@ -855,9 +985,22 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron
             // doet.
             bool wasFout = _dinamoMeldeFoutVorigeKeer;
             _dinamoMeldeFoutVorigeKeer = dinamoMeldtFout;
+            // BUG #45: teller voor de starthandshake - alleen leesbeurten met minstens één
+            // volledig datagram tellen mee (een half binnengekomen bericht zegt niets).
+            if (framesDezeKeer > 0)
+                _schoneLeesbeurten = dinamoMeldtFout ? 0 : _schoneLeesbeurten + 1;
             if (dinamoMeldtFout)
             {
-                if (!wasFout)
+                if (!wasFout && _opstartFaseActief)
+                {
+                    // BUG #45: Dinamo meldt direct na het verbinden bijna altijd nog de foutstatus
+                    // van de vorige sessie. Dat is GEEN kortsluiting: geen banner, en vooral geen
+                    // "foutstatus opgeheven -> alle wissels opnieuw sturen" (BUG #28) bovenop de
+                    // wissel-initialisatie die de aanroeper hierna toch al doet (dat gaf de
+                    // dubbele wissel-ronde van 40 s later in het log van 10-10-2026).
+                    StatusBericht?.Invoke("Dinamo meldt direct na het verbinden nog de foutstatus van de vorige sessie - Reset Fault wordt herhaald tot die gewist is.");
+                }
+                else if (!wasFout)
                 {
                     // GEBRUIKERSCORRECTIE ("koploper geeft alleen een melding, laat alle
                     // treinen gewoon rijden ook in het blok met de kortsluiting, Dinamo
@@ -875,7 +1018,8 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron
             else if (wasFout)
             {
                 StatusBericht?.Invoke("Dinamo's foutstatus is opgeheven.");
-                KortsluitingStatusGewijzigd?.Invoke(false);
+                if (!_opstartFaseActief) // zie hierboven: de opstartfout was geen kortsluiting
+                    KortsluitingStatusGewijzigd?.Invoke(false);
             }
         }
         catch (TimeoutException) { /* niets gelezen binnen de timeout, prima */ }
