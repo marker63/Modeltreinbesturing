@@ -59,3 +59,7 @@ Gevolgtrekking (voorlopig): melder 24 wordt ook voor blok 1 gebruikt (niet allee
 - 8 -> 24 -> 14 lukt alleen met motor 13 afbuigend (16:48:29); met 13 rechtdoor (ook met 12 of 15 erbij) volgt kortsluiting. 14 -> 24 -> 8 (16:59-17:00) lukte met 13 afbuigend.
 - 21 -> 24 -> 129 lukte met motor 10 afbuigend.
 - Conclusie: het vervolg na melder 24 hangt af van de kant waar de loc binnenkwam EN de standen van motor 13 en 10 (Engelse wissel met vier benen).
+
+## Marco 10-10-2026 17:56
+- De kruiswissel (motoren 13 en 10) ligt IN de sectie van melder 24. De loc fysiek "terugschuiven naar melder 24" is dus maar een paar cm in die sectie: hij staat dan nog (deels) op het kruiswissel.
+- Hypothese uit het log 17:18-17:54 (NIET veldgetest): motor 13 rechtdoor verbindt 21 <-> 14, motor 13 afbuigend verbindt 8 <-> 14 (melder 24 ertussen). Een loc die vanaf 8 in 24 komt en naar 14 wil, heeft dus 13 afbuigend nodig.

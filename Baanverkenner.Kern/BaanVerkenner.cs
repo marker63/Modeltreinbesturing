@@ -1039,7 +1039,7 @@ public partial class BaanVerkenner
                     try
                     {
                         await TerugNaar(k.NaMelder, rit, c);
-                        await TerugNaarHuis(k.Route);
+                        await TerugNaarHuis(k.Route, c);
                     }
                     catch (NavigatieFout nf) when (proefKortsluiting || proefOpgelost)
                     {
@@ -1083,15 +1083,18 @@ public partial class BaanVerkenner
         }
     }
 
-    private async Task TerugNaarHuis(List<Etappe> route)
+    /// <param name="eersteConfiguratie">BUG #73: na een proef met een extra wissel op een kruiswissel-sectie blijft de wisselstand van die
+    /// proef staan voor het EERSTE stuk van de terugweg; pas daarna volgen de standen van de route.</param>
+    private async Task TerugNaarHuis(List<Etappe> route, Configuratie? eersteConfiguratie = null)
     {
         for (int i = route.Count - 1; i >= 0; i--)
         {
             var e = route[i];
-            await ZetConfiguratie(e.Configuratie);
+            var cfg = i == route.Count - 1 && eersteConfiguratie is not null ? eersteConfiguratie : e.Configuratie;
+            await ZetConfiguratie(cfg);
             var pad = e.Pad.ToList();
             pad.Reverse();
-            await Rit(e.Naar, e.Richting.Om(), new RitDoel { Configuratie = e.Configuratie, DoelMelder = e.Van, VerwachtPad = pad });
+            await Rit(e.Naar, e.Richting.Om(), new RitDoel { Configuratie = cfg, DoelMelder = e.Van, VerwachtPad = pad });
         }
         await ZetConfiguratie(Configuratie.Basis);
     }
@@ -1153,7 +1156,11 @@ public partial class BaanVerkenner
             var extra = bezet.FirstOrDefault(m => !pad.Contains(m));
             if (extra != 0) { pad.Insert(0, extra); vanaf = extra; }
         }
-        await Rit(vanaf, rit.Richting.Om(), new RitDoel { Configuratie = c, DoelMelder = start, VerwachtPad = pad });
+        var terug = await Rit(vanaf, rit.Richting.Om(), new RitDoel { Configuratie = c, DoelMelder = start, VerwachtPad = pad });
+        // BUG #73 (log 17:48 en 17:54): kreeg de loc op de terugweg kortsluiting, dan was hij NIET terug op de startmelder. Het resultaat werd
+        // genegeerd, de volgende proefrit begon vanaf een verkeerd aangenomen plek en de loc werd steeds opnieuw handmatig verplaatst.
+        if (terug.Einde == RitEinde.Kortsluiting)
+            throw new NavigatieFout($"Op de terugweg naar melder {start} volgde een kortsluiting: de loc staat niet op melder {start}.");
     }
 
     // =====================================================================

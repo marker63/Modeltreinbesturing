@@ -643,6 +643,11 @@ public partial class BaanVerkenner
                 throw new NavigatieFout($"De loc moest vanaf melder {start} naar melder {doel.DoelMelder} rijden, maar staat op melder {werkelijk} (niet op het verwachte pad).");
         }
 
+        // BUG #73: ook een verkenningsrit (geen navigatie) begint alleen vanaf de startmelder. Staat de loc na een mislukte terugweg op een
+        // andere melder, dan wordt die rit niet vanaf een verkeerd aangenomen plek gestart (dat gaf kortsluitingen en valse overgangen).
+        if (!doel.IsNavigatie && _monitor.Bezet is { Count: 1 } elders && !elders.Contains(start))
+            throw new NavigatieFout($"De rit moest beginnen op melder {start}, maar de loc staat op melder {elders.First()}.");
+
         if (doel.IsNavigatie && start == doel.DoelMelder)
         {
             res.Einde = RitEinde.DoelBereikt;

@@ -238,6 +238,11 @@ public static class Tests
         try { ((Task<RitResultaat>)rit.Invoke(v, new object[] { 1, Richting.Vooruit, new RitDoel { DoelMelder = 3, VerwachtPad = new List<int> { 1, 3 } } })!).GetAwaiter().GetResult(); }
         catch (NavigatieFout) { fout = true; }
         Eis(fout && !v.Kaart.Overgangen.Any(o => o.Van == 1), "navigatie-startcontrole: loc buiten het verwachte pad -> NavigatieFout, geen valse overgang");
+        // c) een verkenningsrit (geen navigatie) vanaf een verkeerd aangenomen plek wordt niet gestart (BUG #73)
+        bool fout2 = false;
+        try { ((Task<RitResultaat>)rit.Invoke(v, new object[] { 1, Richting.Vooruit, new RitDoel { Basis = new List<int> { 1 } } })!).GetAwaiter().GetResult(); }
+        catch (NavigatieFout) { fout2 = true; }
+        Eis(fout2 && !v.Kaart.Overgangen.Any(o => o.Van == 1), "verkenningsrit-startcontrole: loc staat elders -> NavigatieFout, geen valse overgang");
     }
 
     // Blokkenschema-tekening (SVG) uit de baankaart van 17:07
