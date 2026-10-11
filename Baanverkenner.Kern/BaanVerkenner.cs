@@ -210,6 +210,9 @@ public partial class BaanVerkenner
                     if (!_kaart.BekendeKortsluitOplossingen.Any(x => x.Sleutel == o.Sleutel)) { _kaart.BekendeKortsluitOplossingen.Add(o); nieuwOpl++; }
                 if (nieuwOpl > 0) _log.Info($"{nieuwOpl} kortsluitoplossing(en) uit eerdere verkenningen overgenomen (bv. een extra wissel die bij een stand hoort); die worden meteen toegepast.");
             }
+            // BUG #98: overgangen uit ritten met de loc andersom (spiegelbeeld van een veel vaker gereden overgang) uit de kaart halen.
+            foreach (var t in _kaart.VerwijderSpiegelOvergangen())
+                _log.Waarschuwing($"Overgang {t} is verwijderd: de omgekeerde overgang in dezelfde richting is veel vaker gereden (waarschijnlijk met de loc andersom).");
             if (Leerprofiel is { AantalMetingen: > 0 } lp) _log.Info($"Leerprofiel: {lp.Overgangen.Count} overgangen uit eerdere verkenningen (tijden worden omgerekend naar verkensnelheid {_ins.Verkensnelheid}).");
             _log.Info($"Hardware: {_hw.Naam}. Testloc adres {_ins.LocAdres} ({_ins.LocStappen} stappen), verkensnelheid {_ins.Verkensnelheid}, kruipsnelheid {_ins.Kruipsnelheid}.");
             _log.Info($"Wisseladressen {_kaart.WisselAdresVan} t/m {_kaart.WisselAdresTot}." + (BlokVereist ? $" Dinamo-blokken: {_ins.DinamoBlokken}." : ""));
@@ -455,6 +458,38 @@ public partial class BaanVerkenner
 
     /// <summary>BUG #87: de stand waarmee de opdracht echt gereden wordt: de stand van de opdracht plus de extra wissel die een eerder opgelost
     /// kortsluitpunt voor deze start en stand vereist (de kortsluiting komt anders steeds terug, bv. wissel 2 afbuigend zonder wissel 1).</summary>
+    /// <summary>BUG #98: het pad dat een rit vanaf <paramref name="start"/> volgens de kaart (en voor melder 24 de kruiswissel-referentie) zeker volgt,
+    /// zolang er per stap precies één vervolg overblijft.</summary>
+    internal static List<int> VoorspeldPad(Baankaart k, int start, Richting r, Configuratie c)
+    {
+        var pad = new List<int> { start };
+        for (int i = 0; i < 8; i++)
+        {
+            int cur = pad[^1];
+            var kand = k.BekendeVolgende(cur, r, c);
+            if (kand.Count == 0) kand = k.BekendeVolgende(cur, r);
+            if (cur == KruiswisselReferentie.Midden && pad.Count >= 2)
+            {
+                bool PastRef(int x) => KruiswisselReferentie.Zoek(pad[^2], x) is { Bewezen: true } v
+                    && (v.Afbuigend13 is not bool a13 || a13 == c.Bevat(KruiswisselReferentie.Motor13))
+                    && (v.Afbuigend10 is not bool a10 || a10 == c.Bevat(KruiswisselReferentie.Motor10));
+                var gefilterd = kand.Where(PastRef).ToList();
+                if (gefilterd.Count == 0) gefilterd = k.BekendeVolgende(cur, r).Where(PastRef).ToList();
+                kand = gefilterd;
+            }
+            // alleen als er ook kandidaten zonder strijd overblijven: een kandidaat die een andere wisselstand eist dan nu (bv. wissel 5 afbuigend
+            // naar 129 terwijl 5 rechtdoor staat) is dan een andere weg dan de bedoelde
+            if (kand.Count > 1)
+            {
+                var zonderStrijd = kand.Where(x => !k.WisselEisenVoorStap(cur, x, r).Any(e => c.Bevat(e.Adres) != e.Afbuigend)).ToList();
+                if (zonderStrijd.Count > 0) kand = zonderStrijd;
+            }
+            if (kand.Count != 1 || pad.Contains(kand[0])) break;
+            pad.Add(kand[0]);
+        }
+        return pad;
+    }
+
     private Configuratie RijStand(Opdracht o)
     {
         var c = _kaart.MetBekendeOplossingenVoorStart(o.Start, o.Richting, o.Configuratie, out var wijz);
@@ -464,16 +499,19 @@ public partial class BaanVerkenner
         // BUG #93: is er vanaf deze start in deze richting precies één vervolg bekend, dan hoeft de verkenner niet te raden: de wissels
         // die dat vervolg nodig heeft worden meteen goed gezet (bv. 129 -> 24 -> 21 vraagt wissel 10 afbuigend, anders kortsluiting
         // in blok 9). Alleen wissels die extra AFBUIGEND moeten worden; wat de opdracht zelf test (BronAdres) of rechtdoor wil, blijft staan.
-        var volgende = _kaart.BekendeVolgende(o.Start, o.Richting);
-        if (volgende.Count == 1)
+        // BUG #98 (Marco 16:24: "weer vergeten hoe wissel 14 moest staan"): niet alleen de eerste stap, het hele voorspelbare vervolg (ook door
+        // de kruiswissel: 14 -> 24 -> 8 met motor 13 afbuigend) telt mee. 24 -> 8 vraagt wissel 14 afbuigend; dat was bekend maar werd pas
+        // toegepast na de kortsluiting in blok 4.
+        var pad = VoorspeldPad(_kaart, o.Start, o.Richting, c);
+        if (pad.Count >= 2)
         {
-            var extra = _kaart.MetWisselEisen(new List<int> { o.Start, volgende[0] }, o.Richting, c, out var wijzigingen);
+            var extra = _kaart.MetWisselEisen(pad, o.Richting, c, out _);
             var toe = c; var toegepast = new List<string>();
             foreach (var a in extra.Afbuigend.Where(x => !c.Bevat(x) && x != o.BronAdres))
             { toe = toe.MetStand(a, true); toegepast.Add($"{a} afbuigend"); }
             if (toegepast.Count > 0)
             {
-                _log.Info($"Opdracht #{o.Id}: vanaf melder {o.Start} ({o.Richting.Tekst()}) is melder {volgende[0]} al bekend; daarvoor moet {string.Join(", ", toegepast)} staan. Rijstand: {toe}.");
+                _log.Info($"Opdracht #{o.Id}: vanaf melder {o.Start} ({o.Richting.Tekst()}) is het vervolg {string.Join(" - ", pad)} al bekend; daarvoor moet {string.Join(", ", toegepast)} staan. Rijstand: {toe}.");
                 c = toe;
             }
         }

@@ -686,6 +686,21 @@ public static class Tests
         Eis(!BaanVerkenner.IsLocAndersom(k, 13, Richting.Achteruit, 99, basis, c12), "loc andersom: een onbekende melder is geen bewijs");
     }
 
+    // BUG #98 (log 16:21): 14 -> 24 -> 8 met motor 13 afbuigend vraagt ook wissel 14 afbuigend (bekend uit de splitsing), maar die stond rechtdoor
+    static void VoorspeldPadTest()
+    {
+        var k = Laad("baankaart_2026-10-11_1608.json"); // nog zonder de rit 24 -> 8 en zonder wissel 14 uit de kaart van 16:23
+        var weg = k.VerwijderSpiegelOvergangen();
+        Eis(weg.Count >= 10 && !k.Overgangen.Any(o => o.Van == 14 && o.Naar == 13 && o.Richting == Richting.Vooruit), "spiegel: overgangen uit ritten met de loc andersom zijn weg (nu " + weg.Count + ")");
+        Eis(k.Overgangen.Any(o => o.Van == 13 && o.Naar == 14 && o.Richting == Richting.Vooruit) && k.Overgangen.Any(o => o.Van == 5 && o.Naar == 13 && o.Richting == Richting.Vooruit), "spiegel: de gewone overgangen blijven");
+        var pad = BaanVerkenner.VoorspeldPad(k, 14, Richting.Vooruit, new Configuratie(new[] { 13 }));
+        Eis(pad.Take(3).SequenceEqual(new[] { 14, 24, 8 }), "voorspeld pad: 14 vooruit met motor 13 afbuigend begint met 14 - 24 - 8 (nu " + string.Join("-", pad) + ")");
+        var eis = k.MetWisselEisen(pad, Richting.Vooruit, new Configuratie(new[] { 13 }), out _);
+        Eis(eis.Bevat(14), "voorspeld pad: dat pad vraagt wissel 14 afbuigend (nu " + eis + ")");
+        var pad2 = BaanVerkenner.VoorspeldPad(k, 14, Richting.Vooruit, Configuratie.Basis);
+        Eis(pad2.Count >= 3 && pad2[2] == 21, "voorspeld pad: met motor 13 rechtdoor gaat 14 vooruit naar 21 (nu " + string.Join("-", pad2) + ")");
+    }
+
     static void StopVoorTerugzettenTest()
     {
         Console.WriteLine("Test: stop naar alle blokken voordat de loc terug gezet moet worden (BUG #94)");
@@ -1017,6 +1032,7 @@ public static class Tests
         KenVervolgTest();
         StopVoorTerugzettenTest();
         LocAndersomTest();
+        VoorspeldPadTest();
         KruisAankomstTest();
         OrientatieTekstTest();
         WisselEisenTest();

@@ -519,6 +519,16 @@ public class Baankaart
         return res.Distinct().OrderBy(x => x).ToList();
     }
 
+    /// <summary>BUG #98: een overgang X->Y (r) waarvan Y->X in dezelfde richting veel vaker is gereden (minstens 3 keer zo vaak) is een spiegelbeeld
+    /// uit een rit met de loc andersom: een spoor loopt in één richting maar één kant op. Verwijdert die overgangen; geeft ze terug als tekst.</summary>
+    public List<string> VerwijderSpiegelOvergangen()
+    {
+        var weg = Overgangen.Where(o => Overgangen.Any(t => t.Van == o.Naar && t.Naar == o.Van && t.Richting == o.Richting
+                                                              && t.AantalKeer >= 3 * Math.Max(1, o.AantalKeer))).ToList();
+        foreach (var o in weg) Overgangen.Remove(o);
+        return weg.Select(o => $"{o.Van} -> {o.Naar} ({o.Richting.Tekst()}, {o.AantalKeer}x, stand {string.Join("/", o.GezienBijConfiguraties.Select(x => x == "" ? "alle rechtdoor" : x))})").ToList();
+    }
+
     public void RegistreerKopspoor(int melder, Richting r, Configuratie c)
     {
         if (!Kopsporen.Any(k => k.Melder == melder && k.Richting == r))
