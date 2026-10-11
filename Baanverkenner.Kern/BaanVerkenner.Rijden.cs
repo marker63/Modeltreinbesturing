@@ -637,6 +637,24 @@ public partial class BaanVerkenner
 
     /// <summary>Rijdt vanaf de melder waar de loc nu staat in richting <paramref name="r"/>
     /// en legt elke nieuw bezette melder vast, tot een van de stopcondities optreedt.</summary>
+    /// <summary>BUG #82 (logs 10:04 en 11:03): Dinamo meldde een kortsluiting in het blok van de melder waar de loc net stilstond (alarm kwam na
+    /// "melder 24 bezet", terwijl de verkenner de volgende stap voorbereidde). De verkenner zette toch wissels om en startte de rit: het
+    /// alarmvlaggetje werd bij de ritstart gewist en een alarm komt maar één keer binnen, dus de kortsluiting werd niet meer gezien.
+    /// Nu: staat er een blokalarm, dan korte tijd wachten of het vanzelf verdwijnt; zo niet, dan geen wissels omzetten en niet rijden
+    /// maar een navigatiefout (loc controleren/terugzetten, mogelijk staat een wissel verkeerd).</summary>
+    private async Task ControleerGeenAlarmVoorStap(string stap)
+    {
+        if (HuidigeAlarmBlokken().Count == 0) return;
+        _log.Waarschuwing($"Dinamo meldt kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())} voordat de volgende stap begint ({stap}). Even wachten of dat vanzelf verdwijnt.");
+        for (int i = 0; i < AlarmWachtPogingen && HuidigeAlarmBlokken().Count > 0; i++)
+            await Wacht(TimeSpan.FromMilliseconds(300));
+        var nog = HuidigeAlarmBlokken();
+        if (nog.Count == 0) { _log.Info("Het alarm is verdwenen; de verkenner gaat verder."); return; }
+        _hw.Noodstop();
+        throw new NavigatieFout($"Dinamo meldt nog steeds kortsluiting in blok {string.Join(" en ", nog)} terwijl de loc stilstaat ({stap}). De verkenner zet geen wissels om en rijdt niet verder: een wissel omzetten of rijden in een kortsluiting kan de loc laten ontsporen.");
+    }
+    private const int AlarmWachtPogingen = 10;
+
     private async Task<RitResultaat> Rit(int start, Richting r, RitDoel doel)
     {
         _ritMinDt = double.MaxValue; _ritMaxDt = 0;
@@ -697,6 +715,8 @@ public partial class BaanVerkenner
 
         // Bij Dinamo met een (nog) onbekend blok gaat StuurSnelheid vanzelf naar alle
         // blokken; de sectie wordt gekoppeld zodra de loc er helemaal in staat.
+
+        await ControleerGeenAlarmVoorStap($"rit {r.Tekst()} vanaf melder {start}");
 
         int snelheid = _ins.Verkensnelheid;
         _log.Rijden(doel.IsNavigatie
@@ -1269,6 +1289,8 @@ public partial class BaanVerkenner
                 $"{aanleiding}\n\nZet de testloc (adres {_ins.LocAdres}) met de hand op melder {melder}, zodat ALLEEN die melder bezet is. Controleer ook of de loc niet ontspoord is.\n\nKlik daarna op OK. (Annuleren stopt de verkenning.)");
             if (!verder) throw new OperationCanceledException("Gebruiker stopte bij het terugzetten van de loc.");
             _kortsluitingGemeld = false;
+            // BUG #82: de gebruiker heeft de loc gecontroleerd/verplaatst (en zo nodig Dinamo herstart): een oud blokalarm geldt niet meer.
+            lock (_alarmSlot) _alarmBlokken.Clear();
             // BUG #74: de loc is met de hand verplaatst en de gebruiker heeft intussen vaak wissels gecontroleerd of rechtgezet; ook kan een
             // open gereden wissel (kruiswissel!) fysiek anders staan dan we denken. Zonder terugmelding weet het programma dat niet, en
             // ZetWissel stuurt niets als de onthouden stand al klopt. Daarom alle standen vergeten: de wissels worden opnieuw gestuurd.

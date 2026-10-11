@@ -1160,6 +1160,7 @@ public partial class BaanVerkenner
         foreach (var e in route)
         {
             var cfg = MetEisen(e.Pad, e.Richting, KiesBijIngang(e.Van, e.Richting, e.Pad, e.Configuratie));
+            await ControleerGeenAlarmVoorStap($"navigatie {e.Van} -> {e.Naar}");
             await ZetConfiguratie(cfg);
             await Rit(e.Van, e.Richting, new RitDoel { Configuratie = cfg, DoelMelder = e.Naar, VerwachtPad = e.Pad });
         }
@@ -1176,6 +1177,7 @@ public partial class BaanVerkenner
             var pad = e.Pad.ToList();
             pad.Reverse();
             cfg = MetEisen(pad, e.Richting.Om(), KiesBijIngang(e.Naar, e.Richting.Om(), pad, cfg));
+            await ControleerGeenAlarmVoorStap($"terugweg {e.Naar} -> {e.Van}");
             await ZetConfiguratie(cfg);
             await Rit(e.Naar, e.Richting.Om(), new RitDoel { Configuratie = cfg, DoelMelder = e.Van, VerwachtPad = pad });
         }
@@ -1242,6 +1244,7 @@ public partial class BaanVerkenner
         // BUG #77 (log 18:58): de terugweg 14 -> 129 -> 24 -> 21 werd met wissel 5 rechtdoor gereden terwijl 14 -> 129 alleen met wissel 5
         // afbuigend bestaat: kortsluiting. Voor de terugweg gelden de bekende wisselstanden per stap.
         c = MetEisen(pad, rit.Richting.Om(), KiesBijIngang(vanaf, rit.Richting.Om(), pad, c));
+        await ControleerGeenAlarmVoorStap($"terugweg naar melder {start}");
         await ZetConfiguratie(c);
         var terug = await Rit(vanaf, rit.Richting.Om(), new RitDoel { Configuratie = c, DoelMelder = start, VerwachtPad = pad });
         // BUG #73 (log 17:48 en 17:54): kreeg de loc op de terugweg kortsluiting, dan was hij NIET terug op de startmelder. Het resultaat werd

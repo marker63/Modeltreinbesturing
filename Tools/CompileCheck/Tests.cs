@@ -479,6 +479,32 @@ public static class Tests
         Eis(BaanVerkenner.StilteWaarschuwing(new Baanverkenner.Kern.Simulatie.SimulatieBaan()) is null, "stilte: hardware zonder verbindingsbron -> geen waarschuwing");
     }
 
+    // BUG #82: een blokalarm van Dinamo vlak voor de volgende stap stopt wissels omzetten en rijden
+    static void AlarmVoorStapTest()
+    {
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
+        var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+        var s1 = sim.NieuweSectie(1, 80, 1); var s2 = sim.NieuweSectie(2, 80, 2);
+        sim.Verbind(s1, B, s2, A); sim.PlaatsLoc(s1, 40, +1);
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 4, DinamoBlokken = "1-2" };
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var v = new BaanVerkenner(sim, ins, klok, new VerkenLog(klok), (_, _) => Task.FromResult(true), new VerkenStatus { Instellingen = ins });
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var check = typeof(BaanVerkenner).GetMethod("ControleerGeenAlarmVoorStap", bf)!;
+        var alarm = typeof(BaanVerkenner).GetMethod("HardwareMeldtBlokAlarm", bf)!;
+        ((Task)check.Invoke(v, new object[] { "test" })!).GetAwaiter().GetResult();
+        Eis(true, "alarm voor stap: zonder alarm gebeurt er niets");
+        alarm.Invoke(v, new object[] { 8, true });
+        bool fout = false; string tekst = "";
+        try { ((Task)check.Invoke(v, new object[] { "test" })!).GetAwaiter().GetResult(); }
+        catch (NavigatieFout nf) { fout = true; tekst = nf.Message; }
+        Eis(fout && tekst.Contains("blok 8") && tekst.Contains("zet geen wissels om"), "alarm voor stap: blok 8 blijft in alarm -> navigatiefout, geen wissels/rit (nu " + tekst + ")");
+        alarm.Invoke(v, new object[] { 8, false });
+        ((Task)check.Invoke(v, new object[] { "test" })!).GetAwaiter().GetResult();
+        Eis(true, "alarm voor stap: alarm opgeheven -> verder");
+    }
+
     // BUG #75: de tweede bezette melder bij een kortsluiting wijst de betrokken wissel aan
     static void TweedeMelderTest()
     {
@@ -664,6 +690,7 @@ public static class Tests
         WisselstraatImportTest();
         WisselOnderLocTest();
         DinamoStilteTest();
+        AlarmVoorStapTest();
         WisselEisenTest();
         WisselstratenTest();
 
