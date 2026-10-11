@@ -570,7 +570,17 @@ public partial class BaanVerkenner
                 bool afwijkendePad = ProefWijktAf(basis.Reeks, proef.Reeks);
                 bool zelfdeKortsluiting = basis.Einde == RitEinde.Kortsluiting && proef.Reeks.SequenceEqual(basis.Reeks);
                 (int Partner, RitResultaat Rit)? partner = null;
-                if (proef.Einde == RitEinde.Kortsluiting && !zelfdeKortsluiting && proef.Reeks.Count >= 1)
+                // BUG #92 (log 14:38): wissel 10 afbuigend gaf kortsluiting zodra de loc op melder 24 (de kruiswissel) kwam en bleef die geven
+                // zolang de loc daar stond. De partnerzoektocht (andere wissels meeschakelen) zette toen wissel 5 afbuigend terwijl de loc op de
+                // kruiswissel stond, gaf het op ("zet geen wissels om") en liet Marco de loc terugzetten, terwijl de kortsluiting pas weg was toen
+                // wissel 10 weer rechtdoor stond (14:39:13 -> opgeheven 14:39:15). Motor 13 en 10 zijn geen overloopwissels: hun stand per rit staat
+                // in de kruiswissel-referentie. Dus geen partnerzoektocht; direct terugzetten (hieronder) en de kortsluiting als bevinding vastleggen.
+                if (IsKruiswisselMotorKortsluiting(a, proef))
+                {
+                    _log.Vondst($"Adres {a} afbuigend geeft kortsluiting zodra de loc op melder {KruiswisselReferentie.Midden} (kruiswissel) komt ({Lijst(proef.Reeks)}). " +
+                                "Motor 13 en 10 zijn geen overloopwissels: geen partnerzoektocht, wissel wordt meteen teruggezet.");
+                }
+                else if (proef.Einde == RitEinde.Kortsluiting && !zelfdeKortsluiting && proef.Reeks.Count >= 1)
                     partner = await PartnerwisselZoeken(o, a, proef);
 
                 if (afwijkendePad)
@@ -611,6 +621,12 @@ public partial class BaanVerkenner
             }
         }
     }
+
+    /// <summary>BUG #92: eindigde de proefrit met wissel <paramref name="adres"/> afbuigend in kortsluiting op melder 24 en is dat adres een van de
+    /// twee kruiswisselmotoren (13 of 10)?</summary>
+    internal static bool IsKruiswisselMotorKortsluiting(int adres, RitResultaat proef)
+        => (adres == KruiswisselReferentie.Motor13 || adres == KruiswisselReferentie.Motor10)
+           && proef.Einde == RitEinde.Kortsluiting && proef.Reeks.Count >= 1 && proef.Reeks[^1] == KruiswisselReferentie.Midden;
 
     private static bool ProefWijktAf(List<int> basis, List<int> proef)
     {

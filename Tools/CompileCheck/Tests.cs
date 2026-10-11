@@ -664,6 +664,17 @@ public static class Tests
         Eis(KruiswisselControle.Controleer(new List<Wisselstraat>()).Count == 0, "kruiswisselcontrole: lege lijst geeft niets");
     }
 
+    static void KruisMotorKortsluitingTest()
+    {
+        Console.WriteLine("Test: kortsluiting op melder 24 met motor 13/10 afbuigend: geen partnerzoektocht (BUG #92)");
+        RitResultaat Rit(RitEinde e, params int[] reeks) { var r = new RitResultaat { Einde = e }; r.Reeks.AddRange(reeks); return r; }
+        Eis(BaanVerkenner.IsKruiswisselMotorKortsluiting(10, Rit(RitEinde.Kortsluiting, 28, 26, 14, 24)), "kruismotor: adres 10 + kortsluiting op melder 24 = geen partnerzoektocht");
+        Eis(BaanVerkenner.IsKruiswisselMotorKortsluiting(13, Rit(RitEinde.Kortsluiting, 14, 24)), "kruismotor: adres 13 + kortsluiting op melder 24 ook");
+        Eis(!BaanVerkenner.IsKruiswisselMotorKortsluiting(5, Rit(RitEinde.Kortsluiting, 14, 24)), "kruismotor: adres 5 (gewone wissel) houdt de partnerzoektocht");
+        Eis(!BaanVerkenner.IsKruiswisselMotorKortsluiting(10, Rit(RitEinde.Kortsluiting, 5, 16)), "kruismotor: kortsluiting elders (melder 16) houdt de partnerzoektocht");
+        Eis(!BaanVerkenner.IsKruiswisselMotorKortsluiting(10, Rit(RitEinde.Lus, 14, 24)), "kruismotor: zonder kortsluiting niets bijzonders");
+    }
+
     static void KortsluitOplossingTest()
     {
         var k = Laad("baankaart_2026-10-11_1103.json");
@@ -893,6 +904,7 @@ public static class Tests
         StopHerhalingTest();
         EchteBloknummersTest();
         KruiswisselControleTest();
+        KruisMotorKortsluitingTest();
         WisselEisenTest();
         WisselstratenTest();
 
