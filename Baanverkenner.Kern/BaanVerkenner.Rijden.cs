@@ -1337,6 +1337,22 @@ public partial class BaanVerkenner
 
     /// <summary>Vraagt de gebruiker de loc met de hand op een melder te zetten, en
     /// controleert daarna of die melder echt (alleen) bezet is.</summary>
+    /// <summary>BUG #96: waar de neus van de loc heen moet wijzen. De verkenner rekent 'vooruit' = de kant van de melders die de kaart na deze melder
+    /// vooruit kent; de loc moet er dus met de neus naar toe staan, anders rijdt hij bij 'vooruit' de andere kant op.</summary>
+    internal static string OrientatieTekst(Baankaart kaart, int melder)
+    {
+        var vooruit = kaart.BekendeVolgende(melder, Richting.Vooruit);
+        var achteruit = kaart.BekendeVolgende(melder, Richting.Achteruit);
+        string Lijst2(List<int> l) => string.Join(" of ", l);
+        if (vooruit.Count > 0 && achteruit.Count > 0)
+            return $"RIJRICHTING: de NEUS van de loc naar melder {Lijst2(vooruit)} en de achterkant naar melder {Lijst2(achteruit)} (zo reed hij ook: 'vooruit' gaat van melder {Lijst2(achteruit)} naar {Lijst2(vooruit)}).";
+        if (vooruit.Count > 0) return $"RIJRICHTING: de NEUS van de loc naar melder {Lijst2(vooruit)}.";
+        if (achteruit.Count > 0) return $"RIJRICHTING: de ACHTERKANT van de loc naar melder {Lijst2(achteruit)} (de neus de andere kant op).";
+        return "Zet de loc in dezelfde rijrichting als waarmee de verkenning gestart is.";
+    }
+
+    private string OrientatieTekst(int melder) => OrientatieTekst(_kaart, melder);
+
     private async Task VraagLocTerugTeZetten(int melder, string aanleiding)
     {
         for (int poging = 1; poging <= 3; poging++)
@@ -1352,9 +1368,11 @@ public partial class BaanVerkenner
             // BUG #79 (Marco 07:59: "wisselmotor 10 stond verkeerd"): eerst vragen of er een wissel verkeerd staat en die dan meteen schakelen;
             // alleen als dat niet zo is (of de loc daarna nog niet goed staat) moet de loc met de hand verplaatst worden.
             if (poging == 1 && await ControleerVerkeerdeWissel(melder, aanleiding)) return;
+            // BUG #96 (Marco 16:05: "de loc de verkeerde rijrichting op"): de verkenner weet in welke richting de loc op deze melder moet staan
+            // (vooruit = naar de volgende melder uit de kaart), maar zei dat niet. Nu staat de gewenste stand van de neus in de vraag.
             bool verder = await _vraag(
                 "Loc terugzetten",
-                $"{aanleiding}\n\nZet de testloc (adres {_ins.LocAdres}) met de hand op melder {melder}, zodat ALLEEN die melder bezet is. Controleer ook of de loc niet ontspoord is.\n\nKlik daarna op OK. (Annuleren stopt de verkenning.)");
+                $"{aanleiding}\n\nZet de testloc (adres {_ins.LocAdres}) met de hand op melder {melder}, zodat ALLEEN die melder bezet is. {OrientatieTekst(melder)} Controleer ook of de loc niet ontspoord is.\n\nKlik daarna op OK. (Annuleren stopt de verkenning.)");
             if (!verder) throw new OperationCanceledException("Gebruiker stopte bij het terugzetten van de loc.");
             _kortsluitingGemeld = false;
             // BUG #82: de gebruiker heeft de loc gecontroleerd/verplaatst (en zo nodig Dinamo herstart): een oud blokalarm geldt niet meer.

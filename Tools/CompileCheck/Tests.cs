@@ -707,6 +707,17 @@ public static class Tests
         Eis(r6.Equals(basis.Met(10)) && u6 is null, "kruisstart: staat de gewenste stand al goed -> geen melding");
     }
 
+    static void OrientatieTekstTest()
+    {
+        Console.WriteLine("Test: de vraag om de loc terug te zetten zegt welke kant de neus op moet (BUG #96)");
+        var k = Laad("baankaart_2026-10-11_1521.json");
+        var t13 = BaanVerkenner.OrientatieTekst(k, 13);
+        Eis(t13.Contains("NEUS") && t13.Contains("melder 14") && t13.Contains("melder 5"), "richting: melder 13 -> neus naar 14, achterkant naar 5 (" + t13 + ")");
+        var t24 = BaanVerkenner.OrientatieTekst(k, 24);
+        Eis(t24.Contains("NEUS"), "richting: melder 24 heeft ook een aanwijzing (" + t24 + ")");
+        Eis(BaanVerkenner.OrientatieTekst(new Baankaart(), 99).Contains("dezelfde rijrichting"), "richting: onbekende melder -> algemene aanwijzing");
+    }
+
     static void EchteBloknummersTest()
     {
         Console.WriteLine("Test: alleen echte Dinamo-bloknummers (BUG #88)");
@@ -991,6 +1002,7 @@ public static class Tests
         KenVervolgTest();
         StopVoorTerugzettenTest();
         KruisAankomstTest();
+        OrientatieTekstTest();
         WisselEisenTest();
         WisselstratenTest();
 

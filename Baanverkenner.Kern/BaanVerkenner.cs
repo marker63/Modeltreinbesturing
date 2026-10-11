@@ -491,6 +491,23 @@ public partial class BaanVerkenner
         {
             var rijstand = RijStand(o);
             await NaarStartVan(o.Route, rijstand);
+            // BUG #96 (Marco 16:01: "weer kortsluiting in het kruiswissel en motor 13 staat verkeerd"): motor 13 of 10 omzetten terwijl de loc op melder 24
+            // staat geeft ALTIJD kortsluiting (log 15:40, 15:48, 14:40). Is dat hier nodig en kon het niet vooraf (#95), dan wordt de opdracht
+            // overgeslagen en de loc terug gebracht, in plaats van weer een kortsluiting te veroorzaken.
+            if (_monitor.Bezet.Contains(KruiswisselReferentie.Midden))
+            {
+                var huidig = new Configuratie(_wisselStand.Where(w => w.Value).Select(w => w.Key).ToArray());
+                var omTeZetten = new[] { KruiswisselReferentie.Motor13, KruiswisselReferentie.Motor10 }
+                    .Where(a => (_wisselStand.TryGetValue(a, out var nu) ? nu : false) != rijstand.Bevat(a)).ToList();
+                if (omTeZetten.Count > 0)
+                {
+                    var tekst = $"Opdracht vanaf melder {o.Start} {o.Richting.Tekst()} ({o.Configuratie}) is overgeslagen: motor {string.Join(" en ", omTeZetten)} zou omgezet moeten worden terwijl de loc op de kruiswissel (melder {KruiswisselReferentie.Midden}) staat, en dat geeft altijd kortsluiting. Vanaf deze ingangskant is de combinatie niet bewezen; niets omgezet.";
+                    _log.Waarschuwing(tekst);
+                    _kaart.Waarschuwingen.Add(tekst);
+                    await TerugNaarHuis(o.Route, huidig);
+                    return;
+                }
+            }
             await ZetConfiguratie(rijstand);
 
             // ---- Basisrit ----
