@@ -1170,15 +1170,17 @@ public partial class BaanVerkenner
                 _log.Waarschuwing($"Adres {a} ligt niet in het geteste bereik ({_ins.WisselAdressen().First()} t/m {_ins.WisselAdressen().Last()}); genegeerd.");
                 continue;
             }
+            // De gebruiker zegt dat deze wissel VERKEERD staat: dus altijd naar de tegenovergestelde stand schakelen (niet opnieuw dezelfde
+            // stand sturen). Bekend is de stand die het programma het laatst stuurde; anders vragen we welke stand hij nu heeft.
             bool afbuigend;
-            if (_wisselStand.TryGetValue(a, out var bekend)) afbuigend = bekend; // de stand die het programma bedoelde: opnieuw sturen herstelt een open gereden motor
+            if (_wisselStand.TryGetValue(a, out var bekend)) afbuigend = !bekend;
             else
             {
-                var stand = await VraagJaNee("Welke stand?", $"Moet wissel {a} op AFBUIGEND staan?\n\nJa = afbuigend\nNee = rechtdoor");
-                if (stand is null) throw new OperationCanceledException("Gebruiker stopte bij het terugzetten van de loc.");
-                afbuigend = stand == true;
+                var nu = await VraagJaNee("Welke stand staat nu?", $"Staat wissel {a} nu op AFBUIGEND?\n\nJa = hij staat afbuigend (wordt rechtdoor gezet)\nNee = hij staat rechtdoor (wordt afbuigend gezet)");
+                if (nu is null) throw new OperationCanceledException("Gebruiker stopte bij het terugzetten van de loc.");
+                afbuigend = nu != true;
             }
-            _log.Info($"Op verzoek van de gebruiker wordt wissel {a} opnieuw naar {(afbuigend ? "afbuigend" : "rechtdoor")} geschakeld.");
+            _log.Info($"Op verzoek van de gebruiker staat wissel {a} verkeerd en wordt naar {(afbuigend ? "afbuigend" : "rechtdoor")} geschakeld (tegenovergestelde stand).");
             await ZetWissel(a, afbuigend, forceer: true);
             geschakeld = true;
         }

@@ -371,6 +371,16 @@ public static class Tests
         var (v1, _) = Maak(jn1, ad1);
         bool klaar = Roep(v1).GetAwaiter().GetResult();
         Eis(klaar && jn1.Count == 0 && ad1.Count == 0, "wissel verkeerd: Ja -> adres -> stand -> Nee schakelt de wissel en de loc hoeft niet verplaatst (nu " + klaar + ")");
+        // bekende stand afbuigend: "verkeerd" betekent naar rechtdoor, en een tweede keer weer terug naar afbuigend (altijd tegenovergesteld)
+        var jn5 = new Queue<bool?>(new bool?[] { true, false }); var ad5 = new Queue<int?>(new int?[] { 3 });
+        var (v5, _) = Maak(jn5, ad5);
+        var ws = (Dictionary<int, bool>)typeof(BaanVerkenner).GetField("_wisselStand", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(v5)!;
+        ws[3] = true;
+        Roep(v5).GetAwaiter().GetResult();
+        Eis(ws.TryGetValue(3, out var na1) && na1 == false && jn5.Count == 0 && ad5.Count == 0, "wissel verkeerd: afbuigend + 'verkeerd' -> rechtdoor (nu " + (ws.TryGetValue(3, out var x) ? x.ToString() : "onbekend") + ")");
+        jn5.Enqueue(true); jn5.Enqueue(false); ad5.Enqueue(3);
+        Roep(v5).GetAwaiter().GetResult();
+        Eis(ws.TryGetValue(3, out var na2) && na2 == true, "wissel verkeerd: nog een keer 'verkeerd' -> weer afbuigend (altijd tegenovergesteld)");
         // Nee meteen: false, dan valt VraagLocTerugTeZetten terug op het verplaatsen
         var (v2, _) = Maak(new Queue<bool?>(new bool?[] { false }), new Queue<int?>());
         Eis(!Roep(v2).GetAwaiter().GetResult(), "wissel verkeerd: Nee -> loc met de hand verplaatsen (geeft false)");
