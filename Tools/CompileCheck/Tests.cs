@@ -432,6 +432,33 @@ public static class Tests
         Eis(res3.IsLeeg, "wisselstraat-import: zonder BlokRelatie komt er geen wisselstraat");
     }
 
+    // BUG #80: een wissel waar de loc op staat wordt niet omgezet (ontsporing)
+    static void WisselOnderLocTest()
+    {
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
+        var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+        var s1 = sim.NieuweSectie(1, 80, 1); var s2 = sim.NieuweSectie(2, 80, 2);
+        sim.Verbind(s1, B, s2, A);
+        sim.PlaatsLoc(s1, 40, +1);
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 4, DinamoBlokken = "1-2" };
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var v = new BaanVerkenner(sim, ins, klok, new VerkenLog(klok), (_, _) => Task.FromResult(true), new VerkenStatus { Instellingen = ins });
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var kaart = v.Kaart;
+        kaart.Wissels.Add(new WisselVondst { Adres = 3, Waarnemingen = { new WisselWaarneming { Soort = WaarnemingSoort.KortsluitingBijOmzetten, NaMelder = 1, Richting = Richting.Vooruit } } });
+        var mon = (MelderMonitor)typeof(BaanVerkenner).GetField("_monitor", bf)!.GetValue(v)!;
+        mon.Ontvang(1, true);
+        klok.Wacht(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult(); mon.Bijwerken();
+        var ws = (Dictionary<int, bool>)typeof(BaanVerkenner).GetField("_wisselStand", bf)!.GetValue(v)!;
+        ws[3] = true; ws[2] = true;
+        var m = typeof(BaanVerkenner).GetMethod("ZetConfiguratie", bf)!;
+        ((Task)m.Invoke(v, new object[] { Configuratie.Basis, true })!).GetAwaiter().GetResult();
+        Eis(ws[3] == true && ws[2] == false, "wissel onder loc: wissel 3 (ligt bij bezette melder 1) blijft staan, wissel 2 wordt gewoon omgezet (nu 3=" + ws[3] + ", 2=" + ws[2] + ")");
+        ((Task)m.Invoke(v, new object[] { Configuratie.Basis, false })!).GetAwaiter().GetResult();
+        Eis(ws[3] == false, "wissel onder loc: zonder sparen (rit volgt) wordt wissel 3 wel omgezet");
+    }
+
     // BUG #75: de tweede bezette melder bij een kortsluiting wijst de betrokken wissel aan
     static void TweedeMelderTest()
     {
@@ -615,6 +642,7 @@ public static class Tests
         TweedeMelderTest();
         VerkeerdeWisselVraagTest();
         WisselstraatImportTest();
+        WisselOnderLocTest();
         WisselEisenTest();
         WisselstratenTest();
 

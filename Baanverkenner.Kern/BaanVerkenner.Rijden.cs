@@ -278,11 +278,15 @@ public partial class BaanVerkenner
 
     private int _wisselCommandos;
 
+    /// <summary>BUG #80: het laatst gestuurde wisselcommando, met de tijd en de toen bezette melders (voor de oorzaak van een ontsporing).</summary>
+    private (int Adres, bool Afbuigend, DateTime Tijd, List<int> Bezet)? _laatsteWisselCommando;
+
     private async Task ZetWissel(int adres, bool afbuigend, bool forceer = false)
     {
         if (!forceer && _wisselStand.TryGetValue(adres, out var huidig) && huidig == afbuigend) return;
         _hw.ZetWissel(adres, afbuigend);
         _wisselStand[adres] = afbuigend;
+        _laatsteWisselCommando = (adres, afbuigend, _klok.Nu, _monitor.Bezet.OrderBy(x => x).ToList());
         // BUG #65: meten is weten - hoeveel wisselcommando's zijn er sinds het verbinden verstuurd? Valt de Dinamo ooit
         // weer uit (wissels bewegen niet meer), dan is in het log te zien na hoeveel commando's dat gebeurde.
         _wisselCommandos++;
@@ -292,10 +296,38 @@ public partial class BaanVerkenner
         for (int i = 0; i < 40 && !_hw.KlaarVoorVolgendeWisselCommando; i++) await Wacht(DinamoCyclus);
     }
 
-    private async Task ZetConfiguratie(Configuratie c)
+    /// <summary>BUG #80: wissels die bij een nu bezette melder LIGGEN (de loc staat er met een deel op of op de tong): een wissel waarvan
+    /// bij die melder een kortsluiting bij omzetten of een kortsluiting-oplossende combinatie is gevonden (hij wordt dus van achteren
+    /// bereden en ligt in of vlak voor die melder). Omzetten terwijl de loc erop staat laat hem ontsporen (Marco 09:39, wissel 10 bij melder 24).
+    /// Resultaat: adres -> melder waar de loc staat.</summary>
+    private Dictionary<int, int> WisselsOnderLoc()
     {
+        var res = new Dictionary<int, int>();
+        var bezet = _monitor.Bezet;
+        if (bezet.Count == 0) return res;
+        foreach (var w in _kaart.Wissels)
+            foreach (var o in w.Waarnemingen)
+                if (bezet.Contains(o.NaMelder) &&
+                    (o.Soort == WaarnemingSoort.KortsluitingBijOmzetten || o.Soort == WaarnemingSoort.LostKortsluitingOp))
+                { res[w.Adres] = o.NaMelder; break; }
+        return res;
+    }
+
+    /// <param name="spaarOnderLoc">BUG #80: sla wissels over die onder de loc liggen (alleen gebruiken als er géén rit volgt, bijv. na een
+    /// mislukte terugweg waarbij de gebruiker de loc met de hand heeft neergezet). Ze worden pas omgezet als de loc weg is.</param>
+    private async Task ZetConfiguratie(Configuratie c, bool spaarOnderLoc = false)
+    {
+        var onder = spaarOnderLoc ? WisselsOnderLoc() : new Dictionary<int, int>();
         foreach (var a in _ins.WisselAdressen())
-            await ZetWissel(a, c.Bevat(a));
+        {
+            bool wens = c.Bevat(a);
+            if (onder.TryGetValue(a, out var m) && !(_wisselStand.TryGetValue(a, out var nu) && nu == wens))
+            {
+                _log.Waarschuwing($"Wissel {a} wordt nu NIET omgezet: de loc staat op melder {m} waar die wissel ligt (omzetten met de loc erop laat hem ontsporen). Hij wordt omgezet zodra de loc daar weg is.");
+                continue;
+            }
+            await ZetWissel(a, wens);
+        }
     }
 
     // =====================================================================
@@ -1103,6 +1135,14 @@ public partial class BaanVerkenner
             : "";
         if (_laatsteKortsluitMelders.Count > 0) alarmTekst += $" Ook bezet op dat moment: melder {string.Join(" en ", _laatsteKortsluitMelders)} (daar zit de loc deels in)." ;
         _log.Waarschuwing($"KORTSLUITING/ONTSPORING vermoed na melder {x} ({res.Richting.Tekst()}): {reden}.{alarmTekst} Noodstop.");
+        if (_laatsteWisselCommando is { } lw && (_klok.Nu - lw.Tijd).TotalSeconds <= 8 && lw.Bezet.Count > 0)
+        {
+            var onderToen = _kaart.Wissels.Where(w => w.Adres == lw.Adres)
+                .SelectMany(w => w.Waarnemingen).Where(o => lw.Bezet.Contains(o.NaMelder) &&
+                    (o.Soort == WaarnemingSoort.KortsluitingBijOmzetten || o.Soort == WaarnemingSoort.LostKortsluitingOp)).Any();
+            _log.Waarschuwing($"Let op: {(_klok.Nu - lw.Tijd).TotalSeconds:0.0} s voor deze kortsluiting is wissel {lw.Adres} naar {(lw.Afbuigend ? "afbuigend" : "rechtdoor")} geschakeld terwijl melder {string.Join(" en ", lw.Bezet)} bezet was." +
+                (onderToen ? $" Wissel {lw.Adres} ligt bij die melder: de loc stond er waarschijnlijk op of tegen de tong aan en is daardoor ontspoord of kortgesloten." : ""));
+        }
         await VolledigeStop();
         res.Einde = RitEinde.Kortsluiting;
         _kortsluitingenTotaal++;

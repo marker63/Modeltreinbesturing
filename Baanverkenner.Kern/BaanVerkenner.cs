@@ -577,7 +577,7 @@ public partial class BaanVerkenner
         catch (NavigatieFout nf)
         {
             _log.Waarschuwing($"Opdracht #{o.Id}: {nf.Message}");
-            await ZetConfiguratie(Configuratie.Basis);
+            await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);
             await VraagLocTerugTeZetten(_kaart.StartMelder, $"{nf.Message}\n\nDe verkenner gaat terug naar de startmelder.");
             o.Pogingen++;
             if (o.Pogingen < 2)
@@ -1103,7 +1103,7 @@ public partial class BaanVerkenner
                     catch (NavigatieFout nf) when (proefKortsluiting || proefOpgelost)
                     {
                         _log.Waarschuwing($"Kortsluitpunt #{k.Id}: de uitkomst van de proef met adres {adres} is vastgelegd, maar de weg terug mislukte: {nf.Message}");
-                        await ZetConfiguratie(Configuratie.Basis);
+                        await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);
                         await VraagLocTerugTeZetten(_kaart.StartMelder, $"{nf.Message}\n\nDe uitkomst van de proef is bewaard. De verkenner gaat terug naar de startmelder.");
                     }
                     if (proefKortsluiting) continue;
@@ -1112,7 +1112,7 @@ public partial class BaanVerkenner
                 catch (NavigatieFout nf)
                 {
                     _log.Waarschuwing($"Kortsluitpunt #{k.Id}: {nf.Message}");
-                    await ZetConfiguratie(Configuratie.Basis);
+                    await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);
                     await VraagLocTerugTeZetten(_kaart.StartMelder, $"{nf.Message}\n\nDe verkenner gaat terug naar de startmelder.");
                 }
             }
