@@ -719,6 +719,21 @@ public static class Tests
         Eis(!c4.Bevat(13), "kruis-ingang: de motor die de opdracht zelf test wordt niet aangeraakt");
     }
 
+    // BUG #100 (log 16:29): tegenstrijdige opgeloste kortsluitpunten voor wissel 13 zetten elkaar steeds terug
+    static void BotsendeOplossingenTest()
+    {
+        Console.WriteLine("Test: tegenstrijdige opgeloste kortsluitpunten (BUG #100)");
+        var k = Laad("baankaart_2026-10-11_1629.json");
+        k.VerwijderSpiegelOvergangen();
+        var pad = new List<int> { 14, 129, 24 };
+        var c = k.MetBekendeKortsluitOplossingen(pad, Richting.Vooruit, new Configuratie(new[] { 5, 10 }), out var wijz);
+        Eis(!c.Bevat(13), "bots: wissel 13 blijft rechtdoor (nu " + c + ")");
+        Eis(c.Bevat(5) && c.Bevat(10), "bots: 5 en 10 blijven afbuigend (nu " + c + ")");
+        Eis(wijz.Count <= 4, "bots: geen herhaalde regels meer (nu " + wijz.Count + ")");
+        var c2 = k.MetBekendeKortsluitOplossingen(pad, Richting.Vooruit, new Configuratie(new[] { 5, 10 }), out _);
+        Eis(c2.Equals(c), "bots: tweede aanroep geeft dezelfde uitkomst");
+    }
+
     static void StopVoorTerugzettenTest()
     {
         Console.WriteLine("Test: stop naar alle blokken voordat de loc terug gezet moet worden (BUG #94)");
@@ -1052,6 +1067,7 @@ public static class Tests
         LocAndersomTest();
         VoorspeldPadTest();
         KruisIngangTest();
+        BotsendeOplossingenTest();
         KruisAankomstTest();
         OrientatieTekstTest();
         WisselEisenTest();

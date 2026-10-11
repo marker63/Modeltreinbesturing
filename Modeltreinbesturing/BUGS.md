@@ -1536,3 +1536,14 @@ Onderzoek naar Rocrail, Win-Digipet, JMRI en de NMRA-normen: `Modeltreinbesturin
 - Oplossing: `KruisIngangStand` (in `RijStand`): gaat het voorspelde pad (`VoorspeldPad`) de kruiswissel in, dan krijgt motor 13 (en 10) vooraf de stand waar ALLE bewezen verbindingen vanaf die ingang het over eens zijn (8: motor 13 afbuigend; 21: motor 13 rechtdoor; 14: twee verschillende standen bewezen, dus niets afdwingen). De motor die de opdracht zelf test blijft ongemoeid. De motor wordt gezet terwijl de loc nog ver weg staat.
 - Test: CompileCheck `KruisIngangTest`. Nog niet getest op de baan.
 - Let op: het log van 16:26 komt van de versie van 16:18 (zonder #97/#98/#99).
+
+## #100 - Tegenstrijdige opgeloste kortsluitpunten zetten elkaar terug (log 16:29, oude build)
+Pad 14-129-24 (vooruit): kortsluitpunt #2 zegt 13 afbuigend, #4 zegt 13 rechtdoor. `MetBekendeKortsluitOplossingen` zette ze 5 rondes lang
+om en om (20 identieke regels in het log); de uitkomst hing van het toeval van het aantal rondes af. Nu: een adres dat door twee
+oplossingen tegenovergesteld wordt gevraagd blijft op zijn oorspronkelijke stand en wordt eenmaal gemeld. Test: `BotsendeOplossingenTest`
+(echte kaart 16:29; faalt zonder de fix met 20 regels, slaagt met 2).
+Gecontroleerd in hetzelfde log (geen softwarefout aangetoond): de kortsluiting 24 -> 129 -> 14 (16:28:23) had precies de stand die de kaart
+voor deze overgang bewezen kent (5 en 10 afbuigend, 13 rechtdoor; 24->129 achteruit 3x eerder goed gegaan, commando's in de hardwarelog aanwezig).
+Oorzaak daarvan niet bewezen. Nog niet getest op de baan.
+De kaart van 16:29 is volledig bruikbaar: de 60 verdachte overgangen (telling 1, spiegel van een overgang met telling 38-48) worden bij
+hervatten door `VerwijderSpiegelOvergangen` (#98) opgeruimd; de echte data blijft.

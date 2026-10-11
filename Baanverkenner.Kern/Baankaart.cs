@@ -441,17 +441,32 @@ public class Baankaart
                 if (eisen.TryGetValue(a, out var bestaand) && bestaand != afb) strijdig.Add(a);
                 eisen[a] = afb;
             }
+        // BUG #100 (log 16:29): twee opgeloste kortsluitpunten die voor hetzelfde adres het tegenovergestelde zeggen (13 afbuigend na
+        // melder 14, 13 rechtdoor na melder 24) zetten elkaar elke ronde terug; de uitkomst hing van het toeval van het aantal rondes af
+        // (in het log 20 keer dezelfde regel). Een adres dat al door een oplossing is gezet en door een andere oplossing de andere kant
+        // op zou moeten, blijft nu staan zoals het voor deze functie was (de oorspronkelijke stand) en wordt eenmaal gemeld.
+        var origineel = c; var gezet = new Dictionary<int, bool>(); var botsend = new HashSet<int>();
         for (int ronde = 0; ronde < 5; ronde++)
         {
             bool veranderd = false;
             foreach (var k in Oplossingen(r).Where(k => pad.Contains(k.NaMelder)))            {
                 if (!k.K.Afbuigend.All(c.Bevat)) continue;
                 int a = k.Adres; bool s = k.Afbuigend;
+                if (botsend.Contains(a)) continue;
+                if (gezet.TryGetValue(a, out var eerder) && eerder != s)
+                {
+                    botsend.Add(a);
+                    c = origineel.Bevat(a) ? c.MetStand(a, true) : c.Zonder(a);
+                    wijzigingen.Add($"{a}: de opgeloste kortsluitpunten op dit pad zeggen verschillende dingen over dit adres; het blijft op '{(origineel.Bevat(a) ? "afbuigend" : "rechtdoor")}' staan");
+                    veranderd = true;
+                    continue;
+                }
                 if (c.Bevat(a) == s) continue;
                 bool eisTegen = !strijdig.Contains(a) && eisen.TryGetValue(a, out var e) && e != s;
                 if (!eisTegen)
                 {
                     c = c.MetStand(a, s);
+                    gezet[a] = s;
                     wijzigingen.Add($"{a} {(s ? "afbuigend" : "rechtdoor")} ({k.Label} na melder {k.NaMelder} was daarmee opgelost)");
                     veranderd = true;
                     continue;
