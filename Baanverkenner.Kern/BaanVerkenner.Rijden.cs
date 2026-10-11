@@ -1122,6 +1122,15 @@ public partial class BaanVerkenner
     // Kortsluiting
     // =====================================================================
 
+    /// <summary>BUG #81: waarschuwingstekst als de centrale al ≥ 2 s niets (ook geen keepalive) meer
+    /// stuurde, anders null. Een vastgelopen Dinamo geeft geen echte kortsluiting.</summary>
+    public static string? StilteWaarschuwing(IHardwareInterface hw)
+    {
+        if (hw is IVerbindingsBron vb && vb.SecondenSindsLaatsteOntvangst is { } stilte && stilte >= 2.0)
+            return $"Let op: er is al {stilte:0.0} s geen enkel bericht (ook geen keepalive) van Dinamo ontvangen. Dinamo is waarschijnlijk vastgelopen en deze kortsluitmelding/stilte is dan geen echte kortsluiting: herstart Dinamo.";
+        return null;
+    }
+
     private async Task<RitResultaat> Kortsluiting(RitResultaat res, string reden)
     {
         int x = res.Reeks[^1];
@@ -1135,6 +1144,8 @@ public partial class BaanVerkenner
             : "";
         if (_laatsteKortsluitMelders.Count > 0) alarmTekst += $" Ook bezet op dat moment: melder {string.Join(" en ", _laatsteKortsluitMelders)} (daar zit de loc deels in)." ;
         _log.Waarschuwing($"KORTSLUITING/ONTSPORING vermoed na melder {x} ({res.Richting.Tekst()}): {reden}.{alarmTekst} Noodstop.");
+        // BUG #81: reageerde Dinamo op dat moment nog?
+        if (StilteWaarschuwing(_hw) is { } stiltetekst) _log.Waarschuwing(stiltetekst);
         if (_laatsteWisselCommando is { } lw && (_klok.Nu - lw.Tijd).TotalSeconds <= 8 && lw.Bezet.Count > 0)
         {
             var onderToen = _kaart.Wissels.Where(w => w.Adres == lw.Adres)

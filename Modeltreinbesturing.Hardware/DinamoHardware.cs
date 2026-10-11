@@ -34,7 +34,7 @@ namespace Modeltreinbesturing.Hardware;
 /// kan dus geen commando verstuurd worden - dat wordt dan duidelijk gemeld i.p.v. blok 0
 /// (een ander, geldig blok) te gebruiken. Nog NIET getest tegen echte hardware.
 /// </summary>
-public class DinamoHardware : IHardwareInterface, IBlokAlarmBron
+public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBron
 {
     private SerialPort? _poort;
     private System.Threading.Timer? _stuurTimer;
@@ -96,6 +96,46 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron
     // achter een snelheidsrefresh-backlog te wachten.
     private readonly Queue<byte[]> _teVersturenPrioriteit = new();
     private readonly object _vergrendeling = new();
+
+    // BUG #81: tijdstip (Stopwatch-ticks) van het laatste ontvangen bericht, keepalives meegeteld
+    // (die staan bewust niet in het log). Stilte langer dan StilteDrempelSeconden wordt gelogd.
+    private const double StilteDrempelSeconden = 2.0;
+    private long _laatsteOntvangstTicks;      // 0 = nog niets ontvangen
+    private bool _stilteGelogd;
+    private long _stilteBegonTicks;
+
+    /// <inheritdoc/>
+    public double? SecondenSindsLaatsteOntvangst
+    {
+        get
+        {
+            long t = Interlocked.Read(ref _laatsteOntvangstTicks);
+            return t == 0 ? null : (double)(System.Diagnostics.Stopwatch.GetTimestamp() - t) / System.Diagnostics.Stopwatch.Frequency;
+        }
+    }
+
+    private void NoteerOntvangst()
+    {
+        long nu = System.Diagnostics.Stopwatch.GetTimestamp();
+        Interlocked.Exchange(ref _laatsteOntvangstTicks, nu);
+        if (_stilteGelogd)
+        {
+            _stilteGelogd = false;
+            double s = (double)(nu - _stilteBegonTicks) / System.Diagnostics.Stopwatch.Frequency;
+            HardwareCommunicatieLog.Log("Info", $"[Dinamo] Weer bericht van Dinamo ontvangen na {s:0.0} s stilte.");
+        }
+    }
+
+    /// <summary>Aangeroepen bij elke stuur-tik (elke 200 ms): meldt in het log dat Dinamo
+    /// zwijgt terwijl wij blijven sturen. Eén regel per stilteperiode.</summary>
+    private void ControleerStilte()
+    {
+        double? s = SecondenSindsLaatsteOntvangst;
+        if (s is null || _stilteGelogd || s < StilteDrempelSeconden) return;
+        _stilteGelogd = true;
+        _stilteBegonTicks = Interlocked.Read(ref _laatsteOntvangstTicks);
+        HardwareCommunicatieLog.Log("Info", $"[Dinamo] GEEN bericht (ook geen keepalive) van Dinamo sinds {s:0.0} s terwijl wij wel blijven sturen: Dinamo reageert niet meer (vastgelopen of kabel los?).");
+    }
     // BUG #45: derde, hoogste voorrangs-wachtrij - ALLEEN voor Reset Fault en stopcommando's
     // (noodstop / stop bij verbinden of afsluiten). Wordt bij elke stuur-tik als EERSTE en
     // volledig leeggetrokken, dus een stopcommando hoeft nooit meer achter melderstatus-
@@ -713,6 +753,7 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron
     private void VerstuurVolgendeInWachtrij()
     {
         if (_poort is null || !Verbonden) return;
+        ControleerStilte();
 
         // BUG #45: nooit twee tikken tegelijk. Loopt de vorige tik nog (trage schrijfactie),
         // dan slaan we deze tik over - de volgende komt over 200 ms vanzelf. Voorheen schreven
@@ -905,6 +946,7 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron
                 }
 
                 bool ditIsKeepalive = aantalDataBytes == 0;
+                NoteerOntvangst();
                 HardwareCommunicatieLog.Log("In", $"[Dinamo] {Convert.ToHexString(_ontvangstBuffer.GetRange(i, berichtLengte).ToArray())}", keepalive: ditIsKeepalive);
 
                 framesDezeKeer++;

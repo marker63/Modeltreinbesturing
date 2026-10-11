@@ -459,6 +459,26 @@ public static class Tests
         Eis(ws[3] == false, "wissel onder loc: zonder sparen (rit volgt) wordt wissel 3 wel omgezet");
     }
 
+    sealed class StilteHw : Baanverkenner.Kern.Simulatie.SimulatieBaan, Modeltreinbesturing.Hardware.IVerbindingsBron
+    {
+        public double? Stilte { get; set; }
+        public double? SecondenSindsLaatsteOntvangst => Stilte;
+    }
+
+    // BUG #81: vastgelopen Dinamo (geen bericht meer) wordt herkend bij kortsluitmelding
+    static void DinamoStilteTest()
+    {
+        var hw = new StilteHw();
+        hw.Stilte = 0.4;
+        Eis(BaanVerkenner.StilteWaarschuwing(hw) is null, "stilte: 0,4 s sinds laatste bericht is normaal -> geen waarschuwing");
+        hw.Stilte = null;
+        Eis(BaanVerkenner.StilteWaarschuwing(hw) is null, "stilte: nog niets ontvangen -> geen waarschuwing");
+        hw.Stilte = 7.5;
+        var t = BaanVerkenner.StilteWaarschuwing(hw);
+        Eis(t != null && t.Contains("7.5") && t.Contains("herstart Dinamo"), "stilte: 7.5 s geen bericht -> waarschuwing met herstart-advies (nu " + t + ")");
+        Eis(BaanVerkenner.StilteWaarschuwing(new Baanverkenner.Kern.Simulatie.SimulatieBaan()) is null, "stilte: hardware zonder verbindingsbron -> geen waarschuwing");
+    }
+
     // BUG #75: de tweede bezette melder bij een kortsluiting wijst de betrokken wissel aan
     static void TweedeMelderTest()
     {
@@ -643,6 +663,7 @@ public static class Tests
         VerkeerdeWisselVraagTest();
         WisselstraatImportTest();
         WisselOnderLocTest();
+        DinamoStilteTest();
         WisselEisenTest();
         WisselstratenTest();
 
