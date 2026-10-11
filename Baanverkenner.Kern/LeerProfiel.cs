@@ -30,6 +30,15 @@ public class LeerProfiel
     public int? BlokHint(int melder) => BlokHints.FirstOrDefault(h => h.Melder == melder)?.Blok;
     public List<Meting> Overgangen { get; set; } = new();
 
+    /// <summary>BUG #87: bewezen kortsluitoplossingen uit eerdere verkenningen (zie <see cref="KortsluitOplossing"/>).</summary>
+    public List<KortsluitOplossing> KortsluitOplossingen { get; set; } = new();
+
+    public void LeerKortsluitOplossingen(Baankaart kaart)
+    {
+        foreach (var o in kaart.AlleKortsluitOplossingen())
+            if (!KortsluitOplossingen.Any(x => x.Sleutel == o.Sleutel)) KortsluitOplossingen.Add(o);
+    }
+
     /// <summary>Verwachte seconden voor deze overgang bij <paramref name="snelheid"/>, of null als onbekend.</summary>
     public double? Verwacht(int van, int naar, Richting r, int snelheid)
     {
@@ -49,6 +58,7 @@ public class LeerProfiel
     /// <summary>Neemt alleen de melder-blokkoppelingen van een kaart over (ook van een kaart zonder bruikbare tijden).</summary>
     public void LeerBlokHints(Baankaart kaart)
     {
+        LeerKortsluitOplossingen(kaart);
         foreach (var mm in kaart.Melders.Where(x => x.DinamoBlok is not null))
         {
             var h = BlokHints.FirstOrDefault(x => x.Melder == mm.Nummer);

@@ -569,6 +569,70 @@ public static class Tests
         Eis(Rapport.AlsHtml(k).Contains("Kruiswissel in melder 24") && Rapport.AlsTekst(k).Contains("KRUISWISSEL MELDER 24"), "kruis: staat in het rapport (html en tekst)");
     }
 
+    static void HandmatigeOplossingTest()
+    {
+        Console.WriteLine("Test: handmatige wisselcorrectie wordt onthouden (BUG #87)");
+        var k = Laad("baankaart_2026-10-11_1258.json");
+        var kp = k.Kortsluitpunten.First(x => x.Id == 1);
+        Eis(!kp.Opgelost && kp.NaMelder == 12 && kp.Configuratie.Equals(Configuratie.Basis.Met(2)), "hand: kortsluitpunt #1 (na 12 achteruit, wissel 2 afbuigend) is open");
+        var voor = k.MetBekendeOplossingenVoorStart(13, Richting.Achteruit, Configuratie.Basis.Met(2), out _);
+        Eis(voor.Equals(Configuratie.Basis.Met(2)), "hand: voor de correctie verandert de ritstand niet");
+        Eis(!k.RegistreerHandmatigeOplossing(kp, 2, true), "hand: een wissel die al in de kortsluitstand zit is geen oplossing");
+        Eis(k.RegistreerHandmatigeOplossing(kp, 1, true) && kp.Opgelost && kp.OpgelostDoorAdres == 1, "hand: wissel 1 afbuigend legt kortsluitpunt #1 als opgelost vast");
+        Eis(k.MetBekendeOplossingenVoorStart(13, Richting.Achteruit, Configuratie.Basis.Met(2), out _).Equals(Configuratie.Basis.Met(1).Met(2)), "hand: opdracht 13 achteruit met wissel 2 rijdt voortaan met wissel 1 erbij");
+        Eis(k.MetBekendeOplossingenVoorStart(14, Richting.Achteruit, Configuratie.Basis.Met(2), out _).Equals(Configuratie.Basis.Met(2)), "hand: andere startmelder blijft ongemoeid");
+        Eis(k.MetBekendeOplossingenVoorStart(13, Richting.Vooruit, Configuratie.Basis.Met(2), out _).Equals(Configuratie.Basis.Met(2)), "hand: andere richting blijft ongemoeid");
+        Eis(k.MetBekendeKortsluitOplossingen(new List<int> { 13, 5, 12 }, Richting.Achteruit, Configuratie.Basis.Met(2), out _).Equals(Configuratie.Basis.Met(1).Met(2)), "hand: ook navigatie over pad 13-5-12 gebruikt het");
+        // doorgeven aan een volgende verkenning via het leerprofiel (json-rondreis)
+        var profiel = new LeerProfiel(); profiel.LeerBlokHints(k);
+        var terug = LeerProfiel.VanJson(profiel.AlsJson())!;
+        var nieuw = new Baankaart();
+        foreach (var o in terug.KortsluitOplossingen) nieuw.BekendeKortsluitOplossingen.Add(o);
+        Eis(terug.KortsluitOplossingen.Any(o => o.Adres == 1 && o.NaMelder == 12 && o.Start == 13), "hand: oplossing staat in het leerprofiel (nu " + terug.KortsluitOplossingen.Count + ")");
+        Eis(nieuw.MetBekendeOplossingenVoorStart(13, Richting.Achteruit, Configuratie.Basis.Met(2), out _).Equals(Configuratie.Basis.Met(1).Met(2)), "hand: een nieuwe, lege kaart past de oplossing uit het leerprofiel meteen toe");
+    }
+
+    static void StopHerhalingTest()
+    {
+        Console.WriteLine("Test: stop herhalen na blokalarm (BUG #86)");
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
+        var s1 = sim.NieuweSectie(1, 80, 1); var s2 = sim.NieuweSectie(2, 80, 2);
+        sim.Verbind(s1, Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B, s2, Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A); sim.PlaatsLoc(s1, 40, +1);
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 4, DinamoBlokken = "1-2" };
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var log = new VerkenLog(klok);
+        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true), new VerkenStatus { Instellingen = ins });
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var alarm = typeof(BaanVerkenner).GetMethod("HardwareMeldtBlokAlarm", bf)!;
+        var stop = typeof(BaanVerkenner).GetMethod("VolledigeStop", bf)!;
+        // zonder alarm: geen herhaling
+        ((Task)stop.Invoke(v, null)!).GetAwaiter().GetResult();
+        Eis(!log.AlsTekst().Contains("stop wordt opnieuw gestuurd") && !log.AlsTekst().Contains("Stop wordt opnieuw gestuurd"), "stop: zonder blokalarm blijft het bij een stoppas");
+        // alarm tijdens de stop dat daarna verdwijnt: nog een stoppas
+        var t0 = klok.Nu;
+        klok.Getikt += _ => { if (klok.Nu >= t0 + TimeSpan.FromSeconds(1)) alarm.Invoke(v, new object[] { 2, false }); };
+        alarm.Invoke(v, new object[] { 2, true });
+        ((Task)stop.Invoke(v, null)!).GetAwaiter().GetResult();
+        Eis(log.AlsTekst().Contains("Stop wordt opnieuw gestuurd"), "stop: blokalarm tijdens de stop -> de stoppas wordt opnieuw gestuurd");
+    }
+
+    static void EchteBloknummersTest()
+    {
+        Console.WriteLine("Test: alleen echte Dinamo-bloknummers (BUG #88)");
+        var k = Laad("baankaart_2026-10-11_1258.json");
+        var blokken = BlokVoorstel.Bereken(k);
+        Eis(blokken.Where(b => b.DinamoBlok is not null).All(b => b.Nummer == b.DinamoBlok && b.Label == b.DinamoBlok.ToString()), "bloknummers: een bekend Dinamo-blok is zelf het nummer en het label");
+        Eis(blokken.Any(b => b.DinamoBlok == 8 && b.Melders.SequenceEqual(new[] { 24 })) && blokken.Any(b => b.DinamoBlok == 9 && b.Melders.SequenceEqual(new[] { 129 })), "bloknummers: melder 24 = Dinamo-blok 8 en 129 = 9");
+        Eis(blokken.Single(b => b.DinamoBlok is null).Label == "onbekend (melder 12)", "bloknummers: onbekend blok heet 'onbekend (melder 12)', geen verzonnen nummer");
+        var html = Rapport.AlsHtml(k); var tekst = Rapport.AlsTekst(k);
+        Eis(html.Contains("<th>Dinamo-blok</th>") && !html.Contains("<th>Blok</th>") && tekst.Contains("Dinamo-blok 3") && !tekst.Contains("  Blok 1 "), "bloknummers: rapport toont Dinamo-blokken en geen 'Blok 1..8'");
+        Eis(tekst.Contains("Dinamo-blok 3 → Dinamo-blok 8"), "bloknummers: wisselstraten tussen Dinamo-blokken");
+        var t = SchemaTekening.Maak(k);
+        Eis(t.Vakken.All(v => v.Titel.StartsWith("Dinamo-blok ")) && t.Vakken.Any(v => v.Titel == "Dinamo-blok 8"), "bloknummers: schema-vakken heten Dinamo-blok N");
+        Eis(blokken.All(b => b.Buren.All(n => blokken.Any(x => x.Nummer == n))), "bloknummers: buren verwijzen naar bestaande blokken");
+    }
+
     static void KortsluitOplossingTest()
     {
         var k = Laad("baankaart_2026-10-11_1103.json");
@@ -662,7 +726,7 @@ public static class Tests
         Eis(t.Verbindingen.Count >= 7, "blokkenschema: minstens 7 verbindingen (nu " + t.Verbindingen.Count + ")");
         Eis(t.Vakken.All(v => v.X > 0 && v.Y > 0 && v.X < t.Breedte && v.Y < t.Hoogte), "blokkenschema: alle vakken liggen binnen de tekening");
         var svg = t.AlsSvg(true);
-        Eis(svg.Contains("<svg") && svg.Contains("melders 24") && svg.Contains("Dinamo ?"), "blokkenschema: svg bevat melder 24 en het onbekende Dinamo-blok van melder 129");
+        Eis(svg.Contains("<svg") && svg.Contains("melders 24") && svg.Contains("onbekend (melder 129)"), "blokkenschema: svg bevat melder 24 en het onbekende Dinamo-blok van melder 129 (geen verzonnen nummer)");
         Eis(t.Vakken.First(v => v.Melders == "24").Soort == "splitsing", "blokkenschema: melder 24 (kruiswissel) is een splitsing");
         var uit = Environment.GetEnvironmentVariable("SCHEMA_UIT");
         if (!string.IsNullOrEmpty(uit)) { File.WriteAllText(uit, svg); Console.WriteLine("  svg geschreven naar " + uit); }
@@ -780,6 +844,9 @@ public static class Tests
         KortsluitOplossingTest();
         KoploperReferentieTest();
         KruiswisselReferentieTest();
+        HandmatigeOplossingTest();
+        StopHerhalingTest();
+        EchteBloknummersTest();
         WisselEisenTest();
         WisselstratenTest();
 

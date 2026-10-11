@@ -69,6 +69,21 @@ public class Overgang
 /// <see cref="Configuraties"/>. Bij een gewone melder is dat altijd hetzelfde; bij een kruiswissel-sectie (Engelse wissel in één melder)
 /// hangt het vervolg af van de ingangskant (Via) én de wisselstanden. Een doorgang geldt ook omgekeerd (Volgende -> Melder -> Via,
 /// andere richting), met dezelfde wisselstanden.</summary>
+/// <summary>BUG #87: een bewezen kortsluitoplossing: rijdend in richting <see cref="Richting"/> vanaf <see cref="Start"/> voorbij <see cref="NaMelder"/>
+/// gaf de stand <see cref="Stand"/> kortsluiting, en wissel <see cref="Adres"/> op <see cref="Afbuigend"/> losse dat op. Wordt ook in het leerprofiel
+/// bewaard, zodat een volgende verkenning dezelfde kortsluiting niet opnieuw opzoekt.</summary>
+public class KortsluitOplossing
+{
+    public int NaMelder { get; set; }
+    public Richting Richting { get; set; }
+    public string Stand { get; set; } = "";
+    public int Start { get; set; }
+    public int Adres { get; set; }
+    public bool Afbuigend { get; set; }
+    public string Bron { get; set; } = "";
+    public string Sleutel => $"{NaMelder}|{Richting}|{Stand}|{Start}|{Adres}|{Afbuigend}";
+}
+
 public class Doorgang
 {
     public int Via { get; set; }
@@ -187,7 +202,10 @@ public class Etappe
 
 public class VoorgesteldBlok
 {
+    /// <summary>BUG #88: gelijk aan het Dinamo-bloknummer als dat bekend en uniek is (anders een intern nummer, nooit getoond). Toon altijd <see cref="Label"/>.</summary>
     public int Nummer { get; set; }
+    /// <summary>De naam die getoond wordt: het ECHTE Dinamo-bloknummer, of "onbekend (melder X)" als dat niet gevonden is. Geen verzonnen nummers.</summary>
+    public string Label => DinamoBlok is int d ? (Nummer is >= 1000 and < 90000 ? $"{d} (deel {Nummer / 1000 + 1})" : d.ToString()) : $"onbekend (melder {(Melders.Count > 0 ? Melders[0].ToString() : "?")})";
     public List<int> Melders { get; set; } = new();
     public int? DinamoBlok { get; set; }
     public List<int> Buren { get; set; } = new();
@@ -223,6 +241,66 @@ public class Baankaart
     /// <summary>BUG #74: per melder welke ingangskant (Via) bij welk vervolg (Volgende) hoort, met de wisselstanden. Oudere kaarten hebben
     /// dit veld niet (leeg).</summary>
     public List<Doorgang> Doorgangen { get; set; } = new();
+
+    /// <summary>BUG #87: kortsluitoplossingen uit eerdere verkenningen (leerprofiel) of door de gebruiker aangewezen.</summary>
+    public List<KortsluitOplossing> BekendeKortsluitOplossingen { get; set; } = new();
+
+    private class OplossingItem { public Configuratie K = Configuratie.Basis; public int NaMelder; public int Start; public int Adres; public bool Afbuigend; public string Label = ""; }
+
+    private List<OplossingItem> Oplossingen(Richting r)
+    {
+        var res = new List<OplossingItem>();
+        foreach (var k in Kortsluitpunten.Where(k => k.Opgelost && k.OpgelostDoorAdres is not null && k.OpgelostMetAfbuigend is not null && k.Richting == r && k.Configuratie.Afbuigend.Length > 0))
+            res.Add(new OplossingItem
+            {
+                K = k.Configuratie, NaMelder = k.NaMelder, Adres = k.OpgelostDoorAdres!.Value, Afbuigend = k.OpgelostMetAfbuigend!.Value,
+                Start = k.Route.Count > 0 && k.Route[^1].Pad.Count > 0 && k.Route[^1].Pad[^1] == k.NaMelder ? k.Route[^1].Pad[0] : 0,
+                Label = $"kortsluitpunt #{k.Id}"
+            });
+        foreach (var o in BekendeKortsluitOplossingen.Where(o => o.Richting == r))
+        {
+            var cfg = Configuratie.VanSleutel(o.Stand);
+            if (cfg.Afbuigend.Length == 0) continue;
+            res.Add(new OplossingItem { K = cfg, NaMelder = o.NaMelder, Adres = o.Adres, Afbuigend = o.Afbuigend, Start = o.Start, Label = "een eerder gevonden oplossing" });
+        }
+        return res;
+    }
+
+    /// <summary>Alle bewezen oplossingen (uit opgeloste kortsluitpunten en bekende oplossingen), om in het leerprofiel te bewaren.</summary>
+    public List<KortsluitOplossing> AlleKortsluitOplossingen()
+    {
+        var res = new List<KortsluitOplossing>();
+        foreach (var r in new[] { Richting.Vooruit, Richting.Achteruit })
+            foreach (var o in Oplossingen(r))
+                res.Add(new KortsluitOplossing { NaMelder = o.NaMelder, Richting = r, Stand = o.K.Sleutel, Start = o.Start, Adres = o.Adres, Afbuigend = o.Afbuigend, Bron = o.Label });
+        return res.GroupBy(x => x.Sleutel).Select(g => g.First()).ToList();
+    }
+
+    /// <summary>BUG #87: de gebruiker heeft aangewezen dat wissel <paramref name="adres"/> verkeerd stond en nu op <paramref name="afbuigend"/> staat;
+    /// daarmee verdween de kortsluiting van <paramref name="kp"/>: dat is dus de oplossing van dat kortsluitpunt.</summary>
+    public bool RegistreerHandmatigeOplossing(Kortsluitpunt kp, int adres, bool afbuigend)
+    {
+        if (kp.Opgelost || kp.Configuratie.Bevat(adres) == afbuigend) return false;
+        kp.Opgelost = true;
+        kp.OpgelostDoorAdres = adres;
+        kp.OpgelostMetAfbuigend = afbuigend;
+        if (!kp.GeprobeerdeAdressen.Contains(adres)) kp.GeprobeerdeAdressen.Add(adres);
+        return true;
+    }
+
+    /// <summary>BUG #87: een opdracht begint op <paramref name="start"/> in richting <paramref name="r"/> met stand <paramref name="c"/>. Is daar eerder
+    /// een kortsluiting bij deze stand opgelost met een extra wissel, dan krijgt de ritstand die wissel meteen mee (anders volgt dezelfde kortsluiting opnieuw).</summary>
+    public Configuratie MetBekendeOplossingenVoorStart(int start, Richting r, Configuratie c, out List<string> wijzigingen)
+    {
+        wijzigingen = new List<string>();
+        foreach (var o in Oplossingen(r).Where(o => o.Start == start && !o.K.Bevat(o.Adres)))
+        {
+            if (!o.K.Afbuigend.All(c.Bevat) || c.Bevat(o.Adres) == o.Afbuigend) continue;
+            c = c.MetStand(o.Adres, o.Afbuigend);
+            wijzigingen.Add($"{o.Adres} {(o.Afbuigend ? "afbuigend" : "rechtdoor")} ({o.Label}: stand {o.K} gaf kortsluiting na melder {o.NaMelder})");
+        }
+        return c;
+    }
     public List<int> AdressenZonderEffect { get; set; } = new();
     public List<VoorgesteldBlok> VoorgesteldeBlokken { get; set; } = new();
     /// <summary>BUG #78: voorstel voor wisselstraten per gereden overgang (zie <see cref="WisselstraatVoorstel"/>). Oudere kaarten: leeg.</summary>
@@ -363,25 +441,23 @@ public class Baankaart
         for (int ronde = 0; ronde < 5; ronde++)
         {
             bool veranderd = false;
-            foreach (var k in Kortsluitpunten.Where(k => k.Opgelost && k.OpgelostDoorAdres is not null && k.OpgelostMetAfbuigend is not null
-                         && k.Richting == r && pad.Contains(k.NaMelder) && k.Configuratie.Afbuigend.Length > 0))
-            {
-                if (!k.Configuratie.Afbuigend.All(c.Bevat)) continue;
-                int a = k.OpgelostDoorAdres!.Value; bool s = k.OpgelostMetAfbuigend!.Value;
+            foreach (var k in Oplossingen(r).Where(k => pad.Contains(k.NaMelder)))            {
+                if (!k.K.Afbuigend.All(c.Bevat)) continue;
+                int a = k.Adres; bool s = k.Afbuigend;
                 if (c.Bevat(a) == s) continue;
                 bool eisTegen = !strijdig.Contains(a) && eisen.TryGetValue(a, out var e) && e != s;
                 if (!eisTegen)
                 {
                     c = c.MetStand(a, s);
-                    wijzigingen.Add($"{a} {(s ? "afbuigend" : "rechtdoor")} (kortsluitpunt #{k.Id} na melder {k.NaMelder} was daarmee opgelost)");
+                    wijzigingen.Add($"{a} {(s ? "afbuigend" : "rechtdoor")} ({k.Label} na melder {k.NaMelder} was daarmee opgelost)");
                     veranderd = true;
                     continue;
                 }
                 // De oplossing botst met een eis van dit pad: dan mag de stand die de kortsluiting gaf hier niet voorkomen.
-                var weg = k.Configuratie.Afbuigend.Where(w => !(eisen.TryGetValue(w, out var ew) && ew)).ToList();
+                var weg = k.K.Afbuigend.Where(w => !(eisen.TryGetValue(w, out var ew) && ew)).ToList();
                 if (weg.Count == 0) continue;
                 foreach (var w in weg) c = c.Zonder(w);
-                wijzigingen.Add($"{string.Join(", ", weg)} rechtdoor (kortsluitpunt #{k.Id}: die stand gaf kortsluiting na melder {k.NaMelder}, en de oplossing, wissel {a} {(s ? "afbuigend" : "rechtdoor")}, kan op dit pad niet)");
+                wijzigingen.Add($"{string.Join(", ", weg)} rechtdoor ({k.Label}: die stand gaf kortsluiting na melder {k.NaMelder}, en de oplossing, wissel {a} {(s ? "afbuigend" : "rechtdoor")}, kan op dit pad niet)");
                 veranderd = true;
             }
             if (!veranderd) break;

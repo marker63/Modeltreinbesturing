@@ -79,17 +79,31 @@ public static class BlokVoorstel
         for (int i = 0; i < groepen.Count; i++)
         {
             var g = groepen[i];
+            // BUG #88 (Marco 13:03): geen verzonnen bloknummers; het nummer IS het Dinamo-bloknummer. Hoort een tweede, losse groep bij hetzelfde
+            // Dinamo-blok, of is het blok onbekend, dan krijgt die een intern nummer (boven 1000; Label toont het echte nummer of "onbekend").
+            int? dinamo = blokVan.GetValueOrDefault(g[0]);
+            int nummer;
+            if (dinamo is int dn)
+            {
+                int eerder = res.Count(x => x.DinamoBlok == dn);
+                nummer = eerder == 0 ? dn : dn + 1000 * eerder;
+            }
+            else nummer = 90000 + i;
             var b = new VoorgesteldBlok
             {
-                Nummer = i + 1,
+                Nummer = nummer,
                 Melders = g,
                 DinamoBlok = blokVan.GetValueOrDefault(g[0])
             };
-            foreach (var m in g)
-                foreach (var n in buren[m])
-                    if (groepVan[n] != i && !b.Buren.Contains(groepVan[n] + 1)) b.Buren.Add(groepVan[n] + 1);
-            b.Buren.Sort();
             res.Add(b);
+        }
+        for (int i = 0; i < groepen.Count; i++)
+        {
+            var b = res[i];
+            foreach (var m in groepen[i])
+                foreach (var n in buren[m])
+                    if (groepVan[n] != i && !b.Buren.Contains(res[groepVan[n]].Nummer)) b.Buren.Add(res[groepVan[n]].Nummer);
+            b.Buren.Sort();
         }
         return res;
     }

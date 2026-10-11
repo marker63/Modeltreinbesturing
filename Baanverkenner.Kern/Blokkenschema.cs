@@ -16,7 +16,9 @@ public class SchemaVak
     public double Y { get; set; }
     public double B { get; set; } = SchemaTekening.VakBreedte;
     public double H { get; set; } = SchemaTekening.VakHoogte;
-    public string Titel => DinamoBlok is int d ? $"Blok {Nummer}  (Dinamo {d})" : $"Blok {Nummer}  (Dinamo ?)";
+    public string Label { get; set; } = "";
+    /// <summary>BUG #88: alleen het echte Dinamo-bloknummer, geen verzonnen nummer.</summary>
+    public string Titel => DinamoBlok is int ? $"Dinamo-blok {Label}" : $"Dinamo-blok {Label}";
 }
 
 /// <summary>Een verbinding tussen twee blokken, met de rijrichting per overgang.</summary>
@@ -58,7 +60,7 @@ public class SchemaTekening
         // Soort + markeringen per blok
         foreach (var b in blokken)
         {
-            var v = new SchemaVak { Nummer = b.Nummer, DinamoBlok = b.DinamoBlok, Melders = string.Join(" – ", b.Melders) };
+            var v = new SchemaVak { Nummer = b.Nummer, Label = b.Label, DinamoBlok = b.DinamoBlok, Melders = string.Join(" – ", b.Melders) };
             bool splitsing = b.Melders.Any(m =>
                 k.Overgangen.Where(o => o.Van == m).GroupBy(o => o.Richting).Any(g => g.Select(o => o.Naar).Distinct().Count() > 1));
             v.Soort = b.DinamoBlok is null ? "onbekend" : splitsing ? "splitsing" : "normaal";

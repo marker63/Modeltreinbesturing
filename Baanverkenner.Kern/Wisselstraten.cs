@@ -24,6 +24,9 @@ public class WisselstraatVoorstel
     public int AantalKeer { get; set; }
     public int? VanBlok { get; set; }
     public int? NaarBlok { get; set; }
+    /// <summary>BUG #88: echte Dinamo-bloknummers (of "onbekend (melder X)") om te tonen.</summary>
+    public string VanLabel { get; set; } = "";
+    public string NaarLabel { get; set; } = "";
     public List<WisselEis> Eisen { get; set; } = new();
     /// <summary>De volledige wisselstand (sleutel van de configuratie: de adressen die afbuigend stonden) waarbij deze overgang gereden is.</summary>
     public string Standen { get; set; } = "";
@@ -42,7 +45,8 @@ public class WisselstraatVoorstel
         var res = new List<WisselstraatVoorstel>();
         var blokken = k.VoorgesteldeBlokken.Count > 0 ? k.VoorgesteldeBlokken : BlokVoorstel.Bereken(k);
         var blokVan = new Dictionary<int, int>();
-        foreach (var b in blokken) foreach (var m in b.Melders) blokVan[m] = b.Nummer;
+        var labelVan = new Dictionary<int, string>();
+        foreach (var b in blokken) foreach (var m in b.Melders) { blokVan[m] = b.Nummer; labelVan[m] = b.Label; }
         var gezien = new HashSet<string>();
 
         foreach (var o in k.Overgangen.OrderBy(o => o.Van).ThenBy(o => o.Naar).ThenBy(o => o.Richting))
@@ -97,7 +101,7 @@ public class WisselstraatVoorstel
                 var v = new WisselstraatVoorstel
                 {
                     VanMelder = o.Van, NaarMelder = o.Naar, Richting = o.Richting, AantalKeer = o.AantalKeer,
-                    VanBlok = vb, NaarBlok = nb, Eisen = eisen.OrderBy(e => e.Adres).ToList(), Standen = standen
+                    VanBlok = vb, NaarBlok = nb, VanLabel = labelVan.GetValueOrDefault(o.Van, "?"), NaarLabel = labelVan.GetValueOrDefault(o.Naar, "?"), Eisen = eisen.OrderBy(e => e.Adres).ToList(), Standen = standen
                 };
                 if (gezien.Add(v.Sleutel)) res.Add(v);
             }

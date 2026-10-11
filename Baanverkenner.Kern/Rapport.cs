@@ -154,7 +154,7 @@ ul{margin:6px 0 0 18px;padding:0}
         Tegel(k.Melders.Count, "melders (secties)");
         Tegel(k.Wissels.Count, "wissels gevonden");
         Tegel(k.Kopsporen.Count, "doodlopende einden");
-        Tegel(k.VoorgesteldeBlokken.Count, "voorgestelde blokken");
+        Tegel(k.VoorgesteldeBlokken.Count, "Dinamo-blokken (voorstel)");
         Tegel(openKs, "open kortsluitpunten");
         Tegel(k.AdressenZonderEffect.Count, "adressen zonder effect");
         sb.Append("</div>");
@@ -196,9 +196,9 @@ ul{margin:6px 0 0 18px;padding:0}
         // Blokken
         sb.Append("<h2>Voorgestelde blokken</h2>");
         sb.Append("<p class=\"uitleg\">Aaneengesloten melders zonder wissel ertussen" + (metBlok ? " en met hetzelfde Dinamo-blok" : "") + " zijn samengenomen. Dit is een voorstel voor de import in Modeltreinbesturing.</p>");
-        sb.Append("<table><tr><th>Blok</th><th>Melders (in rijvolgorde)</th>" + (metBlok ? "<th>Dinamo-blok</th>" : "") + "<th>Grenst aan blok</th></tr>");
+        sb.Append("<table><tr><th>Dinamo-blok</th><th>Melders (in rijvolgorde)</th><th>Grenst aan Dinamo-blok</th></tr>");
         foreach (var b in k.VoorgesteldeBlokken)
-            sb.Append($"<tr><td class=\"num\">{b.Nummer}</td><td>{E(string.Join(" – ", b.Melders))}</td>" + (metBlok ? $"<td>{E(b.DinamoBlok?.ToString() ?? "?")}</td>" : "") + $"<td>{E(string.Join(", ", b.Buren))}</td></tr>");
+            sb.Append($"<tr><td class=\"num\">{E(b.Label)}</td><td>{E(string.Join(" – ", b.Melders))}</td><td>{E(string.Join(", ", b.Buren.Select(n => k.VoorgesteldeBlokken.FirstOrDefault(x => x.Nummer == n)?.Label ?? "?")))}</td></tr>");
         sb.Append("</table>");
         // BUG #74: doorgangen (ingangskant -> vervolg) van melders met meer dan een mogelijkheid
         var opvallend = k.OpvallendeDoorgangen();
@@ -218,9 +218,9 @@ ul{margin:6px 0 0 18px;padding:0}
         if (straten.Count == 0) sb.Append("<p>Geen overgang tussen blokken met een wissel gevonden.</p>");
         else
         {
-            sb.Append("<table><tr><th>Van blok</th><th>Naar blok</th><th>Richting</th><th>Melders</th><th>Wissels</th><th>Keer gereden</th></tr>");
-            foreach (var g in straten.GroupBy(v => (v.VanBlok, v.NaarBlok, v.Richting, v.EisenTekst)).OrderBy(g => g.Key.VanBlok).ThenBy(g => g.Key.NaarBlok))
-                sb.Append($"<tr><td class=\"num\">{g.Key.VanBlok?.ToString() ?? "?"}</td><td class=\"num\">{g.Key.NaarBlok?.ToString() ?? "?"}</td><td>{g.Key.Richting.Tekst()}</td><td>{E(string.Join(", ", g.Select(v => $"{v.VanMelder}→{v.NaarMelder}")))}</td><td>{E(g.Key.EisenTekst)}</td><td>{g.Sum(v => v.AantalKeer)}</td></tr>");
+            sb.Append("<table><tr><th>Van Dinamo-blok</th><th>Naar Dinamo-blok</th><th>Richting</th><th>Melders</th><th>Wissels</th><th>Keer gereden</th></tr>");
+            foreach (var g in straten.GroupBy(v => (v.VanLabel, v.NaarLabel, v.Richting, v.EisenTekst)).OrderBy(g => g.Key.VanLabel, StringComparer.Ordinal).ThenBy(g => g.Key.NaarLabel, StringComparer.Ordinal))
+                sb.Append($"<tr><td class=\"num\">{E(g.First().VanLabel)}</td><td class=\"num\">{E(g.First().NaarLabel)}</td><td>{g.Key.Richting.Tekst()}</td><td>{E(string.Join(", ", g.Select(v => $"{v.VanMelder}→{v.NaarMelder}")))}</td><td>{E(g.Key.EisenTekst)}</td><td>{g.Sum(v => v.AantalKeer)}</td></tr>");
             sb.Append("</table>");
         }
 
@@ -314,7 +314,7 @@ ul{margin:6px 0 0 18px;padding:0}
 
         Kop("VOORGESTELDE BLOKKEN");
         foreach (var b in k.VoorgesteldeBlokken)
-            sb.AppendLine($"  Blok {b.Nummer,-3}: melders {string.Join(" - ", b.Melders)}" + (b.DinamoBlok is int d ? $" (Dinamo-blok {d})" : "") + $"   grenst aan: {string.Join(", ", b.Buren)}");
+            sb.AppendLine($"  Dinamo-blok {b.Label,-5}: melders {string.Join(" - ", b.Melders)}   grenst aan: {string.Join(", ", b.Buren.Select(n => k.VoorgesteldeBlokken.FirstOrDefault(x => x.Nummer == n)?.Label ?? "?"))}");
 
         var opvallendT = k.OpvallendeDoorgangen();
         if (opvallendT.Count > 0)
@@ -330,8 +330,8 @@ ul{margin:6px 0 0 18px;padding:0}
 
         Kop("WISSELSTRATEN (VOORSTEL, NOG NIET GETEST OP DE BAAN)");
         var stratenT = WisselstraatVoorstel.Bereken(k);
-        foreach (var g in stratenT.GroupBy(v => (v.VanBlok, v.NaarBlok, v.Richting, v.EisenTekst)).OrderBy(g => g.Key.VanBlok).ThenBy(g => g.Key.NaarBlok))
-            sb.AppendLine($"  blok {g.Key.VanBlok?.ToString() ?? "?"} → blok {g.Key.NaarBlok?.ToString() ?? "?"} ({g.Key.Richting.Tekst()}, melders {string.Join(", ", g.Select(v => $"{v.VanMelder}→{v.NaarMelder}"))}): {g.Key.EisenTekst}");
+        foreach (var g in stratenT.GroupBy(v => (v.VanLabel, v.NaarLabel, v.Richting, v.EisenTekst)).OrderBy(g => g.Key.VanLabel, StringComparer.Ordinal).ThenBy(g => g.Key.NaarLabel, StringComparer.Ordinal))
+            sb.AppendLine($"  Dinamo-blok {g.Key.VanLabel} → Dinamo-blok {g.Key.NaarLabel} ({g.Key.Richting.Tekst()}, melders {string.Join(", ", g.Select(v => $"{v.VanMelder}→{v.NaarMelder}"))}): {g.Key.EisenTekst}");
         if (stratenT.Count == 0) sb.AppendLine("  (geen)");
 
         Kop("DOODLOPENDE EINDEN");

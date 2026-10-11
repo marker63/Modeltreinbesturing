@@ -202,6 +202,14 @@ public partial class BaanVerkenner
             if (_kaart.RefSnelheid <= 0) _kaart.RefSnelheid = _ins.Verkensnelheid;
             _startVerkensnelheid = _ins.Verkensnelheid;
             _log.Stap(uitbreiden ? "Voltooide verkenning wordt uitgebreid met een tweede traject." : hervat ? "Verkenning wordt hervat." : "Verkenning start.");
+            // BUG #87: bewezen kortsluitoplossingen uit eerdere verkenningen meenemen.
+            if (Leerprofiel is { } lpo)
+            {
+                int nieuwOpl = 0;
+                foreach (var o in lpo.KortsluitOplossingen)
+                    if (!_kaart.BekendeKortsluitOplossingen.Any(x => x.Sleutel == o.Sleutel)) { _kaart.BekendeKortsluitOplossingen.Add(o); nieuwOpl++; }
+                if (nieuwOpl > 0) _log.Info($"{nieuwOpl} kortsluitoplossing(en) uit eerdere verkenningen overgenomen (bv. een extra wissel die bij een stand hoort); die worden meteen toegepast.");
+            }
             if (Leerprofiel is { AantalMetingen: > 0 } lp) _log.Info($"Leerprofiel: {lp.Overgangen.Count} overgangen uit eerdere verkenningen (tijden worden omgerekend naar verkensnelheid {_ins.Verkensnelheid}).");
             _log.Info($"Hardware: {_hw.Naam}. Testloc adres {_ins.LocAdres} ({_ins.LocStappen} stappen), verkensnelheid {_ins.Verkensnelheid}, kruipsnelheid {_ins.Kruipsnelheid}.");
             _log.Info($"Wisseladressen {_kaart.WisselAdresVan} t/m {_kaart.WisselAdresTot}." + (BlokVereist ? $" Dinamo-blokken: {_ins.DinamoBlokken}." : ""));
@@ -445,6 +453,16 @@ public partial class BaanVerkenner
         return res;
     }
 
+    /// <summary>BUG #87: de stand waarmee de opdracht echt gereden wordt: de stand van de opdracht plus de extra wissel die een eerder opgelost
+    /// kortsluitpunt voor deze start en stand vereist (de kortsluiting komt anders steeds terug, bv. wissel 2 afbuigend zonder wissel 1).</summary>
+    private Configuratie RijStand(Opdracht o)
+    {
+        var c = _kaart.MetBekendeOplossingenVoorStart(o.Start, o.Richting, o.Configuratie, out var wijz);
+        if (wijz.Count > 0)
+            _log.Info($"Opdracht #{o.Id} ({o.Configuratie}) rijdt met een bekende extra wisselstand: {string.Join("; ", wijz)}. Rijstand: {c}.");
+        return c;
+    }
+
     private async Task VoerOpdrachtUit(Opdracht o)
     {
         _fase = $"Opdracht #{o.Id}";
@@ -455,7 +473,7 @@ public partial class BaanVerkenner
         try
         {
             await NaarStartVan(o.Route);
-            await ZetConfiguratie(o.Configuratie);
+            await ZetConfiguratie(RijStand(o));
 
             // ---- Basisrit ----
             var basis = await Basisrit(o);
@@ -705,7 +723,7 @@ public partial class BaanVerkenner
             if (i == aantal && (ritten.Count < 2 || ritten[0].Reeks.SequenceEqual(ritten[1].Reeks))) break;
             _bezig = $"opdracht #{o.Id}: basisrit {(i == 0 ? "" : $"(controle {i})")}";
             MeldVoortgang();
-            var rit = await Rit(o.Start, o.Richting, new RitDoel { Configuratie = o.Configuratie, StopBijMelders = stops });
+            var rit = await Rit(o.Start, o.Richting, new RitDoel { Configuratie = RijStand(o), StopBijMelders = stops });
             _log.Info($"Basisrit: {Lijst(rit.Reeks)} - einde: {EindeTekst(rit.Einde)}.");
             VerwerkEinde(o, rit);
             await TerugNaarMetControle(o, rit, o.Configuratie);

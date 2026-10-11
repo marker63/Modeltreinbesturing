@@ -48,6 +48,7 @@ public partial class BaanVerkenner
 {
     private static readonly TimeSpan Poll = TimeSpan.FromMilliseconds(50);
     private static readonly TimeSpan DinamoCyclus = TimeSpan.FromMilliseconds(200);
+    private const int MaxStopPassen = 4;
 
     private readonly Dictionary<int, bool> _wisselStand = new();
     private List<int> _laatsteKortsluitMelders = new();
@@ -248,14 +249,28 @@ public partial class BaanVerkenner
         }
         var blokken = _ins.DinamoBlokLijst();
         var duur = DinamoCyclus * blokken.Count + TimeSpan.FromMilliseconds(400);
-        _negeerKortsluitingTot = _klok.Nu + duur + TimeSpan.FromSeconds(3);
-        _hw.Noodstop();
-        foreach (var b in blokken) _hw.ZetLocSnelheid(_ins.LocAdres, 0, true, b, _ins.LocStappen);
-        var eind = _klok.Nu + duur;
-        while (_klok.Nu < eind)
+        // BUG #86 (Marco 13:02: "de loc stopte niet, bleef gewoon doorrijden na de stopmelding"): tijdens een kortsluiting heeft het getroffen blok
+        // geen rijstroom, dus de stopcommando's die dan naar dat blok gaan komen bij de loc niet aan; zodra de kortsluiting weg is rijdt hij
+        // met de oude snelheid door (hardwarelog 12:26:44: alarm blok 2 tot 45.48 en blok 3 tot 45.68, de stopframes voor blok 2 en 3 gingen
+        // om 44.88 en 45.08). Daarom: was er tijdens de stoppas een blokalarm, wacht dan tot het weg is en stuur de hele stoppas opnieuw.
+        for (int pas = 1; pas <= MaxStopPassen; pas++)
         {
-            await Wacht(TimeSpan.FromMilliseconds(400));
-            _hw.Noodstop(); // F-bit vasthouden tot alle stopcommando's verstuurd zijn
+            bool alarmTijdensPas = HuidigeAlarmBlokken().Count > 0 || (pas == 1 && (_klok.Nu - _laatsteKortsluitingOm).TotalSeconds < 3);
+            _negeerKortsluitingTot = _klok.Nu + duur + TimeSpan.FromSeconds(3);
+            _hw.Noodstop();
+            foreach (var b in blokken) _hw.ZetLocSnelheid(_ins.LocAdres, 0, true, b, _ins.LocStappen);
+            var eind = _klok.Nu + duur;
+            while (_klok.Nu < eind)
+            {
+                await Wacht(TimeSpan.FromMilliseconds(400));
+                _hw.Noodstop(); // F-bit vasthouden tot alle stopcommando's verstuurd zijn
+                if (HuidigeAlarmBlokken().Count > 0) alarmTijdensPas = true;
+            }
+            if (!alarmTijdensPas || pas == MaxStopPassen) break;
+            var wachtTot = _klok.Nu + TimeSpan.FromSeconds(6);
+            while (HuidigeAlarmBlokken().Count > 0 && _klok.Nu < wachtTot) await Wacht(TimeSpan.FromMilliseconds(200));
+            _log.Waarschuwing($"Dinamo had tijdens de stop een kortsluitmelding (blok {string.Join(" en ", HuidigeAlarmBlokken().Count > 0 ? HuidigeAlarmBlokken() : new List<int>())}{(HuidigeAlarmBlokken().Count > 0 ? "" : "nu weg")}): de stopcommando's zijn dan niet aangekomen. Stop wordt opnieuw gestuurd (poging {pas + 1} van {MaxStopPassen}).");
+            await Wacht(TimeSpan.FromMilliseconds(500)); // rijstroom weer op de blokken
         }
         await Wacht(TimeSpan.FromMilliseconds(1500)); // F-bit loslaten + uitrollen
         _monitor.Bijwerken();
@@ -1268,6 +1283,14 @@ public partial class BaanVerkenner
             _log.Info($"Op verzoek van de gebruiker staat wissel {a} verkeerd en wordt naar {(afbuigend ? "afbuigend" : "rechtdoor")} geschakeld (tegenovergestelde stand).");
             await ZetWissel(a, afbuigend, forceer: true);
             geschakeld = true;
+            // BUG #87 (Marco 13:01: "telkens zet ik wissel 1 in de juiste stand en dan is de kortsluiting weg, waarom wordt dit niet vastgehouden?"):
+            // dat de gebruiker deze wissel na een kortsluiting corrigeerde is de oplossing van dat kortsluitpunt, en wordt voortaan toegepast.
+            var kpHand = _kaart.Kortsluitpunten.LastOrDefault(k => !k.Opgelost && !k.Opgegeven && k.Soort == KortsluitpuntSoort.Kortsluiting);
+            if (kpHand is not null && (_klok.Nu - _laatsteKortsluitingOm).TotalMinutes < 15 && _kaart.RegistreerHandmatigeOplossing(kpHand, a, afbuigend))
+            {
+                _log.Vondst($"Kortsluitpunt #{kpHand.Id} (na melder {kpHand.NaMelder}, {kpHand.Richting.Tekst()}, {kpHand.Configuratie}) is volgens de gebruiker opgelost door wissel {a} op {(afbuigend ? "afbuigend" : "rechtdoor")}. Dit wordt onthouden en voortaan meteen toegepast (ook in volgende verkenningen).");
+                BewaarNu();
+            }
         }
         if (!geschakeld) return false;
         _kortsluitingGemeld = false;
