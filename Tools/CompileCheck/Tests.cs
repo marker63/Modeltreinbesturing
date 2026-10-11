@@ -760,6 +760,19 @@ public static class Tests
         Eis(ontvangen.Count == 0, "opstartstand: een latere wijziging (13 vrij) wint van de opstartstand");
     }
 
+    // BUG #102 (Marco 17:01): na "wissel 1 is de oplossing" moet de opdracht meteen opnieuw, niet achteraan de wachtrij
+    static void HerpogingVolgordeTest()
+    {
+        Console.WriteLine("Test: herpoging na handmatige oplossing komt vooraan (BUG #102)");
+        Opdracht O(int id) => new Opdracht { Id = id };
+        var q = new List<Opdracht> { O(6), O(7) };
+        BaanVerkenner.PlaatsHerpoging(q, O(5), true);
+        Eis(q.Select(x => x.Id).SequenceEqual(new[] { 5, 6, 7 }), "herpoging: na handmatige oplossing vooraan (nu " + string.Join(",", q.Select(x => x.Id)) + ")");
+        var q2 = new List<Opdracht> { O(6), O(7) };
+        BaanVerkenner.PlaatsHerpoging(q2, O(5), false);
+        Eis(q2.Select(x => x.Id).SequenceEqual(new[] { 6, 7, 5 }), "herpoging: zonder oplossing achteraan");
+    }
+
     static void StopVoorTerugzettenTest()
     {
         Console.WriteLine("Test: stop naar alle blokken voordat de loc terug gezet moet worden (BUG #94)");
@@ -1095,6 +1108,7 @@ public static class Tests
         KruisIngangTest();
         BotsendeOplossingenTest();
         OpstartStandTest();
+        HerpogingVolgordeTest();
         KruisAankomstTest();
         OrientatieTekstTest();
         WisselEisenTest();

@@ -439,13 +439,15 @@ public partial class BaanVerkenner
     // Opdrachten
     // =====================================================================
 
-    private void Plan(Opdracht o)
+    /// <param name="vooraan">BUG #102: het vervolg van een opgelost kortsluitpunt komt vooraan in de wachtrij: de plek waar de nieuwe melders te vinden
+    /// zijn is bekend, dus daar gaat het eerst heen (en niet pas na alle andere adrestests).</param>
+    private void Plan(Opdracht o, bool vooraan = false)
     {
         if (_status.GeplandeOpdrachten.Contains(o.Sleutel)) return;
         o.Id = _status.VolgendeOpdrachtId++;
         o.VolgendAdres = _ins.WisselAdressen().First();
         _status.GeplandeOpdrachten.Add(o.Sleutel);
-        _status.Wachtrij.Add(o);
+        if (vooraan) _status.Wachtrij.Insert(0, o); else _status.Wachtrij.Add(o);
         _log.Info($"Nieuwe opdracht #{o.Id}: vanaf melder {o.Start} {o.Richting.Tekst()} ({o.Configuratie}) - {o.Reden}.");
     }
 
@@ -547,6 +549,7 @@ public partial class BaanVerkenner
 
     private async Task VoerOpdrachtUit(Opdracht o)
     {
+        _handmatigeOplossingGemeld = false;
         _fase = $"Opdracht #{o.Id}";
         _bezig = $"vanaf melder {o.Start} {o.Richting.Tekst()} ({o.Configuratie})";
         MeldVoortgang();
@@ -712,8 +715,14 @@ public partial class BaanVerkenner
             o.Pogingen++;
             if (o.Pogingen < 2)
             {
-                _log.Info($"Opdracht #{o.Id} wordt later nog één keer geprobeerd.");
-                _status.Wachtrij.Add(o);
+                // BUG #102 (Marco 17:01, log 15:19): zei de gebruiker net welke wissel de kortsluiting oplost, dan meteen opnieuw rijden met die
+                // wissel erbij; anders bleef de opdracht 23 minuten achteraan de wachtrij liggen terwijl het volgende blok zo in beeld kwam.
+                bool direct = _handmatigeOplossingGemeld;
+                _handmatigeOplossingGemeld = false;
+                PlaatsHerpoging(_status.Wachtrij, o, direct);
+                _log.Info(direct
+                    ? $"Opdracht #{o.Id} wordt direct opnieuw gereden: de gebruiker gaf net de oplossing van de kortsluiting aan."
+                    : $"Opdracht #{o.Id} wordt later nog één keer geprobeerd.");
             }
             else
             {
@@ -721,6 +730,13 @@ public partial class BaanVerkenner
             }
         }
     }
+
+    internal static void PlaatsHerpoging(List<Opdracht> wachtrij, Opdracht o, bool direct)
+    {
+        if (direct) wachtrij.Insert(0, o); else wachtrij.Add(o);
+    }
+
+    private bool _handmatigeOplossingGemeld;
 
     /// <summary>BUG #92: eindigde de proefrit met wissel <paramref name="adres"/> afbuigend in kortsluiting op melder 24 en is dat adres een van de
     /// twee kruiswisselmotoren (13 of 10)?</summary>
@@ -823,7 +839,7 @@ public partial class BaanVerkenner
             Richting = o.Richting,
             Route = kp.Route,
             Reden = $"verder voorbij opgelost kortsluitpunt #{kp.Id} (adres {a} en {b} samen afbuigend)"
-        });
+        }, vooraan: true);
     }
 
     /// <summary>De basisrit (zonder omgezet adres), bij de instelling "herhalen" twee keer,
@@ -1227,7 +1243,7 @@ public partial class BaanVerkenner
                             Richting = k.Richting,
                             Route = k.Route,
                             Reden = $"verder voorbij opgelost kortsluitpunt #{k.Id}"
-                        });
+                        }, vooraan: true);
                         nieuwWerk = true;
                     }
                     if (proefKortsluiting || proefOpgelost) BewaarNu();

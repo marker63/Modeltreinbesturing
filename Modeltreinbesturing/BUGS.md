@@ -1556,3 +1556,10 @@ al goed en pakte je hem niet op, dan kwam er nooit een bericht en dacht de verke
 Fix: `DinamoHardware` onthoudt de laatst gemelde stand per melder (ook uit de opstartfase) en geeft die via het nieuwe
 `IHardwareInterface.HerhaalBekendeMelderStanden()` door; `BepaalStart` roept dat aan direct na de aanvragen. Latere wijzigingen winnen altijd.
 Test: `OpstartStandTest` (met de echte frames uit het log). Nog niet getest op de baan; WPF-project niet te compileren hier.
+
+## #102 - Na een opgelost kortsluitpunt meteen verder rijden (Marco 17:01)
+Log 15:19: Marco gaf aan dat wissel 1 de kortsluiting bij wissel 2 oplost. Opdracht #5 (13 achteruit met 2, nu ook met 1) werd achteraan de wachtrij gezet en
+tot 15:43 niet meer gereden; 23 minuten geen vooruitgang bij melder 12. Nu: (a) een opdracht die mislukte terwijl de gebruiker net de oplossing opgaf
+komt vooraan en wordt direct opnieuw gereden (de bekende oplossing, #87, zet wissel 1 er zelf bij); (b) het vervolg "verder voorbij opgelost
+kortsluitpunt" (zowel via adrestest als via de oplosfase) komt vooraan de wachtrij. Test: `HerpogingVolgordeTest`. Nog niet getest op de baan.
+Gemeten (7 logs, 319 min): de adrestests (87 ritten met 1 adres, 91 min) zijn de grootste tijdpost; groeperen is nog niet gebouwd (voorstel gedaan).

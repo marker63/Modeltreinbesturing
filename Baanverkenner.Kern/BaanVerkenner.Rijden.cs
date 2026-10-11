@@ -1337,6 +1337,7 @@ public partial class BaanVerkenner
             if (kpHand is not null && (_klok.Nu - _laatsteKortsluitingOm).TotalMinutes < 15 && _kaart.RegistreerHandmatigeOplossing(kpHand, a, afbuigend))
             {
                 _log.Vondst($"Kortsluitpunt #{kpHand.Id} (na melder {kpHand.NaMelder}, {kpHand.Richting.Tekst()}, {kpHand.Configuratie}) is volgens de gebruiker opgelost door wissel {a} op {(afbuigend ? "afbuigend" : "rechtdoor")}. Dit wordt onthouden en voortaan meteen toegepast (ook in volgende verkenningen).");
+                _handmatigeOplossingGemeld = true; // BUG #102
                 BewaarNu();
             }
         }
