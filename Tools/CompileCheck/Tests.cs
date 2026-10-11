@@ -736,6 +736,20 @@ public static class Tests
         var svg = t.AlsSvg(true);
         Eis(svg.Contains("<svg") && svg.Contains("melders 24") && svg.Contains("onbekend (melder 129)"), "blokkenschema: svg bevat melder 24 en het onbekende Dinamo-blok van melder 129 (geen verzonnen nummer)");
         Eis(t.Vakken.First(v => v.Melders == "24").Soort == "splitsing", "blokkenschema: melder 24 (kruiswissel) is een splitsing");
+        // BUG #90: melders op de zijde naar het buurblok, kruiswissel als X
+        var kruis = t.Vakken.First(v => v.Melders == "24");
+        Eis(kruis.Vorm == "kruis" && kruis.Chips.Select(c => c.Melder).OrderBy(x => x).SequenceEqual(new[] { 8, 14, 21, 129 }), "blokkenschema: kruiswissel is een X met de melders 14, 129, 21 en 8 in de hoeken (nu " + string.Join(",", kruis.Chips.Select(c => c.Melder)) + ")");
+        Eis(t.Vakken.All(v => v.Chips.Count(c => c.Zijde == -1) == (v.Vorm == "kruis" ? 4 : 0)), "blokkenschema: alleen de kruiswissel heeft hoekmelders");
+        var b3 = t.Vakken.First(v => v.DinamoBlok == 3);
+        Eis(b3.Chips.Select(c => c.Melder).OrderBy(x => x).SequenceEqual(new[] { 5, 13, 14 }), "blokkenschema: blok 3 heeft de grensmelders 5, 13 en 14 als vlakje (nu " + string.Join(",", b3.Chips.Select(c => c.Melder)) + ")");
+        bool eindOpChip = t.Verbindingen.All(vb =>
+        {
+            var va = t.Vakken.First(x => x.Nummer == vb.Van); var vn = t.Vakken.First(x => x.Nummer == vb.Naar);
+            var ca = va.Chips.Where(c => c.Melder == vb.VanMelder || va.Vorm == "kruis").Select(c => c.Anker); var cn = vn.Chips.Where(c => c.Melder == vb.NaarMelder || vn.Vorm == "kruis").Select(c => c.Anker);
+            return ca.Any(p => Math.Abs(p.X - vb.Begin.X) < 0.01 && Math.Abs(p.Y - vb.Begin.Y) < 0.01) && cn.Any(p => Math.Abs(p.X - vb.Eind.X) < 0.01 && Math.Abs(p.Y - vb.Eind.Y) < 0.01);
+        });
+        Eis(eindOpChip, "blokkenschema: elke verbinding begint en eindigt bij het vlakje van haar melder");
+        Eis(t.Vakken.All(v => v.Chips.All(c => c.X > 0 && c.Y > 0 && c.X < t.Breedte && c.Y < t.Hoogte)) && t.Verbindingen.All(vb => vb.LabelPlek.X > 0 && vb.LabelPlek.X < t.Breedte && vb.LabelPlek.Y > 0 && vb.LabelPlek.Y < t.Hoogte), "blokkenschema: melders en labels liggen binnen de tekening");
         var uit = Environment.GetEnvironmentVariable("SCHEMA_UIT");
         if (!string.IsNullOrEmpty(uit)) { File.WriteAllText(uit, svg); Console.WriteLine("  svg geschreven naar " + uit); }
         Eis(Rapport.AlsHtml(k).Contains("<h2>Blokkenschema</h2>") && Rapport.AlsHtml(k).Contains("<svg"), "blokkenschema: het HTML-rapport bevat de tekening");
