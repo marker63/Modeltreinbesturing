@@ -671,6 +671,21 @@ public static class Tests
         Eis(Stand(new Opdracht { Id = 3, Start = 14, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis }).Equals(Configuratie.Basis.Met(13).Met(10)) || Stand(new Opdracht { Id = 3, Start = 14, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis }).Equals(Configuratie.Basis), "vervolg: andere start geeft geen vreemde wissels (kaart: " + Stand(new Opdracht { Id = 3, Start = 14, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis }) + ")");
     }
 
+    // BUG #97 (log 16:03): loc stond op melder 13 andersom, rit "13 achteruit" ging 13 -> 14 en reed de hele baan rond
+    static void LocAndersomTest()
+    {
+        var k = Laad("baankaart_2026-10-11_1608.json");
+        // de kaart bevat de foute rit zelf al (13 14 achteruit bij wissel 1,2): voor de test weghalen
+        k.Overgangen.RemoveAll(x => x.Van == 13 && x.Naar == 14 && x.Richting == Richting.Achteruit);
+        var basis = new List<int> { 13, 5, 16, 15, 8 };
+        var c12 = new Configuratie(new[] { 1, 2 });
+        Eis(BaanVerkenner.IsLocAndersom(k, 13, Richting.Achteruit, 14, basis, c12), "loc andersom: 13 achteruit -> 14 met wissel 1,2 afbuigend wordt herkend");
+        Eis(!BaanVerkenner.IsLocAndersom(k, 13, Richting.Achteruit, 5, basis, c12), "loc andersom: 13 achteruit -> 5 (basisrit) is gewoon goed");
+        k.RegistreerOvergang(13, 14, Richting.Achteruit, new Configuratie(new[] { 13 }), null);
+        Eis(!BaanVerkenner.IsLocAndersom(k, 13, Richting.Achteruit, 14, basis, new Configuratie(new[] { 13 })), "loc andersom: 13 achteruit -> 14 met wissel 13 afbuigend is eerder zo gezien: geen alarm");
+        Eis(!BaanVerkenner.IsLocAndersom(k, 13, Richting.Achteruit, 99, basis, c12), "loc andersom: een onbekende melder is geen bewijs");
+    }
+
     static void StopVoorTerugzettenTest()
     {
         Console.WriteLine("Test: stop naar alle blokken voordat de loc terug gezet moet worden (BUG #94)");
@@ -1001,6 +1016,7 @@ public static class Tests
         TijdelijkeKortsluitingTest();
         KenVervolgTest();
         StopVoorTerugzettenTest();
+        LocAndersomTest();
         KruisAankomstTest();
         OrientatieTekstTest();
         WisselEisenTest();

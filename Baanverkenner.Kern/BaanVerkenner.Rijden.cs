@@ -42,6 +42,8 @@ public class NavigatieFout : Exception
     /// die onverwacht bezet werd.</summary>
     public int? LaatsteGoed { get; init; }
     public int? Onverwacht { get; init; }
+    /// <summary>BUG #97: de loc staat andersom (de eerste melder klopt alleen voor de tegengestelde richting).</summary>
+    public bool LocAndersom { get; init; }
 }
 
 public partial class BaanVerkenner
@@ -724,6 +726,14 @@ public partial class BaanVerkenner
         return uitkomst;
     }
 
+    /// <summary>BUG #97: de eerste stap <paramref name="start"/> -> <paramref name="m"/> volgt de basisrit niet, is in deze richting met deze wisselstand
+    /// nooit gezien, maar hoort wel bij de tegengestelde richting terwijl de basisrit wel bekend is: de loc staat andersom.</summary>
+    internal static bool IsLocAndersom(Baankaart kaart, int start, Richting r, int m, List<int> basis, Configuratie cfg)
+        => basis.Count >= 2 && basis[0] == start && basis[1] != m
+           && kaart.BekendeVolgende(start, r.Om()).Contains(m)
+           && kaart.BekendeVolgende(start, r).Contains(basis[1])
+           && !kaart.Overgangen.Any(x => x.Van == start && x.Naar == m && x.Richting == r && x.GezienBijConfiguraties.Contains(cfg.Sleutel));
+
     private async Task<RitResultaat> RitUitvoeren(int start, Richting r, RitDoel doel)
     {
         var res = new RitResultaat { Richting = r };
@@ -866,6 +876,19 @@ public partial class BaanVerkenner
                         LaatsteGoed = bezet.Where(x => x != m && pad.Contains(x)).OrderByDescending(x => pad.LastIndexOf(x)).Cast<int?>().FirstOrDefault() ?? res.Reeks[^1],
                         Onverwacht = m
                     };
+                }
+
+                // BUG #97 (log 16:03): de loc stond op melder 13 de verkeerde kant op. Rit "13 achteruit" ging 13 -> 14 (dat is vooruit) en de
+                // verkenner liet hem de hele baan rondrijden tot hij bij wissel 2 (afbuigend) kortsluiting kreeg. Stap 1 van een verkenningsrit
+                // die niet de basisrit volgt, terwijl die overgang in deze richting nooit met deze wisselstand is gezien maar wel in de
+                // TEGENGESTELDE richting, betekent: de loc staat andersom. Meteen stoppen, niets vastleggen.
+                if (!doel.IsNavigatie && res.Reeks.Count == 1 && doel.Basis is { Count: >= 2 } bas && IsLocAndersom(_kaart, res.Reeks[0], r, m, bas, doel.Configuratie))
+                {
+                    await StopLoc();
+                    string t = $"De loc reed vanaf melder {res.Reeks[0]} ({r.Tekst()}) naar melder {m}, maar {r.Tekst()} gaat hier naar melder {bas[1]}; naar melder {m} gaat de loc {r.Om().Tekst()}. De loc staat dus andersom (neus de verkeerde kant op). De rit is meteen gestopt, er is niets vastgelegd.";
+                    _kaart.Waarschuwingen.Add(t);
+                    _log.Waarschuwing(t);
+                    throw new NavigatieFout(t) { LaatsteGoed = res.Reeks[0], Onverwacht = m, LocAndersom = true };
                 }
 
                 double? dt = onderbroken ? null : (w.Tijd - tijdVorigeMelder).TotalSeconds;
