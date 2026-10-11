@@ -1159,8 +1159,10 @@ public partial class BaanVerkenner
         bool geschakeld = false;
         while (true)
         {
+            var afb = _wisselStand.Where(kv => kv.Value).Select(kv => kv.Key).OrderBy(x => x).ToList();
+            string verdacht = afb.Count > 0 ? $"\n\nDe verkenner heeft deze wissels op AFBUIGEND gezet en niet teruggezet: {string.Join(", ", afb)}. Dat zijn de eerste verdachten." : "";
             var ja = await VraagJaNee("Staat er een wissel verkeerd?",
-                $"{aanleiding}\n\nStaat er een wissel verkeerd (open gereden, of een motor die niet goed omgeschakeld is)?\n\nJa = je geeft het wisseladres op en de verkenner schakelt die wissel meteen.\nNee = je zet de loc met de hand terug.\nAnnuleren = de verkenning stopt.");
+                $"{aanleiding}{verdacht}\n\nStaat er een wissel verkeerd (open gereden, of een motor die niet goed omgeschakeld is)?\n\nJa = je geeft het wisseladres op en de verkenner schakelt die wissel meteen.\nNee = je zet de loc met de hand terug.\nAnnuleren = de verkenning stopt.");
             if (ja is null) throw new OperationCanceledException("Gebruiker stopte bij het terugzetten van de loc.");
             if (ja == false) break;
             var adres = await VraagWisselAdres("Welke wisselmotor?", $"Welk wisseladres staat verkeerd? ({_ins.WisselAdressen().First()} t/m {_ins.WisselAdressen().Last()})");
