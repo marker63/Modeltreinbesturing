@@ -89,6 +89,10 @@ public interface IHardwareInterface
     /// gaat vóór deze standaardimplementatie).</summary>
     void VraagMelderStatusOp(int meldernummer) { }
 
+    /// <summary>BUG #101: geeft de laatst bekende stand van alle melders (ook wat de centrale bij het verbinden meldde) opnieuw door via
+    /// BezetmeldingGewijzigd. Nodig omdat de Dinamo melder-aanvragen niet beantwoordt. Standaard doet dit niets.</summary>
+    void HerhaalBekendeMelderStanden() { }
+
     /// <summary>Meldt een gewijzigde bezetmelding: (meldernummer, bezet).</summary>
     event Action<int, bool>? BezetmeldingGewijzigd;
 

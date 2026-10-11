@@ -316,6 +316,7 @@ public partial class BaanVerkenner
         {
             _log.Stap($"Stand van melder 1 t/m {_ins.HoogsteMelder} opvragen…");
             for (int m = 1; m <= _ins.HoogsteMelder; m++) _hw.VraagMelderStatusOp(m);
+            _hw.HerhaalBekendeMelderStanden(); // BUG #101: de Dinamo beantwoordt de aanvragen niet; de laatst gemelde stand wel gebruiken
             await Wacht(DinamoCyclus * (_ins.HoogsteMelder + 5) + TimeSpan.FromMilliseconds(_ins.OntdenderMs));
         }
         else await Wacht(TimeSpan.FromMilliseconds(_ins.OntdenderMs + 500));

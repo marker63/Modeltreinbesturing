@@ -734,6 +734,32 @@ public static class Tests
         Eis(c2.Equals(c), "bots: tweede aanroep geeft dezelfde uitkomst");
     }
 
+    // BUG #101 (log 16:35): de loc stond al op melder 13; de stand die de Dinamo bij het verbinden meldde werd weggegooid en aanvragen worden niet beantwoord
+    static void OpstartStandTest()
+    {
+        Console.WriteLine("Test: stand uit de opstartfase wordt bewaard en doorgegeven (BUG #101)");
+        var hw = new Modeltreinbesturing.Hardware.DinamoHardware();
+        var t = typeof(Modeltreinbesturing.Hardware.DinamoHardware);
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        t.GetField("_poort", bf)!.SetValue(hw, new System.IO.Ports.SerialPort("COM0", 19200, System.IO.Ports.Parity.Odd, 8, System.IO.Ports.StopBits.One));
+        var buf = (List<byte>)t.GetField("_ontvangstBuffer", bf)!.GetValue(hw)!;
+        var opstart = t.GetField("_opstartFaseActief", bf)!;
+        var verwerk = t.GetMethod("VerwerkOntvangenData", bf)!;
+        void Voer(string hex) { buf.AddRange(Convert.FromHexString(hex)); verwerk.Invoke(hw, null); }
+        opstart.SetValue(hw, true);
+        // zo meldde de Dinamo bij het verbinden (log 16:35): melder 14 bezet, melder 13 knippert en blijft bezet, melder 14 vrij
+        foreach (var f in new[] { "0AD08D99", "4AD08CDA", "0AC08CAA", "4AD08CDA", "0AC08DA9" }) Voer(f);
+        opstart.SetValue(hw, false);
+        var ontvangen = new List<(int, bool)>();
+        hw.BezetmeldingGewijzigd += (m, b) => ontvangen.Add((m, b));
+        hw.HerhaalBekendeMelderStanden();
+        Eis(ontvangen.Count == 1 && ontvangen[0] == (13, true), "opstartstand: alleen melder 13 bezet wordt doorgegeven (nu " + string.Join(",", ontvangen) + ")");
+        Voer("0AC08CAA"); // melder 13 daarna vrij
+        ontvangen.Clear();
+        hw.HerhaalBekendeMelderStanden();
+        Eis(ontvangen.Count == 0, "opstartstand: een latere wijziging (13 vrij) wint van de opstartstand");
+    }
+
     static void StopVoorTerugzettenTest()
     {
         Console.WriteLine("Test: stop naar alle blokken voordat de loc terug gezet moet worden (BUG #94)");
@@ -1068,6 +1094,7 @@ public static class Tests
         VoorspeldPadTest();
         KruisIngangTest();
         BotsendeOplossingenTest();
+        OpstartStandTest();
         KruisAankomstTest();
         OrientatieTekstTest();
         WisselEisenTest();

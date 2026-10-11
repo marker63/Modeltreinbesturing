@@ -1547,3 +1547,12 @@ voor deze overgang bewezen kent (5 en 10 afbuigend, 13 rechtdoor; 24->129 achter
 Oorzaak daarvan niet bewezen. Nog niet getest op de baan.
 De kaart van 16:29 is volledig bruikbaar: de 60 verdachte overgangen (telling 1, spiegel van een overgang met telling 38-48) worden bij
 hervatten door `VerwijderSpiegelOvergangen` (#98) opgeruimd; de echte data blijft.
+
+## #101 - Loc die al goed staat blijft onzichtbaar bij hervatten (log 16:35: "Melder 13 meldt zich niet bezet (bezet: geen)")
+Oorzaak (uit alle hardwarelogs van 10 en 11 oktober: 0 van ~2400 melder-aanvragen werd ooit beantwoord): de Dinamo beantwoordt
+`VraagMelderStatusOp` niet; hij meldt alleen wijzigingen. De stand die hij bij het verbinden meldt (hier: melder 13 bezet) werd in de
+opstartfase bewust niet doorgegeven (anders onderdrukt de wijzigingscontrole het latere antwoord) en daarna nergens meer gebruikt. Stond de loc
+al goed en pakte je hem niet op, dan kwam er nooit een bericht en dacht de verkenner dat er niets bezet was: drie keer "loc terugzetten", daarna gestopt.
+Fix: `DinamoHardware` onthoudt de laatst gemelde stand per melder (ook uit de opstartfase) en geeft die via het nieuwe
+`IHardwareInterface.HerhaalBekendeMelderStanden()` door; `BepaalStart` roept dat aan direct na de aanvragen. Latere wijzigingen winnen altijd.
+Test: `OpstartStandTest` (met de echte frames uit het log). Nog niet getest op de baan; WPF-project niet te compileren hier.

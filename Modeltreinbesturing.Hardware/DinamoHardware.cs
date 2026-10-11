@@ -911,6 +911,21 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
     /// werken.</summary>
     private readonly Dictionary<int, bool> _laatstDoorgegevenStatus = new();
 
+    private readonly object _bekendeStandSlot = new();
+    private readonly Dictionary<int, bool> _bekendeStand = new();
+
+    /// <summary>BUG #101: zie <see cref="IHardwareInterface.HerhaalBekendeMelderStanden"/>. Alleen bezette melders worden doorgegeven (vrij is de beginstand).</summary>
+    public void HerhaalBekendeMelderStanden()
+    {
+        List<int> bezet;
+        lock (_bekendeStandSlot) bezet = _bekendeStand.Where(kv => kv.Value).Select(kv => kv.Key).OrderBy(x => x).ToList();
+        foreach (var m in bezet)
+        {
+            _laatstDoorgegevenStatus[m] = true;
+            BezetmeldingGewijzigd?.Invoke(m, true);
+        }
+    }
+
     /// <summary>BUG #45: DataReceived kan op meerdere threads tegelijk binnenkomen. Zonder slot
     /// raceden die om _ontvangstBuffer en _dinamoMeldeFoutVorigeKeer - zichtbaar in het log
     /// als twee keer dezelfde "foutstatus gemeld/opgeheven"-regel binnen 1 ms. Nu strikt
@@ -956,6 +971,15 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
                 // onze events geabonneerd en worden alle melders daarna toch opnieuw opgevraagd.
                 // Een event nu "doorgeven" zou alleen _laatstDoorgegevenStatus vullen en het
                 // latere antwoord op de statusopvraag dan als "ongewijzigd" onderdrukken.
+                // BUG #101: ook wat de Dinamo tijdens het verbinden meldt is de echte stand (log 16:35: loc stond al op melder 13, de verkenner
+                // zag niets omdat de Dinamo melder-aanvragen nooit beantwoordt). Hier alleen onthouden; HerhaalBekendeMelderStanden geeft het door.
+                if (aantalDataBytes >= 2 && _opstartFaseActief)
+                {
+                    byte d1 = (byte)(_ontvangstBuffer[i + 1] & 0x7F);
+                    byte d2 = (byte)(_ontvangstBuffer[i + 2] & 0x7F);
+                    if ((d1 & 0x7C) != 0x30 && (d1 & 0x40) == 0x40)
+                        lock (_bekendeStandSlot) _bekendeStand[(((d1 & 0x0F) << 7) | d2) + 1] = (d1 & 0x10) != 0;
+                }
                 if (aantalDataBytes >= 2 && !_opstartFaseActief)
                 {
                     byte data1 = (byte)(_ontvangstBuffer[i + 1] & 0x7F);
@@ -991,6 +1015,7 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
                         // eerste keer dat dit adres gezien wordt) - een periodieke
                         // herbevestiging die slechts "nog steeds dezelfde status" meldt
                         // mag hier NOOIT als een nieuwe gebeurtenis doorkomen.
+                        lock (_bekendeStandSlot) _bekendeStand[adres] = bezet;
                         if (!_laatstDoorgegevenStatus.TryGetValue(adres, out bool vorigeStatus) || vorigeStatus != bezet)
                         {
                             _laatstDoorgegevenStatus[adres] = bezet;
