@@ -225,6 +225,8 @@ public class Baankaart
     public List<Doorgang> Doorgangen { get; set; } = new();
     public List<int> AdressenZonderEffect { get; set; } = new();
     public List<VoorgesteldBlok> VoorgesteldeBlokken { get; set; } = new();
+    /// <summary>BUG #78: voorstel voor wisselstraten per gereden overgang (zie <see cref="WisselstraatVoorstel"/>). Oudere kaarten: leeg.</summary>
+    public List<WisselstraatVoorstel> Wisselstraatvoorstellen { get; set; } = new();
     public List<string> Waarschuwingen { get; set; } = new();
 
     // ---- Hulpmethoden voor het vastleggen ----
@@ -321,18 +323,22 @@ public class Baankaart
     /// die tak staan; rijdend van R of A terug naar N (van achteren, andere richting) moet hij ook op die tak staan, anders wordt hij open gereden
     /// of volgt kortsluiting. Een omgekeerde overgang uit de kaart (X->Y gezien, dus Y->X ook) zegt hier niets over: die zegt niet in welke stand
     /// de wissel stond toen er van achteren doorheen gereden werd.</summary>
-    public List<(int Adres, bool Afbuigend)> WisselEisenVoorStap(int van, int naar, Richting r)
+    public List<(int Adres, bool Afbuigend)> WisselEisenVoorStap(int van, int naar, Richting r) =>
+        WisselEisenVoorStapDetail(van, naar, r).Select(e => (e.Adres, e.Afbuigend)).Distinct().ToList();
+
+    /// <summary>Zelfde als <see cref="WisselEisenVoorStap"/>, met erbij of de stap van achteren door de wissel gaat (BUG #78).</summary>
+    public List<(int Adres, bool Afbuigend, bool Achter)> WisselEisenVoorStapDetail(int van, int naar, Richting r)
     {
-        var res = new List<(int, bool)>();
+        var res = new List<(int, bool, bool)>();
         foreach (var w in Wissels)
             foreach (var o in w.Waarnemingen.Where(x => x.Soort == WaarnemingSoort.Splitsing))
             {
                 bool kop = van == o.NaMelder && r == o.Richting;
                 bool achter = naar == o.NaMelder && r == o.Richting.Om();
-                if (kop && o.VolgendeBijRechtdoor == naar) res.Add((w.Adres, false));
-                else if (kop && o.VolgendeBijAfbuigend == naar) res.Add((w.Adres, true));
-                else if (achter && o.VolgendeBijRechtdoor == van) res.Add((w.Adres, false));
-                else if (achter && o.VolgendeBijAfbuigend == van) res.Add((w.Adres, true));
+                if (kop && o.VolgendeBijRechtdoor == naar) res.Add((w.Adres, false, false));
+                else if (kop && o.VolgendeBijAfbuigend == naar) res.Add((w.Adres, true, false));
+                else if (achter && o.VolgendeBijRechtdoor == van) res.Add((w.Adres, false, true));
+                else if (achter && o.VolgendeBijAfbuigend == van) res.Add((w.Adres, true, true));
             }
         return res.Distinct().ToList();
     }

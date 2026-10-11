@@ -340,6 +340,88 @@ public static class Tests
         if (Environment.GetEnvironmentVariable("UITBREIDEN_LOG") == "1") Console.WriteLine(log2.AlsTekst());
     }
 
+    // BUG #79: eerst vragen of er een wissel verkeerd staat, die dan meteen schakelen
+    static void VerkeerdeWisselVraagTest()
+    {
+        bool? Antw(Queue<bool?> q) => q.Dequeue();
+        (BaanVerkenner v, Baanverkenner.Kern.Simulatie.SimulatieBaan sim) Maak(Queue<bool?> jn, Queue<int?> ad)
+        {
+            var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
+            var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+            var s1 = sim.NieuweSectie(1, 80, 1); var s2 = sim.NieuweSectie(2, 80, 2);
+            sim.Verbind(s1, B, s2, A);
+            sim.PlaatsLoc(s1, 40, +1);
+            var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 4, DinamoBlokken = "1-2" };
+            sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+            var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+            var v = new BaanVerkenner(sim, ins, klok, new VerkenLog(klok), (_, _) => Task.FromResult(true), new VerkenStatus { Instellingen = ins })
+            { VraagJaNee = (_, _) => Task.FromResult(jn.Dequeue()), VraagWisselAdres = (_, _) => Task.FromResult(ad.Dequeue()) };
+            return (v, sim);
+        }
+        var m = typeof(BaanVerkenner).GetMethod("ControleerVerkeerdeWissel", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        Task<bool> Roep(BaanVerkenner v)
+        {
+            // de monitor wordt normaal door VoerUit gevoed; hier melden we de loc zelf op melder 1
+            var mon = (MelderMonitor)typeof(BaanVerkenner).GetField("_monitor", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(v)!;
+            mon.Ontvang(1, true);
+            return (Task<bool>)m.Invoke(v, new object[] { 1, "test" })!;
+        }
+        // Ja, adres 3, afbuigend, daarna Nee: wissel geschakeld en loc staat al goed
+        var jn1 = new Queue<bool?>(new bool?[] { true, true, false }); var ad1 = new Queue<int?>(new int?[] { 3 });
+        var (v1, _) = Maak(jn1, ad1);
+        bool klaar = Roep(v1).GetAwaiter().GetResult();
+        Eis(klaar && jn1.Count == 0 && ad1.Count == 0, "wissel verkeerd: Ja -> adres -> stand -> Nee schakelt de wissel en de loc hoeft niet verplaatst (nu " + klaar + ")");
+        // Nee meteen: false, dan valt VraagLocTerugTeZetten terug op het verplaatsen
+        var (v2, _) = Maak(new Queue<bool?>(new bool?[] { false }), new Queue<int?>());
+        Eis(!Roep(v2).GetAwaiter().GetResult(), "wissel verkeerd: Nee -> loc met de hand verplaatsen (geeft false)");
+        // Annuleren
+        var (v3, _) = Maak(new Queue<bool?>(new bool?[] { null }), new Queue<int?>());
+        bool gestopt = false;
+        try { Roep(v3).GetAwaiter().GetResult(); } catch (OperationCanceledException) { gestopt = true; }
+        Eis(gestopt, "wissel verkeerd: Annuleren stopt de verkenning");
+        // adres buiten bereik wordt genegeerd, daarna Nee
+        var (v4, _) = Maak(new Queue<bool?>(new bool?[] { true, false }), new Queue<int?>(new int?[] { 99 }));
+        Eis(!Roep(v4).GetAwaiter().GetResult(), "wissel verkeerd: adres buiten bereik wordt genegeerd");
+    }
+
+    // BUG #78 (B): wisselstraten uit de voorstellen importeren
+    static void WisselstraatImportTest()
+    {
+        var bb = new BlokBeheerder();
+        Blok MaakBlok(int nr, int melder) { var b = new Blok { Nummer = nr }; b.Bezetmeldpunten.Add(new Bezetmeldpunt { MeldernNummer = melder, Rol = BezetmeldpuntRol.Voorblok }); bb.Blokken.Add(b); return b; }
+        var b1 = MaakBlok(1, 14); var b2 = MaakBlok(2, 129); var b3 = MaakBlok(3, 24); var b4 = MaakBlok(4, 21);
+        bb.LegRelatieVast(b1, b2); bb.LegRelatieVast(b1, b3); bb.LegRelatieVast(b3, b4);
+        var w5 = new Wissel { Adres = 5 };
+        var kw = new Kruiswissel { Adres = 13, Adres2 = 10, IsEngels = true };
+        var k = new Baankaart();
+        k.Wisselstraatvoorstellen.Add(new WisselstraatVoorstel { VanMelder = 14, NaarMelder = 129, Richting = Richting.Vooruit, AantalKeer = 3, Standen = "5", Eisen = { new WisselEis { Adres = 5, Afbuigend = true, Bron = EisBron.Splitsing } } });
+        k.Wisselstraatvoorstellen.Add(new WisselstraatVoorstel { VanMelder = 14, NaarMelder = 24, Richting = Richting.Vooruit, AantalKeer = 5, Standen = "10", Eisen = { new WisselEis { Adres = 5, Afbuigend = false, Bron = EisBron.Splitsing } } });
+        // kruiswissel: eis alleen op motor 10 (rechtdoor), motor 13 afbuigend in de gereden stand
+        k.Wisselstraatvoorstellen.Add(new WisselstraatVoorstel { VanMelder = 24, NaarMelder = 21, Richting = Richting.Vooruit, AantalKeer = 2, Standen = "13", Eisen = { new WisselEis { Adres = 10, Afbuigend = false, Bron = EisBron.Aangenomen } } });
+        // melder zonder blok en onbekende wissel
+        k.Wisselstraatvoorstellen.Add(new WisselstraatVoorstel { VanMelder = 99, NaarMelder = 14, Richting = Richting.Vooruit, AantalKeer = 1, Eisen = { new WisselEis { Adres = 5, Afbuigend = true, Bron = EisBron.Splitsing } } });
+        k.Wisselstraatvoorstellen.Add(new WisselstraatVoorstel { VanMelder = 14, NaarMelder = 129, Richting = Richting.Vooruit, AantalKeer = 1, Standen = "5,77", Eisen = { new WisselEis { Adres = 5, Afbuigend = true, Bron = EisBron.Splitsing }, new WisselEis { Adres = 77, Afbuigend = true, Bron = EisBron.Aangenomen } } });
+        var res = new WisselstraatImporter().Importeer(k, bb, new[] { w5 }, new[] { kw }, new List<Wisselstraat>());
+        var a = res.Nieuw.FirstOrDefault(w => w.Van == b1 && w.Naar == b2);
+        Eis(a is { Volgnummer: 1 } && a.Wissels.Count == 1 && a.Wissels[0].Wissel == w5 && a.Wissels[0].GewensteStand == WisselStand.Afbuigend, "wisselstraat-import: 1 -> 2 vraagt wissel 5 afbuigend");
+        Eis(res.Nieuw.Count(w => w.Van == b1 && w.Naar == b2) == 1, "wisselstraat-import: alternatief met onbekende wissel 77 wordt overgeslagen");
+        Eis(res.Meldingen.Any(m => m.Omschrijving.Contains("77")), "wisselstraat-import: onbekende wissel 77 wordt gemeld");
+        var b = res.Nieuw.FirstOrDefault(w => w.Van == b1 && w.Naar == b3);
+        Eis(b is not null && b.Wissels[0].GewensteStand == WisselStand.Rechtdoor, "wisselstraat-import: 1 -> 3 vraagt wissel 5 rechtdoor");
+        var c = res.Nieuw.FirstOrDefault(w => w.Van == b3 && w.Naar == b4);
+        Eis(c is not null && c.Kruiswisselstanden.Count == 1 && c.Kruiswisselstanden[0].StandAdres2 == WisselStand.Rechtdoor && c.Kruiswisselstanden[0].StandAdres == WisselStand.Afbuigend,
+            "wisselstraat-import: kruiswissel krijgt eis op motor 10 en de overige motor uit de gereden stand (13 afbuigend)");
+        Eis(res.Meldingen.Any(m => m.Ernst == "Waarschuwing" && m.Omschrijving.Contains("aangenomen")), "wisselstraat-import: aangenomen eis krijgt een waarschuwing");
+        Eis(!res.Nieuw.Any(w => w.Naar == b1), "wisselstraat-import: melder zonder blok geeft geen wisselstraat");
+        // bestaand blokpaar niet overschrijven; zonder relatie geen wisselstraat
+        var vast = new Wisselstraat { Van = b1, Naar = b2 };
+        var res2 = new WisselstraatImporter().Importeer(k, bb, new[] { w5 }, new[] { kw }, new[] { vast });
+        Eis(!res2.Nieuw.Any(w => w.Van == b1 && w.Naar == b2), "wisselstraat-import: bestaande wisselstraat voor 1 -> 2 wordt niet aangeraakt");
+        var bb2 = new BlokBeheerder(); bb2.Blokken.AddRange(bb.Blokken);
+        var res3 = new WisselstraatImporter().Importeer(k, bb2, new[] { w5 }, new[] { kw }, new List<Wisselstraat>());
+        Eis(res3.IsLeeg, "wisselstraat-import: zonder BlokRelatie komt er geen wisselstraat");
+    }
+
     // BUG #75: de tweede bezette melder bij een kortsluiting wijst de betrokken wissel aan
     static void TweedeMelderTest()
     {
@@ -372,6 +454,34 @@ public static class Tests
         var n3 = k.MetWisselEisen(new List<int> { 14, 24, 21 }, Richting.Vooruit, new Configuratie(new[] { 5 }), out _);
         Eis(n3.Equals(Configuratie.Basis), "wisselEisen: 14 -> 24 vooruit vraagt wissel 5 rechtdoor (nu " + n3 + ")");
         Eis(k.MetWisselEisen(new List<int> { 30, 20, 27 }, Richting.Vooruit, c, out var w5).Equals(c) && w5.Count == 0, "wisselEisen: gewoon spoor zonder wissels verandert niets");
+    }
+
+    // BUG #78: wisselstraten-voorstel uit de baankaart van 19:03
+    static void WisselstratenTest()
+    {
+        var k = Laad("baankaart_2026-10-10_1903_doorgangen.json");
+        var v = WisselstraatVoorstel.Bereken(k);
+        if (Environment.GetEnvironmentVariable("STRATEN_UIT") == "1") foreach (var x in v) Console.WriteLine($"  blok {x.VanBlok}->{x.NaarBlok} {x.Richting} {x.VanMelder}->{x.NaarMelder} [{x.Standen}] {x.EisenTekst}");
+        WisselstraatVoorstel? Zoek(int van, int naar, Richting r) => v.FirstOrDefault(x => x.VanMelder == van && x.NaarMelder == naar && x.Richting == r);
+        var a = Zoek(14, 129, Richting.Vooruit);
+        Eis(a is not null && a.Eisen.Any(e => e.Adres == 5 && e.Afbuigend), "wisselstraat: 14 -> 129 vooruit vraagt wissel 5 afbuigend");
+        var b = Zoek(14, 24, Richting.Vooruit);
+        Eis(b is not null && b.Eisen.Any(e => e.Adres == 5 && !e.Afbuigend && e.Bron == EisBron.Splitsing), "wisselstraat: 14 -> 24 vooruit vraagt wissel 5 rechtdoor (uit splitsing)");
+        var c = Zoek(24, 8, Richting.Vooruit);
+        Eis(c is not null && c.Eisen.Any(e => e.Adres == 5 && e.Afbuigend) && c.Eisen.Any(e => e.Adres == 10 && e.Afbuigend), "wisselstraat: 24 -> 8 vooruit vraagt wissel 5 en 10 afbuigend");
+        var d = Zoek(24, 21, Richting.Vooruit);
+        Eis(d is not null && d.Eisen.Any(e => e.Adres == 10 && !e.Afbuigend && e.Bron == EisBron.Kortsluiting), "wisselstraat: 24 -> 21 vooruit vraagt wissel 10 rechtdoor (anders kortsluiting)");
+        var t = v.Where(x => x.VanMelder == 129 && x.NaarMelder == 14 && x.Richting == Richting.Achteruit).ToList();
+        Eis(t.Count == 1 && t[0].Eisen.Count == 1 && t[0].Eisen[0].Adres == 5 && t[0].Eisen[0].Afbuigend, "wisselstraat: 129 -> 14 achteruit: alleen wissel 5 afbuigend (de gereden stand met 10 erbij is overbodig, en van achteren telt de splitsing) (nu " + string.Join(" | ", t.Select(x => x.EisenTekst)) + ")");
+        var e1 = Zoek(24, 21, Richting.Vooruit);
+        Eis(e1 is not null && e1.Eisen.Any(e => e.Adres == 10 && !e.Afbuigend), "wisselstraat: 24 -> 21 vooruit vraagt wissel 10 rechtdoor");
+        Eis(!v.Any(x => x.VanBlok == x.NaarBlok), "wisselstraat: geen voorstel binnen een blok");
+        Eis(!v.Any(x => x.VanMelder == 20 && x.NaarMelder == 27), "wisselstraat: 20 -> 27 (zelfde blok) heeft geen voorstel");
+        var alt = v.Where(x => x.VanMelder == 13 && x.NaarMelder == 24 && x.Richting == Richting.Vooruit).ToList();
+        Eis(alt.Count == 3 && alt.All(x => x.Eisen.Count(e => e.Afbuigend) == 1), "wisselstraat: 13 -> 24 geeft drie alternatieven (wissel 11, 12 of 13 afbuigend) (nu " + alt.Count + ": " + string.Join(" | ", alt.Select(x => x.EisenTekst)) + ")");
+        var terug = Baankaart.VanJson((new Baankaart { Wisselstraatvoorstellen = v }).AlsJson())!;
+        Eis(terug.Wisselstraatvoorstellen.Count == v.Count && Baankaart.VanJson(new Baankaart().AlsJson())!.Wisselstraatvoorstellen.Count == 0, "wisselstraat: voorstellen blijven na opslaan en laden; lege kaart heeft er geen");
+        Eis(Rapport.AlsTekst(k).Contains("WISSELSTRATEN") && Rapport.AlsHtml(k).Contains("Wisselstraten (voorstel)"), "wisselstraat: staat in het rapport (tekst en html)");
     }
 
     // Blokkenschema-tekening (SVG) uit de baankaart van 17:07
@@ -493,7 +603,10 @@ public static class Tests
         DoorgangTest();
         UitbreidenTest();
         TweedeMelderTest();
+        VerkeerdeWisselVraagTest();
+        WisselstraatImportTest();
         WisselEisenTest();
+        WisselstratenTest();
 
         Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)");
         return _fouten == 0 ? 0 : 1;

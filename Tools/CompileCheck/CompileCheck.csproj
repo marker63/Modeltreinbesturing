@@ -14,6 +14,7 @@
     <Compile Include="../../Modeltreinbesturing/BlokBeheerder.cs" />
     <Compile Include="../../Modeltreinbesturing/RijrichtingImporter.cs" />
     <Compile Include="../../Modeltreinbesturing/BaankaartImporter.cs" />
+    <Compile Include="../../Modeltreinbesturing/WisselstraatImporter.cs" />
     <Compile Include="../../Modeltreinbesturing/DienstAanvuller.cs" />
     <Compile Include="../../Modeltreinbesturing/TreinrouteBeheerder.cs" />
     <Compile Include="../../Modeltreinbesturing/RichtingsverbodBeheerder.cs" />

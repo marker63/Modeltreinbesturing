@@ -122,6 +122,13 @@ public partial class BaanVerkenner
     /// <summary>Wordt na elke rit aangeroepen zodat het programma het profiel kan bewaren.</summary>
     public Action<LeerProfiel>? ProfielBijgewerkt { get; set; }
 
+    /// <summary>BUG #79: Ja/Nee/Annuleren-vraag aan de gebruiker (true = Ja, false = Nee, null = Annuleren). Samen met
+    /// <see cref="VraagWisselAdres"/> gebruikt om eerst te vragen of er een wissel verkeerd staat, voordat de loc verplaatst moet worden.
+    /// Niet ingesteld (bijv. in tests) = alleen de loc-terugzetvraag.</summary>
+    public Func<string, string, Task<bool?>>? VraagJaNee { get; set; }
+    /// <summary>BUG #79: vraagt een wisseladres (null = geannuleerd).</summary>
+    public Func<string, string, Task<int?>>? VraagWisselAdres { get; set; }
+
     public VerkenLog Log => _log;
     public Baankaart Kaart => _kaart;
     public VerkenStatus Status => _status;
@@ -1253,6 +1260,7 @@ public partial class BaanVerkenner
         foreach (var k in _kaart.Kortsluitpunten.Where(k => k.OpgelostDoorAdres is not null)) gevonden.Add(k.OpgelostDoorAdres!.Value);
         _kaart.AdressenZonderEffect = _ins.WisselAdressen().Where(a => !gevonden.Contains(a)).ToList();
         _kaart.VoorgesteldeBlokken = BlokVoorstel.Bereken(_kaart);
+        _kaart.Wisselstraatvoorstellen = WisselstraatVoorstel.Bereken(_kaart);
         _kaart.Voltooid = true;
         _fase = "Voltooid";
         _bezig = "";

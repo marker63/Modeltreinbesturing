@@ -1399,3 +1399,13 @@ Overige waarnemingen uit dit log (NIET opgelost):
 - Wissels 11, 12 en 13 geven alle drie afzonderlijk dezelfde uitkomst (13 -> 24 zonder 14): vraag aan Marco welke adressen fysiek bij elkaar horen.
 - Idee: wissels niet omzetten zolang de loc op twee melders staat (de staart zit dan nog op de wissel). Zie ONDERZOEK_ANDERE_SOFTWARE.md punt 5.
 Onderzoek naar Rocrail, Win-Digipet, JMRI en de NMRA-normen: `Modeltreinbesturing/ONDERZOEK_ANDERE_SOFTWARE.md`.
+
+## #78 - Baanverkenner: wisselstraten meteen mee afleiden (A) en importeren in Modeltreinbesturing (B) (Marco 07:53/07:56)
+- A (`Baanverkenner.Kern/Wisselstraten.cs`): per gereden overgang een voorstel met de benodigde wissels en standen, uit wat de verkenning al weet (splitsingen, kortsluiting bij omzetten, gereden stand als "aangenomen"). Er wordt niets extra gereden. Staat in het rapport ("Wisselstraten (voorstel)") en in de baankaart-JSON. Alternatieven (bijv. 13 -> 24 via wissel 11, 12 of 13) worden apart getoond.
+- B (`Modeltreinbesturing/WisselstraatImporter.cs`, gekoppeld in `BaankaartImporteren_Click`): eerst een voorbeeld met meldingen, pas na "Ja" worden de wisselstraten toegevoegd. Alleen waar een BlokRelatie bestaat; een blokpaar dat al een wisselstraat heeft blijft ongemoeid; wissels die niet op het baanontwerp staan worden gemeld en de wisselstraat wordt dan overgeslagen; een kruiswissel krijgt beide motoren (eis + overige motor uit de gereden stand); alternatieven krijgen Volgnummer op volgorde van aantal keer gezien. "Aangenomen" eisen geven een waarschuwing.
+- C (actief controleren door de straat echt te rijden) is NIET gebouwd; eerst aan Marco vragen of hij dat wil.
+- Test: CompileCheck `WisselstratenTest` en `WisselstraatImportTest`. De WPF-koppeling is hier niet te compileren. Nog niet getest op de baan.
+
+## #79 - Baanverkenner: eerst vragen "Staat er een wissel verkeerd?" voordat de loc verplaatst moet worden (Marco 07:59)
+- Bij `VraagLocTerugTeZetten` komt eerst Ja/Nee/Annuleren: Ja = adres van de wisselmotor vragen en die meteen (opnieuw) schakelen (naar de stand die het programma bedoelde, anders eerst vragen welke stand); herhaalbaar voor meerdere wissels. Staat de loc daarna alleen op de melder, dan hoeft hij niet verplaatst. Nee = de oude vraag om de loc te verplaatsen. Annuleren stopt de verkenning.
+- Test: CompileCheck `VerkeerdeWisselVraagTest`. De dialogen in het WPF-venster (`VraagJaNeeGebruiker`, `VraagAdresGebruiker`) zijn hier niet gecompileerd. Nog niet getest op de baan.

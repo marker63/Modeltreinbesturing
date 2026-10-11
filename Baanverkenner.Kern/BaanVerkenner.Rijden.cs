@@ -1151,12 +1151,64 @@ public partial class BaanVerkenner
         await VraagLocTerugTeZetten(melder, $"Er was een kortsluiting of ontsporing direct na melder {melder} en de loc kon niet zelf terugrijden.");
     }
 
+    /// <summary>BUG #79: vraagt of er een wissel verkeerd staat; zo ja welke, en schakelt die meteen (opnieuw). Geeft true als de loc daarna
+    /// al precies op <paramref name="melder"/> staat (dan hoeft hij niet verplaatst te worden).</summary>
+    private async Task<bool> ControleerVerkeerdeWissel(int melder, string aanleiding)
+    {
+        if (VraagJaNee is null || VraagWisselAdres is null) return false;
+        bool geschakeld = false;
+        while (true)
+        {
+            var ja = await VraagJaNee("Staat er een wissel verkeerd?",
+                $"{aanleiding}\n\nStaat er een wissel verkeerd (open gereden, of een motor die niet goed omgeschakeld is)?\n\nJa = je geeft het wisseladres op en de verkenner schakelt die wissel meteen.\nNee = je zet de loc met de hand terug.\nAnnuleren = de verkenning stopt.");
+            if (ja is null) throw new OperationCanceledException("Gebruiker stopte bij het terugzetten van de loc.");
+            if (ja == false) break;
+            var adres = await VraagWisselAdres("Welke wisselmotor?", $"Welk wisseladres staat verkeerd? ({_ins.WisselAdressen().First()} t/m {_ins.WisselAdressen().Last()})");
+            if (adres is not int a) continue;
+            if (!_ins.WisselAdressen().Contains(a))
+            {
+                _log.Waarschuwing($"Adres {a} ligt niet in het geteste bereik ({_ins.WisselAdressen().First()} t/m {_ins.WisselAdressen().Last()}); genegeerd.");
+                continue;
+            }
+            bool afbuigend;
+            if (_wisselStand.TryGetValue(a, out var bekend)) afbuigend = bekend; // de stand die het programma bedoelde: opnieuw sturen herstelt een open gereden motor
+            else
+            {
+                var stand = await VraagJaNee("Welke stand?", $"Moet wissel {a} op AFBUIGEND staan?\n\nJa = afbuigend\nNee = rechtdoor");
+                if (stand is null) throw new OperationCanceledException("Gebruiker stopte bij het terugzetten van de loc.");
+                afbuigend = stand == true;
+            }
+            _log.Info($"Op verzoek van de gebruiker wordt wissel {a} opnieuw naar {(afbuigend ? "afbuigend" : "rechtdoor")} geschakeld.");
+            await ZetWissel(a, afbuigend, forceer: true);
+            geschakeld = true;
+        }
+        if (!geschakeld) return false;
+        _kortsluitingGemeld = false;
+        if (_hw.KanMelderStatusOpvragen)
+        {
+            _hw.VraagMelderStatusOp(melder);
+            foreach (var m in _monitor.Bezet) _hw.VraagMelderStatusOp(m);
+        }
+        await Wacht(TimeSpan.FromSeconds(2));
+        _monitor.Bijwerken();
+        var bezet = _monitor.Bezet;
+        if (bezet.Count == 1 && bezet.Contains(melder))
+        {
+            _log.Info($"De loc staat al op melder {melder}; verder zonder de loc te verplaatsen.");
+            return true;
+        }
+        return false;
+    }
+
     /// <summary>Vraagt de gebruiker de loc met de hand op een melder te zetten, en
     /// controleert daarna of die melder echt (alleen) bezet is.</summary>
     private async Task VraagLocTerugTeZetten(int melder, string aanleiding)
     {
         for (int poging = 1; poging <= 3; poging++)
         {
+            // BUG #79 (Marco 07:59: "wisselmotor 10 stond verkeerd"): eerst vragen of er een wissel verkeerd staat en die dan meteen schakelen;
+            // alleen als dat niet zo is (of de loc daarna nog niet goed staat) moet de loc met de hand verplaatst worden.
+            if (poging == 1 && await ControleerVerkeerdeWissel(melder, aanleiding)) return;
             bool verder = await _vraag(
                 "Loc terugzetten",
                 $"{aanleiding}\n\nZet de testloc (adres {_ins.LocAdres}) met de hand op melder {melder}, zodat ALLEEN die melder bezet is. Controleer ook of de loc niet ontspoord is.\n\nKlik daarna op OK. (Annuleren stopt de verkenning.)");

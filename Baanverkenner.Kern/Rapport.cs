@@ -212,6 +212,18 @@ ul{margin:6px 0 0 18px;padding:0}
             sb.Append("</table>");
         }
 
+        // BUG #78: wisselstraten (voorstel)
+        var straten = WisselstraatVoorstel.Bereken(k);
+        sb.Append("<h2>Wisselstraten (voorstel)</h2><p class=\"uitleg\">Per overgang tussen twee voorgestelde blokken welke wissels in welke stand moeten staan. Afgeleid uit wat de verkenning al weet; er is niets extra gereden en <b>nog niet getest op de baan</b>. ‘uit splitsing’ = volgt uit een gevonden wissel, ‘anders kortsluiting’ = de andere stand gaf kortsluiting, ‘aangenomen’ = stond zo bij de gereden overgang maar het is niet bewezen dat het nodig is. Wissels die niet genoemd worden, hebben voor zover bekend geen invloed. Meerdere regels voor hetzelfde blokpaar zijn alternatieven.</p>");
+        if (straten.Count == 0) sb.Append("<p>Geen overgang tussen blokken met een wissel gevonden.</p>");
+        else
+        {
+            sb.Append("<table><tr><th>Van blok</th><th>Naar blok</th><th>Richting</th><th>Melders</th><th>Wissels</th><th>Keer gereden</th></tr>");
+            foreach (var g in straten.GroupBy(v => (v.VanBlok, v.NaarBlok, v.Richting, v.EisenTekst)).OrderBy(g => g.Key.VanBlok).ThenBy(g => g.Key.NaarBlok))
+                sb.Append($"<tr><td class=\"num\">{g.Key.VanBlok?.ToString() ?? "?"}</td><td class=\"num\">{g.Key.NaarBlok?.ToString() ?? "?"}</td><td>{g.Key.Richting.Tekst()}</td><td>{E(string.Join(", ", g.Select(v => $"{v.VanMelder}→{v.NaarMelder}")))}</td><td>{E(g.Key.EisenTekst)}</td><td>{g.Sum(v => v.AantalKeer)}</td></tr>");
+            sb.Append("</table>");
+        }
+
         sb.Append("<h2>Blokkenschema</h2><p class=\"uitleg\">Automatisch getekend: de blokken staan in de volgorde waarin de testloc ze bereed. Een pijl betekent dat er in die richting gereden is; bij elke verbinding staan de melders, de rijrichting van de testloc en de wissel. Oranje = een melder met twee mogelijke vervolgen (bijv. de kruiswissel), stippellijn = Dinamo-blok onbekend.</p>");
         try { sb.Append("<div class=\"kaart\" style=\"overflow:auto\">" + SchemaTekening.Maak(k).AlsSvg() + "</div>"); }
         catch (Exception ex) { sb.Append("<p class=\"let\">Het blokkenschema kon niet getekend worden: " + E(ex.Message) + "</p>"); }
@@ -311,6 +323,12 @@ ul{margin:6px 0 0 18px;padding:0}
                 foreach (var d in g.OrderBy(x => x.Richting).ThenBy(x => x.Via).ThenBy(x => x.Volgende))
                     sb.AppendLine($"  melder {d.Melder} ({d.Richting.Tekst()}): vanaf {d.Via} → {d.Volgende}   [{string.Join(" / ", d.Configuraties.Select(c => Configuratie.VanSleutel(c).ToString()))}]  {d.AantalKeer}x");
         }
+
+        Kop("WISSELSTRATEN (VOORSTEL, NOG NIET GETEST OP DE BAAN)");
+        var stratenT = WisselstraatVoorstel.Bereken(k);
+        foreach (var g in stratenT.GroupBy(v => (v.VanBlok, v.NaarBlok, v.Richting, v.EisenTekst)).OrderBy(g => g.Key.VanBlok).ThenBy(g => g.Key.NaarBlok))
+            sb.AppendLine($"  blok {g.Key.VanBlok?.ToString() ?? "?"} → blok {g.Key.NaarBlok?.ToString() ?? "?"} ({g.Key.Richting.Tekst()}, melders {string.Join(", ", g.Select(v => $"{v.VanMelder}→{v.NaarMelder}"))}): {g.Key.EisenTekst}");
+        if (stratenT.Count == 0) sb.AppendLine("  (geen)");
 
         Kop("DOODLOPENDE EINDEN");
         foreach (var e in k.Kopsporen) sb.AppendLine($"  na melder {e.Melder} ({e.Richting.Tekst()})");

@@ -483,7 +483,11 @@ public partial class MainWindow : Window
         if (hervat is not null)
             _log.Info($"Hervat vanaf opgeslagen voortgang ({hervat.AfgerondeOpdrachten} opdrachten al afgerond).");
 
-        _verkenner = new BaanVerkenner(hw, ins, klok, _log, VraagGebruiker, hervat);
+        _verkenner = new BaanVerkenner(hw, ins, klok, _log, VraagGebruiker, hervat)
+        {
+            VraagJaNee = VraagJaNeeGebruiker,
+            VraagWisselAdres = VraagAdresGebruiker
+        };
         // Zelflerend: tijden uit eerdere verkenningen (of het meegeleverde beginprofiel) gebruiken en bijwerken.
         var profiel = LeerProfiel.Laad(LeerprofielPad);
         if (profiel.AantalMetingen == 0) profiel = LeerProfiel.Laad(LeerprofielZaadPad);
@@ -582,6 +586,46 @@ public partial class MainWindow : Window
                 if (m.Success) sim.ZetLocOpMelder(int.Parse(m.Groups[1].Value));
             }
             return r == MessageBoxResult.OK;
+        }).Task;
+    }
+
+    /// <summary>BUG #79: Ja/Nee/Annuleren voor de verkenner (true = Ja, false = Nee, null = Annuleren).</summary>
+    private Task<bool?> VraagJaNeeGebruiker(string titel, string tekst)
+    {
+        return Dispatcher.InvokeAsync(() =>
+        {
+            var r = MessageBox.Show(this, tekst, titel, MessageBoxButton.YesNoCancel, MessageBoxImage.Question, MessageBoxResult.No);
+            return r == MessageBoxResult.Yes ? true : r == MessageBoxResult.No ? (bool?)false : null;
+        }).Task;
+    }
+
+    /// <summary>BUG #79: vraagt een wisseladres met een klein invoervenster (null = geannuleerd). NIET gecompileerd/getest.</summary>
+    private Task<int?> VraagAdresGebruiker(string titel, string tekst)
+    {
+        return Dispatcher.InvokeAsync(() =>
+        {
+            int? resultaat = null;
+            var invoer = new TextBox { Margin = new Thickness(0, 8, 0, 8), MinWidth = 120 };
+            var ok = new Button { Content = "OK", Width = 80, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
+            var annuleer = new Button { Content = "Annuleren", Width = 80, IsCancel = true };
+            var knoppen = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            knoppen.Children.Add(ok); knoppen.Children.Add(annuleer);
+            var paneel = new StackPanel { Margin = new Thickness(16) };
+            paneel.Children.Add(new TextBlock { Text = tekst, TextWrapping = TextWrapping.Wrap, MaxWidth = 380 });
+            paneel.Children.Add(invoer); paneel.Children.Add(knoppen);
+            var venster = new Window
+            {
+                Title = titel, Content = paneel, Owner = this, SizeToContent = SizeToContent.WidthAndHeight,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.NoResize
+            };
+            ok.Click += (_, _) =>
+            {
+                if (int.TryParse(invoer.Text.Trim(), out var a) && a > 0) { resultaat = a; venster.DialogResult = true; }
+                else MessageBox.Show(venster, "Geef een geheel wisseladres op.", titel, MessageBoxButton.OK, MessageBoxImage.Information);
+            };
+            venster.Loaded += (_, _) => invoer.Focus();
+            venster.ShowDialog();
+            return resultaat;
         }).Task;
     }
 
@@ -737,7 +781,10 @@ public partial class MainWindow : Window
         if (json is null) return null;
         var kaart = VerkenStatus.VanJson(json)?.Kaart;
         if (kaart is not null && !kaart.Voltooid)
+        {
             kaart.VoorgesteldeBlokken = BlokVoorstel.Bereken(kaart); // tussenstand: voorstel alvast tonen
+            kaart.Wisselstraatvoorstellen = WisselstraatVoorstel.Bereken(kaart);
+        }
         return kaart;
     }
 

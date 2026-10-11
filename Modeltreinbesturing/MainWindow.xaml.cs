@@ -1659,7 +1659,8 @@ public partial class MainWindow : Window
 
         if (res.IsLeeg)
         {
-            MessageBox.Show(this, "Er was niets toe te voegen: alles uit deze baankaart staat al in het project.", "Baankaart importeren", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(this, "Er was niets toe te voegen aan blokken en relaties: alles uit deze baankaart staat al in het project.", "Baankaart importeren", MessageBoxButton.OK, MessageBoxImage.Information);
+            WisselstratenImporteren(kaart);
             return;
         }
 
@@ -1708,6 +1709,30 @@ public partial class MainWindow : Window
         if (dienst.Toegevoegd.Count > 0) slot.Add($"{dienst.Toegevoegd.Count} automatische route(s) aangemaakt (zonder vertrektijd).");
         if (teZetten.Count > 0) slot.Add($"{teZetten.Count} wissel(s) (adres {string.Join(", ", teZetten)}) onderaan het baanontwerp gezet; sleep ze naar de goede plek en leg de wisselstanden zelf vast.");
         if (slot.Count > 0) MessageBox.Show(this, string.Join("\n\n", slot) + "\n\nNIET getest op de baan.", "Baankaart importeren", MessageBoxButton.OK, MessageBoxImage.Information);
+        WisselstratenImporteren(kaart);
+    }
+
+    /// <summary>BUG #78 (B): wisselstraten uit de voorstellen van de verkenning. Eerst een voorbeeld; pas na "Ja" worden ze toegevoegd
+    /// (Nee = er is niets veranderd). Bestaande wisselstraten blijven ongemoeid.</summary>
+    private void WisselstratenImporteren(Baanverkenner.Kern.Baankaart kaart)
+    {
+        if (kaart.Wisselstraatvoorstellen.Count == 0) return;
+        var res = new WisselstraatImporter().Importeer(kaart, _beheerder,
+            _baanBeheerder.Symbolen.OfType<Wissel>().ToList(), _baanBeheerder.Symbolen.OfType<Kruiswissel>().ToList(),
+            _wisselstraatBeheerder.Wisselstraten);
+        new BaanControleDialog("Wisselstraten uit de verkenning",
+            $"{res.Nieuw.Count} nieuwe wisselstra(a)t(en) mogelijk. Hierna kun je kiezen of je ze wilt toevoegen.", res.Meldingen) { Owner = this }.ShowDialog();
+        if (res.IsLeeg)
+        {
+            MessageBox.Show(this, "Er zijn geen nieuwe wisselstraten toe te voegen (zie de meldingen).", "Wisselstraten importeren", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        var antw = MessageBox.Show(this, $"{res.Nieuw.Count} wisselstra(a)t(en) toevoegen?\n\nAlleen wat de verkenning gezien heeft; bestaande wisselstraten en jouw wisselstanden blijven onaangeroerd. NIET getest op de baan. (Nee = niets toevoegen.)",
+            "Wisselstraten importeren", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
+        if (antw != MessageBoxResult.Yes) return;
+        _wisselstraatBeheerder.Wisselstraten.AddRange(res.Nieuw);
+        Redraw();
+        MessageBox.Show(this, $"{res.Nieuw.Count} wisselstra(a)t(en) toegevoegd. Opslaan en controleren bij Wisselstraten.", "Wisselstraten importeren", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void HandmatigBezet_Click(object sender, RoutedEventArgs e)
