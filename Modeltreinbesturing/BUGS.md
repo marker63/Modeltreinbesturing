@@ -1468,3 +1468,8 @@ Onderzoek naar Rocrail, Win-Digipet, JMRI en de NMRA-normen: `Modeltreinbesturin
 - Het rapport, het blokkenschema en de wisselstraten toonden "Blok 1 t/m 8" (volgnummers van de verkenner) naast de Dinamo-blokken; dat gaf verwarring (bv. "Blok 7" = Dinamo-blok 8).
 - Oplossing: `VoorgesteldBlok.Nummer` is nu het Dinamo-bloknummer en `Label` toont alleen dat nummer; onbekend heet "onbekend (melder X)", een tweede losse groep met hetzelfde Dinamo-blok "N (deel 2)". Rapport (html en tekst), blokkenschema ("Dinamo-blok N") en wisselstraten ("Dinamo-blok 3 -> Dinamo-blok 8") gebruiken dat. Oudere baankaarten krijgen ook de juiste labels.
 - Test: CompileCheck `EchteBloknummersTest`. Nog niet getest op de baan (WPF-vensters ongecompileerd).
+
+## #89 - Het pluskruis stond bij een nieuwe verkenning al helemaal gevuld (Marco 13:44)
+- De kruiswissel-weergave (#85) toonde altijd alle vaste referentiemelders en standen, ook als de verkenning nog niets gevonden had; dat suggereerde dat het al ontdekt was.
+- Oplossing: het kruis blijft staan (met de vier benen) maar een melder staat er pas in als deze verkenning hem gevonden heeft (`KruiswisselReferentie.AlsSvg/AlsHtml/AlsTekst` met de baankaart); anders blanco. Het Dinamo-blok boven een been staat er pas als het gevonden is. In de tabel/tekst staan de standen van motor 13 en 10 pas bij een verbinding waarvan melder 24 en beide benen gevonden zijn, anders "nog niet gevonden door deze verkenning". De vaste referentie die de verkenner zelf gebruikt (#85) verandert niet.
+- Test: CompileCheck `KruiswisselReferentieTest`. Niet apart opgeleverd (Marco: nog geen nieuwe versie nodig); zit in de volgende zip.

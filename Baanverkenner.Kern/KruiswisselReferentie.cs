@@ -79,32 +79,49 @@ public static class KruiswisselReferentie
 
     private static string St(bool? s) => s is null ? "vrij" : s.Value ? "afbuigend" : "rechtdoor";
 
-    public static string AlsTekst()
+    /// <summary>BUG #89 (Marco 13:44: bij een geheel nieuwe verkenning stond het pluskruis al helemaal gevuld): met een baankaart toont de
+    /// weergave alleen wat DEZE verkenning al gevonden heeft; de rest blijft blanco. Zonder baankaart (null) staat alles erin.</summary>
+    private static bool Gevonden(Baankaart? k, int melder) => k is null || k.Melders.Any(m => m.Nummer == melder);
+
+    private static bool VerbindingGevonden(Baankaart? k, Verbinding v) => Gevonden(k, Midden) && Gevonden(k, v.MelderA) && Gevonden(k, v.MelderB);
+
+    private static string BlokLabel(Baankaart? k, Been b)
+    {
+        if (k is null) return $"Dinamo-blok {b.KoploperBlok}";
+        var blok = b.Melders.Select(m => k.Melders.FirstOrDefault(x => x.Nummer == m)?.DinamoBlok).FirstOrDefault(x => x is not null);
+        return blok is int d ? $"Dinamo-blok {d}" : "";
+    }
+
+    public static string AlsTekst(Baankaart? k = null)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("Kruiswissel in melder 24 - referentie (motoren 13 en 10)");
-        foreach (var b in Benen) sb.AppendLine($"  Been {b.Plek} (Koploper-blok {b.KoploperBlok}): 24 - {string.Join(" - ", b.Melders)}");
+        sb.AppendLine("Kruiswissel in melder 24 - referentie (motoren 13 en 10); wat nog niet gevonden is, staat blanco");
+        foreach (var b in Benen) sb.AppendLine($"  Been {b.Plek}: {(Gevonden(k, Midden) ? "24" : "__")} - {string.Join(" - ", b.Melders.Select(m => Gevonden(k, m) ? m.ToString() : "__"))}");
         sb.AppendLine("  Verbindingen (in beide richtingen):");
         foreach (var v in Verbindingen)
-            sb.AppendLine($"    {v.MelderA} <-> {v.MelderB}: motor 13 {St(v.Afbuigend13)}, motor 10 {St(v.Afbuigend10)} ({(v.Bewezen ? "bewezen" : "onbekend")})");
+            sb.AppendLine(VerbindingGevonden(k, v)
+                ? $"    {v.MelderA} <-> {v.MelderB}: motor 13 {St(v.Afbuigend13)}, motor 10 {St(v.Afbuigend10)} ({(v.Bewezen ? "bewezen" : "onbekend")})"
+                : "    __ <-> __: nog niet gevonden door deze verkenning");
         sb.AppendLine("  Nog niet getest op de baan; wordt door de verkenner als laatste op elk pad door melder 24 toegepast.");
         return sb.ToString();
     }
 
     /// <summary>De plusfiguur (SVG) met de benen en alle melders in volgorde, plus de tabel met de standen van motor 13 en 10.</summary>
-    public static string AlsHtml()
+    public static string AlsHtml(Baankaart? k = null)
     {
         var sb = new StringBuilder();
-        sb.Append("<h2>Kruiswissel in melder 24 (referentie motor 13 en 10)</h2><p class=\"uitleg\">De vier benen van de kruiswissel met al hun bezetmelders in volgorde (van 24 af naar buiten). De tabel zegt hoe de motoren moeten staan voor een rit door melder 24. Alleen bewezen standen worden door de verkenner afgedwongen; <b>nog niet getest op de baan</b>. De richting van de benen op het papier is schematisch.</p>");
-        sb.Append(AlsSvg());
+        sb.Append("<h2>Kruiswissel in melder 24 (referentie motor 13 en 10)</h2><p class=\"uitleg\">De vier benen van de kruiswissel met al hun bezetmelders in volgorde (van 24 af naar buiten). Een leeg vakje is nog niet gevonden door deze verkenning. De tabel zegt hoe de motoren moeten staan voor een rit door melder 24. Alleen bewezen standen worden door de verkenner afgedwongen; <b>nog niet getest op de baan</b>. De richting van de benen op het papier is schematisch.</p>");
+        sb.Append(AlsSvg(k));
         sb.Append("<table><tr><th>Rit door melder 24</th><th>Motor 13</th><th>Motor 10</th><th>Status</th><th>Bron</th></tr>");
         foreach (var v in Verbindingen)
-            sb.Append($"<tr><td>{v.MelderA} &harr; {v.MelderB}</td><td>{St(v.Afbuigend13)}</td><td>{St(v.Afbuigend10)}</td><td>{(v.Bewezen ? "bewezen" : "onbekend")}</td><td>{System.Net.WebUtility.HtmlEncode(v.Bron)}</td></tr>");
+            sb.Append(VerbindingGevonden(k, v)
+                ? $"<tr><td>{v.MelderA} &harr; {v.MelderB}</td><td>{St(v.Afbuigend13)}</td><td>{St(v.Afbuigend10)}</td><td>{(v.Bewezen ? "bewezen" : "onbekend")}</td><td>{System.Net.WebUtility.HtmlEncode(v.Bron)}</td></tr>"
+                : "<tr><td>&nbsp;</td><td></td><td></td><td>nog niet gevonden door deze verkenning</td><td></td></tr>");
         sb.Append("</table>");
         return sb.ToString();
     }
 
-    public static string AlsSvg()
+    public static string AlsSvg(Baankaart? k = null)
     {
         const int B = 700, H = 500, cx = B / 2, cy = H / 2, bw = 54, bh = 28, stap = 64;
         var sb = new StringBuilder();
@@ -122,14 +139,14 @@ public static class KruiswisselReferentie
                 int mx = dx != 0 ? cx + dx * stap * (i + 1) : cx;
                 int my = dy != 0 ? cy + dy * (stap - 12) * (i + 1) : cy;
                 sb.Append($"<rect x=\"{mx - bw / 2}\" y=\"{my - bh / 2}\" width=\"{bw}\" height=\"{bh}\" rx=\"5\" fill=\"#eef2ff\" stroke=\"#44506a\"/>");
-                sb.Append($"<text x=\"{mx}\" y=\"{my + 5}\" text-anchor=\"middle\" font-size=\"14\" fill=\"#1c2333\">{b.Melders[i]}</text>");
+                sb.Append($"<text x=\"{mx}\" y=\"{my + 5}\" text-anchor=\"middle\" font-size=\"14\" fill=\"#1c2333\">{(Gevonden(k, b.Melders[i]) ? b.Melders[i].ToString() : "")}</text>");
             }
             int lx = dx != 0 ? cx + dx * stap * b.Melders.Length : cx + 36;
             int ly = dx != 0 ? cy - 24 : cy + dy * (stap - 12) * b.Melders.Length + 5;
-            sb.Append($"<text x=\"{lx}\" y=\"{ly}\" text-anchor=\"{(dx != 0 ? "middle" : "start")}\" font-size=\"12\" fill=\"#44506a\">blok {b.KoploperBlok}</text>");
+            sb.Append($"<text x=\"{lx}\" y=\"{ly}\" text-anchor=\"{(dx != 0 ? "middle" : "start")}\" font-size=\"12\" fill=\"#44506a\">{BlokLabel(k, b)}</text>");
         }
         sb.Append($"<rect x=\"{cx - 34}\" y=\"{cy - 20}\" width=\"68\" height=\"40\" rx=\"8\" fill=\"#fff4e0\" stroke=\"#c77700\" stroke-width=\"2\"/>");
-        sb.Append($"<text x=\"{cx}\" y=\"{cy + 2}\" text-anchor=\"middle\" font-size=\"16\" font-weight=\"bold\" fill=\"#1c2333\">24</text>");
+        sb.Append($"<text x=\"{cx}\" y=\"{cy + 2}\" text-anchor=\"middle\" font-size=\"16\" font-weight=\"bold\" fill=\"#1c2333\">{(Gevonden(k, Midden) ? "24" : "")}</text>");
         sb.Append($"<text x=\"{cx}\" y=\"{cy + 15}\" text-anchor=\"middle\" font-size=\"9\" fill=\"#c77700\">motor 13 + 10</text>");
         sb.Append("</svg>");
         return sb.ToString();

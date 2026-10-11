@@ -566,6 +566,14 @@ public static class Tests
         try { System.Xml.Linq.XDocument.Parse(svg); Eis(true, "kruis: SVG is geldige XML"); } catch (Exception ex) { Eis(false, "kruis: SVG is geldige XML: " + ex.Message); }
         Eis(new[] { "129", "14", "21", "8", "24" }.All(m => svg.Contains(">" + m + "<")), "kruis: alle benen staan in de tekening");
         var k = Laad("baankaart_2026-10-11_1103.json");
+        // BUG #89: een lege baankaart (nieuwe verkenning) toont het kruis blanco; een gevonden melder verschijnt zodra hij gevonden is
+        var leeg = new Baankaart();
+        var svgLeeg = KruiswisselReferentie.AlsSvg(leeg);
+        Eis(!new[] { "129", "14", "21", "8", "24", "13" }.Any(m => svgLeeg.Contains(">" + m + "<")) && svgLeeg.Contains("<rect"), "kruis: nieuwe verkenning -> kruis aanwezig maar alle melders blanco");
+        Eis(!KruiswisselReferentie.AlsTekst(leeg).Contains("motor 13 afbuigend") && !Rapport.AlsHtml(leeg).Contains("&harr;"), "kruis: nieuwe verkenning -> geen standen in tekst/tabel");
+        var gedeeld = new Baankaart(); foreach (var n in new[] { 24, 14 }) gedeeld.Melders.Add(new MelderInfo { Nummer = n });
+        var svgDeel = KruiswisselReferentie.AlsSvg(gedeeld);
+        Eis(svgDeel.Contains(">24<") && svgDeel.Contains(">14<") && !svgDeel.Contains(">21<") && !svgDeel.Contains(">8<"), "kruis: alleen gevonden melders staan ingevuld");
         Eis(Rapport.AlsHtml(k).Contains("Kruiswissel in melder 24") && Rapport.AlsTekst(k).Contains("KRUISWISSEL MELDER 24"), "kruis: staat in het rapport (html en tekst)");
     }
 
