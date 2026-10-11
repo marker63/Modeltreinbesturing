@@ -2,3 +2,6 @@ bin/
 obj/
 .vs/
 *.user
+
+# Door de app aangemaakte, al verwerkte baankaarten (nieuwe niet meer volgen)
+Modeltreinbesturing/Baanverkenner/voor_import/baankaart_verwerkt_*.json
