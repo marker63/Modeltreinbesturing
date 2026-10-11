@@ -671,6 +671,23 @@ public static class Tests
         Eis(Stand(new Opdracht { Id = 3, Start = 14, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis }).Equals(Configuratie.Basis.Met(13).Met(10)) || Stand(new Opdracht { Id = 3, Start = 14, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis }).Equals(Configuratie.Basis), "vervolg: andere start geeft geen vreemde wissels (kaart: " + Stand(new Opdracht { Id = 3, Start = 14, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis }) + ")");
     }
 
+    static void StopVoorTerugzettenTest()
+    {
+        Console.WriteLine("Test: stop naar alle blokken voordat de loc terug gezet moet worden (BUG #94)");
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
+        var s1 = sim.NieuweSectie(1, 80, 1); var s2 = sim.NieuweSectie(2, 80, 2);
+        sim.Verbind(s1, Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B, s2, Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A); sim.PlaatsLoc(s1, 40, +1);
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 4, DinamoBlokken = "1-2" };
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var log = new VerkenLog(klok);
+        bool stopVoorVraag = false; string tekstBijVraag = "";
+        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => { tekstBijVraag = log.AlsTekst(); stopVoorVraag = tekstBijVraag.Contains("stop naar alle blokken"); return Task.FromResult(true); }, new VerkenStatus { Instellingen = ins });
+        var m = typeof(BaanVerkenner).GetMethod("VraagLocTerugTeZetten", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        try { ((Task)m.Invoke(v, new object[] { 1, "test" })!).GetAwaiter().GetResult(); } catch (Exception) { /* melder 1 kan onbezet blijven: alleen de volgorde telt */ }
+        Eis(stopVoorVraag, "terugzetten: de stop naar alle blokken is gelogd VOORDAT de gebruiker de vraag krijgt");
+    }
+
     static void EchteBloknummersTest()
     {
         Console.WriteLine("Test: alleen echte Dinamo-bloknummers (BUG #88)");
@@ -953,6 +970,7 @@ public static class Tests
         KruisMotorKortsluitingTest();
         TijdelijkeKortsluitingTest();
         KenVervolgTest();
+        StopVoorTerugzettenTest();
         WisselEisenTest();
         WisselstratenTest();
 

@@ -1341,6 +1341,14 @@ public partial class BaanVerkenner
     {
         for (int poging = 1; poging <= 3; poging++)
         {
+            // BUG #94 (Marco 15:46: "ik zette de loc terug in melder 13 en hij reed gelijk weg"): Dinamo onthoudt per blok het laatste rijcommando.
+            // De stop ging alleen naar de blokken waar de loc net stond; blok 3 had nog "achteruit 12" van de rit eerder (hardwarelog 15:39:07),
+            // dus een loc die daar met de hand neergezet wordt rijdt meteen weg. Daarom vóór elke vraag eerst snelheid 0 naar ALLE blokken.
+            if (BlokVereist)
+            {
+                _log.Info("Voor het terugzetten van de loc: stop naar alle blokken, zodat een blok met een oud rijcommando de neergezette loc niet laat wegrijden.");
+                await VolledigeStop();
+            }
             // BUG #79 (Marco 07:59: "wisselmotor 10 stond verkeerd"): eerst vragen of er een wissel verkeerd staat en die dan meteen schakelen;
             // alleen als dat niet zo is (of de loc daarna nog niet goed staat) moet de loc met de hand verplaatst worden.
             if (poging == 1 && await ControleerVerkeerdeWissel(melder, aanleiding)) return;
