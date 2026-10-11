@@ -460,6 +460,27 @@ public partial class BaanVerkenner
     /// kortsluitpunt voor deze start en stand vereist (de kortsluiting komt anders steeds terug, bv. wissel 2 afbuigend zonder wissel 1).</summary>
     /// <summary>BUG #98: het pad dat een rit vanaf <paramref name="start"/> volgens de kaart (en voor melder 24 de kruiswissel-referentie) zeker volgt,
     /// zolang er per stap precies één vervolg overblijft.</summary>
+    internal static Configuratie KruisIngangStand(List<int> pad, Configuratie c, int? bronAdres, out string? uitleg)
+    {
+        uitleg = null;
+        int i = pad.IndexOf(KruiswisselReferentie.Midden);
+        if (i < 1) return c;
+        int ingang = pad[i - 1];
+        var bewezen = KruiswisselReferentie.Verbindingen.Where(v => v.Bewezen && (v.MelderA == ingang || v.MelderB == ingang)).ToList();
+        if (bewezen.Count == 0) return c;
+        var delen = new List<string>();
+        foreach (var (motor, waarden) in new[] { (KruiswisselReferentie.Motor13, bewezen.Select(v => v.Afbuigend13)), (KruiswisselReferentie.Motor10, bewezen.Select(v => v.Afbuigend10)) })
+        {
+            if (motor == bronAdres) continue;
+            var vast = waarden.Where(w => w.HasValue).Select(w => w!.Value).Distinct().ToList();
+            if (vast.Count == 1 && c.Bevat(motor) != vast[0])
+            { c = c.MetStand(motor, vast[0]); delen.Add($"motor {motor} {(vast[0] ? "afbuigend" : "rechtdoor")}"); }
+        }
+        if (delen.Count > 0)
+            uitleg = $"Het pad {string.Join(" - ", pad)} gaat de kruiswissel in vanaf melder {ingang}; alle bewezen verbindingen vanaf die kant vragen {string.Join(" en ", delen)}, dat wordt vooraf gezet.";
+        return c;
+    }
+
     internal static List<int> VoorspeldPad(Baankaart k, int start, Richting r, Configuratie c)
     {
         var pad = new List<int> { start };
@@ -515,6 +536,11 @@ public partial class BaanVerkenner
                 c = toe;
             }
         }
+        // BUG #98 (Marco 16:27: "weer het kruiswissel"): rijdt de loc volgens het voorspelde pad de kruiswissel in vanaf een been waarvan ALLE bewezen
+        // verbindingen dezelfde stand van motor 13 (of 10) vragen, dan staat die motor vóór het inrijden goed, ook als de uitgang nog niet bekend is
+        // (8 -> 24: alleen 14 is bewezen en vraagt motor 13 afbuigend; zonder dat gaf 8 -> 24 kortsluiting in blok 8).
+        c = KruisIngangStand(pad, c, o.BronAdres, out var kruisUitleg);
+        if (kruisUitleg is not null) _log.Info($"Opdracht #{o.Id}: {kruisUitleg} Rijstand: {c}.");
         return c;
     }
 

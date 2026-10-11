@@ -701,6 +701,24 @@ public static class Tests
         Eis(pad2.Count >= 3 && pad2[2] == 21, "voorspeld pad: met motor 13 rechtdoor gaat 14 vooruit naar 21 (nu " + string.Join("-", pad2) + ")");
     }
 
+    // BUG #98 (log 16:23): 8 -> 24 met alleen wissel 14 afbuigend gaf kortsluiting in blok 8: de enige bewezen verbinding vanaf 8 vraagt motor 13 afbuigend
+    static void KruisIngangTest()
+    {
+        var k = Laad("baankaart_2026-10-11_1608.json");
+        k.VerwijderSpiegelOvergangen();
+        var c14 = new Configuratie(new[] { 14 });
+        var pad = BaanVerkenner.VoorspeldPad(k, 8, Richting.Achteruit, c14);
+        Eis(pad.Take(2).SequenceEqual(new[] { 8, 24 }), "kruis-ingang: 8 achteruit met wissel 14 afbuigend gaat naar 24 (nu " + string.Join("-", pad) + ")");
+        var c = BaanVerkenner.KruisIngangStand(pad, c14, 14, out var uitleg);
+        Eis(c.Bevat(13) && c.Bevat(14) && uitleg is not null, "kruis-ingang: motor 13 wordt vooraf afbuigend gezet (nu " + c + ")");
+        var c2 = BaanVerkenner.KruisIngangStand(new List<int> { 14, 24, 21 }, Configuratie.Basis, null, out _);
+        Eis(!c2.Bevat(13), "kruis-ingang: vanaf 14 zijn twee standen bewezen (naar 21 of 8): niets afdwingen");
+        var c3 = BaanVerkenner.KruisIngangStand(new List<int> { 21, 24, 14 }, new Configuratie(new[] { 13 }), null, out _);
+        Eis(!c3.Bevat(13), "kruis-ingang: vanaf 21 vraagt elke bewezen verbinding motor 13 rechtdoor");
+        var c4 = BaanVerkenner.KruisIngangStand(pad, Configuratie.Basis, 13, out _);
+        Eis(!c4.Bevat(13), "kruis-ingang: de motor die de opdracht zelf test wordt niet aangeraakt");
+    }
+
     static void StopVoorTerugzettenTest()
     {
         Console.WriteLine("Test: stop naar alle blokken voordat de loc terug gezet moet worden (BUG #94)");
@@ -1033,6 +1051,7 @@ public static class Tests
         StopVoorTerugzettenTest();
         LocAndersomTest();
         VoorspeldPadTest();
+        KruisIngangTest();
         KruisAankomstTest();
         OrientatieTekstTest();
         WisselEisenTest();
