@@ -1152,7 +1152,11 @@ public partial class BaanVerkenner
         var nieuw = _kaart.MetWisselEisen(pad, r, c, out var wijz);
         if (wijz.Count > 0)
             _log.Info($"Wisselstand voor het pad {string.Join("-", pad)} ({r.Tekst()}) aangepast aan wat over de wissels bekend is: {string.Join(", ", wijz)}. Nieuwe stand: {nieuw}.");
-        return nieuw;
+        // BUG #83: ook wat opgeloste kortsluitpunten al bewezen hebben.
+        var metOplossing = _kaart.MetBekendeKortsluitOplossingen(pad, r, nieuw, out var wijz2);
+        if (wijz2.Count > 0)
+            _log.Info($"Wisselstand voor het pad {string.Join("-", pad)} ({r.Tekst()}) aangepast om een bekende kortsluiting te vermijden: {string.Join("; ", wijz2)}. Nieuwe stand: {metOplossing}.");
+        return metOplossing;
     }
 
     private async Task NaarStartVan(List<Etappe> route)

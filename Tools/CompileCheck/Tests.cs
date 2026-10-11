@@ -505,6 +505,29 @@ public static class Tests
         Eis(true, "alarm voor stap: alarm opgeheven -> verder");
     }
 
+    // BUG #83: een opgelost kortsluitpunt wordt ook op routes en terugwegen toegepast
+    static void KortsluitOplossingTest()
+    {
+        var k = Laad("baankaart_2026-10-11_1103.json");
+        // 13 -> 14 -> 24 vooruit met alleen wissel 10 afbuigend gaf kortsluiting (#1); de oplossing (wissel 5 afbuigend) botst met de eis
+        // van 14 -> 24 (wissel 5 rechtdoor): wissel 10 hoort hier dus rechtdoor.
+        var eis = k.MetWisselEisen(new List<int> { 13, 14, 24 }, Richting.Vooruit, new Configuratie(new[] { 10 }), out _);
+        var n = k.MetBekendeKortsluitOplossingen(new List<int> { 13, 14, 24 }, Richting.Vooruit, eis, out var w);
+        Eis(n.Equals(Configuratie.Basis) && w.Count > 0, "kortsluit-oplossing: pad 13-14-24 met alleen 10 afbuigend -> alle wissels rechtdoor (nu " + n + ")");
+        // 24 -> 8 vooruit met 5, 10, 13, 14 afbuigend klopt met de oplossingen en blijft ongewijzigd
+        var c2 = new Configuratie(new[] { 5, 10, 13, 14 });
+        var n2 = k.MetBekendeKortsluitOplossingen(new List<int> { 24, 8 }, Richting.Vooruit, c2, out var w2);
+        Eis(n2.Equals(c2) && w2.Count == 0, "kortsluit-oplossing: 24-8 met 5,10,13,14 afbuigend blijft ongewijzigd (nu " + n2 + ")");
+        // zonder botsende eis wordt de oplossing zelf toegepast: pad 24 -> 8 met alleen 10 afbuigend krijgt wissel 5 afbuigend erbij
+        var n3 = k.MetBekendeKortsluitOplossingen(new List<int> { 24, 8 }, Richting.Vooruit, new Configuratie(new[] { 10 }), out _);
+        Eis(n3.Bevat(5) && n3.Bevat(10), "kortsluit-oplossing: 24-8 met alleen 10 afbuigend -> wissel 5 erbij (nu " + n3 + ")");
+        // de andere rijrichting en een pad zonder die melder blijven ongemoeid
+        Eis(k.MetBekendeKortsluitOplossingen(new List<int> { 24, 21 }, Richting.Achteruit, new Configuratie(new[] { 10 }), out _).Equals(new Configuratie(new[] { 10 })), "kortsluit-oplossing: andere richting (24 achteruit, geen opgelost punt) verandert niets");
+        var n5 = k.MetBekendeKortsluitOplossingen(new List<int> { 21, 14 }, Richting.Achteruit, new Configuratie(new[] { 10 }), out _);
+        Eis(n5.Bevat(9) && n5.Bevat(10), "kortsluit-oplossing: kortsluitpunt #5 (14 achteruit, 10 afbuigend) wordt met wissel 9 opgelost (nu " + n5 + ")");
+        Eis(k.MetBekendeKortsluitOplossingen(new List<int> { 30, 20 }, Richting.Vooruit, new Configuratie(new[] { 10 }), out _).Equals(new Configuratie(new[] { 10 })), "kortsluit-oplossing: pad zonder die melder verandert niets");
+    }
+
     // BUG #75: de tweede bezette melder bij een kortsluiting wijst de betrokken wissel aan
     static void TweedeMelderTest()
     {
@@ -691,6 +714,7 @@ public static class Tests
         WisselOnderLocTest();
         DinamoStilteTest();
         AlarmVoorStapTest();
+        KortsluitOplossingTest();
         WisselEisenTest();
         WisselstratenTest();
 

@@ -343,6 +343,52 @@ public class Baankaart
         return res.Distinct().ToList();
     }
 
+    /// <summary>BUG #83 (Marco 11:21: "de kortsluitingen op dezelfde plekken keren steeds terug, terwijl de oplossing al bekend is"): een opgelost
+    /// kortsluitpunt zegt: rijdend in richting R voorbij melder M gaf de stand K kortsluiting, en het extra schakelen van wissel A gaf
+    /// geen kortsluiting meer. Dat werd alleen bij het oplossen zelf gebruikt; de routes naar een kortsluitpunt en de terugwegen
+    /// bewaarden de oude stand K (bijv. wissel 10 afbuigend zonder wissel 5) en liepen steeds opnieuw in dezelfde kortsluiting.
+    /// Hier wordt een stand die een opgelost kortsluitpunt bevat (alle afbuigende wissels van K staan afbuigend) aangepast: wissel A krijgt de
+    /// opgeloste stand, tenzij een eis van dit pad (<see cref="MetWisselEisen"/>) het tegendeel vraagt; dan gaan de wissels van K die niet
+    /// afbuigend hoeven weer rechtdoor. Open kortsluitpunten worden niet gebruikt (daar is nog niets over bewezen).</summary>
+    public Configuratie MetBekendeKortsluitOplossingen(List<int> pad, Richting r, Configuratie c, out List<string> wijzigingen)
+    {
+        wijzigingen = new List<string>();
+        var eisen = new Dictionary<int, bool>(); var strijdig = new HashSet<int>();
+        for (int i = 0; i + 1 < pad.Count; i++)
+            foreach (var (a, afb) in WisselEisenVoorStap(pad[i], pad[i + 1], r))
+            {
+                if (eisen.TryGetValue(a, out var bestaand) && bestaand != afb) strijdig.Add(a);
+                eisen[a] = afb;
+            }
+        for (int ronde = 0; ronde < 5; ronde++)
+        {
+            bool veranderd = false;
+            foreach (var k in Kortsluitpunten.Where(k => k.Opgelost && k.OpgelostDoorAdres is not null && k.OpgelostMetAfbuigend is not null
+                         && k.Richting == r && pad.Contains(k.NaMelder) && k.Configuratie.Afbuigend.Length > 0))
+            {
+                if (!k.Configuratie.Afbuigend.All(c.Bevat)) continue;
+                int a = k.OpgelostDoorAdres!.Value; bool s = k.OpgelostMetAfbuigend!.Value;
+                if (c.Bevat(a) == s) continue;
+                bool eisTegen = !strijdig.Contains(a) && eisen.TryGetValue(a, out var e) && e != s;
+                if (!eisTegen)
+                {
+                    c = c.MetStand(a, s);
+                    wijzigingen.Add($"{a} {(s ? "afbuigend" : "rechtdoor")} (kortsluitpunt #{k.Id} na melder {k.NaMelder} was daarmee opgelost)");
+                    veranderd = true;
+                    continue;
+                }
+                // De oplossing botst met een eis van dit pad: dan mag de stand die de kortsluiting gaf hier niet voorkomen.
+                var weg = k.Configuratie.Afbuigend.Where(w => !(eisen.TryGetValue(w, out var ew) && ew)).ToList();
+                if (weg.Count == 0) continue;
+                foreach (var w in weg) c = c.Zonder(w);
+                wijzigingen.Add($"{string.Join(", ", weg)} rechtdoor (kortsluitpunt #{k.Id}: die stand gaf kortsluiting na melder {k.NaMelder}, en de oplossing, wissel {a} {(s ? "afbuigend" : "rechtdoor")}, kan op dit pad niet)");
+                veranderd = true;
+            }
+            if (!veranderd) break;
+        }
+        return c;
+    }
+
     /// <summary>BUG #77: de wisselstand <paramref name="c"/> aangevuld met de eisen van alle stappen van <paramref name="pad"/>. Tegenstrijdige
     /// eisen voor een adres (twee stappen willen het tegenovergestelde) worden niet toegepast; dat adres blijft zoals het was.</summary>
     public Configuratie MetWisselEisen(List<int> pad, Richting r, Configuratie c, out List<string> wijzigingen)
