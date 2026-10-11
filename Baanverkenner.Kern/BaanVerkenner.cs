@@ -119,6 +119,8 @@ public partial class BaanVerkenner
 
     /// <summary>BUG #59: geleerde tijden uit eerdere verkenningen (mag null zijn).</summary>
     public LeerProfiel? Leerprofiel { get; set; }
+    /// <summary>BUG #84: referentie uit een Koploper-export (blok per melder, wisselstraatblokken 8/9). Alleen een hulpmiddel voor de blokproef.</summary>
+    public KoploperReferentie? Referentie { get; set; }
     /// <summary>Wordt na elke rit aangeroepen zodat het programma het profiel kan bewaren.</summary>
     public Action<LeerProfiel>? ProfielBijgewerkt { get; set; }
 

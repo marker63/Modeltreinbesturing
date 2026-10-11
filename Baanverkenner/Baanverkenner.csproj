@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <None Include="leerprofiel_zaad.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="koploper_referentie.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

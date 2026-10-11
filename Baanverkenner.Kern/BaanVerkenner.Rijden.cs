@@ -339,6 +339,16 @@ public partial class BaanVerkenner
         var alle = _ins.DinamoBlokLijst();
         var gebruikt = _kaart.Melders.Where(m => m.DinamoBlok is not null).Select(m => m.DinamoBlok!.Value).ToHashSet();
         var res = new List<int>();
+        // BUG #84: volgens de Koploper-referentie is dit een doorgangsmelder (wisselgebied zonder eigen blok, bv. 24 en 129):
+        // de rijstroom komt dan van een wisselstraatblok (8/9), dus alleen die blokken proeven (de meest passende eerst).
+        if (melder is int dm && Referentie is { } rf && rf.IsDoorgangsmelder(dm))
+        {
+            var wb = rf.WisselstraatBlokkenVoor(dm, _kaart.Melders.Where(x => x.Nummer != dm && x.DinamoBlok is not null).Select(x => x.DinamoBlok!.Value).ToHashSet())
+                       .Where(alle.Contains).ToList();
+            if (wb.Count > 0) return wb;
+        }
+        // BUG #84: bij een gewone melder het Koploper-blok eerst proberen.
+        if (melder is int km && Referentie?.BlokVan(km) is int kb && alle.Contains(kb)) res.Add(kb);
         // BUG #62: een blok dat uit een eerdere verkenning van deze baan bekend is voor deze melder, eerst proberen
         // (een verkeerde hint kost hooguit één korte poging).
         if (melder is int mm && Leerprofiel?.BlokHint(mm) is int hint && alle.Contains(hint)) res.Add(hint);
@@ -352,6 +362,8 @@ public partial class BaanVerkenner
     private void KoppelBlok(int melder, int blok)
     {
         _kaart.Melder(melder).DinamoBlok = blok;
+        if (Referentie is { } rf && rf.KlopptMetKoploper(melder, blok) == false)
+            _log.Waarschuwing($"Melder {melder} lijkt rijstroom van Dinamo-blok {blok} te krijgen, maar volgens de Koploper-export is dat {rf.Omschrijving(melder)}. Controleer dit (kan een spookmelding zijn).");
         _log.Vondst($"Melder {melder} krijgt rijstroom van Dinamo-blok {blok}.");
         BewaarNu();
         MeldVoortgang();

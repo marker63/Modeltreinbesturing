@@ -46,6 +46,7 @@ public partial class MainWindow : Window
     private static readonly string VoortgangPad = Path.Combine(Map, "voortgang.json");
     private static readonly string InstellingenPad = Path.Combine(Map, "instellingen.json");
     private static readonly string LeerprofielPad = Path.Combine(Map, "leerprofiel.json");
+    private static readonly string KoploperReferentiePad = Path.Combine(AppContext.BaseDirectory, "koploper_referentie.json");
     private static readonly string LeerprofielZaadPad = Path.Combine(AppContext.BaseDirectory, "leerprofiel_zaad.json");
 
     private class OpgeslagenKeuzes
@@ -495,6 +496,8 @@ public partial class MainWindow : Window
         foreach (var h in LeerProfiel.Laad(LeerprofielZaadPad).BlokHints)
             if (profiel.BlokHint(h.Melder) is null) profiel.BlokHints.Add(new LeerProfiel.BlokHintItem { Melder = h.Melder, Blok = h.Blok });
         _verkenner.Leerprofiel = profiel;
+        // BUG #84: Koploper-referentie (blok per melder, wisselstraatblokken 8/9); ontbreekt het bestand dan werkt alles als voorheen.
+        _verkenner.Referentie = KoploperReferentie.Laad(KoploperReferentiePad);
         _verkenner.ProfielBijgewerkt = p => { try { p.Bewaar(LeerprofielPad); } catch { } };
         _verkenner.VoortgangGewijzigd += v => Dispatcher.InvokeAsync(() => ToonVoortgang(v));
         _verkenner.Bewaren = st =>

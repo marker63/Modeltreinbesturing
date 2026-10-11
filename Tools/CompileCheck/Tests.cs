@@ -506,6 +506,45 @@ public static class Tests
     }
 
     // BUG #83: een opgelost kortsluitpunt wordt ook op routes en terugwegen toegepast
+    static void KoploperReferentieTest()
+    {
+        Console.WriteLine("Test: Koploper-referentie (BUG #84)");
+        var rf = KoploperReferentie.LeesExport(Path.Combine(AppContext.BaseDirectory, "testdata", "Koploper_export_testbaan_002.xlsx"));
+        Eis(rf.BlokVan(1) == 1 && rf.BlokVan(13) == 3 && rf.BlokVan(144) == 12, "referentie: gewone melders hebben hun Koploper-blok (1->1, 13->3, 144->12)");
+        Eis(rf.IsDoorgangsmelder(24) && rf.IsDoorgangsmelder(129) && !rf.IsDoorgangsmelder(13), "referentie: 24 en 129 zijn doorgangsmelders, 13 niet");
+        Eis(rf.WisselstraatBlokken.Select(b => b.Blokkaart).OrderBy(x => x).SequenceEqual(new[] { 8, 9 }), "referentie: wisselstraatblokken zijn 8 en 9");
+        Eis(rf.WisselstraatBlokkenVoor(129).SequenceEqual(new[] { 9 }), "referentie: 129 past alleen in wisselstraatblok 9 (heeft 1>2)");
+        Eis(rf.WisselstraatBlokkenVoor(24).SequenceEqual(new[] { 8, 9 }), "referentie: 24 past in 8 (voorkeur, minste overbodige overgangen) en 9");
+        Eis(rf.WisselstraatBlokkenVoor(24, new HashSet<int> { 8 }).SequenceEqual(new[] { 9, 8 }), "referentie: een al gebruikt blok komt achteraan");
+        Eis(rf.KlopptMetKoploper(24, 8) == true && rf.KlopptMetKoploper(24, 5) == false && rf.KlopptMetKoploper(13, 3) == true && rf.KlopptMetKoploper(13, 4) == false && rf.KlopptMetKoploper(999, 1) == null, "referentie: KlopptMetKoploper");
+
+        // Blokkandidaten: doorgangsmelder alleen 8/9, gewone melder eerst zijn Koploper-blok
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); var log = new VerkenLog(klok);
+        var ins = new VerkenInstellingen { DinamoBlokken = "1-9" };
+        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true)) { Referentie = rf };
+        var mi = typeof(BaanVerkenner).GetMethod("BlokKandidaten", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        var k129 = (List<int>)mi.Invoke(v, new object?[] { null, 129 })!;
+        var k24 = (List<int>)mi.Invoke(v, new object?[] { 5, 24 })!;
+        var k13 = (List<int>)mi.Invoke(v, new object?[] { null, 13 })!;
+        Eis(k129.SequenceEqual(new[] { 9 }), "kandidaten: melder 129 -> alleen blok 9 (kreeg: " + string.Join(",", k129) + ")");
+        Eis(k24.SequenceEqual(new[] { 8, 9 }), "kandidaten: melder 24 -> alleen 8 en 9, ook al is het vorige blok 5 (kreeg: " + string.Join(",", k24) + ")");
+        Eis(k13.Count == 9 && k13[0] == 3, "kandidaten: gewone melder 13 -> blok 3 eerst, daarna de rest (kreeg: " + string.Join(",", k13) + ")");
+        v.Referentie = null;
+        var zonder = (List<int>)mi.Invoke(v, new object?[] { null, 129 })!;
+        Eis(zonder.Count == 9, "kandidaten: zonder referentie blijft het gedrag zoals voorheen");
+
+        // Het meegeleverde JSON-bestand van de Baanverkenner moet hetzelfde zeggen als de export
+        var uitBestand = KoploperReferentie.Laad(Path.Combine(AppContext.BaseDirectory, "testdata", "koploper_referentie.json"));
+        Eis(uitBestand != null && uitBestand.WisselstraatBlokkenVoor(129).SequenceEqual(new[] { 9 }) && uitBestand.WisselstraatBlokkenVoor(24).SequenceEqual(new[] { 8, 9 }) && uitBestand.BlokVan(13) == 3 && uitBestand.Melders.Count == rf.Melders.Count,
+            "referentie: meegeleverd koploper_referentie.json komt overeen met de export");
+
+        // JSON-rondreis
+        var terug = KoploperReferentie.VanJson(rf.AlsJson())!;
+        Eis(terug.WisselstraatBlokkenVoor(129).SequenceEqual(new[] { 9 }) && terug.BlokVan(13) == 3, "referentie: JSON-rondreis");
+    }
+
     static void KortsluitOplossingTest()
     {
         var k = Laad("baankaart_2026-10-11_1103.json");
@@ -715,6 +754,7 @@ public static class Tests
         DinamoStilteTest();
         AlarmVoorStapTest();
         KortsluitOplossingTest();
+        KoploperReferentieTest();
         WisselEisenTest();
         WisselstratenTest();
 

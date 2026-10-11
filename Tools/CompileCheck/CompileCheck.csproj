@@ -19,5 +19,7 @@
     <Compile Include="../../Modeltreinbesturing/TreinrouteBeheerder.cs" />
     <Compile Include="../../Modeltreinbesturing/RichtingsverbodBeheerder.cs" />
     <None Include="testdata/*.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="testdata/*.xlsx" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../Baanverkenner/koploper_referentie.json" Link="testdata/koploper_referentie.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
