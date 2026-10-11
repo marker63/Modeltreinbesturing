@@ -309,7 +309,16 @@ public partial class BaanVerkenner
         await Wacht(TimeSpan.FromMilliseconds(Math.Max(100, _ins.WisselPauzeMs)));
         // Dinamo: pas verder als het commando echt de deur uit is
         for (int i = 0; i < 40 && !_hw.KlaarVoorVolgendeWisselCommando; i++) await Wacht(DinamoCyclus);
+        // BUG #93 (log 15:20:28): wissel 5 werd omgezet terwijl de loc op melder 14 stond (de wissel ligt vlak erachter) en de loc reed 0,6 s later weg;
+        // 3,6 s later kortsluiting, en dezelfde rit zonder nieuw commando lukte wel. Ligt de wissel achter een melder waarop de loc nu staat, dan
+        // krijgt de tong extra tijd voordat de loc weer wegrijdt.
+        var bezetNu = _monitor.Bezet;
+        if (bezetNu.Count > 0 && _kaart.Wissels.Any(w => w.Adres == adres && w.Waarnemingen.Any(o => bezetNu.Contains(o.NaMelder))))
+            await Wacht(TimeSpan.FromMilliseconds(ExtraWisselWachtMs));
     }
+
+    /// <summary>BUG #93: extra wachttijd na het omzetten van een wissel die vlak achter de melder ligt waarop de loc staat.</summary>
+    private const int ExtraWisselWachtMs = 2000;
 
     /// <summary>BUG #80: wissels die bij een nu bezette melder LIGGEN (de loc staat er met een deel op of op de tong): een wissel waarvan
     /// bij die melder een kortsluiting bij omzetten of een kortsluiting-oplossende combinatie is gevonden (hij wordt dus van achteren
@@ -682,10 +691,26 @@ public partial class BaanVerkenner
     }
     private const int AlarmWachtPogingen = 10;
 
+    /// <summary>BUG #93 (log 15:20): na kortsluitpunt #2 (wissel 5 afbuigend na melder 14) lukte dezelfde rit meteen daarna, zonder dat er iets
+    /// veranderd was (melder 129 bereikt). Zo'n kortsluiting was tijdelijk: het punt blijft in het rapport, maar de verkenner gaat er geen
+    /// wissels voor proberen (dat kost alleen nieuwe kortsluitingen).</summary>
+    private void MarkeerTijdelijkeKortsluiting(int start, Richting r, Configuratie c, RitResultaat uitkomst)
+    {
+        if (uitkomst.Einde == RitEinde.Kortsluiting || uitkomst.Reeks.Count < 2 || uitkomst.Reeks[0] != start) return;
+        foreach (var kp in _kaart.Kortsluitpunten.Where(k => !k.Opgelost && !k.Opgegeven && !k.Tijdelijk && k.Soort == KortsluitpuntSoort.Kortsluiting
+                                                             && k.NaMelder == start && k.Richting == r && k.Configuratie.Equals(c)))
+        {
+            kp.Tijdelijk = true;
+            _log.Vondst($"Kortsluitpunt #{kp.Id} (na melder {start}, {r.Tekst()}, {kp.Configuratie}) bleek tijdelijk: dezelfde rit lukte nu wel (melder {uitkomst.Reeks[1]}). " +
+                        "Waarschijnlijk was een tong nog niet (helemaal) omgeschakeld; er worden geen wissels voor geprobeerd.");
+        }
+    }
+
     private async Task<RitResultaat> Rit(int start, Richting r, RitDoel doel)
     {
         _ritMinDt = double.MaxValue; _ritMaxDt = 0;
         var uitkomst = await RitUitvoeren(start, r, doel);
+        MarkeerTijdelijkeKortsluiting(start, r, doel.Configuratie, uitkomst);
         // BUG #74: waar kwam de loc vandaan? (Na een kortsluiting/herstel is dat niet meer te weten.)
         if (uitkomst.Einde == RitEinde.Kortsluiting) _ingang = null;
         else if (uitkomst.Reeks.Count >= 2) _ingang = (uitkomst.Reeks[^2], uitkomst.Reeks[^1], r);
@@ -1285,7 +1310,7 @@ public partial class BaanVerkenner
             geschakeld = true;
             // BUG #87 (Marco 13:01: "telkens zet ik wissel 1 in de juiste stand en dan is de kortsluiting weg, waarom wordt dit niet vastgehouden?"):
             // dat de gebruiker deze wissel na een kortsluiting corrigeerde is de oplossing van dat kortsluitpunt, en wordt voortaan toegepast.
-            var kpHand = _kaart.Kortsluitpunten.LastOrDefault(k => !k.Opgelost && !k.Opgegeven && k.Soort == KortsluitpuntSoort.Kortsluiting);
+            var kpHand = _kaart.Kortsluitpunten.LastOrDefault(k => !k.Opgelost && !k.Opgegeven && !k.Tijdelijk && k.Soort == KortsluitpuntSoort.Kortsluiting);
             if (kpHand is not null && (_klok.Nu - _laatsteKortsluitingOm).TotalMinutes < 15 && _kaart.RegistreerHandmatigeOplossing(kpHand, a, afbuigend))
             {
                 _log.Vondst($"Kortsluitpunt #{kpHand.Id} (na melder {kpHand.NaMelder}, {kpHand.Richting.Tekst()}, {kpHand.Configuratie}) is volgens de gebruiker opgelost door wissel {a} op {(afbuigend ? "afbuigend" : "rechtdoor")}. Dit wordt onthouden en voortaan meteen toegepast (ook in volgende verkenningen).");

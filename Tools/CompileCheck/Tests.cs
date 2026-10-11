@@ -625,6 +625,52 @@ public static class Tests
         Eis(log.AlsTekst().Contains("Stop wordt opnieuw gestuurd"), "stop: blokalarm tijdens de stop -> de stoppas wordt opnieuw gestuurd");
     }
 
+    static void TijdelijkeKortsluitingTest()
+    {
+        Console.WriteLine("Test: kortsluiting die bij herhaling lukt is tijdelijk (BUG #93)");
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
+        var s1 = sim.NieuweSectie(1, 80, 1);
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 4, DinamoBlokken = "1" };
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var log = new VerkenLog(klok);
+        var status = new VerkenStatus { Instellingen = ins };
+        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true), status);
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var kaart = status.Kaart;
+        var c5 = new Configuratie(new[] { 5 });
+        kaart.Kortsluitpunten.Add(new Kortsluitpunt { Id = 2, NaMelder = 14, Richting = Richting.Vooruit, Configuratie = c5 });
+        kaart.Kortsluitpunten.Add(new Kortsluitpunt { Id = 3, NaMelder = 14, Richting = Richting.Vooruit, Configuratie = new Configuratie(new[] { 7 }) });
+        var mark = typeof(BaanVerkenner).GetMethod("MarkeerTijdelijkeKortsluiting", bf)!;
+        RitResultaat Rit(RitEinde e, params int[] reeks) { var r = new RitResultaat { Einde = e }; r.Reeks.AddRange(reeks); return r; }
+        mark.Invoke(v, new object[] { 14, Richting.Vooruit, c5, Rit(RitEinde.Kortsluiting, 14) });
+        Eis(!kaart.Kortsluitpunten[0].Tijdelijk, "tijdelijk: opnieuw kortsluiting -> blijft open");
+        mark.Invoke(v, new object[] { 14, Richting.Vooruit, c5, Rit(RitEinde.Doodlopend, 14, 129) });
+        Eis(kaart.Kortsluitpunten[0].Tijdelijk && !kaart.Kortsluitpunten[0].Opgelost, "tijdelijk: dezelfde rit lukt (14 -> 129) -> kortsluitpunt tijdelijk");
+        Eis(!kaart.Kortsluitpunten[1].Tijdelijk, "tijdelijk: een ander kortsluitpunt (andere wisselstand) blijft open");
+        Eis(log.AlsTekst().Contains("bleek tijdelijk"), "tijdelijk: staat in het log");
+        Eis(Rapport.AlsTekst(kaart).Contains("tijdelijk"), "tijdelijk: staat in het rapport");
+    }
+
+    static void KenVervolgTest()
+    {
+        Console.WriteLine("Test: bekend vervolg bepaalt de rijstand van de verkenner (BUG #93)");
+        var k = Laad("baankaart_2026-10-11_1521.json");
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 4, DinamoBlokken = "1" };
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var log = new VerkenLog(klok);
+        var status = new VerkenStatus { Instellingen = ins, Kaart = k };
+        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true), status);
+        var rs = typeof(BaanVerkenner).GetMethod("RijStand", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        Configuratie Stand(Opdracht o) => (Configuratie)rs.Invoke(v, new object[] { o })!;
+        var c5 = Configuratie.Basis.Met(5);
+        Eis(Stand(new Opdracht { Id = 1, Start = 129, Richting = Richting.Vooruit, Configuratie = c5 }).Equals(c5.Met(10)), "vervolg: 129 vooruit (bekend vervolg 24 -> 21) rijdt met wissel 10 afbuigend erbij");
+        Eis(Stand(new Opdracht { Id = 2, Start = 129, Richting = Richting.Vooruit, Configuratie = c5, BronAdres = 10 }).Equals(c5), "vervolg: de wissel die de opdracht zelf test (BronAdres) blijft ongemoeid");
+        Eis(Stand(new Opdracht { Id = 3, Start = 14, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis }).Equals(Configuratie.Basis.Met(13).Met(10)) || Stand(new Opdracht { Id = 3, Start = 14, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis }).Equals(Configuratie.Basis), "vervolg: andere start geeft geen vreemde wissels (kaart: " + Stand(new Opdracht { Id = 3, Start = 14, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis }) + ")");
+    }
+
     static void EchteBloknummersTest()
     {
         Console.WriteLine("Test: alleen echte Dinamo-bloknummers (BUG #88)");
@@ -905,6 +951,8 @@ public static class Tests
         EchteBloknummersTest();
         KruiswisselControleTest();
         KruisMotorKortsluitingTest();
+        TijdelijkeKortsluitingTest();
+        KenVervolgTest();
         WisselEisenTest();
         WisselstratenTest();
 

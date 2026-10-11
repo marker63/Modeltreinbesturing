@@ -148,7 +148,7 @@ ul{margin:6px 0 0 18px;padding:0}
         sb.Append($"<div><b>Duur</b>{E(Duur(k))}</div>");
         sb.Append("</div>");
 
-        int openKs = k.Kortsluitpunten.Count(x => !x.Opgelost);
+        int openKs = k.Kortsluitpunten.Count(x => !x.Opgelost && !x.Tijdelijk);
         sb.Append("<div class=\"tegels\">");
         void Tegel(object n, string l) => sb.Append($"<div class=\"tegel\"><div class=\"n\">{E(n)}</div><div class=\"l\">{E(l)}</div></div>");
         Tegel(k.Melders.Count, "melders (secties)");
@@ -250,7 +250,7 @@ ul{margin:6px 0 0 18px;padding:0}
             foreach (var x in k.Kortsluitpunten)
             {
                 string st = x.Opgelost ? $"<span class=\"ok\">opgelost: adres {x.OpgelostDoorAdres} op {(x.OpgelostMetAfbuigend == true ? "afbuigend" : "rechtdoor")}</span>"
-                    : x.Opgegeven ? "<span class=\"fout\">opgegeven</span>" : "<span class=\"let\">open</span>";
+                    : x.Tijdelijk ? "<span class=\"ok\">tijdelijk: dezelfde rit lukte bij herhaling</span>" : x.Opgegeven ? "<span class=\"fout\">opgegeven</span>" : "<span class=\"let\">open</span>";
                 string soort = x.Soort == KortsluitpuntSoort.OnverwachteTerugweg ? "onverwachte terugweg (geen kortsluiting, mogelijk geen wissel)" : "kortsluiting";
                 sb.Append($"<tr><td class=\"num\">{x.Id}</td><td>{soort}</td><td>na melder {x.NaMelder} ({x.Richting.Tekst()}){(x.TweedeMelders.Count > 0 ? "<br>ook bezet: melder " + string.Join(" en ", x.TweedeMelders) : "")}</td><td>{E(x.Configuratie)}</td><td>{x.AantalKortsluitingen}</td><td>{(x.AlarmBlokken.Count > 0 ? "blok " + string.Join(", ", x.AlarmBlokken) : "-")}</td><td>{st}</td></tr>");
             }
@@ -341,7 +341,7 @@ ul{margin:6px 0 0 18px;padding:0}
         Kop("KORTSLUITPUNTEN EN ONVERWACHTE TERUGWEGEN");
         foreach (var x in k.Kortsluitpunten)
             sb.AppendLine($"  #{x.Id} [{(x.Soort == KortsluitpuntSoort.OnverwachteTerugweg ? "onverwachte terugweg, geen kortsluiting" : "kortsluiting")}] na melder {x.NaMelder} ({x.Richting.Tekst()}), {x.Configuratie}" + (x.TweedeMelders.Count > 0 ? $" [ook bezet: melder {string.Join(" en ", x.TweedeMelders)}]" : "") + (x.AlarmBlokken.Count > 0 ? $" [Dinamo-alarm in blok {string.Join(", ", x.AlarmBlokken)}]" : "") + ": " +
-                (x.Opgelost ? $"opgelost met adres {x.OpgelostDoorAdres} op {(x.OpgelostMetAfbuigend == true ? "afbuigend" : "rechtdoor")}" : x.Opgegeven ? "opgegeven" : "open"));
+                (x.Opgelost ? $"opgelost met adres {x.OpgelostDoorAdres} op {(x.OpgelostMetAfbuigend == true ? "afbuigend" : "rechtdoor")}" : x.Tijdelijk ? "tijdelijk (lukte bij herhaling)" : x.Opgegeven ? "opgegeven" : "open"));
         if (k.Kortsluitpunten.Count == 0) sb.AppendLine("  (geen)");
 
         Kop("ADRESSEN ZONDER GEVONDEN EFFECT");

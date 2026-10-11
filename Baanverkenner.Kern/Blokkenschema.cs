@@ -97,7 +97,7 @@ public class SchemaTekening
                 k.Overgangen.Where(o => o.Van == m).GroupBy(o => o.Richting).Any(g => g.Select(o => o.Naar).Distinct().Count() > 1));
             v.Soort = b.DinamoBlok is null ? "onbekend" : splitsing ? "splitsing" : "normaal";
             foreach (var kp in k.Kortsluitpunten.Where(x => b.Melders.Contains(x.NaMelder)))
-                v.Markeringen.Add($"{(kp.Opgelost ? "opgelost" : kp.Opgegeven ? "opgegeven" : "open")} kortsluitpunt na {kp.NaMelder} ({kp.Richting.Tekst()})");
+                v.Markeringen.Add($"{(kp.Opgelost ? "opgelost" : kp.Tijdelijk ? "tijdelijk" : kp.Opgegeven ? "opgegeven" : "open")} kortsluitpunt na {kp.NaMelder} ({kp.Richting.Tekst()})");
             foreach (var ks in k.Kopsporen.Where(x => b.Melders.Contains(x.Melder)))
                 v.Markeringen.Add($"doodlopend na {ks.Melder} ({ks.Richting.Tekst()})");
             t.Vakken.Add(v);

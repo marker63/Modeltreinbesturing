@@ -460,6 +460,23 @@ public partial class BaanVerkenner
         var c = _kaart.MetBekendeOplossingenVoorStart(o.Start, o.Richting, o.Configuratie, out var wijz);
         if (wijz.Count > 0)
             _log.Info($"Opdracht #{o.Id} ({o.Configuratie}) rijdt met een bekende extra wisselstand: {string.Join("; ", wijz)}. Rijstand: {c}.");
+
+        // BUG #93: is er vanaf deze start in deze richting precies één vervolg bekend, dan hoeft de verkenner niet te raden: de wissels
+        // die dat vervolg nodig heeft worden meteen goed gezet (bv. 129 -> 24 -> 21 vraagt wissel 10 afbuigend, anders kortsluiting
+        // in blok 9). Alleen wissels die extra AFBUIGEND moeten worden; wat de opdracht zelf test (BronAdres) of rechtdoor wil, blijft staan.
+        var volgende = _kaart.BekendeVolgende(o.Start, o.Richting);
+        if (volgende.Count == 1)
+        {
+            var extra = _kaart.MetWisselEisen(new List<int> { o.Start, volgende[0] }, o.Richting, c, out var wijzigingen);
+            var toe = c; var toegepast = new List<string>();
+            foreach (var a in extra.Afbuigend.Where(x => !c.Bevat(x) && x != o.BronAdres))
+            { toe = toe.MetStand(a, true); toegepast.Add($"{a} afbuigend"); }
+            if (toegepast.Count > 0)
+            {
+                _log.Info($"Opdracht #{o.Id}: vanaf melder {o.Start} ({o.Richting.Tekst()}) is melder {volgende[0]} al bekend; daarvoor moet {string.Join(", ", toegepast)} staan. Rijstand: {toe}.");
+                c = toe;
+            }
+        }
         return c;
     }
 
@@ -1040,7 +1057,7 @@ public partial class BaanVerkenner
     private async Task<bool> LosKortsluitpuntenOp()
     {
         bool nieuwWerk = false;
-        foreach (var k in _kaart.Kortsluitpunten.Where(k => !k.Opgelost && !k.Opgegeven).ToList())
+        foreach (var k in _kaart.Kortsluitpunten.Where(k => !k.Opgelost && !k.Opgegeven && !k.Tijdelijk).ToList())
         {
             _fase = "Kortsluitpunten oplossen";
             _bezig = $"kortsluitpunt #{k.Id} na melder {k.NaMelder}";

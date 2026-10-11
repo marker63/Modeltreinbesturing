@@ -164,6 +164,9 @@ public class Kortsluitpunt
     public List<int> TweedeMelders { get; set; } = new();
     public bool Opgelost { get; set; }
     public bool Opgegeven { get; set; }
+    /// <summary>BUG #93: dezelfde rit (zelfde start, richting en wisselstand) lukte bij herhaling zonder iets te veranderen: de kortsluiting was
+    /// tijdelijk (bijv. een tong die te laat omschakelde) en wordt niet verder "opgelost".</summary>
+    public bool Tijdelijk { get; set; }
     public int? OpgelostDoorAdres { get; set; }
     public bool? OpgelostMetAfbuigend { get; set; }
     public List<int> GeprobeerdeAdressen { get; set; } = new();
