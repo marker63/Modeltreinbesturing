@@ -489,8 +489,9 @@ public partial class BaanVerkenner
 
         try
         {
-            await NaarStartVan(o.Route);
-            await ZetConfiguratie(RijStand(o));
+            var rijstand = RijStand(o);
+            await NaarStartVan(o.Route, rijstand);
+            await ZetConfiguratie(rijstand);
 
             // ---- Basisrit ----
             var basis = await Basisrit(o);
@@ -1216,11 +1217,37 @@ public partial class BaanVerkenner
         return metKruis;
     }
 
-    private async Task NaarStartVan(List<Etappe> route)
+    /// <summary>BUG #95 (Marco 15:51: opdracht 24 achteruit met wissel 10 afbuigend gaf elke keer kortsluiting): begint de opdracht op de kruiswissel
+    /// (melder 24) en moet daar motor 13 of 10 anders staan dan nu, dan wordt die wissel omgezet terwijl de loc op de kruiswissel staat - kortsluiting.
+    /// Is de ingang (het been waar de loc vandaan komt) volgens de referentie samen met de gewenste standen bewezen, dan worden die standen al
+    /// VOOR het inrijden van melder 24 gezet; bij het neerzetten hoeft er dan niets meer onder de loc om.</summary>
+    internal static Configuratie KruisAankomstStand(Etappe e, Configuratie cfg, Configuratie doel, out string? uitleg)
     {
-        foreach (var e in route)
+        uitleg = null;
+        if (e.Naar != KruiswisselReferentie.Midden || e.Pad.Count < 2) return cfg;
+        int ingang = e.Pad[^2];
+        bool w13 = doel.Bevat(KruiswisselReferentie.Motor13), w10 = doel.Bevat(KruiswisselReferentie.Motor10);
+        if (cfg.Bevat(KruiswisselReferentie.Motor13) == w13 && cfg.Bevat(KruiswisselReferentie.Motor10) == w10) return cfg;
+        bool Past(KruiswisselReferentie.Verbinding v) => v.Bewezen
+            && (v.MelderA == ingang || v.MelderB == ingang)
+            && (v.Afbuigend13 is not bool a || a == w13) && (v.Afbuigend10 is not bool b || b == w10);
+        if (!KruiswisselReferentie.Verbindingen.Any(Past)) return cfg;
+        var nieuw = cfg.MetStand(KruiswisselReferentie.Motor13, w13).MetStand(KruiswisselReferentie.Motor10, w10);
+        uitleg = $"De opdracht begint op de kruiswissel (melder {KruiswisselReferentie.Midden}); de loc komt van melder {ingang}. Motor 13 {(w13 ? "afbuigend" : "rechtdoor")} en 10 {(w10 ? "afbuigend" : "rechtdoor")} worden al VOOR het inrijden gezet (referentie: dit past bij die ingang), zodat er niets onder de staande loc omgezet hoeft te worden.";
+        return nieuw;
+    }
+
+    private async Task NaarStartVan(List<Etappe> route, Configuratie? doel = null)
+    {
+        for (int i = 0; i < route.Count; i++)
         {
+            var e = route[i];
             var cfg = MetEisen(e.Pad, e.Richting, KiesBijIngang(e.Van, e.Richting, e.Pad, e.Configuratie));
+            if (doel is not null && i == route.Count - 1)
+            {
+                cfg = KruisAankomstStand(e, cfg, doel, out var uitleg);
+                if (uitleg is not null) _log.Info(uitleg);
+            }
             await ControleerGeenAlarmVoorStap($"navigatie {e.Van} -> {e.Naar}");
             await ZetConfiguratie(cfg);
             await Rit(e.Van, e.Richting, new RitDoel { Configuratie = cfg, DoelMelder = e.Naar, VerwachtPad = e.Pad });

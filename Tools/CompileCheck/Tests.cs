@@ -688,6 +688,25 @@ public static class Tests
         Eis(stopVoorVraag, "terugzetten: de stop naar alle blokken is gelogd VOORDAT de gebruiker de vraag krijgt");
     }
 
+    static void KruisAankomstTest()
+    {
+        Console.WriteLine("Test: opdracht op de kruiswissel zet motor 13/10 vóór het inrijden (BUG #95)");
+        Etappe E(params int[] pad) => new Etappe { Configuratie = Configuratie.Basis, Richting = Richting.Achteruit, Van = pad[0], Naar = pad[^1], Pad = pad.ToList() };
+        var basis = Configuratie.Basis;
+        var r1 = BaanVerkenner.KruisAankomstStand(E(30, 29, 21, 24), basis, basis.Met(10), out var u1);
+        Eis(r1.Equals(basis.Met(10)) && u1 is not null, "kruisstart: loc komt van 21, opdracht wil 10 afbuigend -> 10 al voor het inrijden afbuigend (bewezen 129<->21)");
+        var r2 = BaanVerkenner.KruisAankomstStand(E(30, 29, 21, 24), basis, basis.Met(13), out var u2);
+        Eis(r2.Equals(basis) && u2 is null, "kruisstart: 13 afbuigend vanaf 21 is niet bewezen -> niets aangepast");
+        var r3 = BaanVerkenner.KruisAankomstStand(E(5, 13, 14, 24), basis, basis.Met(10), out var u3);
+        Eis(r3.Equals(basis) && u3 is null, "kruisstart: vanaf 14 met 10 afbuigend bestaat niet (14<->21 vraagt 10 rechtdoor) -> niets aangepast");
+        var r4 = BaanVerkenner.KruisAankomstStand(E(16, 15, 8, 24), basis, basis.Met(13), out _);
+        Eis(r4.Equals(basis.Met(13)), "kruisstart: vanaf 8 met 13 afbuigend (bewezen 14<->8) -> 13 vooraf afbuigend");
+        var r5 = BaanVerkenner.KruisAankomstStand(E(13, 14), basis, basis.Met(10), out _);
+        Eis(r5.Equals(basis), "kruisstart: een opdracht die niet op melder 24 begint verandert niets");
+        var r6 = BaanVerkenner.KruisAankomstStand(E(30, 29, 21, 24), basis.Met(10), basis.Met(10), out var u6);
+        Eis(r6.Equals(basis.Met(10)) && u6 is null, "kruisstart: staat de gewenste stand al goed -> geen melding");
+    }
+
     static void EchteBloknummersTest()
     {
         Console.WriteLine("Test: alleen echte Dinamo-bloknummers (BUG #88)");
@@ -971,6 +990,7 @@ public static class Tests
         TijdelijkeKortsluitingTest();
         KenVervolgTest();
         StopVoorTerugzettenTest();
+        KruisAankomstTest();
         WisselEisenTest();
         WisselstratenTest();
 
