@@ -66,3 +66,15 @@ Gevolgtrekking (voorlopig): melder 24 wordt ook voor blok 1 gebruikt (niet allee
 
 ## Marco 10-10-2026 18:09 - ingangskant
 Marco bevestigt dat het onthouden van de ingangskant (voorgaande melder + melder + volgende melder + wisselstand) belangrijk is. Gebouwd als BUG #74 (`Baankaart.Doorgangen`). Voor de kruiswissel in sectie 24: de verkenner leert uit de gereden ritten welke ingangskant bij welke stand hoort en kiest die stand voor de eerste stap bij het terugnavigeren; bewijs ontbreekt = niets veranderen. Nog niet getest op de baan.
+
+## Referentie motor 13 en 10 voor een rit door melder 24 (BUG #85, 11-10-2026; bron: baankaart 11:03 en logs 10-10 16:40-17:01; NIET veldgetest door Claude)
+Benen (melders van 24 af naar buiten): blok 1: 129 - 10 - 9 - 1 | blok 3: 14 - 13 - 5 | blok 4: 8 - 15 - 16 | blok 7: 21 - 29 - 30. (Melder 10, 9 en 13 hier zijn BEZETMELDERS, niet de motoren.)
+
+| Rit door 24 (beide richtingen) | Motor 13 | Motor 10 | Status |
+|---|---|---|---|
+| 14 <-> 21 | rechtdoor | rechtdoor | bewezen (13 afbuigend is ook eens gezien, niet nodig) |
+| 14 <-> 8 | afbuigend | vrij (beide gezien) | bewezen |
+| 129 <-> 21 | rechtdoor | afbuigend | bewezen |
+| 129 <-> 8 | onbekend | onbekend | nog nooit gereden: eerst meten, niets afgedwongen |
+
+De standen in de Modeltreinbesturing-wisselstraten (tabel hierboven, "veldgetest") spreken dit deels tegen (7 -> 3 daar (1,1), hier 14 <-> 21 (0,0); 4 -> 3 daar (0,0), hier 13 afbuigend). Beide staan er onaangepast; dit kan op een omgekeerde polariteit van de motoren wijzen, maar dat is NIET bewezen: Marco moet dit bevestigen voordat iets wordt overgenomen of gespiegeld.

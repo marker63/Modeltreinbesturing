@@ -545,6 +545,30 @@ public static class Tests
         Eis(terug.WisselstraatBlokkenVoor(129).SequenceEqual(new[] { 9 }) && terug.BlokVan(13) == 3, "referentie: JSON-rondreis");
     }
 
+    static void KruiswisselReferentieTest()
+    {
+        Console.WriteLine("Test: kruiswissel-referentie (BUG #85)");
+        Configuratie P(List<int> pad, Configuratie c) => KruiswisselReferentie.PasToe(pad, c, out _);
+        var basis = Configuratie.Basis;
+        Eis(P(new List<int> { 14, 24, 21 }, basis.Met(10).Met(13)).Equals(basis), "kruis: 14-24-21 -> 13 en 10 rechtdoor (gaf anders kortsluiting)");
+        Eis(P(new List<int> { 21, 24, 14 }, basis.Met(10)).Equals(basis), "kruis: 21-24-14 achteruit -> ook rechtdoor/rechtdoor");
+        Eis(P(new List<int> { 14, 24, 8 }, basis).Equals(basis.Met(13)), "kruis: 14-24-8 -> motor 13 afbuigend");
+        Eis(P(new List<int> { 14, 24, 8 }, basis.Met(10)).Equals(basis.Met(10).Met(13)), "kruis: 14-24-8 -> motor 10 blijft zoals hij stond (vrij)");
+        Eis(P(new List<int> { 129, 24, 21 }, basis.Met(13)).Equals(basis.Met(10)), "kruis: 129-24-21 -> 13 rechtdoor, 10 afbuigend");
+        Eis(P(new List<int> { 129, 24, 8 }, basis.Met(10).Met(13)).Equals(basis.Met(10).Met(13)), "kruis: 129-24-8 (onbekend) verandert niets");
+        Eis(P(new List<int> { 13, 14, 24 }, basis.Met(10)).Equals(basis.Met(10)), "kruis: pad dat op 24 eindigt verandert niets (ingangskant en uitgang onbekend)");
+        Eis(P(new List<int> { 24, 8 }, basis.Met(5).Met(10).Met(13).Met(14)).Equals(basis.Met(5).Met(10).Met(13).Met(14)), "kruis: 24 -> 8 (start op 24) verandert niets");
+        Eis(P(new List<int> { 14, 24, 21, 29 }, basis.Met(5)).Equals(basis.Met(5)), "kruis: andere wissels (5) blijven onaangeroerd");
+        // twee tegenstrijdige doorgangen in een pad: niets afdwingen voor het strijdige adres
+        Eis(P(new List<int> { 21, 24, 14, 24, 8 }, basis.Met(10)).Equals(basis), "kruis: tegenstrijdige eis (motor 13) wordt niet toegepast, de niet-strijdige (motor 10 rechtdoor) wel");
+        var svg = KruiswisselReferentie.AlsSvg();
+        if (Environment.GetEnvironmentVariable("KRUIS_SVG") is { Length: > 0 } svgPad) File.WriteAllText(svgPad, svg);
+        try { System.Xml.Linq.XDocument.Parse(svg); Eis(true, "kruis: SVG is geldige XML"); } catch (Exception ex) { Eis(false, "kruis: SVG is geldige XML: " + ex.Message); }
+        Eis(new[] { "129", "14", "21", "8", "24" }.All(m => svg.Contains(">" + m + "<")), "kruis: alle benen staan in de tekening");
+        var k = Laad("baankaart_2026-10-11_1103.json");
+        Eis(Rapport.AlsHtml(k).Contains("Kruiswissel in melder 24") && Rapport.AlsTekst(k).Contains("KRUISWISSEL MELDER 24"), "kruis: staat in het rapport (html en tekst)");
+    }
+
     static void KortsluitOplossingTest()
     {
         var k = Laad("baankaart_2026-10-11_1103.json");
@@ -755,6 +779,7 @@ public static class Tests
         AlarmVoorStapTest();
         KortsluitOplossingTest();
         KoploperReferentieTest();
+        KruiswisselReferentieTest();
         WisselEisenTest();
         WisselstratenTest();
 

@@ -224,6 +224,7 @@ ul{margin:6px 0 0 18px;padding:0}
             sb.Append("</table>");
         }
 
+        sb.Append(KruiswisselReferentie.AlsHtml());
         sb.Append("<h2>Blokkenschema</h2><p class=\"uitleg\">Automatisch getekend: de blokken staan in de volgorde waarin de testloc ze bereed. Een pijl betekent dat er in die richting gereden is; bij elke verbinding staan de melders, de rijrichting van de testloc en de wissel. Oranje = een melder met twee mogelijke vervolgen (bijv. de kruiswissel), stippellijn = Dinamo-blok onbekend.</p>");
         try { sb.Append("<div class=\"kaart\" style=\"overflow:auto\">" + SchemaTekening.Maak(k).AlsSvg() + "</div>"); }
         catch (Exception ex) { sb.Append("<p class=\"let\">Het blokkenschema kon niet getekend worden: " + E(ex.Message) + "</p>"); }
@@ -323,6 +324,9 @@ ul{margin:6px 0 0 18px;padding:0}
                 foreach (var d in g.OrderBy(x => x.Richting).ThenBy(x => x.Via).ThenBy(x => x.Volgende))
                     sb.AppendLine($"  melder {d.Melder} ({d.Richting.Tekst()}): vanaf {d.Via} → {d.Volgende}   [{string.Join(" / ", d.Configuraties.Select(c => Configuratie.VanSleutel(c).ToString()))}]  {d.AantalKeer}x");
         }
+
+        Kop("KRUISWISSEL MELDER 24 (REFERENTIE)");
+        sb.Append(KruiswisselReferentie.AlsTekst());
 
         Kop("WISSELSTRATEN (VOORSTEL, NOG NIET GETEST OP DE BAAN)");
         var stratenT = WisselstraatVoorstel.Bereken(k);

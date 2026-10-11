@@ -1158,7 +1158,11 @@ public partial class BaanVerkenner
         var metOplossing = _kaart.MetBekendeKortsluitOplossingen(pad, r, nieuw, out var wijz2);
         if (wijz2.Count > 0)
             _log.Info($"Wisselstand voor het pad {string.Join("-", pad)} ({r.Tekst()}) aangepast om een bekende kortsluiting te vermijden: {string.Join("; ", wijz2)}. Nieuwe stand: {metOplossing}.");
-        return metOplossing;
+        // BUG #85: de vaste kruiswissel-referentie (motor 13 en 10 bij een rit door melder 24) gaat voor alles wat uit kortsluitingen is afgeleid.
+        var metKruis = KruiswisselReferentie.PasToe(pad, metOplossing, out var wijz3);
+        if (wijz3.Count > 0)
+            _log.Info($"Wisselstand voor het pad {string.Join("-", pad)} ({r.Tekst()}) aangepast aan de kruiswissel-referentie: {string.Join("; ", wijz3)}. Nieuwe stand: {metKruis}.");
+        return metKruis;
     }
 
     private async Task NaarStartVan(List<Etappe> route)
