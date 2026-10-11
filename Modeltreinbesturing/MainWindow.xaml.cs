@@ -1536,7 +1536,7 @@ public partial class MainWindow : Window
 
     private void BaanControleren_Click(object sender, RoutedEventArgs e)
     {
-        var dialoog = new BaanControleDialog(_beheerder, _baanBeheerder, _routeBeheerder) { Owner = this };
+        var dialoog = new BaanControleDialog(_beheerder, _baanBeheerder, _routeBeheerder, _wisselstraatBeheerder) { Owner = this };
         dialoog.ShowDialog();
     }
 

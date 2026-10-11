@@ -41,6 +41,14 @@ public static class KruiswisselReferentie
         new(129, 8, null, null, false, "Nog nooit gereden: stand onbekend, er wordt niets afgedwongen. Te meten met een proefrit 8 -> 24 -> 129."),
     };
 
+    /// <summary>BUG #91: de verbinding tussen twee Koploper-blokken (benen), bijv. 7 en 3 = melder 21 en 14. Null als een van beide geen been is.</summary>
+    public static Verbinding? ZoekOpBlok(int blokA, int blokB)
+    {
+        var a = Benen.FirstOrDefault(b => b.KoploperBlok == blokA);
+        var b2 = Benen.FirstOrDefault(b => b.KoploperBlok == blokB);
+        return a is null || b2 is null ? null : Zoek(a.Melders[0], b2.Melders[0]);
+    }
+
     public static Verbinding? Zoek(int a, int b)
         => Verbindingen.FirstOrDefault(v => (v.MelderA == a && v.MelderB == b) || (v.MelderA == b && v.MelderB == a));
 

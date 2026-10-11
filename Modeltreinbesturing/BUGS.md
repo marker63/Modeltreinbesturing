@@ -1479,3 +1479,10 @@ Onderzoek naar Rocrail, Win-Digipet, JMRI en de NMRA-normen: `Modeltreinbesturin
 - Oplossing (`Baanverkenner.Kern/Blokkenschema.cs`): per melderpaar een eigen verbinding (`SchemaVerbinding.VanMelder/NaarMelder`); grensmelders zijn vlakjes (`SchemaMelder`) op de rand, zijde bepaald uit de richting naar het buurblok, volgorde op de plaats van de buren (zelfde volgorde aan beide uiteinden, dus geen kruisende lijnen); een vak wordt breder/hoger als er veel vlakjes op één zijde staan. De kruiswissel (melder 24 met 3-4 buren) is een X met de buurmelders (14, 129, 21, 8) in de hoeken, hoeken zo toegewezen dat ze naar het betreffende blok wijzen; de naam staat aan de kant zonder been. Labels worden niet meer over vakken, melders of andere labels geplaatst; de tekening wordt tot het nodige formaat bijgesneden.
 - `Baanverkenner/BlokkenschemaWindow.xaml.cs` tekent dezelfde indeling (vlakjes en X). Dit WPF-venster is hier NIET gecompileerd; de SVG in het rapport is wel visueel gecontroleerd.
 - Test: CompileCheck `BlokkenschemaTest`. Nog niet getest op de baan.
+
+## #91 - Kruiswissel-referentie ook in Modeltreinbesturing (Marco 14:32)
+- Wens: de referentie voor motor 13 en 10 (#85) ook in de Modeltreinbesturing-module gebruiken.
+- Oplossing: `KruiswisselReferentie.ZoekOpBlok(blokA, blokB)` (Kern) en nieuw `Modeltreinbesturing/KruiswisselControle.cs`; "Controleer mijn baan" (`BaanControleBeheerder`, nu met de wisselstraten) legt de kruiswisselstanden van elke wisselstraat naast de referentie en meldt verschillen als Info. Het WPF-scherm roept dit aan via `BaanControleDialog` (optionele parameter).
+- BEWUST ALLEEN SIGNALEREN: er wordt niets aangepast of gespiegeld. Jouw veldgetest standen blijven leidend (KRUISWISSEL.md); de wisselstraten zijn dus ongewijzigd.
+- Uitkomst op de huidige wisselstraten (testbaan-v24): afwijkend zijn 7->3 (motor 13 en 10), 4->3 (motor 13) en 3->4 (motor 13); 7->1, 3->7 en 1->4 (onbekend) niet. Marco moet bevestigen welke bron klopt (omgekeerde polariteit van de motor?) voordat er iets verandert.
+- Test: CompileCheck `KruiswisselControleTest`. WPF-deel hier niet gecompileerd. Nog niet getest op de baan.

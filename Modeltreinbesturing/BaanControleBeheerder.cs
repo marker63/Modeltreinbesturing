@@ -13,7 +13,7 @@ public record BaanControleMelding(string Ernst, string Omschrijving);
 /// </summary>
 public class BaanControleBeheerder
 {
-    public List<BaanControleMelding> VoerControleUit(BlokBeheerder blokBeheerder, BaanOntwerpBeheerder baanBeheerder, TreinrouteBeheerder routeBeheerder)
+    public List<BaanControleMelding> VoerControleUit(BlokBeheerder blokBeheerder, BaanOntwerpBeheerder baanBeheerder, TreinrouteBeheerder routeBeheerder, WisselstraatBeheerder? wisselstraatBeheerder = null)
     {
         var meldingen = new List<BaanControleMelding>();
 
@@ -84,6 +84,10 @@ public class BaanControleBeheerder
             var namen = string.Join("', '", groep.Select(r => r.Omschrijving));
             meldingen.Add(new BaanControleMelding("Waarschuwing", $"Dienstregelingsconflict: '{namen}' hebben allemaal dezelfde geplande vertrektijd ({groep.Key.GeplandeVertrektijd:hh\\:mm}) vanaf hetzelfde startblok {groep.Key.Startblok.Nummer} - deze kunnen nooit allemaal daadwerkelijk starten."));
         }
+
+        // BUG #91: kruiswisselstanden in de wisselstraten naast de referentie leggen (alleen melden, niets aanpassen)
+        if (wisselstraatBeheerder is not null)
+            meldingen.AddRange(KruiswisselControle.Controleer(wisselstraatBeheerder.Wisselstraten));
 
         return meldingen;
     }

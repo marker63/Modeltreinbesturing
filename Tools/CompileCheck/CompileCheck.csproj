@@ -16,6 +16,7 @@
     <Compile Include="../../Modeltreinbesturing/BaankaartImporter.cs" />
     <Compile Include="../../Modeltreinbesturing/WisselstraatImporter.cs" />
     <Compile Include="../../Modeltreinbesturing/DienstAanvuller.cs" />
+    <Compile Include="../../Modeltreinbesturing/KruiswisselControle.cs" />
     <Compile Include="../../Modeltreinbesturing/TreinrouteBeheerder.cs" />
     <Compile Include="../../Modeltreinbesturing/RichtingsverbodBeheerder.cs" />
     <None Include="testdata/*.json" CopyToOutputDirectory="PreserveNewest" />

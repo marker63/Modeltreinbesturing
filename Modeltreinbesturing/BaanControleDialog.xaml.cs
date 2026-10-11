@@ -4,10 +4,10 @@ namespace Modeltreinbesturing;
 
 public partial class BaanControleDialog : Window
 {
-    public BaanControleDialog(BlokBeheerder blokBeheerder, BaanOntwerpBeheerder baanBeheerder, TreinrouteBeheerder routeBeheerder)
+    public BaanControleDialog(BlokBeheerder blokBeheerder, BaanOntwerpBeheerder baanBeheerder, TreinrouteBeheerder routeBeheerder, WisselstraatBeheerder? wisselstraatBeheerder = null)
     {
         InitializeComponent();
-        var meldingen = new BaanControleBeheerder().VoerControleUit(blokBeheerder, baanBeheerder, routeBeheerder);
+        var meldingen = new BaanControleBeheerder().VoerControleUit(blokBeheerder, baanBeheerder, routeBeheerder, wisselstraatBeheerder);
 
         SamenvattingTekst.Text = meldingen.Count == 0
             ? "Geen bijzonderheden gevonden."

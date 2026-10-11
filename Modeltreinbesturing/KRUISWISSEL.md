@@ -78,3 +78,6 @@ Benen (melders van 24 af naar buiten): blok 1: 129 - 10 - 9 - 1 | blok 3: 14 - 1
 | 129 <-> 8 | onbekend | onbekend | nog nooit gereden: eerst meten, niets afgedwongen |
 
 De standen in de Modeltreinbesturing-wisselstraten (tabel hierboven, "veldgetest") spreken dit deels tegen (7 -> 3 daar (1,1), hier 14 <-> 21 (0,0); 4 -> 3 daar (0,0), hier 13 afbuigend). Beide staan er onaangepast; dit kan op een omgekeerde polariteit van de motoren wijzen, maar dat is NIET bewezen: Marco moet dit bevestigen voordat iets wordt overgenomen of gespiegeld.
+
+## Controle in Modeltreinbesturing (BUG #91, 11-10-2026)
+"Controleer mijn baan" vergelijkt de kruisstanden van de wisselstraten met de referentie hierboven en meldt verschillen (Info). Het past NIETS aan. Afwijkend op testbaan-v24: 7 -> 3, 4 -> 3 en 3 -> 4; de door Claude gespiegelde 3 -> 7 (0,0) komt wel overeen met de referentie. Wacht op bevestiging van Marco welke bron klopt.

@@ -641,6 +641,29 @@ public static class Tests
         Eis(blokken.All(b => b.Buren.All(n => blokken.Any(x => x.Nummer == n))), "bloknummers: buren verwijzen naar bestaande blokken");
     }
 
+    static void KruiswisselControleTest()
+    {
+        Console.WriteLine("Test: kruiswisselstanden in wisselstraten naast de referentie (BUG #91)");
+        var kw = new Kruiswissel { Adres = 13, Adres2 = 10, IsEngels = true };
+        Blok B(int n) => new Blok { Nummer = n };
+        Wisselstraat W(int van, int naar, WisselStand s13, WisselStand s10)
+        {
+            var w = new Wisselstraat { Van = B(van), Naar = B(naar) };
+            w.Kruiswisselstanden.Add(new KruiswisselInWisselstraat { Kruiswissel = kw, StandAdres = s13, StandAdres2 = s10 });
+            return w;
+        }
+        var R = WisselStand.Rechtdoor; var A = WisselStand.Afbuigend;
+        var lijst = new List<Wisselstraat> { W(7, 3, A, A), W(4, 3, R, R), W(7, 1, R, A), W(3, 4, R, R), W(3, 7, R, R), W(1, 4, A, A) };
+        var m = KruiswisselControle.Controleer(lijst);
+        Eis(m.Count == 3, "kruiswisselcontrole: 7->3, 4->3 en 3->4 wijken af; 3->7, 7->1 en 1->4 niet (samen 3 meldingen) (nu " + m.Count + ")");
+        Eis(m.Any(x => x.Omschrijving.Contains("blok 7 -> 3") && x.Omschrijving.Contains("motor 13") && x.Omschrijving.Contains("motor 10")), "kruiswisselcontrole: 7->3 wijkt af op motor 13 en 10");
+        Eis(m.Any(x => x.Omschrijving.Contains("blok 4 -> 3") && x.Omschrijving.Contains("motor 13") && !x.Omschrijving.Contains("motor 10")), "kruiswisselcontrole: 4->3 wijkt alleen af op motor 13 (motor 10 vrij)");
+        Eis(!m.Any(x => x.Omschrijving.Contains("blok 7 -> 1")), "kruiswisselcontrole: 7->1 (13 rechtdoor, 10 afbuigend) klopt met de referentie");
+        Eis(!m.Any(x => x.Omschrijving.Contains("blok 1 -> 4")), "kruiswisselcontrole: 1->4 is nog nooit gereden: geen oordeel");
+        Eis(lijst[0].Kruiswisselstanden[0].StandAdres == A && lijst[1].Kruiswisselstanden[0].StandAdres == R, "kruiswisselcontrole: de wisselstraten zijn NIET aangepast");
+        Eis(KruiswisselControle.Controleer(new List<Wisselstraat>()).Count == 0, "kruiswisselcontrole: lege lijst geeft niets");
+    }
+
     static void KortsluitOplossingTest()
     {
         var k = Laad("baankaart_2026-10-11_1103.json");
@@ -869,6 +892,7 @@ public static class Tests
         HandmatigeOplossingTest();
         StopHerhalingTest();
         EchteBloknummersTest();
+        KruiswisselControleTest();
         WisselEisenTest();
         WisselstratenTest();
 
