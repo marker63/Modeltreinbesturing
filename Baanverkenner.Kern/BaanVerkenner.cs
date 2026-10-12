@@ -1478,6 +1478,30 @@ public partial class BaanVerkenner
         }
     }
 
+    /// <summary>BUG #105: de weg VOORUIT (in de rijrichting van de rit) van de laatste melder van <paramref name="rit"/> naar <paramref name="start"/>,
+    /// als elke stap daarvan eerder met precies wisselstand <paramref name="c"/> is gereden, er nergens een keuze is (één vervolgmelder) en de weg
+    /// strikt korter is dan de weg terug langs de rit. Anders null. De loc moet nu op de laatste melder staan.</summary>
+    internal static List<int>? DoorrijdenNaarStart(Baankaart kaart, int start, RitResultaat rit, Configuratie c, ISet<int> bezet)
+    {
+        if (rit.Reeks.Count < 3) return null;
+        int huidig = rit.Reeks[^1];
+        if (!bezet.Contains(huidig)) return null;
+        var pad = new List<int> { huidig };
+        for (int i = 0; i < rit.Reeks.Count - 2; i++)
+        {
+            int van = huidig;
+            var volg = kaart.Overgangen
+                .Where(o => o.Van == van && o.Richting == rit.Richting && o.GezienBijConfiguraties.Contains(c.Sleutel))
+                .Select(o => o.Naar).Distinct().ToList();
+            if (volg.Count != 1) return null;
+            huidig = volg[0];
+            if (pad.Contains(huidig) && huidig != start) return null;
+            pad.Add(huidig);
+            if (huidig == start) return pad;
+        }
+        return null;
+    }
+
     /// <summary>Na een rit terug naar de startmelder van die rit (achteruit langs dezelfde
     /// melders - meteen ook de controle dat de weg terug klopt).</summary>
     private async Task TerugNaar(int start, RitResultaat rit, Configuratie c)
@@ -1486,6 +1510,21 @@ public partial class BaanVerkenner
         if (rit.Reeks[^1] == start || (bezet.Count == 1 && bezet.Contains(start)))
         {
             await Nastellen(start, rit.Richting, achter: rit.Reeks.Count >= 2 && rit.Reeks[^1] == start ? rit.Reeks[^2] : null);
+            return;
+        }
+        // BUG #105 (log 08:46): na de proef met wissel 2 afbuigend stond de loc op melder 5, één melder voor de startmelder 13 van de lus. Hij reed de hele
+        // lus achteruit terug (15 melders, ruim twee minuten) in plaats van één melder vooruit. Is de weg vooruit naar de startmelder bekend (elke stap
+        // eerder gereden met precies deze wisselstand, zonder keuze) en korter dan de weg terug, dan wordt die genomen.
+        var door = DoorrijdenNaarStart(_kaart, start, rit, c, bezet);
+        if (door is not null)
+        {
+            _log.Info($"Terug naar melder {start} door verder te rijden ({Lijst(door)}, {rit.Richting.Tekst()}) in plaats van {rit.Reeks.Count - 1} melders terug: die weg is eerder met deze wisselstand gereden.");
+            var cDoor = MetEisen(door, rit.Richting, KiesBijIngang(door[0], rit.Richting, door, c));
+            await ControleerGeenAlarmVoorStap($"doorrijden naar melder {start}");
+            await ZetConfiguratie(cDoor);
+            var klaar = await Rit(door[0], rit.Richting, new RitDoel { Configuratie = cDoor, DoelMelder = start, VerwachtPad = door });
+            if (klaar.Einde == RitEinde.Kortsluiting)
+                throw new NavigatieFout($"Bij het doorrijden naar melder {start} volgde een kortsluiting: de loc staat niet op melder {start}.");
             return;
         }
         var pad = rit.Reeks.ToList();

@@ -299,6 +299,25 @@ public static class Tests
         Eis(v.Kaart.Doorgangen.Any(d => d.Via == 2 && d.Melder == 3 && d.Volgende == 4 && d.Richting == Richting.Vooruit), "doorgangen: ingangskant blijft bekend over de ritgrens (2 -> 3 -> 4)");
     }
 
+    // BUG #105: terug naar de startmelder door verder te rijden als dat korter is dan de hele lus terug
+    static void DoorrijdenTest()
+    {
+        var k = new Baankaart();
+        int[] lus = { 13, 14, 24, 21, 29, 30, 20, 27, 28, 26, 25, 17, 8, 15, 16, 5, 13 };
+        for (int i = 0; i + 1 < lus.Length; i++) k.RegistreerOvergang(lus[i], lus[i + 1], Richting.Vooruit, Configuratie.Basis, 3.0);
+        var rit = new RitResultaat { Richting = Richting.Vooruit };
+        foreach (var m in lus.Take(lus.Length - 1)) rit.Reeks.Add(m); // gestopt op 5, vlak voor 13
+        var p = BaanVerkenner.DoorrijdenNaarStart(k, 13, rit, Configuratie.Basis, new HashSet<int> { 5, 16 });
+        Eis(p is not null && p.SequenceEqual(new[] { 5, 13 }), "doorrijden: vanaf 5 één melder vooruit naar 13 in plaats van 15 melders terug (nu " + (p is null ? "geen" : string.Join(",", p)) + ")");
+        Eis(BaanVerkenner.DoorrijdenNaarStart(k, 13, rit, Configuratie.Basis, new HashSet<int> { 16 }) is null, "doorrijden: staat de loc niet op de laatste melder -> niet doorrijden");
+        Eis(BaanVerkenner.DoorrijdenNaarStart(k, 13, rit, new Configuratie(new[] { 2 }), new HashSet<int> { 5 }) is null, "doorrijden: weg niet met deze wisselstand gereden -> niet doorrijden");
+        var half = new RitResultaat { Richting = Richting.Vooruit };
+        foreach (var m in lus.Take(9)) half.Reeks.Add(m); // gestopt op 28, halverwege: vooruit en terug even ver
+        Eis(BaanVerkenner.DoorrijdenNaarStart(k, 13, half, Configuratie.Basis, new HashSet<int> { 28 }) is null, "doorrijden: halverwege de lus is vooruit niet korter dan terug -> terug zoals voorheen");
+        k.RegistreerOvergang(5, 12, Richting.Vooruit, Configuratie.Basis, 3.0);
+        Eis(BaanVerkenner.DoorrijdenNaarStart(k, 13, rit, Configuratie.Basis, new HashSet<int> { 5 }) is null, "doorrijden: twee mogelijke vervolgen -> niet doorrijden (geen keuze maken)");
+    }
+
     // BUG #104: "Voltooide baan nogmaals checken": de bestaande kaart blijft onaangeroerd, de baan wordt opnieuw gereden en vergeleken
     static void ControleRondeTest()
     {
@@ -1172,6 +1191,7 @@ public static class Tests
         DoorgangTest();
         UitbreidenTest();
         ControleRondeTest();
+        DoorrijdenTest();
         TweedeMelderTest();
         VerkeerdeWisselVraagTest();
         WisselstraatImportTest();

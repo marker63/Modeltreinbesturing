@@ -1588,3 +1588,11 @@ Beperkingen: Dinamo-blokken en bekende wisselstanden worden in de controle gebru
 traject van de huidige startmelder.
 Test: `ControleRondeTest` (simulatie: geen verschillen, kaart ongewijzigd, verschillen worden gemeld, JSON-rondreis). WPF-deel (knop, vragen, venster) niet
 gecompileerd hier en nog niet getest op de baan.
+
+## #105 - Na een kortsluiting vlak voor de startmelder de hele lus achteruit terug (Marco 08:49, controle 08:38-08:47)
+Controle-log 08:45:29: adres 2 afbuigend gaf (bekend) kortsluiting na melder 5, de loc stond één melder voor de startmelder 13 van de lus. `TerugNaar` reed de
+rit omgekeerd terug: 5-16-15-8-17-25-26-28-27-20-30-29-21-24-14-13, 15 melders, ruim twee minuten, terwijl 5 -> 13 vooruit één melder is.
+Nu: `DoorrijdenNaarStart` zoekt de weg vooruit naar de startmelder. Alleen als elke stap eerder met precies de huidige wisselstand is gereden, er nergens een keuze is
+(één vervolgmelder), de weg strikt korter is dan terug en de loc nog op de laatste melder van de rit staat. Anders gaat alles zoals voorheen. Wisselstanden gaan
+door `MetEisen`. Test: `DoorrijdenTest` (5 gevallen). Niet gesimuleerd als volledige rit; nog niet getest op de baan.
+Bevestigd uit het hardwarelog: de loc reed niet "vanzelf", hij kreeg om 08:46:49 het rijcommando van de verkenner (2 s na wissel 2 -> rechtdoor).
