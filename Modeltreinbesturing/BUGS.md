@@ -1693,3 +1693,11 @@ wordt teruggezet. Dit geldt voor alle stops van de adrestest (ook #106 en openst
 Test: `ProefStopTest` (5 regels). Nog niet getest op de baan; het WPF-project is niet gecompileerd.
 Gevolg: bij het zelfde proefadres wordt de kortsluiting niet opnieuw 'bewezen'; de bekende waarneming blijft in de kaart staan. De controle meldt zo'n wissel mogelijk als "niet opnieuw vastgesteld".
 Open: of de loc bij stoppen op de voorlaatste melder altijd ver genoeg van de tong staat (bij een lange loc op een kort blok) is niet getest.
+
+## #116 Overloopwissels ontbraken in de wisselstraatvoorstellen en dus in de import (Marco 15:56)
+Het rapport gaf voor 5 -> 12 alleen "wissel 2 afbuigend (aangenomen)", terwijl de kaart weet dat wissel 1 mee afbuigend moet staan (overloopwissel die de kortsluiting oplost).
+Oplossing: `Wisselstraten.VoegOverloopToe`: een bekende kortsluitoplossing (zelfde richting, NaMelder is begin of eind van de overgang) wordt als extra eis `EisBron.Overloop`
+toegevoegd ("overloopwissel, bewezen") als alle afbuigende wissels van de configuratie al in de eisen staan en het oplossingsadres er nog niet in zit.
+`WisselstraatImporter` neemt alle `v.Eisen` over, dus de overloopwissels komen daarmee in de ingelezen wisselstraten; alleen `Aangenomen` blijft een waarschuwing.
+Test: `OverloopStraatTest` (4 regels: 5 -> 12 geeft wissel 2 én wissel 1 afbuigend). Nog niet getest op de baan; het WPF-project is niet gecompileerd.
+Let op: de voorstellen worden bij het exporteren van de baankaart berekend; exporteer de kaart opnieuw met deze versie en importeer die.

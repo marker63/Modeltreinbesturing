@@ -2,8 +2,9 @@ namespace Baanverkenner.Kern;
 
 /// <summary>Waar een wisseleis vandaan komt: <see cref="Splitsing"/> = uit een gevonden splitsing (rijden vanaf de puntzijde of van achteren
 /// door dezelfde wissel), <see cref="Kortsluiting"/> = de andere stand gaf kortsluiting bij het omzetten, <see cref="Aangenomen"/> = deze wissel
-/// stond afbuigend bij de (minimale) wisselstand waarmee de overgang gereden is - niet bewezen dat hij ook echt nodig is.</summary>
-public enum EisBron { Splitsing, Kortsluiting, Aangenomen }
+/// stond afbuigend bij de (minimale) wisselstand waarmee de overgang gereden is - niet bewezen dat hij ook echt nodig is,
+/// <see cref="Overloop"/> = BUG #116: partnerwissel van een overloopverbinding (twee wissels samen afbuigend), bewezen door een opgelost kortsluitpunt.</summary>
+public enum EisBron { Splitsing, Kortsluiting, Aangenomen, Overloop }
 
 public class WisselEis
 {
@@ -35,6 +36,7 @@ public class WisselstraatVoorstel
     {
         EisBron.Splitsing => " (uit splitsing)",
         EisBron.Kortsluiting => " (anders kortsluiting)",
+        EisBron.Overloop => " (overloopwissel, bewezen)",
         _ => " (aangenomen)"
     })));
 
@@ -48,6 +50,7 @@ public class WisselstraatVoorstel
         var labelVan = new Dictionary<int, string>();
         foreach (var b in blokken) foreach (var m in b.Melders) { blokVan[m] = b.Nummer; labelVan[m] = b.Label; }
         var gezien = new HashSet<string>();
+        var oplossingen = k.AlleKortsluitOplossingen();
 
         foreach (var o in k.Overgangen.OrderBy(o => o.Van).ThenBy(o => o.Naar).ThenBy(o => o.Richting))
         {
@@ -89,9 +92,10 @@ public class WisselstraatVoorstel
                     .Select(e => new WisselEis { Adres = e.Adres, Afbuigend = e.Afbuigend, Bron = e.Bron }).ToList();
                 foreach (var a in m.Afbuigend)
                     if (!eisen.Any(e => e.Adres == a)) eisen.Add(new WisselEis { Adres = a, Afbuigend = true, Bron = EisBron.Aangenomen });
+                VoegOverloopToe(eisen, o, oplossingen);
                 opties.Add((eisen, m.Sleutel));
             }
-            if (opties.Count == 0) opties.Add((basis, ""));
+            if (opties.Count == 0) { VoegOverloopToe(basis, o, oplossingen); opties.Add((basis, "")); }
             // Een optie met alle eisen van een andere optie en nog meer is overbodig
             string[] Set((List<WisselEis> Eisen, string Standen) opt) => opt.Eisen.Select(e => $"{e.Adres}{(e.Afbuigend ? 'A' : 'R')}").ToArray();
             opties = opties.Where(a => !opties.Any(b => !ReferenceEquals(a.Eisen, b.Eisen) && Set(b).Length < Set(a).Length && Set(b).All(Set(a).Contains))).ToList();
@@ -107,5 +111,21 @@ public class WisselstraatVoorstel
             }
         }
         return res;
+    }
+
+    /// <summary>BUG #116: staan in <paramref name="eisen"/> alle wissels van een bewezen kortsluitstand afbuigend en gaat de stap langs de melder van dat
+    /// kortsluitpunt, dan hoort de bewezen oplossing (de partnerwissel van de overloopverbinding) erbij. Zonder dat rijdt de wisselstraat in de
+    /// kortsluiting (bijv. 5 -> 12 met wissel 2 afbuigend vraagt ook wissel 1 afbuigend). Botst de oplossing met een bestaande eis voor dat adres,
+    /// dan geldt de bestaande eis (de oplossing hoort dan bij een andere stap, bijv. wissel 2 rechtdoor voor 5 -> 16).</summary>
+    internal static void VoegOverloopToe(List<WisselEis> eisen, Overgang o, List<KortsluitOplossing> oplossingen)
+    {
+        foreach (var sol in oplossingen)
+        {
+            if (sol.Richting != o.Richting || (sol.NaMelder != o.Van && sol.NaMelder != o.Naar)) continue;
+            var kStand = Configuratie.VanSleutel(sol.Stand);
+            if (kStand.Afbuigend.Length == 0 || !kStand.Afbuigend.All(a => eisen.Any(e => e.Adres == a && e.Afbuigend))) continue;
+            if (eisen.Any(e => e.Adres == sol.Adres)) continue;
+            eisen.Add(new WisselEis { Adres = sol.Adres, Afbuigend = sol.Afbuigend, Bron = EisBron.Overloop });
+        }
     }
 }

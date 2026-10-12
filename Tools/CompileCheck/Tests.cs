@@ -1117,6 +1117,23 @@ public static class Tests
         Eis(!BaanVerkenner.IsKruiswisselMotorKortsluiting(10, Rit(RitEinde.Lus, 14, 24)), "kruismotor: zonder kortsluiting niets bijzonders");
     }
 
+    static void OverloopStraatTest()
+    {
+        // BUG #116: wissel 2 afbuigend (5 -> 12) vraagt ook wissel 1 afbuigend; 5 -> 16 blijft zonder wissels
+        var k = new Baankaart();
+        k.Overgangen.Add(new Overgang { Van = 5, Naar = 12, Richting = Richting.Achteruit, AantalKeer = 2, GezienBijConfiguraties = { "2" } });
+        k.Overgangen.Add(new Overgang { Van = 13, Naar = 5, Richting = Richting.Achteruit, AantalKeer = 30, GezienBijConfiguraties = { "", "2" } });
+        k.Kortsluitpunten.Add(new Kortsluitpunt { Id = 1, NaMelder = 12, Richting = Richting.Achteruit, Configuratie = Configuratie.Basis.Met(2), Opgelost = true, OpgelostDoorAdres = 1, OpgelostMetAfbuigend = true });
+        k.Kortsluitpunten.Add(new Kortsluitpunt { Id = 5, NaMelder = 5, Richting = Richting.Achteruit, Configuratie = Configuratie.Basis.Met(2), Opgelost = true, OpgelostDoorAdres = 2, OpgelostMetAfbuigend = false });
+        var v = WisselstraatVoorstel.Bereken(k);
+        var s512 = v.Where(x => x.VanMelder == 5 && x.NaarMelder == 12).ToList();
+        Eis(s512.Count == 1 && s512[0].Eisen.Any(e => e.Adres == 2 && e.Afbuigend) && s512[0].Eisen.Any(e => e.Adres == 1 && e.Afbuigend && e.Bron == EisBron.Overloop), "overloopstraat (#116): 5 -> 12 heeft wissel 2 en wissel 1 afbuigend (nu " + (s512.Count > 0 ? s512[0].EisenTekst : "geen") + ")");
+        Eis(!s512.Any(x => x.Eisen.Any(e => e.Adres == 2 && !e.Afbuigend)), "overloopstraat (#116): oplossing 'wissel 2 rechtdoor' botst en wordt niet toegepast op 5 -> 12");
+        var s135 = v.Where(x => x.VanMelder == 13 && x.NaarMelder == 5).ToList();
+        Eis(s135.Count > 0 && s135.All(x => !x.Eisen.Any(e => e.Adres == 1)), "overloopstraat (#116): 13 -> 5 zonder wissel 2 krijgt wissel 1 niet");
+        Eis(s512[0].EisenTekst.Contains("overloopwissel"), "overloopstraat (#116): tekst noemt de overloopwissel");
+    }
+
     static void ProefStopTest()
     {
         // BUG #115 (log 14:02 en 14:37)
@@ -1370,6 +1387,7 @@ public static class Tests
         StaartWisselTest();
         AltijdAfbuigendTest();
         ProefStopTest();
+        OverloopStraatTest();
         TweedeMelderTest();
         VerkeerdeWisselVraagTest();
         WisselstraatImportTest();

@@ -16,7 +16,7 @@ Bijna alles uit #61-#115 is verkenlogica (ritten, proefstops, controle) en hoort
    (blok rood) en geen wissel- of rijcommando's naar het alarmblok zolang het alarm staat.
 3. **Wissel niet omzetten terwijl de loc erop staat (#80, #110).** In de Baanverkenner afgedekt via `WisselsBijBezet`. Controleren of routes/wisselstraten in het hoofdprogramma
    een wissel kunnen omzetten terwijl het blok bezet is (kruiswissel 13/10 in melder 24 in het bijzonder), en dat zo nodig blokkeren of uitstellen.
-4. **Overloopwissels en kortsluitoplossingen uit de baankaart importeren (open vraag bij #64).** `BaankaartImporter` gebruikt de wisselwaarnemingen nog niet. Voorstel: bij het
+4. **Overloopwissels uit de baankaart importeren (open vraag bij #64) — OVERLOOPWISSELS GEDAAN in #116, nog niet getest op de baan.** `BaankaartImporter` gebruikt de wisselwaarnemingen nog niet. Voorstel: bij het
    importeren de combinaties "wissel A én B afbuigend" meenemen in de wisselstraten (nu alleen voorgesteld, niet ingelezen).
 5. **Opstartstand van de Dinamo bewaren (#101)** en het hervatten met de loc op de juiste plek: bekijken of het hoofdprogramma dezelfde 'loc staat al goed' situatie heeft bij het opstarten.
 6. **Wisseleffect-controle (open vanaf #65).** Een wissel met bewezen effect die later geen effect meer heeft, melden als "wissel reageert niet, Dinamo opnieuw opstarten".
