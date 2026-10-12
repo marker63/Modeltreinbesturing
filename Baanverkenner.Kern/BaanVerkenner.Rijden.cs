@@ -1398,7 +1398,40 @@ public partial class BaanVerkenner
         if (bezet.Count != 1) { _log.Info($"De loc staat niet op precies één melder (bezet: {Lijst(bezet)}); de verkenner rijdt niet zelf terug."); return false; }
         int x = bezet.Single();
         var idx = ZelfTerugIndex(route, x, _kaart.StartMelder);
-        if (idx is null) { _log.Info($"Melder {x} ligt niet op de route terug; de verkenner rijdt niet zelf terug."); return false; }
+        if (idx is null)
+        {
+            // BUG #106 (log 09:06): een opdracht die op de startmelder zelf begint heeft een lege route, dus "ligt niet op de route terug" terwijl
+            // de loc op de bekende basis-lus stond. Dan de kortste bekende weg met alle wissels rechtdoor.
+            var weg = ZelfTerugWeg(_kaart, x, _kaart.StartMelder);
+            if (weg is null) { _log.Info($"Melder {x} ligt niet op de route terug en er is geen bekende weg met alle wissels rechtdoor naar melder {_kaart.StartMelder}; de verkenner rijdt niet zelf terug."); return false; }
+            _log.Info($"De kortsluiting is weg en de loc staat op melder {x}: de verkenner rijdt zelf terug naar melder {_kaart.StartMelder} over de bekende basisweg ({Lijst(new[] { x }.Concat(weg.Select(s => s.Naar)).ToList())}) (niet getest op de baan).");
+            _kortsluitingGemeld = false;
+            try
+            {
+                int k = 0;
+                while (k < weg.Count)
+                {
+                    var r = weg[k].Richting;
+                    var pad = new List<int> { weg[k].Van };
+                    while (k < weg.Count && weg[k].Richting == r) { pad.Add(weg[k].Naar); k++; }
+                    var cfg = MetEisen(pad, r, KiesBijIngang(pad[0], r, pad, Configuratie.Basis));
+                    await ControleerGeenAlarmVoorStap($"terugweg {pad[0]} -> {pad[^1]}");
+                    await ZetConfiguratie(cfg);
+                    var terug = await Rit(pad[0], r, new RitDoel { Configuratie = cfg, DoelMelder = pad[^1], VerwachtPad = pad });
+                    if (terug.Einde == RitEinde.Kortsluiting) throw new NavigatieFout($"Op de terugweg naar melder {pad[^1]} volgde een kortsluiting.");
+                }
+            }
+            catch (NavigatieFout f)
+            {
+                _log.Waarschuwing($"Zelf terugrijden mislukte: {f.Message}");
+                await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);
+                return false;
+            }
+            await ZetConfiguratie(Configuratie.Basis);
+            await Wacht(TimeSpan.FromSeconds(1));
+            _monitor.Bijwerken();
+            idx = -1;
+        }
         if (idx.Value >= 0)
         {
             _log.Info($"De kortsluiting is weg en de loc staat op melder {x}: de verkenner rijdt zelf terug naar melder {_kaart.StartMelder} (niet getest op de baan).");

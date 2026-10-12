@@ -318,6 +318,29 @@ public static class Tests
         Eis(BaanVerkenner.DoorrijdenNaarStart(k, 13, rit, Configuratie.Basis, new HashSet<int> { 5 }) is null, "doorrijden: twee mogelijke vervolgen -> niet doorrijden (geen keuze maken)");
     }
 
+    // BUG #106: adrestest stopt vóór een stap die het adres rechtdoor eist; zelf terug via de bekende basisweg zonder route
+    static void Wissel14Test()
+    {
+        var k = new Baankaart();
+        k.Wissel(14).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.Splitsing, NaMelder = 8, Richting = Richting.Achteruit, VolgendeBijRechtdoor = 17, VolgendeBijAfbuigend = 24 });
+        var reeks = new List<int> { 8, 15, 16, 5, 13, 14, 24, 21, 29, 30, 20, 27, 28, 26, 25, 17, 8 };
+        var s = BaanVerkenner.EisConflictStops(k, reeks, Richting.Vooruit, 14);
+        Eis(s.SetEquals(new[] { 17 }), "wissel 14: afbuigend testen stopt op melder 17, vóór 17 -> 8 (nu " + string.Join(",", s) + ")");
+        Eis(BaanVerkenner.EisConflictStops(k, reeks, Richting.Vooruit, 9).Count == 0, "wissel 14: een ander adres krijgt geen extra stop");
+        Eis(BaanVerkenner.EisConflictStops(k, reeks, Richting.Achteruit, 14).Count == 0, "wissel 14: in de andere richting geen conflict");
+
+        var lus = new[] { 8, 15, 16, 5, 13, 14, 24, 21, 29, 30, 20, 27, 28, 26, 25, 17, 8 };
+        var kb = new Baankaart();
+        for (int i = 0; i + 1 < lus.Length; i++) kb.RegistreerOvergang(lus[i], lus[i + 1], Richting.Vooruit, Configuratie.Basis, 3.0);
+        var w = BaanVerkenner.ZelfTerugWeg(kb, 13, 8);
+        Eis(w is not null && w.Count == 12 && w[0].Van == 13 && w[^1].Naar == 8 && w.All(x => x.Richting == Richting.Vooruit), "zelf terug: van 13 naar 8 vooruit over de basis-lus (nu " + (w is null ? "geen" : w.Count.ToString()) + " stappen)");
+        Eis(BaanVerkenner.ZelfTerugWeg(kb, 8, 8)!.Count == 0, "zelf terug: al op de startmelder -> lege weg");
+        Eis(BaanVerkenner.ZelfTerugWeg(kb, 99, 8) is null, "zelf terug: onbekende melder -> geen weg");
+        var kz = new Baankaart();
+        kz.RegistreerOvergang(5, 13, Richting.Vooruit, new Configuratie(new[] { 2 }), 3.0);
+        Eis(BaanVerkenner.ZelfTerugWeg(kz, 5, 13) is null, "zelf terug: alleen met afbuigende wissel gereden -> geen basisweg");
+    }
+
     // BUG #104: "Voltooide baan nogmaals checken": de bestaande kaart blijft onaangeroerd, de baan wordt opnieuw gereden en vergeleken
     static void ControleRondeTest()
     {
@@ -1192,6 +1215,7 @@ public static class Tests
         UitbreidenTest();
         ControleRondeTest();
         DoorrijdenTest();
+        Wissel14Test();
         TweedeMelderTest();
         VerkeerdeWisselVraagTest();
         WisselstraatImportTest();

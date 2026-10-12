@@ -1596,3 +1596,16 @@ Nu: `DoorrijdenNaarStart` zoekt de weg vooruit naar de startmelder. Alleen als e
 (één vervolgmelder), de weg strikt korter is dan terug en de loc nog op de laatste melder van de rit staat. Anders gaat alles zoals voorheen. Wisselstanden gaan
 door `MetEisen`. Test: `DoorrijdenTest` (5 gevallen). Niet gesimuleerd als volledige rit; nog niet getest op de baan.
 Bevestigd uit het hardwarelog: de loc reed niet "vanzelf", hij kreeg om 08:46:49 het rijcommando van de verkenner (2 s na wissel 2 -> rechtdoor).
+
+## #106 - Wissel 14: de controle veroorzaakte zelf een kortsluiting en kon de loc niet terugrijden (Marco 09:09, log 09:06)
+Oorzaak (hardwarelog/log 09:04-09:07): de adrestest zette adres 14 afbuigend tijdens de basisrit, die daarna 17 -> 8 vooruit moest rijden. Volgens de kaart (splitsing
+na melder 8 achteruit: rechtdoor naar 17, afbuigend naar 24) vraagt die stap wissel 14 rechtdoor, dus de test veroorzaakte zelf de kortsluiting in blok 4
+(begin 09:04:09, weg 2 s nadat 14 weer rechtdoor stond). Daarna zette de partnerzoektocht wissel 13 om en gaf de verkenner op. `ProbeerZelfTerugNaarStart`
+zei "melder 8 ligt niet op de route terug" omdat de route van een opdracht die op de startmelder begint leeg is, dus moest Marco de loc zelf op 13 zetten.
+Nu: (a) `EisConflictStops`: de rit stopt op de melder vóór een stap waarvan de kaart eist dat het geteste adres rechtdoor staat (hier melder 17); dat telt in
+`Vergelijk` als "geen verschil" en veroorzaakt geen kortsluiting. (b) `ZelfTerugWeg`: ligt de loc niet op de route, dan rijdt de verkenner de kortste bekende weg
+(overgangen gereden met alle wissels rechtdoor, elke stap in eigen rijrichting) naar de startmelder, met wisselstanden via `MetEisen`.
+Test: `Wissel14Test` (stop op 17, geen stop bij ander adres of andere richting, weg 13 -> 8 in 12 stappen, geen weg bij onbekend/alleen-afbuigend).
+Gevolg voor de controleronde: adres 14 wordt zo mogelijk niet op die stap opnieuw bewezen; het verslag kan dat als 'niet opnieuw gevonden' tonen. De ritten zelf
+zijn niet gesimuleerd; nog niet getest op de baan.
+Niet onderzocht: de kortsluiting van 09:06:45 bij opdracht #2 (13 achteruit, na melder 16).

@@ -517,6 +517,36 @@ public partial class BaanVerkenner
         return idx < 0 ? null : idx;
     }
 
+    /// <summary>BUG #106: kortste bekende weg (aantal stappen) van <paramref name="van"/> naar <paramref name="naar"/> over overgangen die met alle
+    /// wissels rechtdoor gereden zijn, elke stap in zijn eigen rijrichting. Null als er geen is; lege lijst als van == naar.</summary>
+    internal static List<(int Van, int Naar, Richting Richting)>? ZelfTerugWeg(Baankaart kaart, int van, int naar)
+    {
+        if (van == naar) return new();
+        string basis = Configuratie.Basis.Sleutel;
+        var vorige = new Dictionary<int, (int Van, Richting R)>();
+        var rij = new Queue<int>(); rij.Enqueue(van);
+        var gezien = new HashSet<int> { van };
+        while (rij.Count > 0)
+        {
+            int m = rij.Dequeue();
+            foreach (var o in kaart.Overgangen.Where(o => o.Van == m && o.GezienBijConfiguraties.Contains(basis)).OrderBy(o => o.Naar))
+            {
+                if (!gezien.Add(o.Naar)) continue;
+                vorige[o.Naar] = (m, o.Richting);
+                if (o.Naar == naar)
+                {
+                    var weg = new List<(int, int, Richting)>();
+                    int cur = naar;
+                    while (cur != van) { var (v, r) = vorige[cur]; weg.Add((v, cur, r)); cur = v; }
+                    weg.Reverse();
+                    return weg;
+                }
+                rij.Enqueue(o.Naar);
+            }
+        }
+        return null;
+    }
+
     private static List<Etappe> RouteMet(List<Etappe> basis, Configuratie c, Richting r, List<int> pad)
     {
         var res = basis.ToList();
@@ -713,6 +743,9 @@ public partial class BaanVerkenner
                 // kortsluitingen én geen valse toeschrijvingen meer aan adressen die er niets
                 // mee te maken hebben.
                 var kortsluitStops = KortsluitStops(o.Configuratie, o.Richting);
+                // BUG #106 (log 09:06): adres 14 afbuigend op de basisrit 17 -> 8 gaf zelf een kortsluiting, want de kaart weet al dat 14 daar
+                // rechtdoor moet staan. De rit stopt nu vóór zo'n stap (op melder 17) in plaats van de kortsluiting zelf te veroorzaken.
+                foreach (var s in EisConflictStops(_kaart, basis.Reeks, o.Richting, a)) kortsluitStops.Add(s);
 
                 await ZetWissel(a, true);
                 var proef = await Rit(o.Start, o.Richting, new RitDoel
@@ -1028,6 +1061,17 @@ public partial class BaanVerkenner
         _log.Vondst(soort == KortsluitpuntSoort.OnverwachteTerugweg
             ? $"Onverwachte terugweg #{k.Id}: direct na melder {x} ({r.Tekst()}, {c}) kwam de loc terug via een andere melder dan verwacht. Geen kortsluiting - mogelijk een wissel die van achteren in de verkeerde stand bereden wordt, mogelijk een melder die de eerste keer niet geregistreerd is; wordt zo mogelijk later opgelost."
             : $"Kortsluitpunt #{k.Id}: direct na melder {x} ({r.Tekst()}, {c})." + (alarmBlokken.Count > 0 ? $" Dinamo meldde kortsluiting in blok {string.Join(" en ", alarmBlokken)}." : "") + (tweede.Count > 0 ? $" Ook bezet: melder {string.Join(" en ", tweede)}." : "") + " Waarschijnlijk een wissel die van achteren in de verkeerde stand bereden wordt; wordt later opgelost.");
+    }
+
+    /// <summary>BUG #106: melders waar de adrestest moet stoppen omdat de volgende stap van de basisrit volgens de kaart eist dat adres
+    /// <paramref name="a"/> rechtdoor staat, terwijl de test het afbuigend zet. Zonder stop veroorzaakt de test zelf een kortsluiting.</summary>
+    internal static HashSet<int> EisConflictStops(Baankaart kaart, List<int> reeks, Richting r, int a)
+    {
+        var res = new HashSet<int>();
+        for (int i = 1; i + 1 < reeks.Count; i++)
+            if (kaart.WisselEisenVoorStapDetail(reeks[i], reeks[i + 1], r).Any(e => e.Adres == a && !e.Afbuigend))
+                res.Add(reeks[i]);
+        return res;
     }
 
     private HashSet<int> KortsluitStops(Configuratie c, Richting r) =>
