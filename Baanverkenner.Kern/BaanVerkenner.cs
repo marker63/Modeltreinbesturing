@@ -49,6 +49,37 @@ public class VerkenStatus
     /// <summary>BUG #74: de voltooide kaart wordt uitgebreid met een tweede, los traject: de volgende start bepaalt een nieuwe startmelder
     /// (waar de loc nu staat) en laat alles wat al gevonden is staan.</summary>
     public bool Uitbreiden { get; set; }
+    /// <summary>BUG #104: 'Voltooide baan nogmaals checken' loopt. De verkenner werkt dan op <see cref="ControleKaart"/>; <see cref="Kaart"/>
+    /// (de voltooide kaart) blijft ongewijzigd en wordt alleen aan het eind vergeleken.</summary>
+    public bool Controle { get; set; }
+    public Baankaart? ControleKaart { get; set; }
+    /// <summary>Aantal waarnemingen per wissel waarmee de controlekaart begon (alles daarboven is tijdens de controle gezien).</summary>
+    public Dictionary<int, int> ControleWisselSeed { get; set; } = new();
+
+    /// <summary>BUG #104: zet een voltooide verkenning klaar voor een controleronde. De bestaande kaart blijft onaangeroerd. De nieuwe
+    /// (controle)kaart begint met de kennis die kortsluitingen voorkomt (wissels, doorgangen, kortsluitoplossingen, Dinamo-blok per melder),
+    /// maar zonder overgangen, kopsporen en kortsluitpunten: die moeten opnieuw gereden worden.</summary>
+    public void VoorControle(DateTime nu)
+    {
+        if (!Kaart.Voltooid) throw new InvalidOperationException("Alleen een voltooide verkenning kan gecontroleerd worden.");
+        var o = Kaart;
+        static List<T> Kloon<T>(List<T> l) => JsonSerializer.Deserialize<List<T>>(JsonSerializer.Serialize(l, Baankaart.JsonOpties), Baankaart.JsonOpties)!;
+        var k = new Baankaart
+        {
+            Gestart = nu, Hardware = o.Hardware, LocAdres = o.LocAdres, LocStappen = o.LocStappen, RefSnelheid = o.RefSnelheid,
+            StartMelder = o.StartMelder, WisselAdresVan = o.WisselAdresVan, WisselAdresTot = o.WisselAdresTot,
+            EerdereStartMelders = o.EerdereStartMelders.ToList(),
+            Melders = o.Melders.Select(m => new MelderInfo { Nummer = m.Nummer, DinamoBlok = m.DinamoBlok }).ToList(),
+            Wissels = Kloon(o.Wissels), Doorgangen = Kloon(o.Doorgangen), BekendeKortsluitOplossingen = Kloon(o.BekendeKortsluitOplossingen)
+        };
+        ControleKaart = k;
+        ControleWisselSeed = k.Wissels.ToDictionary(w => w.Adres, w => w.Waarnemingen.Count);
+        Controle = true;
+        Uitbreiden = false;
+        Wachtrij.Clear(); Huidig = null;
+        GeplandeOpdrachten.Clear(); GetesteOvergangen.Clear(); Geidentificeerd.Clear();
+        VolgendeOpdrachtId = 1; VolgendeKortsluitId = 1; AfgerondeOpdrachten = 0; KortsluitingenTotaal = 0;
+    }
 
     /// <summary>BUG #74: maakt van een (voltooide) verkenning een verkenning die verder gaat op een tweede, fysiek los traject. Alles wat
     /// gevonden is (melders, overgangen, wissels, doorgangen, Dinamo-blokken, geïdentificeerde adressen) blijft staan. Alleen de wachtrij
@@ -100,7 +131,7 @@ public partial class BaanVerkenner
     private readonly MelderMonitor _monitor;
     private readonly Func<string, string, Task<bool>> _vraag;
     private readonly VerkenStatus _status;
-    private Baankaart _kaart => _status.Kaart;
+    private Baankaart _kaart => _status.Controle && _status.ControleKaart is { } ck ? ck : _status.Kaart;
 
     private CancellationToken _token;
     private volatile bool _gepauzeerd;
@@ -190,7 +221,8 @@ public partial class BaanVerkenner
         {
             bool uitbreiden = _status.Uitbreiden && _status.Kaart.StartMelder != 0;
             bool hervat = _status.Kaart.StartMelder != 0 && !uitbreiden;
-            if (!hervat && !uitbreiden)
+            bool controleRit = _status.Controle;
+            if (!hervat && !uitbreiden && !_status.Controle)
             {
                 _kaart.Gestart = _klok.Nu;
                 _kaart.Hardware = _hw.Naam;
@@ -201,7 +233,7 @@ public partial class BaanVerkenner
             }
             if (_kaart.RefSnelheid <= 0) _kaart.RefSnelheid = _ins.Verkensnelheid;
             _startVerkensnelheid = _ins.Verkensnelheid;
-            _log.Stap(uitbreiden ? "Voltooide verkenning wordt uitgebreid met een tweede traject." : hervat ? "Verkenning wordt hervat." : "Verkenning start.");
+            _log.Stap(_status.Controle ? "Voltooide baan wordt nogmaals gecontroleerd (de bestaande kaart blijft ongewijzigd; aan het eind volgt een vergelijking)." : uitbreiden ? "Voltooide verkenning wordt uitgebreid met een tweede traject." : hervat ? "Verkenning wordt hervat." : "Verkenning start.");
             // BUG #87: bewezen kortsluitoplossingen uit eerdere verkenningen meenemen.
             if (Leerprofiel is { } lpo)
             {
@@ -230,7 +262,7 @@ public partial class BaanVerkenner
             _log.Stap("Alle adressen in het bereik op rechtdoor zetten (commando gestuurd; de centrale meldt de werkelijke stand van de wisselmotoren niet terug).");
             foreach (var a in _ins.WisselAdressen()) await ZetWissel(a, false, forceer: true);
 
-            if (!hervat)
+            if (!hervat || (_status.Controle && _status.GeplandeOpdrachten.Count == 0))
             {
                 Plan(new Opdracht { Configuratie = Configuratie.Basis, Start = _kaart.StartMelder, Richting = Richting.Vooruit, Reden = "start, vooruit" });
                 Plan(new Opdracht { Configuratie = Configuratie.Basis, Start = _kaart.StartMelder, Richting = Richting.Achteruit, Reden = "start, achteruit" });
@@ -265,7 +297,8 @@ public partial class BaanVerkenner
             }
 
             Afronden();
-            _log.Stap("Verkenning voltooid.");
+            if (_status.Controle) RondControleAf();
+            _log.Stap(controleRit ? "Controle voltooid." : "Verkenning voltooid.");
         }
         catch (OperationCanceledException)
         {
@@ -1491,6 +1524,21 @@ public partial class BaanVerkenner
         _fase = "Voltooid";
         _bezig = "";
         _log.Vondst($"Resultaat: {_kaart.Melders.Count} melders, {_kaart.Wissels.Count} wissels, {_kaart.Kopsporen.Count} doodlopende einden, {_kaart.VoorgesteldeBlokken.Count} voorgestelde blokken, {_kaart.AdressenZonderEffect.Count} adressen zonder gevonden effect.");
+    }
+
+    /// <summary>BUG #104: vergelijkt de controlekaart met de voltooide kaart, zet het verslag bij de voltooide kaart (de rest ervan blijft
+    /// zoals het was) en zet de controle uit.</summary>
+    private void RondControleAf()
+    {
+        var oud = _status.Kaart;
+        var nieuw = _status.ControleKaart!;
+        var verslag = ControleVergelijking.Vergelijk(oud, nieuw, _status.ControleWisselSeed, _status.Geidentificeerd.ToHashSet(), _klok.Nu);
+        oud.ControleVerslagen.Add(verslag);
+        _status.Controle = false; // vanaf hier is _kaart weer de bestaande, voltooide kaart
+        _log.Vondst(verslag.Samenvatting);
+        foreach (var r in verslag.Regels) { if (r.StartsWith("NIEUW") || r.StartsWith("WISSEL")) _log.Waarschuwing(r); else _log.Info(r); }
+        _fase = "Voltooid";
+        BewaarNu();
     }
 
     private void BewaarNu()

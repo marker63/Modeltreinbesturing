@@ -393,7 +393,7 @@ public partial class MainWindow : Window
         }
         // BUG #74: een voltooide verkenning kan worden uitgebreid met een tweede, fysiek los traject (alles blijft in dezelfde kaart).
         bool uitbreiden = false;
-        if (st.Kaart.Voltooid)
+        if (st.Kaart.Voltooid && !st.Controle)
         {
             ToonResultaat(st);
             var keuze = MessageBox.Show(this,
@@ -455,12 +455,89 @@ public partial class MainWindow : Window
             uitbreiden
                 ? $"De voltooide verkenning ({st.Kaart.Wissels.Count} wissels en {st.Kaart.Melders.Count} melders) wordt uitgebreid met een tweede traject, met verkensnelheid {vast.Verkensnelheid} en kruipsnelheid {vast.Kruipsnelheid}.{behoudenTekst}\n\n" +
                   $"Zet de testloc (adres {vast.LocAdres}) op het ANDERE traject, helemaal binnen één melder (alleen die melder bezet). Die melder wordt de nieuwe startmelder.\n\nUitbreiden?"
+                : st.Controle ? $"De onderbroken controle van de baan wordt hervat met verkensnelheid {vast.Verkensnelheid} en kruipsnelheid {vast.Kruipsnelheid}.{behoudenTekst}\n\nZet de testloc (adres {vast.LocAdres}) op startmelder {st.Kaart.StartMelder}, met dezelfde kant vooruit als de vorige keer.\n\nHervatten?"
                 : $"De onderbroken verkenning (gestart {st.Kaart.Gestart:dd-MM-yyyy HH:mm}, {st.Kaart.Wissels.Count} wissels en {st.Kaart.Melders.Count} melders gevonden) wordt hervat met verkensnelheid {vast.Verkensnelheid} en kruipsnelheid {vast.Kruipsnelheid}.{behoudenTekst}\n\n" +
                   $"Zet de testloc (adres {vast.LocAdres}) op startmelder {st.Kaart.StartMelder}, met dezelfde kant vooruit als de vorige keer.\n\nHervatten?",
-            uitbreiden ? "Verkenning uitbreiden" : "Verkenning hervatten", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            uitbreiden ? "Verkenning uitbreiden" : st.Controle ? "Controle hervatten" : "Verkenning hervatten", MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (ok != MessageBoxResult.Yes) return;
         if (uitbreiden) st.VoorUitbreiding();
         else if (_sim is not null) _sim.ZetLocOpMelder(st.Kaart.StartMelder);
+        await VoerVerkenningUit(st.Instellingen, st);
+    }
+
+    /// <summary>BUG #104: "Voltooide baan nogmaals checken". De baan wordt opnieuw gereden op een aparte controlekaart en daarna vergeleken met
+    /// de voltooide kaart; die blijft ongewijzigd (alleen een verslag erbij). Nog niet getest op de baan; dit WPF-deel is niet gecompileerd.</summary>
+    private async void Controle_Click(object sender, RoutedEventArgs e)
+    {
+        var st = LaadVoortgang();
+        if (st is null || !st.Kaart.Voltooid)
+        {
+            MessageBox.Show(this, st is { Controle: true }
+                ? "Er is nog een onderbroken controle. Hervat die met de knop 'Vorige verkenning hervatten / uitbreiden'."
+                : "Er is geen voltooide verkenning om te controleren.", "Baan checken", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        if (st.Controle)
+        {
+            MessageBox.Show(this, "Er is nog een onderbroken controle. Hervat die met de knop 'Vorige verkenning hervatten / uitbreiden'.", "Baan checken", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        if (_hw is null || !_hw.Verbonden)
+        {
+            MessageBox.Show(this, "Maak eerst verbinding met dezelfde centrale als bij de verkenning.", "Niet verbonden", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        VerkenInstellingen scherm;
+        try { scherm = LeesInstellingen(); }
+        catch (FormatException ex)
+        {
+            MessageBox.Show(this, ex.Message, "Controleer de instellingen", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        var vast = st.Instellingen;
+        vast.Verkensnelheid = scherm.Verkensnelheid;
+        vast.Kruipsnelheid = scherm.Kruipsnelheid;
+        vast.WisselPauzeMs = scherm.WisselPauzeMs;
+        vast.HoogsteMelder = scherm.HoogsteMelder;
+        vast.MaxSecondenTussenMelders = scherm.MaxSecondenTussenMelders;
+        vast.SlimmeTimeout = scherm.SlimmeTimeout;
+        vast.MinSecondenTussenMelders = scherm.MinSecondenTussenMelders;
+        vast.LegeMeldersSeconden = scherm.LegeMeldersSeconden;
+        vast.MaxKortsluitingenPerPlek = scherm.MaxKortsluitingenPerPlek;
+        vast.OntdenderMs = scherm.OntdenderMs;
+        vast.BlokproefLangSeconden = scherm.BlokproefLangSeconden;
+        vast.BlokproefKortSeconden = scherm.BlokproefKortSeconden;
+        vast.BlokproefInrijSeconden = scherm.BlokproefInrijSeconden;
+        vast.ExtraMeldersNaAfwijking = scherm.ExtraMeldersNaAfwijking;
+        vast.BasisritHerhalen = scherm.BasisritHerhalen;
+        vast.AutoSnelheid = scherm.AutoSnelheid;
+        if (vast.LocStappen <= 28 && (vast.Verkensnelheid > vast.LocStappen || vast.Kruipsnelheid > vast.LocStappen))
+        {
+            MessageBox.Show(this, $"De verkenning gebruikt {vast.LocStappen} rijstappen; de snelheden mogen daar niet boven komen.", "Controleer de instellingen", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        ToonInstellingen(vast);
+        BewaarKeuzes(vast);
+        string extra = st.Kaart.EerdereStartMelders.Count > 0
+            ? "\n\nLet op: deze kaart heeft meerdere trajecten. De controle rijdt alleen het traject van startmelder " + st.Kaart.StartMelder + "; de andere trajecten worden als 'niet gereden' gemeld."
+            : "";
+        var ok = MessageBox.Show(this,
+            $"De baan ({st.Kaart.Melders.Count} melders, {st.Kaart.Wissels.Count} wissels) wordt nogmaals helemaal gereden, met verkensnelheid {vast.Verkensnelheid} en kruipsnelheid {vast.Kruipsnelheid}.\n\n" +
+            "•  Je bestaande baankaart blijft ongewijzigd. De nieuwe rit komt op een aparte controlekaart; aan het eind volgt een vergelijking met de verschillen.\n" +
+            "•  De bekende wisselstanden en kortsluitoplossingen worden gebruikt, zodat kortsluitingen zoveel mogelijk vermeden worden.\n" +
+            "•  Er wordt een kopie van de voortgang bewaard (voortgang_voor_controle_….json)." + extra + "\n\n" +
+            $"Zet de testloc (adres {vast.LocAdres}) op startmelder {st.Kaart.StartMelder}, met dezelfde kant vooruit als bij de verkenning.\n\nControle starten?",
+            "Voltooide baan nogmaals checken", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (ok != MessageBoxResult.Yes) return;
+        try
+        {
+            Directory.CreateDirectory(Map);
+            if (File.Exists(VoortgangPad))
+                File.Copy(VoortgangPad, Path.Combine(Map, $"voortgang_voor_controle_{DateTime.Now:yyyyMMdd_HHmm}.json"), true);
+        }
+        catch { /* een mislukte kopie houdt de controle niet tegen: de bestaande kaart wordt niet gewijzigd */ }
+        st.VoorControle(DateTime.Now);
+        if (_sim is not null) _sim.ZetLocOpMelder(st.Kaart.StartMelder);
         await VoerVerkenningUit(st.Instellingen, st);
     }
 
@@ -532,9 +609,23 @@ public partial class MainWindow : Window
 
         var verkenner = _verkenner;
         var token = _cts.Token;
+        bool controleRit = hervat is { Controle: true };
         try
         {
             await Task.Run(() => verkenner.VoerUit(token));
+            if (controleRit)
+            {
+                FaseTekst.Text = "Controle voltooid";
+                BezigTekst.Text = "De bestaande kaart is ongewijzigd; het verslag staat in het rapport.";
+                ToonResultaat(verkenner.Status);
+                var vs = verkenner.Kaart.ControleVerslagen.LastOrDefault();
+                string regels = vs is null ? "" : string.Join("\n", vs.Regels.Take(12).Select(r => "•  " + r)) + (vs.Regels.Count > 12 ? $"\n… en nog {vs.Regels.Count - 12} regel(s) in het rapport." : "");
+                MessageBox.Show(this,
+                    (vs?.Samenvatting ?? "De controle is voltooid.") + (regels.Length > 0 ? "\n\n" + regels : "") +
+                    "\n\nStuur bij verschillen het rapport en het logboek, dan los ik ze op. Niet getest op de baan: dit was de eerste keer.",
+                    "Controle klaar", MessageBoxButton.OK, vs is { Verschillen: true } ? MessageBoxImage.Warning : MessageBoxImage.Information);
+                return;
+            }
             FaseTekst.Text = "Verkenning voltooid";
             BezigTekst.Text = "Bekijk het resultaat of sla het rapport en de baankaart op.";
             ToonResultaat(verkenner.Status);
@@ -723,6 +814,7 @@ public partial class MainWindow : Window
         OntkoppelenKnop.IsEnabled = !_bezig && verbonden;
         StartKnop.IsEnabled = !_bezig && verbonden;
         HervatVorigeKnop.IsEnabled = !_bezig;
+        ControleKnop.IsEnabled = !_bezig && verbonden;
         PauzeKnop.IsEnabled = _bezig;
         StopKnop.IsEnabled = _bezig;
         NoodstopKnop.IsEnabled = verbonden;

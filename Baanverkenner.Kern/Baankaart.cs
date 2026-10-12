@@ -41,6 +41,15 @@ public sealed class Configuratie
     public override int GetHashCode() => Sleutel.GetHashCode();
 }
 
+/// <summary>BUG #104: het verslag van één controleronde (vergelijking van de nieuwe rit met de bestaande kaart).</summary>
+public class ControleVerslag
+{
+    public DateTime Datum { get; set; }
+    public string Samenvatting { get; set; } = "";
+    public bool Verschillen { get; set; }
+    public List<string> Regels { get; set; } = new();
+}
+
 public class MelderInfo
 {
     public int Nummer { get; set; }
@@ -309,6 +318,8 @@ public class Baankaart
     /// <summary>BUG #78: voorstel voor wisselstraten per gereden overgang (zie <see cref="WisselstraatVoorstel"/>). Oudere kaarten: leeg.</summary>
     public List<WisselstraatVoorstel> Wisselstraatvoorstellen { get; set; } = new();
     public List<string> Waarschuwingen { get; set; } = new();
+    /// <summary>BUG #104: uitkomsten van 'Voltooide baan nogmaals checken'. De kaart zelf blijft bij een controle ongewijzigd; dit zijn alleen de verslagen.</summary>
+    public List<ControleVerslag> ControleVerslagen { get; set; } = new();
 
     // ---- Hulpmethoden voor het vastleggen ----
 

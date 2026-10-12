@@ -299,6 +299,71 @@ public static class Tests
         Eis(v.Kaart.Doorgangen.Any(d => d.Via == 2 && d.Melder == 3 && d.Volgende == 4 && d.Richting == Richting.Vooruit), "doorgangen: ingangskant blijft bekend over de ritgrens (2 -> 3 -> 4)");
     }
 
+    // BUG #104: "Voltooide baan nogmaals checken": de bestaande kaart blijft onaangeroerd, de baan wordt opnieuw gereden en vergeleken
+    static void ControleRondeTest()
+    {
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = false, LocAdres = 5408 };
+        var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+        var P = Baanverkenner.Kern.Simulatie.SimulatieBaan.Poort.Stam; var R = Baanverkenner.Kern.Simulatie.SimulatieBaan.Poort.Recht; var Af = Baanverkenner.Kern.Simulatie.SimulatieBaan.Poort.Af;
+        var s1 = sim.NieuweSectie(1, 90, 1); var s2 = sim.NieuweSectie(2, 80, 2); var sL = sim.NieuweSectie(3, 60, 3);
+        var s4 = sim.NieuweSectie(4, 80, 4); var s5 = sim.NieuweSectie(5, 60, 5);
+        var w2 = sim.NieuweWissel(2, true, 1); var w1 = sim.NieuweWissel(1, true, 3);
+        sim.Verbind(w2, P, s1, B); sim.Verbind(w2, R, s2, A); sim.Verbind(w2, Af, sL, A);
+        sim.Verbind(w1, Af, sL, B); sim.Verbind(w1, P, s4, A); sim.Verbind(w1, R, s5, A);
+        sim.PlaatsLoc(s1, 45, +1);
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 4 };
+        var status = new VerkenStatus { Instellingen = ins };
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var v = new BaanVerkenner(sim, ins, klok, new VerkenLog(klok), (_, _) => Task.FromResult(true), status);
+        using var cts = new CancellationTokenSource();
+        try { v.VoerUit(cts.Token).GetAwaiter().GetResult(); } catch (Exception ex) { Console.WriteLine("  (controle: eerste verkenning stopte met: " + ex.Message + ")"); }
+        Eis(status.Kaart.Voltooid, "controle: de eerste verkenning is voltooid");
+        string voor = status.Kaart.AlsJson();
+        int opdrVoor = status.AfgerondeOpdrachten;
+
+        // zonder voltooide kaart kan geen controle gestart worden
+        bool gefaald = false;
+        try { new VerkenStatus { Instellingen = ins }.VoorControle(DateTime.Now); } catch (InvalidOperationException) { gefaald = true; }
+        Eis(gefaald, "controle: een niet-voltooide kaart kan niet gecontroleerd worden");
+
+        // de loc staat na afloop weer op de startmelder; controle starten
+        status.VoorControle(DateTime.Now);
+        Eis(status.Controle && status.ControleKaart is not null && status.Kaart.Voltooid, "controle: bestaande kaart blijft 'voltooid', controlekaart is aangemaakt");
+        Eis(status.ControleKaart!.Overgangen.Count == 0 && status.ControleKaart.Wissels.Count == status.Kaart.Wissels.Count && status.ControleKaart.StartMelder == status.Kaart.StartMelder, "controle: controlekaart begint zonder overgangen maar met de bekende wissels");
+        var v2 = new BaanVerkenner(sim, ins, klok, new VerkenLog(klok), (_, _) => Task.FromResult(true), status);
+        using var cts2 = new CancellationTokenSource();
+        try { v2.VoerUit(cts2.Token).GetAwaiter().GetResult(); } catch (Exception ex) { Console.WriteLine("  (controle: controleronde stopte met: " + ex.Message + ")"); }
+        Eis(!status.Controle, "controle: de vlag staat na afloop weer uit");
+        Eis(status.ControleKaart.Overgangen.Count > 0 && status.ControleKaart.Voltooid, "controle: de baan is opnieuw gereden (overgangen op de controlekaart: " + status.ControleKaart.Overgangen.Count + ")");
+        var k = status.Kaart;
+        Eis(k.ControleVerslagen.Count == 1, "controle: precies één verslag bij de kaart");
+        // de kaart zelf is niet gewijzigd (behalve het verslag)
+        var na = Baankaart.VanJson(k.AlsJson())!;
+        na.ControleVerslagen.Clear();
+        var vk = Baankaart.VanJson(voor)!;
+        na.Bijgewerkt = vk.Bijgewerkt;
+        Eis(na.AlsJson() == vk.AlsJson(), "controle: de bestaande kaart is ongewijzigd (alleen het verslag is toegevoegd)");
+        var vs = k.ControleVerslagen[0];
+        Console.WriteLine("  (controle: " + vs.Samenvatting + (vs.Regels.Count > 0 ? " | " + string.Join(" | ", vs.Regels) : "") + ")");
+        Eis(!vs.Verschillen, "controle: dezelfde baan geeft geen verschillen");
+        Eis(Rapport.AlsTekst(k).Contains("CONTROLES VAN DE BAAN") && Rapport.AlsHtml(k).Contains("Controles van de baan"), "controle: rapport toont het verslag");
+
+        // vergelijking: een weggelaten overgang en een extra overgang worden gemeld
+        var oud = Baankaart.VanJson(k.AlsJson())!; oud.ControleVerslagen.Clear();
+        var nieuw = Baankaart.VanJson(status.ControleKaart.AlsJson())!;
+        var weg = nieuw.Overgangen[0]; nieuw.Overgangen.RemoveAt(0);
+        nieuw.Overgangen.Add(new Overgang { Van = 90, Naar = 91, Richting = Richting.Vooruit });
+        var vs2 = ControleVergelijking.Vergelijk(oud, nieuw, status.ControleWisselSeed, new HashSet<int>(), DateTime.Now);
+        Eis(vs2.Verschillen && vs2.Regels.Any(r => r.Contains($"{weg.Van} → {weg.Naar}")) && vs2.Regels.Any(r => r.StartsWith("NIEUW: overgang melder 90 → 91")), "controle: ontbrekende en nieuwe overgangen worden gemeld");
+
+        // een onderbroken controle bewaart de status en kan hervat worden: JSON-rondreis
+        var st2 = new VerkenStatus { Instellingen = ins, Kaart = Baankaart.VanJson(voor)! };
+        st2.VoorControle(DateTime.Now);
+        var terug = VerkenStatus.VanJson(st2.AlsJson())!;
+        Eis(terug.Controle && terug.ControleKaart is not null && terug.ControleWisselSeed.Count == st2.ControleWisselSeed.Count && terug.Kaart.Voltooid, "controle: controlestatus blijft na opslaan en laden bewaard");
+    }
+
     // BUG #74: een voltooide verkenning uitbreiden met een tweede, fysiek los traject (twee losse stukken spoor: 1-2-3 en 4-5)
     static void UitbreidenTest()
     {
@@ -1106,6 +1171,7 @@ public static class Tests
         OverdrachtTest();
         DoorgangTest();
         UitbreidenTest();
+        ControleRondeTest();
         TweedeMelderTest();
         VerkeerdeWisselVraagTest();
         WisselstraatImportTest();

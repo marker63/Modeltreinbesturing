@@ -1576,3 +1576,15 @@ Toegepast bij het plannen van een opdracht en bij het uitvoeren (ook voor opgesl
 Niet opgelost: 08:04:59 kortsluiting in blok 9 bij het binnenrijden van 129 vanaf melder 4 (wissel 9 stond rechtdoor, moet afbuigend); de rit werd als lus
 beëindigd, er is geen kortsluitpunt voor aangemaakt en het alarm bleef tot jij wissel 9 omzette. Dat moet nog uitgezocht.
 Tests: `RouteVerkortTest`. Zelf terugrijden zelf is niet gesimuleerd; nog niet getest op de baan.
+
+## #104 - Knop "Voltooide baan nogmaals checken" (Marco 08:26)
+Hervatten van een voltooide verkenning verkent niets opnieuw (wachtrij leeg, alle opdrachten staan als afgerond). Nieuw: een controleronde.
+`VerkenStatus.VoorControle()` maakt een aparte controlekaart: die begint met de kennis die kortsluitingen voorkomt (wissels, doorgangen, kortsluitoplossingen,
+Dinamo-blok per melder) maar zonder overgangen, kopsporen en kortsluitpunten; alles wordt opnieuw gereden. De voltooide kaart wordt NIET gewijzigd.
+Aan het eind vergelijkt `ControleVergelijking` beide (ontbrekende/nieuwe overgangen, wissels die anders vastgelegd zijn, doodlopende einden, kortsluitpunten,
+adressen zonder effect). Het verslag staat bij de kaart (`ControleVerslagen`), in het logboek, in het rapport (tekst en html) en in een venster.
+Een onderbroken controle hervat je met de bestaande hervat-knop. Bij het starten wordt `voortgang_voor_controle_….json` als kopie bewaard.
+Beperkingen: Dinamo-blokken en bekende wisselstanden worden in de controle gebruikt, niet opnieuw bewezen; een kaart met meerdere trajecten controleert alleen het
+traject van de huidige startmelder.
+Test: `ControleRondeTest` (simulatie: geen verschillen, kaart ongewijzigd, verschillen worden gemeld, JSON-rondreis). WPF-deel (knop, vragen, venster) niet
+gecompileerd hier en nog niet getest op de baan.

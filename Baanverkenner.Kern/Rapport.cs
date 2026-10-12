@@ -269,6 +269,16 @@ ul{margin:6px 0 0 18px;padding:0}
             foreach (var w in k.Waarschuwingen) sb.Append($"<li class=\"let\">{E(w)}</li>");
             sb.Append("</ul></div>");
         }
+        if (k.ControleVerslagen.Count > 0)
+        {
+            sb.Append("<h2>Controles van de baan</h2><p class=\"uitleg\">Elke controle rijdt de baan opnieuw en vergelijkt met deze kaart. De kaart zelf is daarbij niet gewijzigd. Wat niet is teruggezien hoeft geen fout te zijn.</p>");
+            foreach (var v in k.ControleVerslagen)
+            {
+                sb.Append($"<div class=\"kaart\"><p><b>{v.Datum:dd-MM-yyyy HH:mm}</b>: {E(v.Samenvatting)}</p>");
+                if (v.Regels.Count > 0) { sb.Append("<ul>"); foreach (var r in v.Regels) sb.Append($"<li>{E(r)}</li>"); sb.Append("</ul>"); }
+                sb.Append("</div>");
+            }
+        }
         var zonderBlok = k.Melders.Where(m => m.DinamoBlok is null).Select(m => m.Nummer).ToList();
         if (metBlok && zonderBlok.Count > 0)
             sb.Append($"<p class=\"let\">Melders zonder gevonden Dinamo-blok: {E(string.Join(", ", zonderBlok))}.</p>");
@@ -351,6 +361,15 @@ ul{margin:6px 0 0 18px;padding:0}
         {
             Kop("AANDACHTSPUNTEN");
             foreach (var w in k.Waarschuwingen) sb.AppendLine("  - " + w);
+        }
+        if (k.ControleVerslagen.Count > 0)
+        {
+            Kop("CONTROLES VAN DE BAAN");
+            foreach (var v in k.ControleVerslagen)
+            {
+                sb.AppendLine($"  {v.Datum:dd-MM-yyyy HH:mm}: {v.Samenvatting}");
+                foreach (var r in v.Regels) sb.AppendLine("    - " + r);
+            }
         }
         return sb.ToString();
     }
