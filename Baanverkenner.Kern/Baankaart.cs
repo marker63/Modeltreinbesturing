@@ -292,7 +292,9 @@ public class Baankaart
     /// daarmee verdween de kortsluiting van <paramref name="kp"/>: dat is dus de oplossing van dat kortsluitpunt.</summary>
     public bool RegistreerHandmatigeOplossing(Kortsluitpunt kp, int adres, bool afbuigend)
     {
-        if (kp.Opgelost || kp.Configuratie.Bevat(adres) == afbuigend) return false;
+        // BUG #122: een wissel die zelf in de geteste stand zit terugzetten (bv. wissel 2 rechtdoor bij stand '2 afbuigend') is geen extra wissel
+        // die de kortsluiting oplost, maar gewoon een andere stand; die zou later ten onrechte als 'oplossing' worden toegepast.
+        if (kp.Opgelost || kp.Configuratie.Bevat(adres) || !afbuigend) return false;
         kp.Opgelost = true;
         kp.OpgelostDoorAdres = adres;
         kp.OpgelostMetAfbuigend = afbuigend;
@@ -305,11 +307,18 @@ public class Baankaart
     public Configuratie MetBekendeOplossingenVoorStart(int start, Richting r, Configuratie c, out List<string> wijzigingen)
     {
         wijzigingen = new List<string>();
-        foreach (var o in Oplossingen(r).Where(o => (o.Start == start || BereiktMelder(start, o.NaMelder, r, c)) && !o.K.Bevat(o.Adres)))
+        // BUG #122: een toegepaste oplossing kan een volgende oplossing mogelijk maken (stand + extra wissel is zelf weer een geteste stand): herhalen tot er niets meer verandert.
+        for (int ronde = 0; ronde < 5; ronde++)
         {
-            if (!o.K.Afbuigend.All(c.Bevat) || c.Bevat(o.Adres) == o.Afbuigend) continue;
-            c = c.MetStand(o.Adres, o.Afbuigend);
-            wijzigingen.Add($"{o.Adres} {(o.Afbuigend ? "afbuigend" : "rechtdoor")} ({o.Label}: stand {o.K} gaf kortsluiting na melder {o.NaMelder})");
+            bool veranderd = false;
+            foreach (var o in Oplossingen(r).Where(o => (o.Start == start || BereiktMelder(start, o.NaMelder, r, c)) && !o.K.Bevat(o.Adres)))
+            {
+                if (!o.K.Afbuigend.All(c.Bevat) || c.Bevat(o.Adres) == o.Afbuigend) continue;
+                c = c.MetStand(o.Adres, o.Afbuigend);
+                veranderd = true;
+                wijzigingen.Add($"{o.Adres} {(o.Afbuigend ? "afbuigend" : "rechtdoor")} ({o.Label}: stand {o.K} gaf kortsluiting na melder {o.NaMelder})");
+            }
+            if (!veranderd) break;
         }
         return c;
     }

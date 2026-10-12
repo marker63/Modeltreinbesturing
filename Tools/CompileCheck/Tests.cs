@@ -1197,6 +1197,30 @@ public static class Tests
         Eis(r.Bevat(13) && r.Bevat(14), "kruisterugweg (#121): terugweg 13-14-24 zet motor 13 afbuigend vóór het inrijden van 24 (nu " + r + ")");
     }
 
+    // BUG #122 (controle 18:36): wissels bij de startmelder vooraf zetten; geen triviale oplossingen; oplossingsketen
+    static void StartmelderVoorafTest()
+    {
+        var k = new Baankaart();
+        k.Wissel(1).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.Splitsing, NaMelder = 5, Richting = Richting.Achteruit, VolgendeBijRechtdoor = 16, VolgendeBijAfbuigend = 12 });
+        k.Wissel(2).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.Splitsing, NaMelder = 5, Richting = Richting.Achteruit, VolgendeBijRechtdoor = 16, VolgendeBijAfbuigend = 12 });
+        k.Wissel(6).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.Splitsing, NaMelder = 13, Richting = Richting.Achteruit, VolgendeBijRechtdoor = 5, VolgendeBijAfbuigend = 7 });
+        var e = new Etappe { Van = 13, Naar = 5, Richting = Richting.Achteruit, Pad = new List<int> { 13, 5 } };
+        var doel = Configuratie.Basis.Met(1).Met(2);
+        var r = BaanVerkenner.StartmelderWisselsVooraf(k, e, Configuratie.Basis, doel, out var uitleg);
+        Eis(r.Bevat(1) && r.Bevat(2) && uitleg is not null, "startmelder vooraf (#122): wissels 1 en 2 (bij melder 5) staan al afbuigend voordat de loc op 5 komt (nu " + r + ")");
+        Eis(!r.Bevat(6), "startmelder vooraf (#122): wissel 6 ligt bij de melder waar de loc nog staat en blijft ongemoeid");
+        var r2 = BaanVerkenner.StartmelderWisselsVooraf(k, e, Configuratie.Basis.Met(6), doel.Met(6), out _);
+        Eis(r2.Bevat(6), "startmelder vooraf (#122): wissel onder de loc wordt niet omgezet");
+        var kp = new Kortsluitpunt { Id = 5, NaMelder = 5, Richting = Richting.Achteruit, Configuratie = Configuratie.Basis.Met(2) };
+        Eis(!k.RegistreerHandmatigeOplossing(kp, 2, false), "oplossing (#122): de geteste wissel zelf terugzetten is geen oplossing");
+        // keten: stand 2 + wissel 1 geeft kortsluiting, stand 1+2 + wissel 5 lost op
+        var k3 = new Baankaart();
+        k3.BekendeKortsluitOplossingen.Add(new KortsluitOplossing { NaMelder = 12, Richting = Richting.Achteruit, Stand = Configuratie.Basis.Met(2).Sleutel, Start = 13, Adres = 1, Afbuigend = true });
+        k3.BekendeKortsluitOplossingen.Add(new KortsluitOplossing { NaMelder = 12, Richting = Richting.Achteruit, Stand = Configuratie.Basis.Met(1).Met(2).Sleutel, Start = 13, Adres = 5, Afbuigend = true });
+        var ketting = k3.MetBekendeOplossingenVoorStart(13, Richting.Achteruit, Configuratie.Basis.Met(2), out _);
+        Eis(ketting.Bevat(1) && ketting.Bevat(2) && ketting.Bevat(5), "oplossingsketen (#122): 2 -> 1+2 -> 1+2+5 (nu " + ketting + ")");
+    }
+
     static void ProefOplossingTest()
     {
         var k = new Baankaart();
@@ -1481,6 +1505,7 @@ public static class Tests
         ProefOplossingTest();
         KruisVoorafTest();
         OplossingLaterOpWegTest();
+        StartmelderVoorafTest();
         TweedeMelderTest();
         VerkeerdeWisselVraagTest();
         WisselstraatImportTest();

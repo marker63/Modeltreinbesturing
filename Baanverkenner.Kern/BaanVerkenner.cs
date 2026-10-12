@@ -1606,6 +1606,8 @@ public partial class BaanVerkenner
                 if (uitleg is not null) _log.Info(uitleg);
                 cfg = KruisVoorafStand(e, cfg, doel, out var uitleg2);   // BUG #119
                 if (uitleg2 is not null) _log.Info(uitleg2);
+                cfg = StartmelderWisselsVooraf(_kaart, e, cfg, doel, out var uitleg4);   // BUG #122
+                if (uitleg4 is not null) _log.Info(uitleg4);
             }
             else if (i < route.Count - 1)
             {
@@ -1621,6 +1623,29 @@ public partial class BaanVerkenner
             await ZetConfiguratie(cfg);
             await Rit(e.Van, e.Richting, new RitDoel { Configuratie = cfg, DoelMelder = e.Naar, VerwachtPad = e.Pad });
         }
+    }
+
+    /// <summary>BUG #122 (log 18:18, opdracht #4 vanaf melder 5, wissel 2 afbuigend): de wissels 1 en 2 liggen bij startmelder 5 en werden pas omgezet toen de
+    /// loc al op melder 5 stond: direct kortsluiting, een onterecht kortsluitpunt en een onterechte 'oplossing'. Dezelfde rit slaagde om 17:50 toen deze wissels
+    /// gezet waren terwijl de loc nog op melder 13 stond. De wissels die de kaart bij de aankomstmelder van de laatste etappe noemt (en niet bij een
+    /// melder waar de loc eerder op die etappe staat) krijgen daarom hun rijstand al tijdens de laatste etappe, dus voordat de loc aankomt.</summary>
+    internal static Configuratie StartmelderWisselsVooraf(Baankaart kaart, Etappe e, Configuratie cfg, Configuratie doel, out string? uitleg)
+    {
+        uitleg = null;
+        if (e.Pad.Count < 2) return cfg;
+        var onderLoc = WisselsBijBezet(kaart, e.Pad.Take(e.Pad.Count - 1));
+        var bijStart = WisselsBijBezet(kaart, new[] { e.Naar });
+        var eis = kaart.MetWisselEisen(e.Pad, e.Richting, Configuratie.Basis, out _);
+        var gezet = new List<string>();
+        foreach (var a in bijStart.OrderBy(x => x))
+        {
+            if (a == KruiswisselReferentie.Motor13 || a == KruiswisselReferentie.Motor10) continue;   // die hebben hun eigen regels (#95, #119)
+            if (onderLoc.Contains(a) || eis.Bevat(a) || cfg.Bevat(a) == doel.Bevat(a)) continue;
+            cfg = cfg.MetStand(a, doel.Bevat(a));
+            gezet.Add($"{a} {(doel.Bevat(a) ? "afbuigend" : "rechtdoor")}");
+        }
+        if (gezet.Count > 0) uitleg = $"Wissels bij startmelder {e.Naar} worden al gezet voordat de loc daar aankomt: {string.Join(", ", gezet)}.";
+        return cfg;
     }
 
     /// <summary>BUG #121 (log 18:11:42): de terugweg naar startmelder 24 (de kruiswissel) zette motor 13 rechtdoor door een oude 'oplossing' (stand 13 afbuigend gaf

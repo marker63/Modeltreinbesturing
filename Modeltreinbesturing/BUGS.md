@@ -1768,3 +1768,24 @@ Open: (a) opdracht #4 zette wissel 2 om terwijl de loc op melder 5 stond; de waa
 ontbrekende wissel 1, zie 2), maar het omzetten van de opdrachtwissel direct vóór de loc is niet vooraf gedaan (alleen de kruiswissel, #119); (b) de oude
 'oplossing' van kortsluitpunt #4 (13 afbuigend bij 24 vooruit) is in deze controle ronde met een goede rit tegengesproken (WISSEL 13 gevonden 17:44) maar wordt nog
 niet automatisch ingetrokken; (c) het wissel-6-verhaal van 17:24 is nog niet te verklaren zonder log van dat moment.
+
+## #122 Controle 18:36 nagekeken: wissels bij de startmelder te laat gezet, onterechte 'oplossingen' (Marco 18:38)
+Bevindingen uit de volledige controleronde (17:23-18:36, 35 punten):
+1. Opdracht #4 (melder 5 achteruit, wissel 2 afbuigend, 18:18): wissel 1 en 2 liggen bij startmelder 5 en werden omgezet toen de loc al op 5 stond: meteen
+   kortsluiting in blok 3. Dezelfde rit slaagde om 17:50 doordat de wissels gezet waren terwijl de loc nog op melder 13 stond. Gevolg: onterecht kortsluitpunt #2/#5
+   en een onterechte 'oplossing' (de handmatige 'wissel 2 rechtdoor' van Marco was alleen de geteste wissel terugzetten). Dat verklaart ook de melding 'wissel 2 ligt bij melder 5'.
+   Fix: `StartmelderWisselsVooraf` zet in de laatste etappe van `NaarStartVan` alle wissels die de kaart bij de aankomstmelder noemt al op hun rijstand, behalve
+   wissels bij een melder waar de loc zelf nog op staat, wissels die de route zelf eist en de kruiswissel-motoren (die hebben hun eigen regels, #95/#119).
+2. Rijstand 18:18 had alleen wissel 1; om 17:50 was het een keten (2 -> 1+2 -> 1+2+5...). Fix: `MetBekendeOplossingenVoorStart` herhaalt tot niets meer verandert (max. 5 rondes).
+3. Een handmatige correctie waarbij de gebruiker een wissel TERUGZET die zelf in de geteste stand zit, of een wissel op rechtdoor zet, wordt niet meer als
+   oplossing van het kortsluitpunt vastgelegd (`RegistreerHandmatigeOplossing`). Bestaande opgeslagen oplossingen (kortsluitpunt #4 en #5 in de kaart van 18:36) blijven staan:
+   tests (#100/#112) leunen op het bestaande gedrag; zie open punten.
+4. Valse vondsten in de kaart/controle (wissel 6, 7, 8, 9 'na melder 24' en de opdrachten #5-#8, 'Adressen zonder gevonden effect' 3,4,5,10,11,12,14 tegenover 3,4,7,8,11,12)
+   komen uit de adrestest van 18:11 (build vóór #121: motor 13 stond fout). Voor wissel 13 (24 vooruit: rechtdoor -> 21, afbuigend -> 8) en wissel 2 (5 achteruit:
+   rechtdoor -> 16, afbuigend -> 12) wijst alles op echte vondsten. Dit is met #121 (HerstelRijstand) al afgevangen; een nieuwe controleronde met de nieuwe build moet dit bevestigen.
+5. 18 overgangen in het gebied 129/blok 1-4 zijn in deze controle niet gereden doordat opdrachten werden overgeslagen na aanhoudende kortsluiting
+   (14 vooruit afb 5, 24 achteruit afb 10, 129 vooruit afb 5/9/10, 24 achteruit afb 5/6/10). Waarschijnlijk dezelfde wissel-onder-de-loc-oorzaak; niet los opgelost.
+Tests: `StartmelderVoorafTest` (5 regels: vooraf zetten, wissel bij loc blijft staan, wissel onder loc, terugzetten is geen oplossing, keten 2 -> 1+2 -> 1+2+5).
+Nog niet getest op de baan; het WPF-project is niet gecompileerd.
+Open: (a) oude 'oplossingen' kortsluitpunt #4 (24 vooruit, 13 rechtdoor) en #5 (5 achteruit, 2 rechtdoor) zijn in de kaart nog aanwezig en worden niet ingetrokken;
+(b) staat de loc bij de start al op de startmelder (geen aanloop), dan kunnen opdrachtwissels nog onder de loc omgezet worden; (c) wissel 6 van 17:24 is nog niet te verklaren.
