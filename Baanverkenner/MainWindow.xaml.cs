@@ -479,8 +479,12 @@ public partial class MainWindow : Window
         }
         if (st.Controle)
         {
-            MessageBox.Show(this, "Er is nog een onderbroken controle. Hervat die met de knop 'Vorige verkenning hervatten / uitbreiden'.", "Baan checken", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
+            // BUG #114: een onderbroken controle mag ook weggegooid worden; dan begint de controle opnieuw vanaf de voltooide kaart.
+            var keuze = MessageBox.Show(this,
+                "Er is nog een onderbroken controle.\n\nJa = opnieuw beginnen (de onderbroken controle wordt weggegooid; je bestaande baankaart blijft ongewijzigd).\n" +
+                "Nee = niets doen; hervat die controle dan met de knop 'Vorige verkenning hervatten / uitbreiden'.",
+                "Baan checken", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (keuze != MessageBoxResult.Yes) return;
         }
         if (_hw is null || !_hw.Verbonden)
         {

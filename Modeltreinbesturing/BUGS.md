@@ -1674,3 +1674,9 @@ Test: `AltijdAfbuigendTest` (4 regels). Nog niet getest op de baan; het WPF-proj
 Open: (1) de controle hervatte op 12:07 vanaf opgeslagen voortgang van eerdere mislukte ritten (14 opdrachten): daarin zitten onjuiste bevindingen (wissel 3 'afbuigend' op het pad 13-14-24-21
 gaf de kortsluiting van 12:08:07; wissel 11 -> 138; wissel 1/3 als 'nieuw'). Start de controle opnieuw vanaf nul in plaats van te hervatten. (2) Wat precies "wissel 2 afbuigend" tegen de
 kortsluiting aan was, is uit het log niet met zekerheid vast te stellen: het log laat 12:31 wissel 2 juist rechtdoor zien. Zie ook de antwoordtekst.
+
+## #114 Controle kon niet opnieuw gestart worden (Marco 13:52)
+'Baan checken' meldde bij een onderbroken controle alleen "hervat die met de knop Vorige verkenning hervatten". Een controle met onjuiste bevindingen uit eerdere mislukte ritten (zie #113)
+kon daardoor niet worden weggegooid. Nu vraagt de knop: Ja = opnieuw beginnen (de onderbroken controle wordt vervangen door een schone controlekaart uit de voltooide kaart, die ongewijzigd blijft;
+een kopie van de voortgang wordt bewaard), Nee = niets doen en later hervatten.
+Test: controle-test (1 regel, `VoorControle` opnieuw). Het WPF-vraagvenster is niet getest en niet gecompileerd; nog niet getest op de baan.

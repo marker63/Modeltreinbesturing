@@ -496,6 +496,11 @@ public static class Tests
         st2.VoorControle(DateTime.Now);
         var terug = VerkenStatus.VanJson(st2.AlsJson())!;
         Eis(terug.Controle && terug.ControleKaart is not null && terug.ControleWisselSeed.Count == st2.ControleWisselSeed.Count && terug.Kaart.Voltooid, "controle: controlestatus blijft na opslaan en laden bewaard");
+        // BUG #114: opnieuw beginnen midden in een controle geeft weer een schone controlekaart
+        st2.ControleKaart!.Overgangen.Add(new Overgang { Van = 90, Naar = 91, Richting = Richting.Vooruit });
+        st2.AfgerondeOpdrachten = 14;
+        st2.VoorControle(DateTime.Now);
+        Eis(st2.Controle && st2.ControleKaart!.Overgangen.Count == 0 && st2.AfgerondeOpdrachten == 0 && st2.Wachtrij.Count == 0 && st2.Kaart.Voltooid, "controle (#114): opnieuw beginnen geeft een schone controlekaart en wijzigt de bestaande kaart niet");
     }
 
     // BUG #74: een voltooide verkenning uitbreiden met een tweede, fysiek los traject (twee losse stukken spoor: 1-2-3 en 4-5)
