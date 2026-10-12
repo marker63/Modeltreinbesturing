@@ -1157,6 +1157,20 @@ public static class Tests
     }
 
     // BUG #117 (Marco 16:12, log 15:58)
+    static void KruisVoorafTest()
+    {
+        var basis = Configuratie.Basis;
+        Etappe E(params int[] pad) => new Etappe { Van = pad[0], Naar = pad[^1], Pad = pad.ToList() };
+        var r1 = BaanVerkenner.KruisVoorafStand(E(13, 14), basis, basis.Met(5).Met(10), out var u1);
+        Eis(r1.Bevat(10) && !r1.Bevat(5) && u1 is not null, "kruisvooraf (#119): 13->14 zet motor 10 al vóór aankomst op 14 (5 blijft aan de opdracht)");
+        var r2 = BaanVerkenner.KruisVoorafStand(E(13, 14), basis.Met(10), basis.Met(10), out var u2);
+        Eis(r2.Bevat(10) && u2 is null, "kruisvooraf (#119): staat al goed, niets te doen");
+        var r3 = BaanVerkenner.KruisVoorafStand(E(30, 29, 21, 24), basis, basis.Met(10), out var u3);
+        Eis(!r3.Bevat(10) && u3 is null, "kruisvooraf (#119): pad via melder 24 is aan KruisAankomstStand");
+        var r4 = BaanVerkenner.KruisVoorafStand(E(13, 14), basis.Met(13), basis, out _);
+        Eis(!r4.Bevat(13), "kruisvooraf (#119): motor 13 terug naar rechtdoor vóór aankomst");
+    }
+
     static void ProefOplossingTest()
     {
         var k = new Baankaart();
@@ -1439,6 +1453,7 @@ public static class Tests
         ProefStopTest();
         OverloopStraatTest();
         ProefOplossingTest();
+        KruisVoorafTest();
         TweedeMelderTest();
         VerkeerdeWisselVraagTest();
         WisselstraatImportTest();

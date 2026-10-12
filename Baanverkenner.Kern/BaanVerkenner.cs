@@ -1536,6 +1536,20 @@ public partial class BaanVerkenner
         return nieuw;
     }
 
+    /// <summary>BUG #119 (Marco 17:14: "het kruiswissel werd geschakeld terwijl de loc er half op stond"): de opdracht begon op melder 14, naast de
+    /// kruiswissel. Pas NA aankomst op 14 werden motor 10 (en 5) omgezet; de loc reikte dan nog tot in de kruiswissel en ontspoorde. Eindigt de
+    /// laatste etappe van de aanloop niet op of via de kruiswissel zelf, dan worden motor 13 en 10 al VOOR die laatste etappe op de gewenste stand
+    /// gezet, terwijl de loc nog ver van de kruiswissel staat.</summary>
+    internal static Configuratie KruisVoorafStand(Etappe e, Configuratie cfg, Configuratie doel, out string? uitleg)
+    {
+        uitleg = null;
+        if (e.Pad.Contains(KruiswisselReferentie.Midden)) return cfg;   // dat geval regelt KruisAankomstStand
+        bool w13 = doel.Bevat(KruiswisselReferentie.Motor13), w10 = doel.Bevat(KruiswisselReferentie.Motor10);
+        if (cfg.Bevat(KruiswisselReferentie.Motor13) == w13 && cfg.Bevat(KruiswisselReferentie.Motor10) == w10) return cfg;
+        uitleg = $"Motor 13 {(w13 ? "afbuigend" : "rechtdoor")} en 10 {(w10 ? "afbuigend" : "rechtdoor")} worden al gezet voordat de loc de startmelder {e.Naar} inrijdt: daar staat hij vlak bij de kruiswissel en omzetten onder de loc laat hem ontsporen.";
+        return cfg.MetStand(KruiswisselReferentie.Motor13, w13).MetStand(KruiswisselReferentie.Motor10, w10);
+    }
+
     private async Task NaarStartVan(List<Etappe> route, Configuratie? doel = null)
     {
         for (int i = 0; i < route.Count; i++)
@@ -1546,6 +1560,17 @@ public partial class BaanVerkenner
             {
                 cfg = KruisAankomstStand(e, cfg, doel, out var uitleg);
                 if (uitleg is not null) _log.Info(uitleg);
+                cfg = KruisVoorafStand(e, cfg, doel, out var uitleg2);   // BUG #119
+                if (uitleg2 is not null) _log.Info(uitleg2);
+            }
+            else if (i < route.Count - 1)
+            {
+                // BUG #119 (log 17:13:41): de volgende etappe (14 -> ... -> 24 -> ...) rijdt door de kruiswissel; motor 10 werd pas omgezet toen de loc al op
+                // melder 14 stond. De standen van de kruiswissel voor de volgende etappe worden daarom al in deze etappe gezet.
+                var volg = route[i + 1];
+                var cVolg = _kaart.MetWisselEisen(volg.Pad, volg.Richting, KiesBijIngang(volg.Van, volg.Richting, volg.Pad, volg.Configuratie), out _);
+                cfg = KruisVoorafStand(e, cfg, cVolg, out var uitleg3);
+                if (uitleg3 is not null) _log.Info(uitleg3);
             }
             await ControleerGeenAlarmVoorStap($"navigatie {e.Van} -> {e.Naar}");
             cfg = MetAlarmStand(cfg);

@@ -1732,3 +1732,17 @@ met wissels K afbuigend is waargenomen, geldt ook als er elders nog andere wisse
 Test: `proefstop (#118)` (4 regels, naast de aangepaste #115-regel). Nog niet getest op de baan; het WPF-project is niet gecompileerd.
 Gevolg: wissel 6 wordt in een opdracht die bij melder 14 begint niet getest (komt op een andere opdracht/startmelder aan de beurt). Open: de terugweg na een afgebroken proef reed 14 melders achteruit
 (85 s) omdat 5 -> 13 -> 14 niet eerder met precies stand '5' is gereden; werkt wel, maar traag.
+
+## #119 Kruiswissel (motor 10) omgezet terwijl de loc er nog half op stond (Marco 17:14, log 17:11:52 en 17:13:41)
+Oorzaak: de opdracht begon op melder 14 (vlak naast de kruiswissel in melder 24). Motor 10 (en 5) werden pas omgezet NADAT de loc op 14 aangekomen was
+(`ZetConfiguratie(rijstand)` na `NaarStartVan`, en bij opdracht #5 voor de etappe 14 -> 129 -> 24); de loc reikte dan nog tot in de kruiswissel en ontspoorde
+(kortsluiting blok 3, daarna dezelfde fout bij de herhaling). #95/#96/#98 dekten alleen het geval dat de etappe zelf op melder 24 eindigt of de loc op 24 staat.
+Fix: `KruisVoorafStand` (BaanVerkenner.cs): motor 13 en 10 worden al gezet in de etappe VOOR de loc de kruiswissel-omgeving bereikt (laatste etappe van de aanloop:
+standen van de rijstand; tussenetappe: standen van de volgende etappe), zolang de huidige etappe zelf niet via melder 24 rijdt.
+Test: `KruisVoorafTest` (4 regels). Nog niet getest op de baan; het WPF-project is niet gecompileerd.
+Open: staat de loc bij de start van een opdracht al op 14 (geen aanloop), dan kan de stand nog onder de loc omgezet worden.
+
+## #120 Hardware-communicatie op het scherm toonde alleen In-berichten (Marco 17:16)
+Oorzaak: de Dinamo stuurt 5x per seconde een In-statusbericht; de lijst (3000 regels) liep daarmee vol en scrolde niet mee, zodat de zeldzame Uit-berichten niet
+te zien waren. In het hardwarelog-bestand staan ze wel (bv. 17:11:46 en 17:11:49). Fix: herhaalde In-statusberichten worden standaard verborgen
+(keuzevak bovenaan het tabblad) en de lijst scrolt mee. Nog niet getest op de baan; het WPF-project is niet gecompileerd.

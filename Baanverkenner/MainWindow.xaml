@@ -227,14 +227,18 @@
                              Text="Nog geen resultaat."/>
                 </TabItem>
                 <TabItem Header="Hardware-communicatie">
-                    <ListBox x:Name="HardwareLijst" FontFamily="Consolas" FontSize="12"
-                             VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding Tekst}" Foreground="{Binding Kleur}" FontWeight="{Binding Gewicht}"/>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
+                    <DockPanel>
+                        <CheckBox x:Name="VerbergInBox" DockPanel.Dock="Top" Margin="4,4,4,4" IsChecked="True"
+                                  Content="Alleen Uit-berichten en In-berichten die iets melden tonen (verbergt de 5x per seconde terugkerende Dinamo-statusberichten)"/>
+                        <ListBox x:Name="HardwareLijst" FontFamily="Consolas" FontSize="12"
+                                 VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Tekst}" Foreground="{Binding Kleur}" FontWeight="{Binding Gewicht}"/>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </DockPanel>
                 </TabItem>
             </TabControl>
 

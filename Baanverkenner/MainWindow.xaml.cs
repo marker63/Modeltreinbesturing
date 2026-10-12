@@ -306,10 +306,35 @@ public partial class MainWindow : Window
         if (r.Tekst.Contains("keepalive")) return; // Dinamo: 5x per seconde, geen informatie
         Dispatcher.InvokeAsync(() =>
         {
+            // BUG #120 (Marco 17:16: "op het scherm alleen In-berichten, geen Uit"): de Dinamo stuurt 5x per seconde een In-statusbericht; de lijst liep
+            // daarmee vol en bleef bovenaan staan, zodat de (zeldzame) Uit-berichten niet te zien waren. Nu worden herhalende statusberichten
+            // (kop 4A/0A met een melderstand die niet veranderd is) standaard verborgen en scrolt de lijst mee met de nieuwste regel.
+            if (r.Richting == "In" && VerbergInBox.IsChecked == true && IsHerhaaldStatusBericht(r.Tekst)) return;
             var kleur = r.Richting switch { "Uit" => Brushes.DarkOrange, "In" => Brushes.SteelBlue, _ => Brushes.DarkGoldenrod };
             _hardwareRegels.Add(new LogItem { Tekst = $"{r.Tijdstip:HH:mm:ss.fff}  {r.Richting,-4} {r.Tekst}", Kleur = kleur });
             while (_hardwareRegels.Count > 3000) _hardwareRegels.RemoveAt(0);
+            if (_hardwareRegels.Count > 0) HardwareLijst.ScrollIntoView(_hardwareRegels[^1]);
         });
+    }
+
+    private string? _vorigeInA, _vorigeInB;
+
+    /// <summary>Een In-bericht van de Dinamo is "herhaald" als de inhoud (zonder de vaste kop en de laatste byte) gelijk is aan het vorige bericht met dezelfde kop.</summary>
+    private bool IsHerhaaldStatusBericht(string tekst)
+    {
+        int i = tekst.IndexOf("[Dinamo] ", StringComparison.Ordinal);
+        if (i < 0) return false;
+        var hex = tekst[(i + 9)..].Trim();
+        if (hex.Length < 8) return false;
+        bool a = hex.StartsWith("4A", StringComparison.Ordinal);
+        bool b = hex.StartsWith("0A", StringComparison.Ordinal);
+        if (!a && !b) return false;
+        // Het statusbericht bevat een lopende teller in de laatste bytes; vergelijk daarom alleen het midden (de melderbits).
+        var kern = hex.Substring(2, hex.Length - 4);
+        ref string? vorig = ref (a ? ref _vorigeInA : ref _vorigeInB);
+        bool gelijk = vorig == kern;
+        vorig = kern;
+        return gelijk;
     }
 
     // =====================================================================
