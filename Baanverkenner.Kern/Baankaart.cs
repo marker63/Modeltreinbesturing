@@ -445,6 +445,7 @@ public class Baankaart
     public Configuratie MetBekendeKortsluitOplossingen(List<int> pad, Richting r, Configuratie c, out List<string> wijzigingen)
     {
         wijzigingen = new List<string>();
+        var beschermd = AltijdAfbuigendOpPad(pad, r);
         var eisen = new Dictionary<int, bool>(); var strijdig = new HashSet<int>();
         for (int i = 0; i + 1 < pad.Count; i++)
             foreach (var (a, afb) in WisselEisenVoorStap(pad[i], pad[i + 1], r))
@@ -473,6 +474,8 @@ public class Baankaart
                     continue;
                 }
                 if (c.Bevat(a) == s) continue;
+                // BUG #112: een oplossing mag geen wissel rechtdoor zetten die een stap van dit pad altijd afbuigend nodig had.
+                if (!s && beschermd.Contains(a)) continue;
                 bool eisTegen = !strijdig.Contains(a) && eisen.TryGetValue(a, out var e) && e != s;
                 if (!eisTegen)
                 {
@@ -483,7 +486,7 @@ public class Baankaart
                     continue;
                 }
                 // De oplossing botst met een eis van dit pad: dan mag de stand die de kortsluiting gaf hier niet voorkomen.
-                var weg = k.K.Afbuigend.Where(w => !(eisen.TryGetValue(w, out var ew) && ew)).ToList();
+                var weg = k.K.Afbuigend.Where(w => !(eisen.TryGetValue(w, out var ew) && ew) && !beschermd.Contains(w)).ToList();
                 if (weg.Count == 0) continue;
                 foreach (var w in weg) c = c.Zonder(w);
                 wijzigingen.Add($"{string.Join(", ", weg)} rechtdoor ({k.Label}: die stand gaf kortsluiting na melder {k.NaMelder}, en de oplossing, wissel {a} {(s ? "afbuigend" : "rechtdoor")}, kan op dit pad niet)");
@@ -492,6 +495,28 @@ public class Baankaart
             if (!veranderd) break;
         }
         return c;
+    }
+
+    /// <summary>BUG #112 (Marco 13:46, log 12:31): een stap die minstens twee keer is gereden, steeds met dezelfde wissel(s) afbuigend, heeft die
+    /// wissel(s) afbuigend nodig. Wissel 2 heeft geen splitsing in de kaart (alleen "kortsluiting bij omzetten"), dus de eisen van het pad kenden
+    /// hem niet; de bekende oplossing 'wissel 2 rechtdoor' (voor 5 -> 16) werd ook op het pad 5-12-11-4-129-14 toegepast, waardoor de loc
+    /// naar 16 reed. Alleen gebruikt om te voorkomen dat zo'n wissel rechtdoor wordt gezet, nooit om er een om te zetten.</summary>
+    public HashSet<int> AltijdAfbuigendOpPad(List<int> pad, Richting r)
+    {
+        var res = new HashSet<int>();
+        for (int i = 0; i + 1 < pad.Count; i++)
+        {
+            var o = Overgangen.FirstOrDefault(x => x.Van == pad[i] && x.Naar == pad[i + 1] && x.Richting == r);
+            if (o is null || o.AantalKeer < 2 || o.GezienBijConfiguraties.Count == 0) continue;
+            HashSet<int>? gemeen = null;
+            foreach (var sleutel in o.GezienBijConfiguraties)
+            {
+                var af = Configuratie.VanSleutel(sleutel).Afbuigend;
+                if (gemeen is null) gemeen = new HashSet<int>(af); else gemeen.IntersectWith(af);
+            }
+            if (gemeen is not null) res.UnionWith(gemeen);
+        }
+        return res;
     }
 
     /// <summary>BUG #77: de wisselstand <paramref name="c"/> aangevuld met de eisen van alle stappen van <paramref name="pad"/>. Tegenstrijdige

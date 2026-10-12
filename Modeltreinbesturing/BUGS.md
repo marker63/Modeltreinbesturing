@@ -1662,3 +1662,15 @@ met ALLE regels genummerd en de knoppen Opslaan als tekst, Opslaan als webpagina
 Het volledige verslag stond en staat ook in 'Rapport opslaan' (tekst/html) onder "Controles van de baan".
 Test: controle-test in CompileCheck (2 regels, tekst/html). Het WPF-venster en het afdrukken zijn NIET getest en niet gecompileerd (hier niet mogelijk); nog niet getest op de baan.
 Let op: de 25 verschillen van 12:32 komen uit een rit vóór #109/#110; een deel kan door de toenmalige wisselfouten komen. Stuur bij een nieuwe controle het verslag.
+
+## #113 Wissel 2 werd tijdens de controle verkeerd gezet: loc reed 5 -> 16 in plaats van 5 -> 12 (Marco 13:46, log 12:31)
+Opdracht #12 (14 achteruit, afbuigend 1, 2, 11) rijdt 13 -> 5 -> 12 -> 11 -> 4 -> 129 -> 14. De stand werd gecorrigeerd met "2 rechtdoor (kortsluitpunt #4 ... kan op dit pad niet)",
+terwijl 5 -> 12 wissel 2 afbuigend nodig heeft. Wissel 2 heeft in de kaart geen splitsing (alleen "kortsluiting bij omzetten"), dus de eisen van het pad kenden hem niet en de
+bekende oplossing 'wissel 2 rechtdoor' (hoort bij 5 -> 16) werd ook op dit pad toegepast. Gevolg: de loc reed op 12:31:34 en 12:32:02 naar melder 16 (onverwacht bezet) met wissel 1
+afbuigend, kortsluiting, de verkenner reed zelf terug en gaf het op.
+Oplossing: `Baankaart.AltijdAfbuigendOpPad`: een stap die minstens 2x is gereden en waarbij steeds dezelfde wissels afbuigend stonden (5 -> 12: altijd 2) beschermt die wissels;
+`MetBekendeKortsluitOplossingen` zet ze niet meer rechtdoor (noch via een oplossing, noch via de botsregel). Het wordt nooit gebruikt om een wissel om te zetten.
+Test: `AltijdAfbuigendTest` (4 regels). Nog niet getest op de baan; het WPF-project is niet gecompileerd.
+Open: (1) de controle hervatte op 12:07 vanaf opgeslagen voortgang van eerdere mislukte ritten (14 opdrachten): daarin zitten onjuiste bevindingen (wissel 3 'afbuigend' op het pad 13-14-24-21
+gaf de kortsluiting van 12:08:07; wissel 11 -> 138; wissel 1/3 als 'nieuw'). Start de controle opnieuw vanaf nul in plaats van te hervatten. (2) Wat precies "wissel 2 afbuigend" tegen de
+kortsluiting aan was, is uit het log niet met zekerheid vast te stellen: het log laat 12:31 wissel 2 juist rechtdoor zien. Zie ook de antwoordtekst.

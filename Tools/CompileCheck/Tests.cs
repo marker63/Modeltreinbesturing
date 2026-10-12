@@ -1112,6 +1112,21 @@ public static class Tests
         Eis(!BaanVerkenner.IsKruiswisselMotorKortsluiting(10, Rit(RitEinde.Lus, 14, 24)), "kruismotor: zonder kortsluiting niets bijzonders");
     }
 
+    static void AltijdAfbuigendTest()
+    {
+        // BUG #112 (log 12:31): oplossing 'wissel 2 rechtdoor' (na melder 5 achteruit) hoort bij het pad naar 16, niet bij 5 -> 12.
+        var k = new Baankaart();
+        k.Overgangen.Add(new Overgang { Van = 5, Naar = 12, Richting = Richting.Achteruit, AantalKeer = 2, GezienBijConfiguraties = { "2" } });
+        k.Overgangen.Add(new Overgang { Van = 13, Naar = 5, Richting = Richting.Achteruit, AantalKeer = 30, GezienBijConfiguraties = { "", "2", "1" } });
+        k.BekendeKortsluitOplossingen.Add(new KortsluitOplossing { NaMelder = 5, Richting = Richting.Achteruit, Stand = "2", Start = 13, Adres = 2, Afbuigend = false, Bron = "test" });
+        var naar12 = k.MetBekendeKortsluitOplossingen(new List<int> { 5, 12, 11 }, Richting.Achteruit, Configuratie.Basis.Met(1).Met(2), out _);
+        Eis(naar12.Bevat(2) && naar12.Bevat(1), "altijd afbuigend (#112): pad 5-12-11 houdt wissel 2 afbuigend (nu " + naar12 + ")");
+        var naar16 = k.MetBekendeKortsluitOplossingen(new List<int> { 13, 5 }, Richting.Achteruit, Configuratie.Basis.Met(2), out _);
+        Eis(!naar16.Bevat(2), "altijd afbuigend (#112): pad 13-5 zet wissel 2 nog steeds rechtdoor (nu " + naar16 + ")");
+        Eis(k.AltijdAfbuigendOpPad(new List<int> { 13, 5 }, Richting.Achteruit).Count == 0, "altijd afbuigend (#112): stap gereden met en zonder wissel -> niets beschermd");
+        Eis(k.AltijdAfbuigendOpPad(new List<int> { 5, 12 }, Richting.Vooruit).Count == 0, "altijd afbuigend (#112): andere richting niet beschermd");
+    }
+
     static void KortsluitOplossingTest()
     {
         var k = Laad("baankaart_2026-10-11_1103.json");
@@ -1332,6 +1347,7 @@ public static class Tests
         DoorrijdenTest();
         Wissel14Test();
         StaartWisselTest();
+        AltijdAfbuigendTest();
         TweedeMelderTest();
         VerkeerdeWisselVraagTest();
         WisselstraatImportTest();
