@@ -1718,3 +1718,17 @@ Drie oorzaken, drie fouten:
 Test: `ProefOplossingTest` (6 regels). Nog niet getest op de baan; het WPF-project is niet gecompileerd.
 Gevolg voor de kaart: de proef van wissel 2 achteruit kan nu eindelijk de splitsing van wissel 2 na melder 5 (achteruit: rechtdoor 16, afbuigend 12) vastleggen, die tot nu toe ontbrak.
 Open: bij het terugzetten van het extra adres (wissel 1) na de proef kan de loc nog dicht bij die wissel staan (niet getest).
+
+## #118 Proefritten rekenden zonder de extra wissel van de rijstand en reden in bekende omzet-kortsluitingen (Marco 16:34, log 16:12-16:25, versie vóór #117)
+Opdracht #3 ('afbuigend: 5') rijdt met een bekende extra wissel (10 afbuigend, kortsluitpunt #3): rijstand 5+10. De adrestest gebruikte voor de proefritten de stand van de opdracht
+ZONDER die extra wissel (`o.Configuratie.Met(a)`), terwijl wissel 10 fysiek afbuigend bleef staan. Gevolgen:
+1. 16:18:34 proef wissel 2 afbuigend: de kaart kent 'wissel 2 afbuigend = kortsluiting na melder 5' (waargenomen met alles rechtdoor). De #115-stop eiste exact dezelfde basisstand ('5' of '5,10'
+   is niet 'alles rechtdoor'), herkende niets en de loc reed tegen de kortsluiting aan (loc half op 16 en 5, 90 s herstel).
+2. 16:24:38 proef wissel 6 afbuigend: waargenomen bij '5, 10'; de proef rekende met '5' -> geen stop, kortsluiting in blok 9 met de loc op melder 129 waar wissel 6 ligt; de partnerzoektocht
+   mocht (terecht) wissel 9 en 10 niet omzetten, geen enkele andere wissel hielp, de loc zat vast tot Marco 16:32 wissel 5 en 6 zelf corrigeerde (9 minuten).
+Oplossing: (1) de adrestest gaat nu uit van de werkelijke rijstand (stops, proefstand, terugweg, extra wissel terugzetten en partnerzoektocht). (2) `ConfiguratieTekstIsDeelVan`: een omzet-kortsluiting die
+met wissels K afbuigend is waargenomen, geldt ook als er elders nog andere wissels afbuigend staan (alle wissels van K moeten wel afbuigend staan). (3) Valt de stop op de startmelder zelf
+(de wissel ligt direct na de startmelder, bv. wissel 6 na 129 bij start 14), dan zou de rit er dwars doorheen rijden; dat adres wordt in die opdracht overgeslagen met een melding.
+Test: `proefstop (#118)` (4 regels, naast de aangepaste #115-regel). Nog niet getest op de baan; het WPF-project is niet gecompileerd.
+Gevolg: wissel 6 wordt in een opdracht die bij melder 14 begint niet getest (komt op een andere opdracht/startmelder aan de beurt). Open: de terugweg na een afgebroken proef reed 14 melders achteruit
+(85 s) omdat 5 -> 13 -> 14 niet eerder met precies stand '5' is gereden; werkt wel, maar traag.

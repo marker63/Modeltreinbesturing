@@ -744,20 +744,31 @@ public partial class BaanVerkenner
                 // meteen ook de nog te testen adressen behoedt - geen herhaalde onnodige
                 // kortsluitingen én geen valse toeschrijvingen meer aan adressen die er niets
                 // mee te maken hebben.
-                var kortsluitStops = KortsluitStops(o.Configuratie, o.Richting);
+                // BUG #118 (Marco 16:34, log 16:12-16:25): de opdracht reed met een extra wissel (opdracht 'afbuigend: 5' rijdt met 10 erbij, de rijstand), maar de
+                // proefritten rekenden met de stand van de opdracht ZONDER die extra wissel. Daardoor werd een bekende omzet-kortsluiting (wissel 2 na melder 5,
+                // wissel 6 na melder 129) niet herkend en reed de proef er tegenaan. Alles in de adrestest gaat nu uit van de werkelijke rijstand.
+                var kortsluitStops = KortsluitStops(rijstand, o.Richting);
+                foreach (var s in KortsluitStops(o.Configuratie, o.Richting)) kortsluitStops.Add(s);
                 // BUG #106 (log 09:06): adres 14 afbuigend op de basisrit 17 -> 8 gaf zelf een kortsluiting, want de kaart weet al dat 14 daar
                 // rechtdoor moet staan. De rit stopt nu vóór zo'n stap (op melder 17) in plaats van de kortsluiting zelf te veroorzaken.
                 foreach (var s in EisConflictStops(_kaart, basis.Reeks, o.Richting, a)) kortsluitStops.Add(s);
                 // BUG #115 (log 14:02 en 14:37): (1) wissel 2 afbuigend is al bekend als kortsluiting na melder 5; de proefrit reed er toch tegenaan.
                 // (2) wissel 10 lag onder de loc (kruiswissel in melder 24) toen de rit daar stopte en hij werd teruggezet: kortsluiting. Stop dus
                 // vóór de melder waar de wissel ligt, zodat hij zonder loc erop teruggezet wordt.
-                foreach (var s in BekendeOmzetKortsluitStops(_kaart, a, o.Richting, o.Configuratie)) kortsluitStops.Add(s);
+                foreach (var s in BekendeOmzetKortsluitStops(_kaart, a, o.Richting, rijstand)) kortsluitStops.Add(s);
                 kortsluitStops = VeiligeStops(_kaart, basis.Reeks, a, kortsluitStops);
+                // BUG #118: ligt de bekende kortsluiting (of de wissel zelf) direct na de startmelder, dan komt de stop op de startmelder zelf te liggen en
+                // wordt die nooit 'bereikt': de rit zou er dwars doorheen rijden. Dan wordt dit adres hier niet getest.
+                if (kortsluitStops.Contains(o.Start))
+                {
+                    _log.Info($"Adres {a} wordt in deze opdracht niet getest: de kaart weet dat omzetten direct na melder {o.Start} ({o.Richting.Tekst()}) kortsluiting geeft; de loc zou er bovenop staan.");
+                    continue;
+                }
 
                 await ZetWissel(a, true);
                 // BUG #117 (Marco 16:12, log 15:58): wissel 2 afbuigend (rit achteruit vanaf 13) reed weer in de kortsluiting na melder 12 die de kaart al
                 // kent én waarvan de oplossing bekend is (wissel 1 afbuigend). De proefrit krijgt die oplossing nu mee, net als een gewone opdracht.
-                var proefCfg = ProefStandMetOplossing(_kaart, _ins.WisselAdressen(), o.Start, o.Richting, o.Configuratie, a, out var proefExtra);
+                var proefCfg = ProefStandMetOplossing(_kaart, _ins.WisselAdressen(), o.Start, o.Richting, rijstand, a, out var proefExtra);
                 foreach (var (ex, st) in proefExtra) await ZetWissel(ex, st);
                 if (proefExtra.Count > 0)
                     _log.Info($"Adres {a} afbuigend gaf eerder kortsluiting; de proef rijdt met de bekende oplossing: {string.Join(", ", proefExtra.Select(x => $"{x.Adres} {(x.Afbuigend ? "afbuigend" : "rechtdoor")}"))}.");
@@ -799,20 +810,20 @@ public partial class BaanVerkenner
                                 "Motor 13 en 10 zijn geen overloopwissels: geen partnerzoektocht, wissel wordt meteen teruggezet.");
                 }
                 else if (proef.Einde == RitEinde.Kortsluiting && !zelfdeKortsluiting && proef.Reeks.Count >= 1)
-                    partner = await PartnerwisselZoeken(o, a, proef);
+                    partner = await PartnerwisselZoeken(o, a, proef, rijstand);
 
                 if (afwijkendePad)
                 {
                     await TerugNaarMetControle(o, proef, cA0);
                     await ZetWissel(a, false);
-                    foreach (var (ex, _) in proefExtra) await ZetWissel(ex, o.Configuratie.Bevat(ex));
+                    foreach (var (ex, _) in proefExtra) await ZetWissel(ex, rijstand.Bevat(ex));
                 }
                 else
                 {
                     // BUG #35: de loc staat hier altijd stil; eerst terugzetten, dan de terugrit.
                     await ZetWissel(a, false);
-                    foreach (var (ex, _) in proefExtra) await ZetWissel(ex, o.Configuratie.Bevat(ex));
-                    await TerugNaarMetControle(o, proef, o.Configuratie);
+                    foreach (var (ex, _) in proefExtra) await ZetWissel(ex, rijstand.Bevat(ex));
+                    await TerugNaarMetControle(o, proef, rijstand);
                 }
 
                 Vergelijk(o, basis, proef, a);
@@ -874,11 +885,12 @@ public partial class BaanVerkenner
     /// staan; alle andere wissels worden één voor één ook op afbuigend gezet (dichtstbijzijnde
     /// adres eerst, hoogstens MaxPartnerProeven) om te kijken of de kortsluiting weg is. Bij een
     /// succes staat de loc weer op die laatste melder, met alleen <paramref name="a"/> afbuigend.</summary>
-    private async Task<(int Partner, RitResultaat Rit)?> PartnerwisselZoeken(Opdracht o, int a, RitResultaat proef)
+    private async Task<(int Partner, RitResultaat Rit)?> PartnerwisselZoeken(Opdracht o, int a, RitResultaat proef, Configuratie? rijstand = null)
     {
         int x = proef.Reeks[^1];
-        var cA = o.Configuratie.Met(a);
-        var kandidaten = PartnerVolgorde(_kaart, _ins.WisselAdressen(), a, x, o.Configuratie, _ins.MaxPartnerProeven);
+        var cBasis = rijstand ?? o.Configuratie;   // BUG #118: de werkelijke rijstand, niet de nominale stand van de opdracht
+        var cA = cBasis.Met(a);
+        var kandidaten = PartnerVolgorde(_kaart, _ins.WisselAdressen(), a, x, cBasis, _ins.MaxPartnerProeven);
         _log.Info($"Kortsluiting na melder {x} met adres {a} op afbuigend: dat wissel blijft afbuigend staan en de andere wissels worden één voor één meegeschakeld ({kandidaten.Count} adressen) om te zien of de kortsluiting verdwijnt (overloopwissels).");
         // BUG #109 (Marco 12:03): de partnerproef zette wissel 9 om terwijl de loc op melder 129 stond, waar die wissel ligt (hij heeft daar zijn
         // punt) en ontspoorde. Wissels die de kaart bij melder x noemen worden niet meer als partner geprobeerd.
@@ -1121,8 +1133,19 @@ public partial class BaanVerkenner
 
     internal static HashSet<int> BekendeOmzetKortsluitStops(Baankaart kaart, int a, Richting r, Configuratie c) =>
         kaart.Wissels.Where(w => w.Adres == a).SelectMany(w => w.Waarnemingen)
-            .Where(o => o.Soort == WaarnemingSoort.KortsluitingBijOmzetten && o.Richting == r && o.Configuratie == c.ToString())
+            .Where(o => o.Soort == WaarnemingSoort.KortsluitingBijOmzetten && o.Richting == r && ConfiguratieTekstIsDeelVan(o.Configuratie, c))
             .Select(o => o.NaMelder).ToHashSet();
+
+    /// <summary>BUG #118: staan alle wissels die in <paramref name="tekst"/> (zoals <see cref="Configuratie.ToString"/>) afbuigend stonden, ook in <paramref name="c"/> afbuigend?
+    /// Een kortsluiting die ontstond toen alleen die wissels afbuigend stonden, ontstaat ook als er elders nog een wissel extra afbuigend staat.</summary>
+    internal static bool ConfiguratieTekstIsDeelVan(string tekst, Configuratie c)
+    {
+        if (tekst == Configuratie.Basis.ToString()) return true;
+        const string kop = "afbuigend: ";
+        if (!tekst.StartsWith(kop)) return false;
+        var delen = tekst.Substring(kop.Length).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return delen.All(d => int.TryParse(d, out var n) && c.Bevat(n));
+    }
 
     /// <summary>BUG #115: ligt wissel <paramref name="a"/> volgens de kaart direct na de stopmelder (waarneming met die NaMelder), dan zou de loc er bij het stoppen bovenop staan en
     /// bij het terugzetten van de wissel kortsluiting of ontsporing krijgen. De stop schuift dan op naar de melder ervoor in <paramref name="reeks"/>.</summary>

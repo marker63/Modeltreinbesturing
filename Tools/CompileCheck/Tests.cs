@@ -1142,7 +1142,13 @@ public static class Tests
         k.Wissels.Add(new WisselVondst { Adres = 10, Waarnemingen = { new WisselWaarneming { Soort = WaarnemingSoort.Splitsing, NaMelder = 24, Richting = Richting.Achteruit, VolgendeBijRechtdoor = 14, VolgendeBijAfbuigend = 129, Configuratie = "alle wissels rechtdoor" } } });
         var stops = BaanVerkenner.BekendeOmzetKortsluitStops(k, 2, Richting.Vooruit, Configuratie.Basis);
         Eis(stops.SetEquals(new[] { 5 }), "proefstop (#115): wissel 2 afbuigend gaf al kortsluiting na melder 5 -> stop daar");
-        Eis(BaanVerkenner.BekendeOmzetKortsluitStops(k, 2, Richting.Achteruit, Configuratie.Basis).Count == 0 && BaanVerkenner.BekendeOmzetKortsluitStops(k, 2, Richting.Vooruit, Configuratie.Basis.Met(1)).Count == 0, "proefstop (#115): andere richting of andere basisstand geeft geen stop");
+        Eis(BaanVerkenner.BekendeOmzetKortsluitStops(k, 2, Richting.Achteruit, Configuratie.Basis).Count == 0, "proefstop (#115): andere richting geeft geen stop");
+        // BUG #118 (log 16:18 en 16:24): een extra wissel elders (opdracht 5 rijdt met 10 erbij) mag de herkenning niet verhinderen; ontbrekende wissels wel
+        Eis(BaanVerkenner.BekendeOmzetKortsluitStops(k, 2, Richting.Vooruit, new Configuratie(new[] { 5, 10 })).SetEquals(new[] { 5 }), "proefstop (#118): kortsluiting gezien met alles rechtdoor geldt ook als er elders wissels afbuigend staan");
+        k.Wissels.Add(new WisselVondst { Adres = 6, Waarnemingen = { new WisselWaarneming { Soort = WaarnemingSoort.KortsluitingBijOmzetten, NaMelder = 129, Richting = Richting.Vooruit, VolgendeBijRechtdoor = 24, Configuratie = "afbuigend: 5, 10" } } });
+        Eis(BaanVerkenner.BekendeOmzetKortsluitStops(k, 6, Richting.Vooruit, new Configuratie(new[] { 5, 10 })).SetEquals(new[] { 129 }), "proefstop (#118): wissel 6 na melder 129 bij 5+10 afbuigend wordt herkend");
+        Eis(BaanVerkenner.BekendeOmzetKortsluitStops(k, 6, Richting.Vooruit, new Configuratie(new[] { 5 })).Count == 0, "proefstop (#118): zonder wissel 10 is de waarneming van wissel 6 niet van toepassing");
+        Eis(BaanVerkenner.VeiligeStops(k, new List<int> { 14, 129, 24 }, 6, new[] { 129 }).SetEquals(new[] { 14 }), "proefstop (#118): wissel 6 ligt direct na de startmelder 14 -> stop valt op de startmelder (adres wordt overgeslagen)");
         var reeks = new List<int> { 13, 14, 24, 21, 29, 30, 20, 27, 28, 26, 25, 17, 8, 15, 16, 5, 13 };
         Eis(BaanVerkenner.VeiligeStops(k, reeks, 2, new[] { 5 }).SetEquals(new[] { 16 }), "proefstop (#115): wissel 2 ligt na melder 5 -> de rit stopt op 16, niet erop");
         var achteruit = new List<int> { 13, 5, 16, 15, 8, 17, 25, 26, 28, 27, 20, 30, 29, 21, 24, 14, 13 };
