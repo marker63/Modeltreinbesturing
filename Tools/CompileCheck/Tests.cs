@@ -1171,6 +1171,32 @@ public static class Tests
         Eis(!r4.Bevat(13), "kruisvooraf (#119): motor 13 terug naar rechtdoor vóór aankomst");
     }
 
+    // BUG #121 (log 18:14): oplossing van een kortsluitpunt geldt ook voor een opdracht die LATER op dezelfde weg begint
+    static void OplossingLaterOpWegTest()
+    {
+        var k = new Baankaart();
+        k.Kortsluitpunten.Add(new Kortsluitpunt
+        {
+            Id = 1, NaMelder = 12, Richting = Richting.Achteruit, Configuratie = new Configuratie(new[] { 2 }), Opgelost = true, OpgelostDoorAdres = 1, OpgelostMetAfbuigend = true,
+            Route = { new Etappe { Van = 13, Naar = 12, Richting = Richting.Achteruit, Pad = { 13, 5, 12 }, Configuratie = new Configuratie(new[] { 2 }) } }
+        });
+        var c2 = new Configuratie(new[] { 2 });
+        k.RegistreerOvergang(13, 5, Richting.Achteruit, c2, 3.0);
+        k.RegistreerOvergang(5, 12, Richting.Achteruit, c2, 3.0);
+        var c = k.MetBekendeOplossingenVoorStart(13, Richting.Achteruit, c2, out _);
+        Eis(c.Bevat(1), "oplossing (#121): zelfde startmelder 13 -> wissel 1 erbij");
+        c = k.MetBekendeOplossingenVoorStart(5, Richting.Achteruit, c2, out _);
+        Eis(c.Bevat(1) && c.Bevat(2), "oplossing (#121): opdracht vanaf melder 5 (later op dezelfde weg) krijgt wissel 1 ook (nu " + c + ")");
+        c = k.MetBekendeOplossingenVoorStart(16, Richting.Achteruit, c2, out _);
+        Eis(!c.Bevat(1), "oplossing (#121): startmelder zonder bekende weg naar melder 12 -> niets erbij");
+        c = k.MetBekendeOplossingenVoorStart(5, Richting.Achteruit, new Configuratie(new[] { 3 }), out _);
+        Eis(!c.Bevat(1), "oplossing (#121): andere stand -> niets erbij");
+        // terugweg naar de kruiswissel: motor 13 afbuigend van de opdracht blijft staan als de referentie dat bewijst (14 <-> 8)
+        Etappe E(params int[] pad) => new Etappe { Van = pad[0], Naar = pad[^1], Pad = pad.ToList() };
+        var r = BaanVerkenner.KruisAankomstStand(E(13, 14, 24), Configuratie.Basis.Met(14), Configuratie.Basis.Met(13).Met(14), out _);
+        Eis(r.Bevat(13) && r.Bevat(14), "kruisterugweg (#121): terugweg 13-14-24 zet motor 13 afbuigend vóór het inrijden van 24 (nu " + r + ")");
+    }
+
     static void ProefOplossingTest()
     {
         var k = new Baankaart();
@@ -1454,6 +1480,7 @@ public static class Tests
         OverloopStraatTest();
         ProefOplossingTest();
         KruisVoorafTest();
+        OplossingLaterOpWegTest();
         TweedeMelderTest();
         VerkeerdeWisselVraagTest();
         WisselstraatImportTest();

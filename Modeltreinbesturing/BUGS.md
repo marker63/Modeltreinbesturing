@@ -1746,3 +1746,25 @@ Open: staat de loc bij de start van een opdracht al op 14 (geen aanloop), dan ka
 Oorzaak: de Dinamo stuurt 5x per seconde een In-statusbericht; de lijst (3000 regels) liep daarmee vol en scrolde niet mee, zodat de zeldzame Uit-berichten niet
 te zien waren. In het hardwarelog-bestand staan ze wel (bv. 17:11:46 en 17:11:49). Fix: herhaalde In-statusberichten worden standaard verborgen
 (keuzevak bovenaan het tabblad) en de lijst scrolt mee. Nog niet getest op de baan; het WPF-project is niet gecompileerd.
+
+## #121 Terugweg, proefritten en opdrachtstand liepen uiteen (Marco 18:19, log 17:23-18:18, controleronde; ook de oorzaak van 17:01 en 17:11)
+Gemeenschappelijke oorzaak: op meerdere plekken werd de NOMINALE stand van de opdracht gebruikt in plaats van de werkelijke rijstand (opdracht + bekende extra wissels),
+of de stand na een terugweg werd niet hersteld voordat de volgende proef begon. Gevonden in dit log:
+1. Basisrit (18:16:37, ook 17:01:58): `TerugNaarMetControle(o, rit, o.Configuratie)` gaf de terugweg de stand 'afbuigend: 2' terwijl de rit met 'afbuigend: 1, 2'
+   gereden was. Wissel 1 ging rechtdoor terwijl de loc op melder 12 (met de staart op 5) stond: kortsluiting, ontsporing, NavigatieFout. Een tweede basisrit
+   begon bovendien met de verkeerde stand. Fix: terugweg met de rijstand van de basisrit.
+2. Bekende oplossing werd gemist (18:14:39): de oplossing van kortsluitpunt #1 (wissel 1 bij wissel 2 afbuigend) werd alleen toegepast als de opdracht op dezelfde
+   startmelder (13) begon; opdracht #4 begon op melder 5 (verderop dezelfde weg) en kreeg wissel 1 niet. Fix: `Baankaart.BereiktMelder`; de oplossing geldt ook
+   als de loc volgens de kaart (stappen met deze stand eerder gereden, zonder keuze) vanaf de startmelder de melder van de kortsluiting bereikt.
+3. Valse vondsten (18:11:42-18:12:55): de terugweg naar startmelder 24 zette motor 13 rechtdoor (oude 'oplossing' van kortsluitpunt #4); op de kruiswissel zelf kan
+   hij daarna niet meer om. De proefritten heetten 'afbuigend: 6, 13, 14' maar reden met 13 rechtdoor en kwamen op melder 21 uit: de verkenner legde wissel 6, 7,
+   8 en 9 vast als splitsing na melder 24 (onjuist) en plande er vier opdrachten voor. Fixes: (a) eindigt de terugweg op melder 24, dan krijgen motor 13 en 10
+   vóór het inrijden de stand van de opdracht (`KruisStandBijTerugweg`, via de referentie); (b) vóór elke proef wordt de werkelijke stand gelijk gemaakt aan de
+   rijstand (`HerstelRijstand`; wissels bij een bezette melder blijven staan); kan een kruiswisselmotor niet omdat de loc op melder 24 staat, dan wordt dat adres
+   niet getest en staat dat in het log, in plaats van een valse vondst.
+4. Adres 10 testen met de loc op melder 24 (18:12:55) gaf altijd kortsluiting die bleef staan. Motor 13 en 10 worden vanaf een opdracht op melder 24 niet meer getest.
+Tests: `oplossing (#121)` (4 regels), `kruisterugweg (#121)` (1 regel). Nog niet getest op de baan; het WPF-project is niet gecompileerd.
+Open: (a) opdracht #4 zette wissel 2 om terwijl de loc op melder 5 stond; de waarschuwing 'wissel 2 ligt bij melder 5' was hier misleidend (de echte oorzaak was het
+ontbrekende wissel 1, zie 2), maar het omzetten van de opdrachtwissel direct vóór de loc is niet vooraf gedaan (alleen de kruiswissel, #119); (b) de oude
+'oplossing' van kortsluitpunt #4 (13 afbuigend bij 24 vooruit) is in deze controle ronde met een goede rit tegengesproken (WISSEL 13 gevonden 17:44) maar wordt nog
+niet automatisch ingetrokken; (c) het wissel-6-verhaal van 17:24 is nog niet te verklaren zonder log van dat moment.

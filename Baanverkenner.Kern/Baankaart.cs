@@ -305,7 +305,7 @@ public class Baankaart
     public Configuratie MetBekendeOplossingenVoorStart(int start, Richting r, Configuratie c, out List<string> wijzigingen)
     {
         wijzigingen = new List<string>();
-        foreach (var o in Oplossingen(r).Where(o => o.Start == start && !o.K.Bevat(o.Adres)))
+        foreach (var o in Oplossingen(r).Where(o => (o.Start == start || BereiktMelder(start, o.NaMelder, r, c)) && !o.K.Bevat(o.Adres)))
         {
             if (!o.K.Afbuigend.All(c.Bevat) || c.Bevat(o.Adres) == o.Afbuigend) continue;
             c = c.MetStand(o.Adres, o.Afbuigend);
@@ -313,6 +313,24 @@ public class Baankaart
         }
         return c;
     }
+    /// <summary>BUG #121 (log 18:14, opdracht vanaf melder 5): de bekende oplossing van kortsluitpunt #1 (wissel 1 bij wissel 2 afbuigend, kortsluiting na melder 12) werd
+    /// alleen toegepast bij een opdracht die op dezelfde startmelder (13) begon als toen. Begint de opdracht op een melder LATER op dezelfde weg (5), dan is de weg
+    /// van daar naar de melder van de kortsluiting even goed bekend: rijdt de loc volgens de kaart (stappen met deze wisselstand eerder gereden, zonder keuze)
+    /// van <paramref name="van"/> naar <paramref name="doel"/>, dan geldt de oplossing ook.</summary>
+    internal bool BereiktMelder(int van, int doel, Richting r, Configuratie c)
+    {
+        int huidig = van; var gezien = new HashSet<int> { huidig };
+        for (int i = 0; i < 60; i++)
+        {
+            if (huidig == doel) return true;
+            var volg = Overgangen.Where(x => x.Van == huidig && x.Richting == r && x.GezienBijConfiguraties.Contains(c.Sleutel)).Select(x => x.Naar).Distinct().ToList();
+            if (volg.Count != 1) return false;
+            huidig = volg[0];
+            if (!gezien.Add(huidig)) return huidig == doel;
+        }
+        return false;
+    }
+
     public List<int> AdressenZonderEffect { get; set; } = new();
     public List<VoorgesteldBlok> VoorgesteldeBlokken { get; set; } = new();
     /// <summary>BUG #78: voorstel voor wisselstraten per gereden overgang (zie <see cref="WisselstraatVoorstel"/>). Oudere kaarten: leeg.</summary>

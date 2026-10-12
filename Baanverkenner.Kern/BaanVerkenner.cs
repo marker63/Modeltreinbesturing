@@ -765,6 +765,21 @@ public partial class BaanVerkenner
                     continue;
                 }
 
+                // BUG #121 (log 18:12:55): adres 10 werd getest met de loc op melder 24 (de opdracht begon daar): motor 13 of 10 omzetten terwijl de loc op de
+                // kruiswissel staat geeft ALTIJD kortsluiting (zie #96), en de kortsluiting bleef daarna staan. Die adressen worden vanaf melder 24 niet getest.
+                if ((a == KruiswisselReferentie.Motor13 || a == KruiswisselReferentie.Motor10) && _monitor.Bezet.Contains(KruiswisselReferentie.Midden))
+                {
+                    _log.Info($"Adres {a} wordt in opdracht #{o.Id} niet getest: de loc staat op de kruiswissel (melder {KruiswisselReferentie.Midden}) en motor {a} omzetten onder de loc geeft altijd kortsluiting.");
+                    continue;
+                }
+                // BUG #121 (log 18:11:57): na een terugweg kan de stand afwijken van de rijstand (motor 13 stond rechtdoor terwijl de opdracht hem afbuigend
+                // vraagt); de proefrit heette 'afbuigend: 6, 13, 14' maar reed met 13 rechtdoor en leverde valse vondsten op (wissel 6, 7, 8 en 9 'splitsen').
+                // Voor elke proef wordt de stand dus eerst weer gelijk gemaakt aan de rijstand; kan dat niet veilig, dan wordt dit adres niet getest.
+                if (!await HerstelRijstand(rijstand, a))
+                {
+                    _log.Waarschuwing($"Adres {a} wordt in opdracht #{o.Id} nu niet getest: de wisselstand kon niet veilig gelijk gemaakt worden aan de rijstand ({rijstand}); een proef met een andere stand zou valse vondsten geven.");
+                    continue;
+                }
                 await ZetWissel(a, true);
                 // BUG #117 (Marco 16:12, log 15:58): wissel 2 afbuigend (rit achteruit vanaf 13) reed weer in de kortsluiting na melder 12 die de kaart al
                 // kent én waarvan de oplossing bekend is (wissel 1 afbuigend). De proefrit krijgt die oplossing nu mee, net als een gewone opdracht.
@@ -858,6 +873,31 @@ public partial class BaanVerkenner
                 _kaart.Waarschuwingen.Add($"Opdracht vanaf melder {o.Start} {o.Richting.Tekst()} ({o.Configuratie}) is overgeslagen: {nf.Message}");
             }
         }
+    }
+
+    /// <summary>BUG #121: maakt de werkelijke wisselstand gelijk aan <paramref name="rijstand"/> (behalve het adres dat de proef zelf omzet). Wissels die bij een nu
+    /// bezette melder liggen blijven zoals ze staan; kan een kruiswisselmotor niet omgezet worden omdat de loc op de kruiswissel staat, dan false.</summary>
+    private async Task<bool> HerstelRijstand(Configuratie rijstand, int proefAdres)
+    {
+        var bijBezet = WisselsBijBezet(_kaart, _monitor.Bezet);
+        var teDoen = new List<(int Adres, bool Afb)>();
+        foreach (var adres in _ins.WisselAdressen())
+        {
+            if (adres == proefAdres) continue;
+            bool wens = rijstand.Bevat(adres);
+            bool nu = _wisselStand.TryGetValue(adres, out var st) && st;
+            if (nu == wens) continue;
+            bool kruisMotor = adres == KruiswisselReferentie.Motor13 || adres == KruiswisselReferentie.Motor10;
+            if (kruisMotor && _monitor.Bezet.Contains(KruiswisselReferentie.Midden)) return false;
+            if (bijBezet.Contains(adres)) continue;   // ligt bij de melder waar de loc staat: niet onder de loc omzetten (de staartwissels regelt de rit zelf, #107)
+            teDoen.Add((adres, wens));
+        }
+        foreach (var (adres, afb) in teDoen)
+        {
+            _log.Info($"Rijstand hersteld voor de proef: wissel {adres} stond {(afb ? "rechtdoor" : "afbuigend")} en moet {(afb ? "afbuigend" : "rechtdoor")} staan.");
+            await ZetWissel(adres, afb);
+        }
+        return true;
     }
 
     internal static void PlaatsHerpoging(List<Opdracht> wachtrij, Opdracht o, bool direct)
@@ -991,10 +1031,14 @@ public partial class BaanVerkenner
             if (i == aantal && (ritten.Count < 2 || ritten[0].Reeks.SequenceEqual(ritten[1].Reeks))) break;
             _bezig = $"opdracht #{o.Id}: basisrit {(i == 0 ? "" : $"(controle {i})")}";
             MeldVoortgang();
-            var rit = await Rit(o.Start, o.Richting, new RitDoel { Configuratie = RijStand(o), StopBijMelders = stops, StaartWissels = true });
+            var rijstandBasis = RijStand(o);
+            var rit = await Rit(o.Start, o.Richting, new RitDoel { Configuratie = rijstandBasis, StopBijMelders = stops, StaartWissels = true });
             _log.Info($"Basisrit: {Lijst(rit.Reeks)} - einde: {EindeTekst(rit.Einde)}.");
             VerwerkEinde(o, rit);
-            await TerugNaarMetControle(o, rit, o.Configuratie);
+            // BUG #121 (log 18:16:37 en 17:01:58): de terugweg ging uit van de NOMINALE stand van de opdracht (afbuigend: 2) in plaats van de werkelijke
+            // rijstand (afbuigend: 1, 2). Wissel 1 werd rechtdoor gezet terwijl de loc er nog op stond (kortsluiting, ontsporing); een tweede basisrit
+            // begon bovendien met de verkeerde stand.
+            await TerugNaarMetControle(o, rit, rijstandBasis);
             ritten.Add(rit);
             eerste ??= rit;
             // Na een kortsluiting niet nog eens dezelfde kortsluiting opzoeken.
@@ -1579,6 +1623,18 @@ public partial class BaanVerkenner
         }
     }
 
+    /// <summary>BUG #121 (log 18:11:42): de terugweg naar startmelder 24 (de kruiswissel) zette motor 13 rechtdoor door een oude 'oplossing' (stand 13 afbuigend gaf
+    /// kortsluiting), terwijl de opdracht (24 vooruit, 13 afbuigend) hem afbuigend nodig had. Op de kruiswissel zelf kan hij daarna niet meer omgezet worden;
+    /// de proefritten reden daardoor met een andere stand dan ze meldden. Eindigt de terugweg op de kruiswissel, dan krijgen motor 13 en 10 vóór het inrijden de
+    /// stand van de opdracht, als de referentie die combinatie vanaf deze ingangskant bewezen heeft.</summary>
+    private Configuratie KruisStandBijTerugweg(List<int> pad, Richting r, int start, Configuratie cfg, Configuratie opdrachtStand)
+    {
+        if (start != KruiswisselReferentie.Midden || pad.Count < 2) return cfg;
+        var nieuw = KruisAankomstStand(new Etappe { Van = pad[0], Naar = start, Richting = r, Pad = pad }, cfg, opdrachtStand, out var uitleg);
+        if (uitleg is not null) _log.Info("Terugweg: " + uitleg);
+        return nieuw;
+    }
+
     /// <param name="eersteConfiguratie">BUG #73: na een proef met een extra wissel op een kruiswissel-sectie blijft de wisselstand van die
     /// proef staan voor het EERSTE stuk van de terugweg; pas daarna volgen de standen van de route.</param>
     private async Task TerugNaarHuis(List<Etappe> route, Configuratie? eersteConfiguratie = null)
@@ -1678,6 +1734,7 @@ public partial class BaanVerkenner
         {
             _log.Info($"Terug naar melder {start} door verder te rijden ({Lijst(door)}, {rit.Richting.Tekst()}) in plaats van {rit.Reeks.Count - 1} melders terug: die weg is eerder met deze wisselstand gereden.");
             var cDoor = MetEisen(door, rit.Richting, KiesBijIngang(door[0], rit.Richting, door, c));
+            cDoor = KruisStandBijTerugweg(door, rit.Richting, start, cDoor, c);
             await ControleerGeenAlarmVoorStap($"doorrijden naar melder {start}");
             cDoor = MetAlarmStand(cDoor);
             await ZetConfiguratie(cDoor);
@@ -1697,7 +1754,9 @@ public partial class BaanVerkenner
         }
         // BUG #77 (log 18:58): de terugweg 14 -> 129 -> 24 -> 21 werd met wissel 5 rechtdoor gereden terwijl 14 -> 129 alleen met wissel 5
         // afbuigend bestaat: kortsluiting. Voor de terugweg gelden de bekende wisselstanden per stap.
+        var cOpdracht = c;
         c = MetEisen(pad, rit.Richting.Om(), KiesBijIngang(vanaf, rit.Richting.Om(), pad, c));
+        c = KruisStandBijTerugweg(pad, rit.Richting.Om(), start, c, cOpdracht);
         await ControleerGeenAlarmVoorStap($"terugweg naar melder {start}");
         c = MetAlarmStand(c);
         await ZetConfiguratie(c);
