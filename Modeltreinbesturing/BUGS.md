@@ -1680,3 +1680,16 @@ kortsluiting aan was, is uit het log niet met zekerheid vast te stellen: het log
 kon daardoor niet worden weggegooid. Nu vraagt de knop: Ja = opnieuw beginnen (de onderbroken controle wordt vervangen door een schone controlekaart uit de voltooide kaart, die ongewijzigd blijft;
 een kopie van de voortgang wordt bewaard), Nee = niets doen en later hervatten.
 Test: controle-test (1 regel, `VoorControle` opnieuw). Het WPF-vraagvenster is niet getest en niet gecompileerd; nog niet getest op de baan.
+
+## #115 Proefrit reed tegen een bekende kortsluiting aan (wissel 2) en zette wissel 10 terug met de loc op de kruiswissel (Marco 15:04, log 13:56-15:03)
+Dit was de schone controle (0 opdrachten afgerond), dus #113/#114 werkten; twee andere fouten:
+1. 14:02:48: de adrestest van wissel 2 afbuigend (rit vooruit vanaf 13) reed de hele lus en kreeg bij melder 5 de kortsluiting die de kaart al kent
+   ("wissel 2: afbuigend = kortsluiting na melder 5, van achteren bereden"). De proefstops kenden alleen openstaande kortsluitpunten, niet de waarneming van de wissel zelf.
+2. 14:37:27: de adrestest van wissel 10 afbuigend stopte op melder 24 (eisconflict, #106) en zette wissel 10 direct terug terwijl de loc over 24/21 de kruiswissel
+   op stond; 2 s later kortsluiting in blok 8 die niet meer wegging (ook niet na het omzetten van alle andere wissels, #108) tot Marco de loc zelf corrigeerde.
+Oplossing: (1) `BekendeOmzetKortsluitStops`: de adrestest stopt op de melder waarna dit adres afbuigend al kortsluiting gaf (zelfde richting en basisstand).
+(2) `VeiligeStops`: ligt de wissel volgens de kaart direct na de stopmelder (waarneming met die NaMelder), dan stopt de rit op de melder ervoor, zodat de wissel zonder loc erop
+wordt teruggezet. Dit geldt voor alle stops van de adrestest (ook #106 en openstaande kortsluitpunten).
+Test: `ProefStopTest` (5 regels). Nog niet getest op de baan; het WPF-project is niet gecompileerd.
+Gevolg: bij het zelfde proefadres wordt de kortsluiting niet opnieuw 'bewezen'; de bekende waarneming blijft in de kaart staan. De controle meldt zo'n wissel mogelijk als "niet opnieuw vastgesteld".
+Open: of de loc bij stoppen op de voorlaatste melder altijd ver genoeg van de tong staat (bij een lange loc op een kort blok) is niet getest.

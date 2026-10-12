@@ -1117,6 +1117,22 @@ public static class Tests
         Eis(!BaanVerkenner.IsKruiswisselMotorKortsluiting(10, Rit(RitEinde.Lus, 14, 24)), "kruismotor: zonder kortsluiting niets bijzonders");
     }
 
+    static void ProefStopTest()
+    {
+        // BUG #115 (log 14:02 en 14:37)
+        var k = new Baankaart();
+        k.Wissels.Add(new WisselVondst { Adres = 2, Waarnemingen = { new WisselWaarneming { Soort = WaarnemingSoort.KortsluitingBijOmzetten, NaMelder = 5, Richting = Richting.Vooruit, VolgendeBijRechtdoor = 13, Configuratie = "alle wissels rechtdoor" } } });
+        k.Wissels.Add(new WisselVondst { Adres = 10, Waarnemingen = { new WisselWaarneming { Soort = WaarnemingSoort.Splitsing, NaMelder = 24, Richting = Richting.Achteruit, VolgendeBijRechtdoor = 14, VolgendeBijAfbuigend = 129, Configuratie = "alle wissels rechtdoor" } } });
+        var stops = BaanVerkenner.BekendeOmzetKortsluitStops(k, 2, Richting.Vooruit, Configuratie.Basis);
+        Eis(stops.SetEquals(new[] { 5 }), "proefstop (#115): wissel 2 afbuigend gaf al kortsluiting na melder 5 -> stop daar");
+        Eis(BaanVerkenner.BekendeOmzetKortsluitStops(k, 2, Richting.Achteruit, Configuratie.Basis).Count == 0 && BaanVerkenner.BekendeOmzetKortsluitStops(k, 2, Richting.Vooruit, Configuratie.Basis.Met(1)).Count == 0, "proefstop (#115): andere richting of andere basisstand geeft geen stop");
+        var reeks = new List<int> { 13, 14, 24, 21, 29, 30, 20, 27, 28, 26, 25, 17, 8, 15, 16, 5, 13 };
+        Eis(BaanVerkenner.VeiligeStops(k, reeks, 2, new[] { 5 }).SetEquals(new[] { 16 }), "proefstop (#115): wissel 2 ligt na melder 5 -> de rit stopt op 16, niet erop");
+        var achteruit = new List<int> { 13, 5, 16, 15, 8, 17, 25, 26, 28, 27, 20, 30, 29, 21, 24, 14, 13 };
+        Eis(BaanVerkenner.VeiligeStops(k, achteruit, 10, new[] { 24 }).SetEquals(new[] { 21 }), "proefstop (#115): wissel 10 ligt in melder 24 (kruiswissel) -> stop op 21");
+        Eis(BaanVerkenner.VeiligeStops(k, achteruit, 14, new[] { 24 }).SetEquals(new[] { 24 }), "proefstop (#115): een wissel die niet bij de stopmelder ligt houdt de stop zoals hij was");
+    }
+
     static void AltijdAfbuigendTest()
     {
         // BUG #112 (log 12:31): oplossing 'wissel 2 rechtdoor' (na melder 5 achteruit) hoort bij het pad naar 16, niet bij 5 -> 12.
@@ -1353,6 +1369,7 @@ public static class Tests
         Wissel14Test();
         StaartWisselTest();
         AltijdAfbuigendTest();
+        ProefStopTest();
         TweedeMelderTest();
         VerkeerdeWisselVraagTest();
         WisselstraatImportTest();

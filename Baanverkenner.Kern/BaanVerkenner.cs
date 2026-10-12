@@ -748,6 +748,11 @@ public partial class BaanVerkenner
                 // BUG #106 (log 09:06): adres 14 afbuigend op de basisrit 17 -> 8 gaf zelf een kortsluiting, want de kaart weet al dat 14 daar
                 // rechtdoor moet staan. De rit stopt nu vóór zo'n stap (op melder 17) in plaats van de kortsluiting zelf te veroorzaken.
                 foreach (var s in EisConflictStops(_kaart, basis.Reeks, o.Richting, a)) kortsluitStops.Add(s);
+                // BUG #115 (log 14:02 en 14:37): (1) wissel 2 afbuigend is al bekend als kortsluiting na melder 5; de proefrit reed er toch tegenaan.
+                // (2) wissel 10 lag onder de loc (kruiswissel in melder 24) toen de rit daar stopte en hij werd teruggezet: kortsluiting. Stop dus
+                // vóór de melder waar de wissel ligt, zodat hij zonder loc erop teruggezet wordt.
+                foreach (var s in BekendeOmzetKortsluitStops(_kaart, a, o.Richting, o.Configuratie)) kortsluitStops.Add(s);
+                kortsluitStops = VeiligeStops(_kaart, basis.Reeks, a, kortsluitStops);
 
                 await ZetWissel(a, true);
                 var proef = await Rit(o.Start, o.Richting, new RitDoel
@@ -1081,6 +1086,27 @@ public partial class BaanVerkenner
         for (int i = 1; i + 1 < reeks.Count; i++)
             if (kaart.WisselEisenVoorStapDetail(reeks[i], reeks[i + 1], r).Any(e => e.Adres == a && !e.Afbuigend))
                 res.Add(reeks[i]);
+        return res;
+    }
+
+    /// <summary>BUG #115: melders waarna wissel <paramref name="a"/> afbuigend al eerder kortsluiting gaf (waarneming 'KortsluitingBijOmzetten' in dezelfde
+    /// richting en dezelfde basisstand). De adrestest stopt daar in plaats van de kortsluiting nog eens op te zoeken.</summary>
+    internal static HashSet<int> BekendeOmzetKortsluitStops(Baankaart kaart, int a, Richting r, Configuratie c) =>
+        kaart.Wissels.Where(w => w.Adres == a).SelectMany(w => w.Waarnemingen)
+            .Where(o => o.Soort == WaarnemingSoort.KortsluitingBijOmzetten && o.Richting == r && o.Configuratie == c.ToString())
+            .Select(o => o.NaMelder).ToHashSet();
+
+    /// <summary>BUG #115: ligt wissel <paramref name="a"/> volgens de kaart direct na de stopmelder (waarneming met die NaMelder), dan zou de loc er bij het stoppen bovenop staan en
+    /// bij het terugzetten van de wissel kortsluiting of ontsporing krijgen. De stop schuift dan op naar de melder ervoor in <paramref name="reeks"/>.</summary>
+    internal static HashSet<int> VeiligeStops(Baankaart kaart, List<int> reeks, int a, IEnumerable<int> stops)
+    {
+        var res = new HashSet<int>();
+        foreach (var m in stops)
+        {
+            int idx = reeks.IndexOf(m);
+            if (idx >= 1 && kaart.Wissels.Any(w => w.Adres == a && w.Waarnemingen.Any(o => o.NaMelder == m))) res.Add(reeks[idx - 1]);
+            else res.Add(m);
+        }
         return res;
     }
 
