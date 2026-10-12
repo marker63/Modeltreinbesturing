@@ -195,7 +195,17 @@ public class SimulatieBaan : IHardwareInterface
 
     public void ZetWissel(int adres, bool afbuigend) => InWachtrij(() =>
     {
-        foreach (var w in _wissels.Where(w => w.Adres == adres)) w.Afbuigend = afbuigend;
+        foreach (var w in _wissels.Where(w => w.Adres == adres))
+        {
+            w.Afbuigend = afbuigend;
+            // Zoals op de echte baan (log 09:24:50): een loc die van achteren tegen een verkeerd staande wissel kortgesloten zit, is vrij zodra de
+            // wissel naar de tak wordt gezet waar de loc vandaan komt.
+            if (_kortsluiting && ReferenceEquals(_element, w) && (_wisselIn == Poort.Af) == afbuigend)
+            {
+                _kortsluiting = false;
+                if (MeldtKortsluiting) KortsluitingStatusGewijzigd?.Invoke(false);
+            }
+        }
         HardwareCommunicatieLog.Log("Uit", $"[Simulatie] wissel {adres} -> {(afbuigend ? "afbuigend" : "rechtdoor")}");
     });
 

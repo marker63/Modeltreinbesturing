@@ -1609,3 +1609,19 @@ Test: `Wissel14Test` (stop op 17, geen stop bij ander adres of andere richting, 
 Gevolg voor de controleronde: adres 14 wordt zo mogelijk niet op die stap opnieuw bewezen; het verslag kan dat als 'niet opnieuw gevonden' tonen. De ritten zelf
 zijn niet gesimuleerd; nog niet getest op de baan.
 Niet onderzocht: de kortsluiting van 09:06:45 bij opdracht #2 (13 achteruit, na melder 16).
+
+## #107 Wissel 5 stond verkeerd tijdens een verkenningsrit (log 09:22/09:25)
+Oorzaak: wissels werden alleen vooraf per rit gezet; de controlerit 4 -> 129 -> 14 achteruit liep van achteren op wissel 5 (rechtdoor) en gaf kortsluiting,
+terwijl de kaart (Splitsing, 14 -> 129 afbuigend) dat al wist. Herstel lukte niet en de gebruiker moest "wissel 5 verkeerd" melden.
+Oplossing: (A) tijdens verkenningsritten zet de verkenner de staartwissels die de kaart kent zelf bij de volgende melder (`StaartWissels`/`ZetStaartWissels`,
+niet het adres dat de rit zelf test); (B) bij kortsluiting schakelt hij een bekende, afwijkende staartwissel van de laatste stap zelf, wacht tot het alarm weg is
+en stelt de loc daarna na (`HerstelBekendeWisselstand`). Simulatie: SimulatieBaan haalt de kortsluiting weg als de vastgelopen wissel goed gezet wordt.
+Test: `StaartWisselTest`. Nog niet getest op de baan; het WPF-project is hier niet te compileren.
+
+## #108 Kortsluiting bleef na de lus; verkenner gaf op (log 09:31)
+Oorzaak: na de lus (melder 129 opnieuw bereikt, 09:29) bleef Dinamo kortsluiting in blok 9 melden terwijl de loc stilstond. `ControleerGeenAlarmVoorStap`
+gaf op ("zet geen wissels om"); de gebruiker moest wissel 6 omzetten en toen was het alarm weg. Dat is precies wat de verkenner zelf moet kunnen.
+Oplossing: `ProbeerAlarmWegTeKrijgen`: de verkenner schakelt zelf wissels om (eerst die bij de bezette melders, dan de rest; nooit de kruiswissel-motoren 10 en 13),
+kijkt 2,5 s of het alarm weggaat, zet een wissel die niet helpt terug, laat een wissel die wel helpt staan en legt dat vast als vondst. Pas als niets helpt volgt de navigatiefout.
+Beperking: de gevonden stand wordt (nog) niet als vaste eis in de kaart opgenomen; een volgende rit die alle wissels opnieuw zet kan hem weer terugzetten.
+Test: `AlarmVoorStapTest` (uitgebreid). Nog niet getest op de baan; het WPF-project is hier niet te compileren.

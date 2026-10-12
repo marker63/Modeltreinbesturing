@@ -341,6 +341,79 @@ public static class Tests
         Eis(BaanVerkenner.ZelfTerugWeg(kz, 5, 13) is null, "zelf terug: alleen met afbuigende wissel gereden -> geen basisweg");
     }
 
+    // BUG #107: wissel 5 stond verkeerd tijdens de controle (rit 4 -> 129 -> 14 achteruit met 5 rechtdoor)
+    static void StaartWisselTest()
+    {
+        var k = new Baankaart();
+        k.Wissel(5).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.Splitsing, NaMelder = 14, Richting = Richting.Vooruit, VolgendeBijRechtdoor = 24, VolgendeBijAfbuigend = 129 });
+        k.Wissel(9).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.Splitsing, NaMelder = 129, Richting = Richting.Vooruit, VolgendeBijRechtdoor = 24, VolgendeBijAfbuigend = 4 });
+        k.Wissel(14).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.Splitsing, NaMelder = 8, Richting = Richting.Achteruit, VolgendeBijRechtdoor = 17, VolgendeBijAfbuigend = 24 });
+        k.Wissel(2).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.KortsluitingBijOmzetten, NaMelder = 5, Richting = Richting.Vooruit, VolgendeBijRechtdoor = 13 });
+        string T(List<(int Adres, bool Afbuigend)> l) => string.Join(",", l.Select(x => $"{x.Adres}{(x.Afbuigend ? "A" : "R")}"));
+        Eis(T(BaanVerkenner.StaartWissels(k, 129, Richting.Achteruit)) == "5A", "staartwissel: aankomst op 129 achteruit -> wissel 5 afbuigend (nu " + T(BaanVerkenner.StaartWissels(k, 129, Richting.Achteruit)) + ")");
+        Eis(T(BaanVerkenner.StaartWissels(k, 4, Richting.Achteruit)) == "9A", "staartwissel: aankomst op 4 achteruit -> wissel 9 afbuigend");
+        Eis(T(BaanVerkenner.StaartWissels(k, 24, Richting.Achteruit)) == "5R,9R", "staartwissel: aankomst op 24 achteruit -> 5 en 9 rechtdoor (nu " + T(BaanVerkenner.StaartWissels(k, 24, Richting.Achteruit)) + ")");
+        Eis(T(BaanVerkenner.StaartWissels(k, 17, Richting.Vooruit)) == "14R", "staartwissel: aankomst op 17 vooruit -> wissel 14 rechtdoor");
+        Eis(BaanVerkenner.StaartWissels(k, 129, Richting.Vooruit).Count == 0, "staartwissel: op 129 vooruit rijdt de loc van de puntzijde, geen eis");
+        Eis(BaanVerkenner.StaartWissels(k, 13, Richting.Achteruit).Count == 0, "staartwissel: wissel 2 heeft alleen een kortsluiting-waarneming, geen splitsing -> geen eis");
+        // tegenspraak tussen twee splitsingen van hetzelfde adres: weglaten
+        k.Wissel(5).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.Splitsing, NaMelder = 20, Richting = Richting.Vooruit, VolgendeBijRechtdoor = 99, VolgendeBijAfbuigend = 24 });
+        Eis(T(BaanVerkenner.StaartWissels(k, 24, Richting.Achteruit)) == "9R", "staartwissel: tegenstrijdige splitsingen voor één adres -> dat adres blijft weg (nu " + T(BaanVerkenner.StaartWissels(k, 24, Richting.Achteruit)) + ")");
+        k.Wissel(5).Waarnemingen.RemoveAt(1);
+        Eis(T(BaanVerkenner.EisenLaatsteStap(k, new List<int> { 13, 5, 12, 11, 4, 129, 14 }, Richting.Achteruit)) == "5A", "laatste stap: 129 -> 14 achteruit gaat van achteren door wissel 5 (afbuigend)");
+        Eis(BaanVerkenner.EisenLaatsteStap(k, new List<int> { 13, 14 }, Richting.Vooruit).Count == 0, "laatste stap: van de puntzijde af geeft geen eis");
+        Eis(BaanVerkenner.EisenLaatsteStap(k, new List<int> { 14 }, Richting.Vooruit).Count == 0, "laatste stap: één melder geeft geen eis");
+
+        // simulatie: 4 -> 129 -> (wissel 5 van achteren, tak 'afbuigend') -> 14
+        (Baanverkenner.Kern.Simulatie.SimulatieBaan, Baanverkenner.Kern.Simulatie.SimulatieBaan.Wissel, BaanVerkenner, VerkenLog, VirtueleKlok, System.Reflection.MethodInfo) Wereld()
+        {
+            var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = false, LocAdres = 5408 };
+            var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+            var Stam = Baanverkenner.Kern.Simulatie.SimulatieBaan.Poort.Stam; var Recht = Baanverkenner.Kern.Simulatie.SimulatieBaan.Poort.Recht; var Af = Baanverkenner.Kern.Simulatie.SimulatieBaan.Poort.Af;
+            var s4 = sim.NieuweSectie(4, 60, 2); var s129 = sim.NieuweSectie(129, 60, 9); var s14 = sim.NieuweSectie(14, 60, 3); var s24 = sim.NieuweSectie(24, 60, 8);
+            var w5 = sim.NieuweWissel(5, true, 3);
+            sim.Verbind(s4, B, s129, A); sim.Verbind(w5, Af, s129, B); sim.Verbind(w5, Stam, s14, A); sim.Verbind(w5, Recht, s24, A);
+            sim.PlaatsLoc(s4, 30, +1);
+            var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 5, WisselAdresTot = 5 };
+            var status = new VerkenStatus { Instellingen = ins };
+            status.Kaart.StartMelder = 4; status.Kaart.Hardware = "Simulatie"; status.Kaart.RefSnelheid = 12;
+            status.Kaart.Wissel(5).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.Splitsing, NaMelder = 14, Richting = Richting.Achteruit, VolgendeBijRechtdoor = 24, VolgendeBijAfbuigend = 129 });
+            sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+            var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+            var log = new VerkenLog(klok);
+            var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true), status);
+            var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var monitor = (MelderMonitor)typeof(BaanVerkenner).GetField("_monitor", bf)!.GetValue(v)!;
+            sim.BezetmeldingGewijzigd += monitor.Ontvang;
+            foreach (var mm in new[] { 4, 129, 14, 24 }) sim.VraagMelderStatusOp(mm);
+            klok.Wacht(TimeSpan.FromSeconds(1)).GetAwaiter().GetResult();
+            return (sim, w5, v, log, klok, typeof(BaanVerkenner).GetMethod("Rit", bf)!);
+        }
+
+        var (sim1, w1, v1, log1, _, rit1) = Wereld();
+        var uit1 = ((Task<RitResultaat>)rit1.Invoke(v1, new object[] { 4, Richting.Vooruit, new RitDoel { StaartWissels = true } })!).GetAwaiter().GetResult();
+        Eis(uit1.Einde != RitEinde.Kortsluiting && uit1.Reeks.SequenceEqual(new[] { 4, 129, 14 }), "staartwissel sim: rit 4 -> 129 -> 14 zonder kortsluiting (nu " + string.Join(",", uit1.Reeks) + ", " + uit1.Einde + ")");
+        Eis(w1.Afbuigend, "staartwissel sim: wissel 5 is door de verkenner afbuigend gezet");
+        Eis(v1.Kaart.Overgangen.Any(o => o.Van == 129 && o.Naar == 14 && o.GezienBijConfiguraties.Contains("5")), "staartwissel sim: overgang 129 -> 14 is vastgelegd met de werkelijke stand (wissel 5 afbuigend)");
+        Eis(log1.Regels.Any(r => r.Tekst.Contains("van achteren op wissel 5 af")), "staartwissel sim: het log zegt waarom wissel 5 omgezet werd");
+
+        var (sim2, w2, v2, log2, _, rit2) = Wereld();
+        var uit2 = ((Task<RitResultaat>)rit2.Invoke(v2, new object[] { 4, Richting.Vooruit, new RitDoel { StaartWissels = true, ProefAdres = 5 } })!).GetAwaiter().GetResult();
+        Eis(uit2.Einde == RitEinde.Kortsluiting, "staartwissel sim: het adres dat de rit zelf test (5) wordt niet automatisch gezet -> kortsluiting blijft (controle van de test zelf)");
+
+        var (sim3, w3, v3, log3, _, rit3) = Wereld();
+        var uit3 = ((Task<RitResultaat>)rit3.Invoke(v3, new object[] { 4, Richting.Vooruit, new RitDoel { StaartWissels = false } })!).GetAwaiter().GetResult();
+        Eis(uit3.Einde == RitEinde.Kortsluiting && !w3.Afbuigend, "staartwissel sim: zonder de automatische stand geeft dezelfde rit kortsluiting (de test is dus betekenisvol)");
+        // herstel: de kaart eist voor de laatste stap (129 -> 14) wissel 5 afbuigend; de verkenner schakelt hem zelf
+        var bf2 = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var herstel = typeof(BaanVerkenner).GetMethod("HerstelBekendeWisselstand", bf2)!;
+        var res = new RitResultaat { Richting = Richting.Vooruit };
+        res.Reeks.AddRange(new[] { 4, 129, 14 });
+        try { ((Task<bool>)herstel.Invoke(v3, new object[] { res })!).GetAwaiter().GetResult(); } catch (Exception ex) { Console.WriteLine("  (herstel stopte met: " + ex.Message + ")"); }
+        Eis(w3.Afbuigend, "herstel: de verkenner schakelt wissel 5 zelf naar afbuigend omdat de kaart dat voor 129 -> 14 eist");
+        Eis(log3.Regels.Any(r => r.Tekst.Contains("verklaart deze kortsluiting")), "herstel: het log legt de verklaring uit");
+    }
+
     // BUG #104: "Voltooide baan nogmaals checken": de bestaande kaart blijft onaangeroerd, de baan wordt opnieuw gereden en vergeleken
     static void ControleRondeTest()
     {
@@ -606,10 +679,19 @@ public static class Tests
         bool fout = false; string tekst = "";
         try { ((Task)check.Invoke(v, new object[] { "test" })!).GetAwaiter().GetResult(); }
         catch (NavigatieFout nf) { fout = true; tekst = nf.Message; }
-        Eis(fout && tekst.Contains("blok 8") && tekst.Contains("zet geen wissels om"), "alarm voor stap: blok 8 blijft in alarm -> navigatiefout, geen wissels/rit (nu " + tekst + ")");
+        Eis(fout && tekst.Contains("blok 8") && tekst.Contains("wissels geprobeerd"), "alarm voor stap: blok 8 blijft in alarm en geen wissel helpt -> navigatiefout (nu " + tekst + ")");
         alarm.Invoke(v, new object[] { 8, false });
         ((Task)check.Invoke(v, new object[] { "test" })!).GetAwaiter().GetResult();
         Eis(true, "alarm voor stap: alarm opgeheven -> verder");
+
+        // BUG #108: helpt het omzetten van wissel 3, dan gaat de verkenner zelf verder en blijft die wissel staan
+        var stand = (Dictionary<int, bool>)typeof(BaanVerkenner).GetField("_wisselStand", bf)!.GetValue(v)!;
+        alarm.Invoke(v, new object[] { 8, true });
+        klok.Getikt += _ => { if (stand.TryGetValue(3, out var af) && af) alarm.Invoke(v, new object[] { 8, false }); };
+        bool ok = true;
+        try { ((Task)check.Invoke(v, new object[] { "test" })!).GetAwaiter().GetResult(); } catch (NavigatieFout) { ok = false; }
+        Eis(ok && stand.TryGetValue(3, out var af3) && af3, "alarm voor stap #108: kortsluiting weg na omzetten van wissel 3 -> verkenner gaat zelf verder, wissel 3 blijft afbuigend");
+        Eis(stand.Where(kv => kv.Key != 3).All(kv => !kv.Value), "alarm voor stap #108: de eerder geprobeerde wissels staan weer in hun oude stand");
     }
 
     // BUG #83: een opgelost kortsluitpunt wordt ook op routes en terugwegen toegepast
@@ -1216,6 +1298,7 @@ public static class Tests
         ControleRondeTest();
         DoorrijdenTest();
         Wissel14Test();
+        StaartWisselTest();
         TweedeMelderTest();
         VerkeerdeWisselVraagTest();
         WisselstraatImportTest();

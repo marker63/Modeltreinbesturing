@@ -753,7 +753,9 @@ public partial class BaanVerkenner
                     Configuratie = o.Configuratie.Met(a),
                     Basis = basis.Reeks,
                     ExtraNaAfwijking = _ins.ExtraMeldersNaAfwijking,
-                    StopBijMelders = kortsluitStops
+                    StopBijMelders = kortsluitStops,
+                    StaartWissels = true,
+                    ProefAdres = a
                 });
 
                 // BUG #63. Gebruikerswaarneming (13:34 en 13:40): (1) na wissel 2 afbuigend een
@@ -956,7 +958,7 @@ public partial class BaanVerkenner
             if (i == aantal && (ritten.Count < 2 || ritten[0].Reeks.SequenceEqual(ritten[1].Reeks))) break;
             _bezig = $"opdracht #{o.Id}: basisrit {(i == 0 ? "" : $"(controle {i})")}";
             MeldVoortgang();
-            var rit = await Rit(o.Start, o.Richting, new RitDoel { Configuratie = RijStand(o), StopBijMelders = stops });
+            var rit = await Rit(o.Start, o.Richting, new RitDoel { Configuratie = RijStand(o), StopBijMelders = stops, StaartWissels = true });
             _log.Info($"Basisrit: {Lijst(rit.Reeks)} - einde: {EindeTekst(rit.Einde)}.");
             VerwerkEinde(o, rit);
             await TerugNaarMetControle(o, rit, o.Configuratie);

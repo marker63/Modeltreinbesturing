@@ -31,6 +31,13 @@ public class RitDoel
     public HashSet<int> StopBijMelders { get; set; } = new();
 
     public bool IsNavigatie => DoelMelder is not null;
+
+    /// <summary>BUG #107: tijdens deze rit zet de verkenner een wissel waarvan de kaart de tak al kent zelf goed zodra de loc op die tak komt
+    /// en erdoor van achteren op de wissel af rijdt (anders volgt een kortsluiting die al verklaard kan worden).</summary>
+    public bool StaartWissels { get; set; }
+
+    /// <summary>BUG #107: het adres dat deze rit zelf test; dat wordt nooit automatisch gezet.</summary>
+    public int? ProefAdres { get; set; }
 }
 
 /// <summary>De loc kwam niet waar hij verwacht werd (bijv. een wissel die niet omging).</summary>
@@ -689,9 +696,41 @@ public partial class BaanVerkenner
         var nog = HuidigeAlarmBlokken();
         if (nog.Count == 0) { _log.Info("Het alarm is verdwenen; de verkenner gaat verder."); return; }
         _hw.Noodstop();
-        throw new NavigatieFout($"Dinamo meldt nog steeds kortsluiting in blok {string.Join(" en ", nog)} terwijl de loc stilstaat ({stap}). De verkenner zet geen wissels om en rijdt niet verder: een wissel omzetten of rijden in een kortsluiting kan de loc laten ontsporen.");
+        if (await ProbeerAlarmWegTeKrijgen(stap)) return; // BUG #108
+        throw new NavigatieFout($"Dinamo meldt nog steeds kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())} terwijl de loc stilstaat ({stap}). De verkenner heeft zelf wissels geprobeerd zonder dat de kortsluiting wegging en rijdt niet verder.");
     }
     private const int AlarmWachtPogingen = 10;
+
+    /// <summary>BUG #108 (log 09:29): na de lus (melder 129 opnieuw bereikt) meldde Dinamo kortsluiting in blok 9 terwijl de loc stilstond. De
+    /// verkenner gaf op ("zet geen wissels om") en de gebruiker moest zelf wissel 6 omzetten, waarna de kortsluiting weg was. Een kortsluiting
+    /// bij een stilstaande loc betekent dat er stroom weg is en dat een wissel verkeerd staat; de verkenner schakelt nu zelf één voor één
+    /// wissels om (eerst de wissels bij de bezette melders, dan de rest; nooit de kruiswissel-motoren 10 en 13) en kijkt of het alarm weggaat.
+    /// Helpt het niet, dan gaat de wissel terug naar zijn oude stand. Geeft true als het alarm weg is.</summary>
+    private async Task<bool> ProbeerAlarmWegTeKrijgen(string stap)
+    {
+        var bezet = _monitor.Bezet.ToHashSet();
+        var alle = _ins.WisselAdressen().Where(a => a != KruiswisselReferentie.Motor13 && a != KruiswisselReferentie.Motor10).ToList();
+        var dichtbij = alle.Where(a => _kaart.Wissels.Any(w => w.Adres == a && w.Waarnemingen.Any(o =>
+            bezet.Contains(o.NaMelder) || (o.VolgendeBijRechtdoor is int x && bezet.Contains(x)) || (o.VolgendeBijAfbuigend is int y && bezet.Contains(y))))).ToList();
+        var volgorde = dichtbij.Concat(alle.Except(dichtbij)).ToList();
+        _log.Waarschuwing($"Kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())} blijft terwijl de loc stilstaat ({stap}). De verkenner probeert zelf wissels om te zetten (eerst bij melder {string.Join(" en ", bezet.OrderBy(m => m))}).");
+        foreach (var a in volgorde)
+        {
+            bool oud = _wisselStand.TryGetValue(a, out var nu) && nu;
+            await ZetWissel(a, !oud, forceer: true);
+            var eind = _klok.Nu + TimeSpan.FromSeconds(2.5);
+            while (HuidigeAlarmBlokken().Count > 0 && _klok.Nu < eind) await Wacht(TimeSpan.FromMilliseconds(300));
+            if (HuidigeAlarmBlokken().Count == 0)
+            {
+                _log.Vondst($"De kortsluiting ging weg nadat wissel {a} naar {(oud ? "rechtdoor" : "afbuigend")} is geschakeld ({stap}). De wissel blijft zo staan.");
+                _kortsluitingGemeld = false;
+                return true;
+            }
+            await ZetWissel(a, oud, forceer: true);
+        }
+        _log.Waarschuwing("Geen enkele wissel haalde de kortsluiting weg.");
+        return false;
+    }
 
     /// <summary>BUG #93 (log 15:20): na kortsluitpunt #2 (wissel 5 afbuigend na melder 14) lukte dezelfde rit meteen daarna, zonder dat er iets
     /// veranderd was (melder 129 bereikt). Zo'n kortsluiting was tijdelijk: het punt blijft in het rapport, maar de verkenner gaat er geen
@@ -739,6 +778,8 @@ public partial class BaanVerkenner
         var res = new RitResultaat { Richting = r };
         res.Reeks.Add(start);
         _monitor.Bijwerken();
+        var cfgNu = doel.Configuratie;   // BUG #107: de werkelijke stand; kan tijdens de rit veranderen door ZetStaartWissels
+        _ritDoel = doel;
 
         // BUG #71 (log 16:48): een navigatie begon vanaf melder 13 terwijl de loc na een herstel na kortsluiting op melder 8 stond.
         // De rit "13 -> 8" werd daarna als echte overgang in de kaart gezet (13 achteruit -> 8, bestaat niet) en zo ook de omgekeerde
@@ -784,6 +825,7 @@ public partial class BaanVerkenner
         _log.Rijden(doel.IsNavigatie
             ? $"Rijden {r.Tekst()} van melder {start} naar melder {doel.DoelMelder}."
             : $"Verkenningsrit {r.Tekst()} vanaf melder {start} ({doel.Configuratie}).");
+        if (doel.StaartWissels && !doel.IsNavigatie) cfgNu = await ZetStaartWissels(start, r, cfgNu, doel);
         await StuurSnelheid(r, snelheid);
 
         var laatsteWijziging = _klok.Nu;
@@ -882,7 +924,7 @@ public partial class BaanVerkenner
                 // verkenner liet hem de hele baan rondrijden tot hij bij wissel 2 (afbuigend) kortsluiting kreeg. Stap 1 van een verkenningsrit
                 // die niet de basisrit volgt, terwijl die overgang in deze richting nooit met deze wisselstand is gezien maar wel in de
                 // TEGENGESTELDE richting, betekent: de loc staat andersom. Meteen stoppen, niets vastleggen.
-                if (!doel.IsNavigatie && res.Reeks.Count == 1 && doel.Basis is { Count: >= 2 } bas && IsLocAndersom(_kaart, res.Reeks[0], r, m, bas, doel.Configuratie))
+                if (!doel.IsNavigatie && res.Reeks.Count == 1 && doel.Basis is { Count: >= 2 } bas && IsLocAndersom(_kaart, res.Reeks[0], r, m, bas, cfgNu))
                 {
                     await StopLoc();
                     string t = $"De loc reed vanaf melder {res.Reeks[0]} ({r.Tekst()}) naar melder {m}, maar {r.Tekst()} gaat hier naar melder {bas[1]}; naar melder {m} gaat de loc {r.Om().Tekst()}. De loc staat dus andersom (neus de verkeerde kant op). De rit is meteen gestopt, er is niets vastgelegd.";
@@ -904,12 +946,12 @@ public partial class BaanVerkenner
                     _ritMaxDt = Math.Max(_ritMaxDt, gemeten);
                 }
                 double? dtOpgeslagen = dt is double d1 && !doelInzicht ? d1 * _ins.Verkensnelheid / RefSnelheid : null;
-                _kaart.RegistreerOvergang(res.Reeks[^1], m, r, doel.Configuratie, dtOpgeslagen);
+                _kaart.RegistreerOvergang(res.Reeks[^1], m, r, cfgNu, dtOpgeslagen);
                 // BUG #74: ingangskant onthouden. Binnen de rit is het de melder daarvoor; bij de eerste stap van de rit de ingang van
                 // de vorige rit, mits de loc daar nog in dezelfde richting rijdt en niet met de hand verplaatst is.
                 int? ingangVia = res.Reeks.Count >= 2 ? res.Reeks[^2]
                     : _ingang is { } ing0 && ing0.Melder == res.Reeks[0] && ing0.Richting == r ? ing0.Via : null;
-                if (ingangVia is int iv && iv != m) _kaart.RegistreerDoorgang(iv, res.Reeks[^1], m, r, doel.Configuratie);
+                if (ingangVia is int iv && iv != m) _kaart.RegistreerDoorgang(iv, res.Reeks[^1], m, r, cfgNu);
                 bool herhaling = res.Reeks.Contains(m);
                 res.Reeks.Add(m);
                 tijdVorigeMelder = w.Tijd;
@@ -993,6 +1035,8 @@ public partial class BaanVerkenner
                     res.Einde = RitEinde.BekendKortsluitpunt;
                     return res;
                 }
+                // BUG #107: de rit gaat door; ligt voor de loc een wissel waar hij van achteren op af rijdt, dan nu goed zetten.
+                if (doel.StaartWissels) cfgNu = await ZetStaartWissels(m, r, cfgNu, doel);
             }
 
             // ---- Helemaal in een nieuwe, nog onbekende sectie (Dinamo): blokproef ----
@@ -1068,7 +1112,7 @@ public partial class BaanVerkenner
             // BUG #60: bij een al bekend kopspoor (zelfde richting en wisselstand, en de loc is echt vertrokken) niet de hele
             // wachttijd tegen het stootjuk blijven draaien: kort wachten, dan keren.
             bool kopBekend = !doel.IsNavigatie && res.Reeks.Count >= 2
-                && _kaart.Kopsporen.Any(k => k.Melder == res.Reeks[^1] && k.Richting == r && k.Configuratie == doel.Configuratie.ToString());
+                && _kaart.Kopsporen.Any(k => k.Melder == res.Reeks[^1] && k.Richting == r && k.Configuratie == cfgNu.ToString());
             if (kopBekend)
             {
                 double kopSec = Math.Max(_ins.MinSecondenTussenMelders, 12.0 * RefSnelheid / Math.Max(1, _ins.Verkensnelheid));
@@ -1088,7 +1132,7 @@ public partial class BaanVerkenner
                 // BUG #64: na deze melder is bij deze wisselstand al eens een vervolgmelder gevonden (ook de omgekeerde
                 // overgang telt). Dan is dit geen kopspoor maar blijft de loc hangen (slecht contact, tong, stroomonderbreking):
                 // één keer het rijcommando herhalen en nog een keer wachten voordat er iets uit geconcludeerd wordt.
-                var bekendVervolg = _kaart.BekendeVolgende(res.Reeks[^1], r, doel.Configuratie);
+                var bekendVervolg = _kaart.BekendeVolgende(res.Reeks[^1], r, cfgNu);
                 bool eersteBlokcontrole = BlokVereist && res.Reeks.Count == 1 && !blokGecontroleerd && !doelInzicht;
                 if (bekendVervolg.Count > 0 && !vervolgHerhaald && !eersteBlokcontrole && !kopBekend)
                 {
@@ -1226,6 +1270,92 @@ public partial class BaanVerkenner
         return null;
     }
 
+    private RitDoel? _ritDoel;
+
+    /// <summary>BUG #107 (Marco 09:26: "wissel 5 stond verkeerd, je kon dit niet oplossen terwijl je de route al zou moeten kennen"; log 09:22):
+    /// de controlerit reed 4 -> 129 -> 14 (achteruit) met wissel 5 rechtdoor. De kaart weet uit de splitsing van wissel 5 (na melder 14 vooruit:
+    /// rechtdoor 24, afbuigend 129) dat van 129 naar 14 rijden van achteren door die wissel gaat en dat hij dan afbuigend moet staan.
+    /// Dit zijn de wissels waar een loc die op <paramref name="melder"/> staat of net aankomt en in rijrichting <paramref name="r"/> verder
+    /// rijdt van achteren (vanaf de tak waar die melder aan ligt) op af rijdt, met de stand die daarvoor nodig is. Een adres waarvoor de
+    /// splitsingen elkaar tegenspreken wordt weggelaten.</summary>
+    internal static List<(int Adres, bool Afbuigend)> StaartWissels(Baankaart kaart, int melder, Richting r)
+    {
+        var wens = new Dictionary<int, bool>(); var strijdig = new HashSet<int>();
+        foreach (var w in kaart.Wissels)
+            foreach (var o in w.Waarnemingen.Where(x => x.Soort == WaarnemingSoort.Splitsing && r == x.Richting.Om()))
+            {
+                bool? afb = o.VolgendeBijRechtdoor == melder ? false : o.VolgendeBijAfbuigend == melder ? true : null;
+                if (afb is null) continue;
+                if (wens.TryGetValue(w.Adres, out var bestaand) && bestaand != afb.Value) strijdig.Add(w.Adres);
+                wens[w.Adres] = afb.Value;
+            }
+        return wens.Where(kv => !strijdig.Contains(kv.Key)).OrderBy(kv => kv.Key).Select(kv => (kv.Key, kv.Value)).ToList();
+    }
+
+    /// <summary>BUG #107: zet de wissels uit <see cref="StaartWissels"/> goed voordat de loc erop afrijdt. Overgeslagen worden: het adres dat de
+    /// rit zelf test, de twee kruiswisselmotoren (daar geldt de kruiswissel-referentie), adressen buiten het geteste bereik en een wissel die de
+    /// rit zelf bewust afbuigend heeft gezet. Geeft de werkelijke stand terug.</summary>
+    private async Task<Configuratie> ZetStaartWissels(int melder, Richting r, Configuratie cfg, RitDoel doel)
+    {
+        foreach (var (adres, afb) in StaartWissels(_kaart, melder, r))
+        {
+            if (doel.ProefAdres == adres) continue;
+            if (adres == KruiswisselReferentie.Motor13 || adres == KruiswisselReferentie.Motor10) continue;
+            if (!_ins.WisselAdressen().Contains(adres)) continue;
+            if (doel.Configuratie.Bevat(adres) && !afb) continue;
+            if (_wisselStand.TryGetValue(adres, out var nu) && nu == afb) { cfg = cfg.MetStand(adres, afb); continue; }
+            _log.Info($"Melder {melder}: de loc rijdt {r.Tekst()} van achteren op wissel {adres} af (de kaart kent die splitsing); wissel {adres} gaat nu naar {(afb ? "afbuigend" : "rechtdoor")} voordat de loc er is.");
+            await ZetWissel(adres, afb);
+            cfg = cfg.MetStand(adres, afb);
+        }
+        return cfg;
+    }
+
+    /// <summary>BUG #107: de wissels die de laatste stap van de rit van achteren doorloopt, met de stand die de kaart daarvoor kent.</summary>
+    internal static List<(int Adres, bool Afbuigend)> EisenLaatsteStap(Baankaart kaart, List<int> reeks, Richting r) =>
+        reeks.Count < 2 ? new()
+            : kaart.WisselEisenVoorStapDetail(reeks[^2], reeks[^1], r).Where(e => e.Achter).Select(e => (e.Adres, e.Afbuigend)).Distinct().ToList();
+
+    /// <summary>BUG #107: staat een wissel die de laatste stap van achteren doorloopt niet zoals de kaart eist, dan is dat de verklaring van de
+    /// kortsluiting en schakelt de verkenner hem zelf (dat deed de gebruiker in het log van 09:24 ook, en toen was de kortsluiting meteen weg).
+    /// Daarna kruipt de loc door tot hij alleen nog op de laatste melder staat. Geeft true als dat gelukt is.</summary>
+    private async Task<bool> HerstelBekendeWisselstand(RitResultaat res)
+    {
+        var eisen = EisenLaatsteStap(_kaart, res.Reeks, res.Richting)
+            .Where(e => e.Adres != _ritDoel?.ProefAdres && e.Adres != KruiswisselReferentie.Motor13 && e.Adres != KruiswisselReferentie.Motor10
+                        && _ins.WisselAdressen().Contains(e.Adres))
+            .Where(e => !(_wisselStand.TryGetValue(e.Adres, out var nu) && nu == e.Afbuigend)).ToList();
+        if (eisen.Count == 0) return false;
+        int van = res.Reeks[^2], naar = res.Reeks[^1];
+        foreach (var (adres, afb) in eisen)
+        {
+            _log.Waarschuwing($"De kaart weet dat de stap {van} -> {naar} ({res.Richting.Tekst()}) van achteren door wissel {adres} gaat en dat die dan {(afb ? "afbuigend" : "rechtdoor")} moet staan; hij stond {(_wisselStand.TryGetValue(adres, out var nu0) && nu0 ? "afbuigend" : "rechtdoor")}. Dat verklaart deze kortsluiting: de verkenner schakelt wissel {adres} nu zelf.");
+            await ZetWissel(adres, afb, forceer: true);
+        }
+        _kortsluitingGemeld = false;
+        if (_hw.KanMelderStatusOpvragen) foreach (var m in _monitor.Bezet) _hw.VraagMelderStatusOp(m);
+        var eind = _klok.Nu + TimeSpan.FromSeconds(8);
+        while (HuidigeAlarmBlokken().Count > 0 && _klok.Nu < eind) await Wacht(TimeSpan.FromMilliseconds(300));
+        if (HuidigeAlarmBlokken().Count > 0)
+        {
+            _log.Waarschuwing($"De kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())} blijft ook na het schakelen; de gebruiker wordt gevraagd.");
+            return false;
+        }
+        _kortsluitingGemeld = false;
+        _negeerKortsluitingTot = _klok.Nu + TimeSpan.FromSeconds(12);
+        try
+        {
+            await Nastellen(naar, res.Richting, achter: van);
+            _log.Info($"Loc staat weer op melder {naar}.");
+            return true;
+        }
+        catch (NavigatieFout f)
+        {
+            _log.Waarschuwing($"Na het schakelen lukte het neerzetten op melder {naar} niet: {f.Message}");
+            return false;
+        }
+    }
+
     private async Task<RitResultaat> Kortsluiting(RitResultaat res, string reden)
     {
         int x = res.Reeks[^1];
@@ -1252,7 +1382,8 @@ public partial class BaanVerkenner
         await VolledigeStop();
         res.Einde = RitEinde.Kortsluiting;
         _kortsluitingenTotaal++;
-        await HerstelNaKortsluiting(x, res.Richting);
+        if (!await HerstelBekendeWisselstand(res))
+            await HerstelNaKortsluiting(x, res.Richting);
         return res;
     }
 
