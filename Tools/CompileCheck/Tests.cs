@@ -364,6 +364,16 @@ public static class Tests
         Eis(BaanVerkenner.EisenLaatsteStap(k, new List<int> { 13, 14 }, Richting.Vooruit).Count == 0, "laatste stap: van de puntzijde af geeft geen eis");
         Eis(BaanVerkenner.EisenLaatsteStap(k, new List<int> { 14 }, Richting.Vooruit).Count == 0, "laatste stap: één melder geeft geen eis");
 
+        // BUG #108: vooruitkijken (log 11:12: wissel 5 ging op melder 24 naar rechtdoor en pas op 129 naar afbuigend, 0,65 s later kortsluiting)
+        var k2 = new Baankaart();
+        k2.Wissel(5).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.Splitsing, NaMelder = 14, Richting = Richting.Vooruit, VolgendeBijRechtdoor = 24, VolgendeBijAfbuigend = 129 });
+        k2.Wissel(10).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.Splitsing, NaMelder = 24, Richting = Richting.Achteruit, VolgendeBijRechtdoor = 14, VolgendeBijAfbuigend = 129 });
+        var cf = new Configuratie(new int[0]);
+        foreach (var (v, n) in new[] { (24, 14), (24, 129), (129, 14), (129, 10) }) k2.RegistreerOvergang(v, n, Richting.Achteruit, cf, 3.0);
+        Eis(T(BaanVerkenner.StaartWissels(k2, 24, Richting.Achteruit, a => a == 10)) == "5A", "vooruitkijken: op 24 achteruit met wissel 10 afbuigend gaat de loc naar 129 en daarna van achteren op wissel 5 af -> wissel 5 meteen afbuigend (nu " + T(BaanVerkenner.StaartWissels(k2, 24, Richting.Achteruit, a => a == 10)) + ")");
+        Eis(T(BaanVerkenner.StaartWissels(k2, 24, Richting.Achteruit, a => false)) == "5R", "vooruitkijken: op 24 achteruit met wissel 10 rechtdoor gaat de loc naar 14 -> wissel 5 rechtdoor (nu " + T(BaanVerkenner.StaartWissels(k2, 24, Richting.Achteruit, a => false)) + ")");
+        Eis(T(BaanVerkenner.StaartWissels(k2, 129, Richting.Achteruit, a => false)) == "5A", "vooruitkijken: op 129 achteruit -> wissel 5 afbuigend");
+
         // simulatie: 4 -> 129 -> (wissel 5 van achteren, tak 'afbuigend') -> 14
         (Baanverkenner.Kern.Simulatie.SimulatieBaan, Baanverkenner.Kern.Simulatie.SimulatieBaan.Wissel, BaanVerkenner, VerkenLog, VirtueleKlok, System.Reflection.MethodInfo) Wereld()
         {

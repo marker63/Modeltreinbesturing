@@ -1278,18 +1278,72 @@ public partial class BaanVerkenner
     /// Dit zijn de wissels waar een loc die op <paramref name="melder"/> staat of net aankomt en in rijrichting <paramref name="r"/> verder
     /// rijdt van achteren (vanaf de tak waar die melder aan ligt) op af rijdt, met de stand die daarvoor nodig is. Een adres waarvoor de
     /// splitsingen elkaar tegenspreken wordt weggelaten.</summary>
-    internal static List<(int Adres, bool Afbuigend)> StaartWissels(Baankaart kaart, int melder, Richting r)
+    internal static List<(int Adres, bool Afbuigend)> StaartWissels(Baankaart kaart, int melder, Richting r, Func<int, bool>? stand = null)
     {
         var wens = new Dictionary<int, bool>(); var strijdig = new HashSet<int>();
-        foreach (var w in kaart.Wissels)
-            foreach (var o in w.Waarnemingen.Where(x => x.Soort == WaarnemingSoort.Splitsing && r == x.Richting.Om()))
+        void Voeg(int adres, bool afb)
+        {
+            if (wens.TryGetValue(adres, out var bestaand) && bestaand != afb) strijdig.Add(adres);
+            wens[adres] = afb;
+        }
+        // BUG #108 (log 11:12): de oude regel ("op melder 24 achteruit staat de loc op de rechtdoor-tak van wissel 5, dus wissel 5 rechtdoor") klopte
+        // alleen als de loc van 24 naar 14 rijdt. Met wissel 10 afbuigend rijdt hij naar 129; wissel 5 ging toen eerst naar rechtdoor en pas bij
+        // melder 129 (loc al bijna bij de tong) naar afbuigend: 0,65 s later kortsluiting in blok 9, en de partnerzoektocht concludeerde ten
+        // onrechte dat wissel 3 en 5 'overloopwissels' zijn. Nu kijkt de verkenner vooruit: waar gaat de loc vanaf deze melder heen (uit de
+        // splitsingen en de stand van de wissels, anders uit de bekende overgangen) en welke wissel moet voor die stap, of de stap daarna, van
+        // achteren goed staan? Is er niets bekend over de vervolgmelders, dan geldt de oude regel.
+        var volgende = VerwachteVolgende(kaart, melder, r, stand);
+        if (volgende.Count > 0)
+        {
+            foreach (var y in volgende)
+                foreach (var e in kaart.WisselEisenVoorStapDetail(melder, y, r).Where(e => e.Achter)) Voeg(e.Adres, e.Afbuigend);
+            // de stap daarna: alleen wissels die ver genoeg weg liggen en waar alle bekende vervolgen hetzelfde van vragen
+            var tweede = new Dictionary<int, HashSet<bool>>(); bool allesBekend = true;
+            foreach (var y in volgende)
             {
-                bool? afb = o.VolgendeBijRechtdoor == melder ? false : o.VolgendeBijAfbuigend == melder ? true : null;
-                if (afb is null) continue;
-                if (wens.TryGetValue(w.Adres, out var bestaand) && bestaand != afb.Value) strijdig.Add(w.Adres);
-                wens[w.Adres] = afb.Value;
+                var zs = VerwachteVolgende(kaart, y, r, null);
+                if (zs.Count == 0) { allesBekend = false; continue; }
+                foreach (var z in zs)
+                    foreach (var e in kaart.WisselEisenVoorStapDetail(y, z, r).Where(e => e.Achter))
+                    {
+                        if (!tweede.TryGetValue(e.Adres, out var set)) tweede[e.Adres] = set = new HashSet<bool>();
+                        set.Add(e.Afbuigend);
+                    }
             }
+            if (allesBekend)
+                foreach (var kv in tweede.Where(kv => kv.Value.Count == 1 && !wens.ContainsKey(kv.Key))) Voeg(kv.Key, kv.Value.First());
+        }
+        else
+        {
+            foreach (var w in kaart.Wissels)
+                foreach (var o in w.Waarnemingen.Where(x => x.Soort == WaarnemingSoort.Splitsing && r == x.Richting.Om()))
+                {
+                    bool? afb = o.VolgendeBijRechtdoor == melder ? false : o.VolgendeBijAfbuigend == melder ? true : null;
+                    if (afb is null) continue;
+                    Voeg(w.Adres, afb.Value);
+                }
+        }
         return wens.Where(kv => !strijdig.Contains(kv.Key)).OrderBy(kv => kv.Key).Select(kv => (kv.Key, kv.Value)).ToList();
+    }
+
+    /// <summary>BUG #108: de melders waar de loc vanaf <paramref name="melder"/> in richting <paramref name="r"/> naartoe kan: bij een bekende
+    /// splitsing met de kop op deze melder bepaalt de stand van die wissel (zoals bekend in <paramref name="stand"/>; onbekend = rechtdoor) de tak,
+    /// anders de bekende overgangen.</summary>
+    internal static List<int> VerwachteVolgende(Baankaart kaart, int melder, Richting r, Func<int, bool>? stand)
+    {
+        var kop = kaart.Wissels.SelectMany(w => w.Waarnemingen.Where(o => o.Soort == WaarnemingSoort.Splitsing && o.NaMelder == melder && o.Richting == r)
+                                                             .Select(o => (w.Adres, o))).ToList();
+        if (kop.Count > 0 && stand != null)
+        {
+            var res = new List<int>();
+            foreach (var (adres, o) in kop)
+            {
+                int? y = stand(adres) ? o.VolgendeBijAfbuigend : o.VolgendeBijRechtdoor;
+                if (y is int yy) res.Add(yy);
+            }
+            if (res.Count > 0) return res.Distinct().ToList();
+        }
+        return kaart.BekendeVolgende(melder, r);
     }
 
     /// <summary>BUG #107: zet de wissels uit <see cref="StaartWissels"/> goed voordat de loc erop afrijdt. Overgeslagen worden: het adres dat de
@@ -1297,7 +1351,7 @@ public partial class BaanVerkenner
     /// rit zelf bewust afbuigend heeft gezet. Geeft de werkelijke stand terug.</summary>
     private async Task<Configuratie> ZetStaartWissels(int melder, Richting r, Configuratie cfg, RitDoel doel)
     {
-        foreach (var (adres, afb) in StaartWissels(_kaart, melder, r))
+        foreach (var (adres, afb) in StaartWissels(_kaart, melder, r, a => _wisselStand.TryGetValue(a, out var st) ? st : cfg.Bevat(a)))
         {
             if (doel.ProefAdres == adres) continue;
             if (adres == KruiswisselReferentie.Motor13 || adres == KruiswisselReferentie.Motor10) continue;

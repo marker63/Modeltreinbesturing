@@ -1625,3 +1625,14 @@ Oplossing: `ProbeerAlarmWegTeKrijgen`: de verkenner schakelt zelf wissels om (ee
 kijkt 2,5 s of het alarm weggaat, zet een wissel die niet helpt terug, laat een wissel die wel helpt staan en legt dat vast als vondst. Pas als niets helpt volgt de navigatiefout.
 Beperking: de gevonden stand wordt (nog) niet als vaste eis in de kaart opgenomen; een volgende rit die alle wissels opnieuw zet kan hem weer terugzetten.
 Test: `AlarmVoorStapTest` (uitgebreid). Nog niet getest op de baan; het WPF-project is hier niet te compileren.
+
+## #109 Wissel 5 te laat omgezet op de kleine lus 24 - 129 - 14 (log 11:12)
+Oorzaak: de staartwissel-regel van #107 nam aan dat een loc die op melder 24 achteruit staat naar 14 rijdt, dus zette hij wissel 5 op rechtdoor en pas bij melder 129
+(loc al bijna bij de tong) op afbuigend. 11:08:36: 0,65 s na dat commando kortsluiting in blok 9; de partnerzoektocht concludeerde daarna ten onrechte dat wissel 3 en 5
+'overloopwissels' zijn (de kaart van dat rapport bevat die bevinding niet, maar het log wel).
+Oplossing: `StaartWissels` kijkt vooruit (`VerwachteVolgende`): vanaf de melder waar de loc staat volgt de verkenner de bekende splitsing met de huidige wisselstand
+(wissel 10 afbuigend op 24 achteruit = naar 129) en zet de wissel die de stap daarna van achteren nodig heeft (wissel 5 afbuigend) meteen, alleen als alle bekende
+vervolgen hetzelfde vragen. Is er niets bekend over de vervolgmelders, dan geldt de oude regel.
+Test: `StaartWisselTest` (3 nieuwe regels). Nog niet getest op de baan.
+Niet opgelost: kortsluiting in blok 3 na melder 14 vooruit (11:12:19, wissel 5 afbuigend, loc daarvoor door Marco neergezet) en 11:09:23 (wissel 4 afbuigend als proef,
+bedoelde bevinding). Eerste lijkt op het eerder 'tijdelijke' kortsluitpunt #2 (oplossing wissel 13 afbuigend, botst met #4); oorzaak nog onbekend.
