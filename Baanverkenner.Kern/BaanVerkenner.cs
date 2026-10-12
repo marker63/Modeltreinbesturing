@@ -446,9 +446,42 @@ public partial class BaanVerkenner
         if (_status.GeplandeOpdrachten.Contains(o.Sleutel)) return;
         o.Id = _status.VolgendeOpdrachtId++;
         o.VolgendAdres = _ins.WisselAdressen().First();
+        o.Route = VerkortRoute(o.Route, o.Start);
         _status.GeplandeOpdrachten.Add(o.Sleutel);
         if (vooraan) _status.Wachtrij.Insert(0, o); else _status.Wachtrij.Add(o);
         _log.Info($"Nieuwe opdracht #{o.Id}: vanaf melder {o.Start} {o.Richting.Tekst()} ({o.Configuratie}) - {o.Reden}.");
+    }
+
+    /// <summary>BUG #103 (log 08:06): de route naar melder 129 liep 14 -> 129 -> 24 en daarna nog een hele ronde 24 -> ... -> 14 -> 129 (75 s), terwijl de loc al
+    /// op de heenweg door 129 kwam. Twee verkortingen, beide zonder iets aan de rijrichting of de wisselstanden te veranderen:
+    /// (A) een etappe die een gesloten ronde is (begint en eindigt op dezelfde melder) brengt de loc nergens: weg ermee;
+    /// (B) komt de startmelder eerder op de route al voor, dan stopt de route daar.</summary>
+    internal static List<Etappe> VerkortRoute(List<Etappe> route, int start)
+    {
+        if (route.Count == 0) return route;
+        var r = route.Where(e => !(e.Van == e.Naar && e.Pad.Count > 2)).ToList();
+        for (int i = 0; i < r.Count; i++)
+        {
+            var e = r[i];
+            for (int k = 1; k < e.Pad.Count; k++)
+            {
+                if (e.Pad[k] != start) continue;
+                if (i == r.Count - 1 && k == e.Pad.Count - 1) return r; // het normale geval: de route eindigt op de startmelder
+                var kort = r.Take(i).ToList();
+                kort.Add(new Etappe { Configuratie = e.Configuratie, Richting = e.Richting, Van = e.Van, Naar = start, Pad = e.Pad.Take(k + 1).ToList() });
+                return kort;
+            }
+        }
+        return r;
+    }
+
+    /// <summary>BUG #103: waar de loc na een mislukte opdracht zelf naartoe kan rijden. -1 = de loc staat al op de startmelder van de verkenning,
+    /// anders de index van de laatste etappe die op melder <paramref name="x"/> eindigt; null als de plek niet op de route ligt.</summary>
+    internal static int? ZelfTerugIndex(List<Etappe> route, int x, int huisMelder)
+    {
+        if (x == huisMelder) return -1;
+        int idx = route.FindLastIndex(e => e.Naar == x);
+        return idx < 0 ? null : idx;
     }
 
     private static List<Etappe> RouteMet(List<Etappe> basis, Configuratie c, Richting r, List<int> pad)
@@ -550,6 +583,7 @@ public partial class BaanVerkenner
     private async Task VoerOpdrachtUit(Opdracht o)
     {
         _handmatigeOplossingGemeld = false;
+        o.Route = VerkortRoute(o.Route, o.Start); // ook voor opdrachten uit een eerder opgeslagen voortgang
         _fase = $"Opdracht #{o.Id}";
         _bezig = $"vanaf melder {o.Start} {o.Richting.Tekst()} ({o.Configuratie})";
         MeldVoortgang();
@@ -711,7 +745,8 @@ public partial class BaanVerkenner
         {
             _log.Waarschuwing($"Opdracht #{o.Id}: {nf.Message}");
             await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);
-            await VraagLocTerugTeZetten(_kaart.StartMelder, $"{nf.Message}\n\nDe verkenner gaat terug naar de startmelder.");
+            if (!await ProbeerZelfTerugNaarStart(o.Route, nf))
+                await VraagLocTerugTeZetten(_kaart.StartMelder, $"{nf.Message}\n\nDe verkenner gaat terug naar de startmelder.");
             o.Pogingen++;
             if (o.Pogingen < 2)
             {
@@ -1256,7 +1291,8 @@ public partial class BaanVerkenner
                     {
                         _log.Waarschuwing($"Kortsluitpunt #{k.Id}: de uitkomst van de proef met adres {adres} is vastgelegd, maar de weg terug mislukte: {nf.Message}");
                         await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);
-                        await VraagLocTerugTeZetten(_kaart.StartMelder, $"{nf.Message}\n\nDe uitkomst van de proef is bewaard. De verkenner gaat terug naar de startmelder.");
+                        if (!await ProbeerZelfTerugNaarStart(k.Route, nf))
+                            await VraagLocTerugTeZetten(_kaart.StartMelder, $"{nf.Message}\n\nDe uitkomst van de proef is bewaard. De verkenner gaat terug naar de startmelder.");
                     }
                     if (proefKortsluiting) continue;
                     if (proefOpgelost) break;
@@ -1265,7 +1301,8 @@ public partial class BaanVerkenner
                 {
                     _log.Waarschuwing($"Kortsluitpunt #{k.Id}: {nf.Message}");
                     await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);
-                    await VraagLocTerugTeZetten(_kaart.StartMelder, $"{nf.Message}\n\nDe verkenner gaat terug naar de startmelder.");
+                    if (!await ProbeerZelfTerugNaarStart(k.Route, nf))
+                        await VraagLocTerugTeZetten(_kaart.StartMelder, $"{nf.Message}\n\nDe verkenner gaat terug naar de startmelder.");
                 }
             }
             if (!k.Opgelost && k.AantalKortsluitingen >= _ins.MaxKortsluitingenPerPlek)

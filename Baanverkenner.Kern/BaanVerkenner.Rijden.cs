@@ -1377,6 +1377,48 @@ public partial class BaanVerkenner
 
     private string OrientatieTekst(int melder) => OrientatieTekst(_kaart, melder);
 
+    /// <summary>BUG #103 (Marco 08:07: "alweer een paar keer de loc op melder 13 moeten terugzetten"; log 08:01): na een mislukte opdracht werd direct
+    /// om hulp gevraagd, terwijl de kortsluiting twee seconden na het terugzetten van de wissels vanzelf weg was (hardwarelog 08:01:27) en de loc
+    /// gewoon over de bekende route terug had gekund. Nu: wissels staan al op basis; wacht tot het alarm weg is; staat de loc op precies één melder
+    /// van de route (of al thuis), dan rijdt de verkenner zelf terug. Lukt dat niet (alarm blijft, loc andersom, plek niet op de route, nieuwe
+    /// fout), dan volgt als vanouds de vraag aan de gebruiker.</summary>
+    private async Task<bool> ProbeerZelfTerugNaarStart(List<Etappe> route, NavigatieFout nf)
+    {
+        if (nf.LocAndersom) return false;
+        var eind = _klok.Nu + TimeSpan.FromSeconds(10);
+        while (HuidigeAlarmBlokken().Count > 0 && _klok.Nu < eind) await Wacht(TimeSpan.FromMilliseconds(300));
+        if (HuidigeAlarmBlokken().Count > 0)
+        {
+            _log.Info($"De kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())} blijft; de verkenner rijdt niet zelf terug.");
+            return false;
+        }
+        await Wacht(TimeSpan.FromSeconds(1));
+        _monitor.Bijwerken();
+        var bezet = _monitor.Bezet;
+        if (bezet.Count != 1) { _log.Info($"De loc staat niet op precies één melder (bezet: {Lijst(bezet)}); de verkenner rijdt niet zelf terug."); return false; }
+        int x = bezet.Single();
+        var idx = ZelfTerugIndex(route, x, _kaart.StartMelder);
+        if (idx is null) { _log.Info($"Melder {x} ligt niet op de route terug; de verkenner rijdt niet zelf terug."); return false; }
+        if (idx.Value >= 0)
+        {
+            _log.Info($"De kortsluiting is weg en de loc staat op melder {x}: de verkenner rijdt zelf terug naar melder {_kaart.StartMelder} (niet getest op de baan).");
+            _kortsluitingGemeld = false;
+            try { await TerugNaarHuis(route.Take(idx.Value + 1).ToList()); }
+            catch (NavigatieFout f)
+            {
+                _log.Waarschuwing($"Zelf terugrijden mislukte: {f.Message}");
+                await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);
+                return false;
+            }
+            await Wacht(TimeSpan.FromSeconds(1));
+            _monitor.Bijwerken();
+        }
+        var nu = _monitor.Bezet;
+        if (nu.Count == 1 && nu.Contains(_kaart.StartMelder)) { _log.Info($"Loc staat weer op melder {_kaart.StartMelder}."); return true; }
+        _log.Info($"Na het terugrijden staat de loc niet (alleen) op melder {_kaart.StartMelder} (bezet: {Lijst(nu)}).");
+        return false;
+    }
+
     private async Task VraagLocTerugTeZetten(int melder, string aanleiding)
     {
         for (int poging = 1; poging <= 3; poging++)

@@ -1563,3 +1563,16 @@ tot 15:43 niet meer gereden; 23 minuten geen vooruitgang bij melder 12. Nu: (a) 
 komt vooraan en wordt direct opnieuw gereden (de bekende oplossing, #87, zet wissel 1 er zelf bij); (b) het vervolg "verder voorbij opgelost
 kortsluitpunt" (zowel via adrestest als via de oplosfase) komt vooraan de wachtrij. Test: `HerpogingVolgordeTest`. Nog niet getest op de baan.
 Gemeten (7 logs, 319 min): de adrestests (87 ritten met 1 adres, 91 min) zijn de grootste tijdpost; groeperen is nog niet gebouwd (voorstel gedaan).
+
+## #103 - Loc steeds met de hand op melder 13 terugzetten + route met een overbodige ronde (Marco 08:07, log 07:58-08:06)
+(a) Opdracht #12 (start melder 129): na de mislukte rit (wissel 9 afbuigend gaf kortsluiting in blok 9, 08:01:00) werden de wissels op basis gezet en
+meteen aan de gebruiker gevraagd de loc op 13 te zetten. De hardwarelog laat zien dat de kortsluiting 2 s na het terugzetten van wissel 9 al weg was
+(08:01:27). Nu: na een mislukte opdracht (en bij de twee plekken in de oplosfase) wacht de verkenner tot het alarm weg is (max. 10 s) en rijdt zelf terug
+over de route als de loc op precies één melder van die route staat (`ProbeerZelfTerugNaarStart`). Blijft het alarm, staat de loc andersom, ligt de plek niet
+op de route of mislukt de terugrit, dan vraagt hij het zoals voorheen.
+(b) De route naar 129 was 13-14, 14-129-24, en dan nog een hele ronde 24-21-...-14-129 (75 s heen, even lang terug), terwijl 129 al op de heenweg gepasseerd werd.
+`VerkortRoute`: gesloten rondes in een route vervallen en de route stopt zodra de startmelder eerder voorkomt (rijrichting en wisselstanden blijven zoals ze zijn).
+Toegepast bij het plannen van een opdracht en bij het uitvoeren (ook voor opgeslagen opdrachten).
+Niet opgelost: 08:04:59 kortsluiting in blok 9 bij het binnenrijden van 129 vanaf melder 4 (wissel 9 stond rechtdoor, moet afbuigend); de rit werd als lus
+beëindigd, er is geen kortsluitpunt voor aangemaakt en het alarm bleef tot jij wissel 9 omzette. Dat moet nog uitgezocht.
+Tests: `RouteVerkortTest`. Zelf terugrijden zelf is niet gesimuleerd; nog niet getest op de baan.

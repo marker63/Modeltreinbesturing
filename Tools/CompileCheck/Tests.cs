@@ -773,6 +773,26 @@ public static class Tests
         Eis(q2.Select(x => x.Id).SequenceEqual(new[] { 6, 7, 5 }), "herpoging: zonder oplossing achteraan");
     }
 
+    // BUG #103 (log 08:06): route naar 129 liep een hele ronde extra; en zelf terugrijden i.p.v. de gebruiker te vragen
+    static void RouteVerkortTest()
+    {
+        Console.WriteLine("Test: route verkorten en zelf terugrijden (BUG #103)");
+        Etappe E(Richting r, params int[] pad) => new Etappe { Configuratie = Configuratie.Basis, Richting = r, Van = pad[0], Naar = pad[^1], Pad = pad.ToList() };
+        var lap = new[] { 24, 21, 29, 30, 20, 27, 28, 26, 25, 17, 8, 15, 16, 5, 13, 14, 129 };
+        var route = new List<Etappe> { E(Richting.Vooruit, 13, 14), E(Richting.Vooruit, 14, 129, 24), E(Richting.Vooruit, lap) };
+        var kort = BaanVerkenner.VerkortRoute(route, 129);
+        Eis(kort.Count == 2 && kort[1].Pad.SequenceEqual(new[] { 14, 129 }) && kort[1].Naar == 129, "route: 13-14-129-24 plus ronde wordt 13-14, 14-129 (nu " + string.Join(" | ", kort.Select(e => string.Join("-", e.Pad))) + ")");
+        var normaal = new List<Etappe> { E(Richting.Vooruit, 13, 14), E(Richting.Vooruit, 14, 24) };
+        Eis(BaanVerkenner.VerkortRoute(normaal, 24).Count == 2, "route: eindigt de route op de startmelder, dan blijft hij zoals hij was");
+        var ronde = new List<Etappe> { E(Richting.Vooruit, 13, 14, 24, 21, 29, 30, 20, 27, 28, 26, 25, 17, 8, 15, 16, 5, 13), E(Richting.Achteruit, 13, 5, 12) };
+        var r2 = BaanVerkenner.VerkortRoute(ronde, 12);
+        Eis(r2.Count == 1 && r2[0].Pad.SequenceEqual(new[] { 13, 5, 12 }), "route: een gesloten ronde aan het begin van de route valt weg (kortsluitpunt na melder 12)");
+        Eis(BaanVerkenner.VerkortRoute(new List<Etappe>(), 5).Count == 0, "route: lege route blijft leeg");
+        Eis(BaanVerkenner.ZelfTerugIndex(kort, 13, 13) == -1, "zelf terug: loc al op de startmelder");
+        Eis(BaanVerkenner.ZelfTerugIndex(kort, 129, 13) == 1, "zelf terug: loc op 129 -> terug via etappe 1 en 0");
+        Eis(BaanVerkenner.ZelfTerugIndex(kort, 21, 13) is null, "zelf terug: melder 21 ligt niet op de route -> de gebruiker vragen");
+    }
+
     static void StopVoorTerugzettenTest()
     {
         Console.WriteLine("Test: stop naar alle blokken voordat de loc terug gezet moet worden (BUG #94)");
@@ -1109,6 +1129,7 @@ public static class Tests
         BotsendeOplossingenTest();
         OpstartStandTest();
         HerpogingVolgordeTest();
+        RouteVerkortTest();
         KruisAankomstTest();
         OrientatieTekstTest();
         WisselEisenTest();
