@@ -755,9 +755,15 @@ public partial class BaanVerkenner
                 kortsluitStops = VeiligeStops(_kaart, basis.Reeks, a, kortsluitStops);
 
                 await ZetWissel(a, true);
+                // BUG #117 (Marco 16:12, log 15:58): wissel 2 afbuigend (rit achteruit vanaf 13) reed weer in de kortsluiting na melder 12 die de kaart al
+                // kent én waarvan de oplossing bekend is (wissel 1 afbuigend). De proefrit krijgt die oplossing nu mee, net als een gewone opdracht.
+                var proefCfg = ProefStandMetOplossing(_kaart, _ins.WisselAdressen(), o.Start, o.Richting, o.Configuratie, a, out var proefExtra);
+                foreach (var (ex, st) in proefExtra) await ZetWissel(ex, st);
+                if (proefExtra.Count > 0)
+                    _log.Info($"Adres {a} afbuigend gaf eerder kortsluiting; de proef rijdt met de bekende oplossing: {string.Join(", ", proefExtra.Select(x => $"{x.Adres} {(x.Afbuigend ? "afbuigend" : "rechtdoor")}"))}.");
                 var proef = await Rit(o.Start, o.Richting, new RitDoel
                 {
-                    Configuratie = o.Configuratie.Met(a),
+                    Configuratie = proefCfg,
                     Basis = basis.Reeks,
                     ExtraNaAfwijking = _ins.ExtraMeldersNaAfwijking,
                     StopBijMelders = kortsluitStops,
@@ -778,7 +784,7 @@ public partial class BaanVerkenner
                 // Regel: is de loc via een andere weg gereden dan de basisrit (de weg wijkt af),
                 // dan gaat hij ook met dezelfde wisselstand terug; pas daarna wordt teruggezet.
                 // Volgde de proefrit de basisrit, dan blijft BUG #35 gelden (eerst terugzetten).
-                var cA0 = o.Configuratie.Met(a);
+                var cA0 = proefCfg;
                 bool afwijkendePad = ProefWijktAf(basis.Reeks, proef.Reeks);
                 bool zelfdeKortsluiting = basis.Einde == RitEinde.Kortsluiting && proef.Reeks.SequenceEqual(basis.Reeks);
                 (int Partner, RitResultaat Rit)? partner = null;
@@ -799,11 +805,13 @@ public partial class BaanVerkenner
                 {
                     await TerugNaarMetControle(o, proef, cA0);
                     await ZetWissel(a, false);
+                    foreach (var (ex, _) in proefExtra) await ZetWissel(ex, o.Configuratie.Bevat(ex));
                 }
                 else
                 {
                     // BUG #35: de loc staat hier altijd stil; eerst terugzetten, dan de terugrit.
                     await ZetWissel(a, false);
+                    foreach (var (ex, _) in proefExtra) await ZetWissel(ex, o.Configuratie.Bevat(ex));
                     await TerugNaarMetControle(o, proef, o.Configuratie);
                 }
 
@@ -1091,6 +1099,26 @@ public partial class BaanVerkenner
 
     /// <summary>BUG #115: melders waarna wissel <paramref name="a"/> afbuigend al eerder kortsluiting gaf (waarneming 'KortsluitingBijOmzetten' in dezelfde
     /// richting en dezelfde basisstand). De adrestest stopt daar in plaats van de kortsluiting nog eens op te zoeken.</summary>
+    /// <summary>BUG #117: de stand voor de proefrit van adres <paramref name="a"/> afbuigend: heeft de kaart bij precies deze stand (basis + a) al een
+    /// kortsluiting opgelost met een extra wissel, dan krijgt de proefrit die wissel mee. Kruiswissel-motoren (13 en 10) blijven buiten beschouwing:
+    /// hun stand staat vast in de referentie en ze worden nooit extra omgezet. <paramref name="extra"/> = de extra wissels met hun stand in de proef.</summary>
+    internal static Configuratie ProefStandMetOplossing(Baankaart kaart, IEnumerable<int> adressen, int start, Richting r, Configuratie basis, int a,
+                                                        out List<(int Adres, bool Afbuigend)> extra)
+    {
+        extra = new List<(int, bool)>();
+        var cA = basis.Met(a);
+        if (a == KruiswisselReferentie.Motor13 || a == KruiswisselReferentie.Motor10) return cA;
+        var metOpl = kaart.MetBekendeOplossingenVoorStart(start, r, cA, out _);
+        foreach (var x in adressen)
+            if (x != a && metOpl.Bevat(x) != cA.Bevat(x)) extra.Add((x, metOpl.Bevat(x)));
+        if (extra.Any(e => e.Adres == KruiswisselReferentie.Motor13 || e.Adres == KruiswisselReferentie.Motor10))
+        {
+            extra.Clear();
+            return cA;
+        }
+        return metOpl;
+    }
+
     internal static HashSet<int> BekendeOmzetKortsluitStops(Baankaart kaart, int a, Richting r, Configuratie c) =>
         kaart.Wissels.Where(w => w.Adres == a).SelectMany(w => w.Waarnemingen)
             .Where(o => o.Soort == WaarnemingSoort.KortsluitingBijOmzetten && o.Richting == r && o.Configuratie == c.ToString())
@@ -1497,6 +1525,7 @@ public partial class BaanVerkenner
                 if (uitleg is not null) _log.Info(uitleg);
             }
             await ControleerGeenAlarmVoorStap($"navigatie {e.Van} -> {e.Naar}");
+            cfg = MetAlarmStand(cfg);
             await ZetConfiguratie(cfg);
             await Rit(e.Van, e.Richting, new RitDoel { Configuratie = cfg, DoelMelder = e.Naar, VerwachtPad = e.Pad });
         }
@@ -1514,6 +1543,7 @@ public partial class BaanVerkenner
             pad.Reverse();
             cfg = MetEisen(pad, e.Richting.Om(), KiesBijIngang(e.Naar, e.Richting.Om(), pad, cfg));
             await ControleerGeenAlarmVoorStap($"terugweg {e.Naar} -> {e.Van}");
+            cfg = MetAlarmStand(cfg);
             await ZetConfiguratie(cfg);
             await Rit(e.Naar, e.Richting.Om(), new RitDoel { Configuratie = cfg, DoelMelder = e.Van, VerwachtPad = pad });
         }
@@ -1601,6 +1631,7 @@ public partial class BaanVerkenner
             _log.Info($"Terug naar melder {start} door verder te rijden ({Lijst(door)}, {rit.Richting.Tekst()}) in plaats van {rit.Reeks.Count - 1} melders terug: die weg is eerder met deze wisselstand gereden.");
             var cDoor = MetEisen(door, rit.Richting, KiesBijIngang(door[0], rit.Richting, door, c));
             await ControleerGeenAlarmVoorStap($"doorrijden naar melder {start}");
+            cDoor = MetAlarmStand(cDoor);
             await ZetConfiguratie(cDoor);
             var klaar = await Rit(door[0], rit.Richting, new RitDoel { Configuratie = cDoor, DoelMelder = start, VerwachtPad = door });
             if (klaar.Einde == RitEinde.Kortsluiting)
@@ -1620,6 +1651,7 @@ public partial class BaanVerkenner
         // afbuigend bestaat: kortsluiting. Voor de terugweg gelden de bekende wisselstanden per stap.
         c = MetEisen(pad, rit.Richting.Om(), KiesBijIngang(vanaf, rit.Richting.Om(), pad, c));
         await ControleerGeenAlarmVoorStap($"terugweg naar melder {start}");
+        c = MetAlarmStand(c);
         await ZetConfiguratie(c);
         var terug = await Rit(vanaf, rit.Richting.Om(), new RitDoel { Configuratie = c, DoelMelder = start, VerwachtPad = pad });
         // BUG #73 (log 17:48 en 17:54): kreeg de loc op de terugweg kortsluiting, dan was hij NIET terug op de startmelder. Het resultaat werd

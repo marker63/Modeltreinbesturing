@@ -1701,3 +1701,20 @@ toegevoegd ("overloopwissel, bewezen") als alle afbuigende wissels van de config
 `WisselstraatImporter` neemt alle `v.Eisen` over, dus de overloopwissels komen daarmee in de ingelezen wisselstraten; alleen `Aangenomen` blijft een waarschuwing.
 Test: `OverloopStraatTest` (4 regels: 5 -> 12 geeft wissel 2 én wissel 1 afbuigend). Nog niet getest op de baan; het WPF-project is niet gecompileerd.
 Let op: de voorstellen worden bij het exporteren van de baankaart berekend; exporteer de kaart opnieuw met deze versie en importeer die.
+
+## #117 Proefrit reed weer in de bekende kortsluiting na melder 12; de oplossing werd direct teruggezet en de loc zat 12 minuten vast (Marco 16:12, log 15:58-16:11)
+Verloop: 15:58:16 adrestest wissel 2 afbuigend, rit achteruit vanaf 13 -> 5 -> 12; kortsluiting in blok 2 (kortsluitpunt #1, al opgelost met wissel 1 afbuigend).
+De alarmroutine (#108) zette wissel 1 afbuigend: alarm weg (15:58:32.130), melding "de wissel blijft zo staan". Maar de terugweg zette alle wissels meteen weer in de
+stand van de route (wissel 1 rechtdoor, 15:58:32.330): na 0,8 s was de kortsluiting terug (15:58:32.931), de loc vertrok niet meer, de blokproef (9 blokken x 2 richtingen
+x 30 s) duurde 11 minuten, tot Marco de loc zelf op melder 13 zette.
+Drie oorzaken, drie fouten:
+1. De proefrit van een adres kent alleen de stops voor open kortsluitpunten en omzet-waarnemingen in dezelfde richting; een al OPGELOST kortsluitpunt met bekende oplossing werd niet gebruikt.
+   Nu: `ProefStandMetOplossing`: is bij precies deze stand (basis + proefadres) en startmelder/richting al een kortsluiting opgelost met een extra wissel, dan rijdt de proef met die wissel
+   (hier: wissel 2 én 1 afbuigend). Daarna wordt het extra adres weer in zijn oude stand gezet. Kruiswissel-motoren 13 en 10 doen hier niet aan mee (hun stand staat in de referentie).
+2. De stand die het alarm wegnam gold maar voor één moment. Nu: `_alarmStand` wordt gevuld door `ProbeerAlarmWegTeKrijgen` en `MetAlarmStand` past hem toe op de stap die er direct op volgt
+   (rit, navigatie, terugweg, doorrijden); bij de eerstvolgende alarmcontrole zonder alarm vervalt hij.
+3. De blokproef werd niet overgeslagen (#66) omdat `_laatsteKortsluitingOm` alleen bij kortsluiting TIJDENS een rit werd gezet. Nu ook bij een alarm voor een stap, en bij een actief alarm
+   wordt de blokproef altijd overgeslagen (dan ligt het niet aan de blokkoppeling).
+Test: `ProefOplossingTest` (6 regels). Nog niet getest op de baan; het WPF-project is niet gecompileerd.
+Gevolg voor de kaart: de proef van wissel 2 achteruit kan nu eindelijk de splitsing van wissel 2 na melder 5 (achteruit: rechtdoor 16, afbuigend 12) vastleggen, die tot nu toe ontbrak.
+Open: bij het terugzetten van het extra adres (wissel 1) na de proef kan de loc nog dicht bij die wissel staan (niet getest).

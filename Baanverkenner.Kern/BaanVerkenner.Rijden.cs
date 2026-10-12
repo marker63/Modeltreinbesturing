@@ -701,7 +701,9 @@ public partial class BaanVerkenner
     /// maar een navigatiefout (loc controleren/terugzetten, mogelijk staat een wissel verkeerd).</summary>
     private async Task ControleerGeenAlarmVoorStap(string stap)
     {
+        _alarmStand.Clear();
         if (HuidigeAlarmBlokken().Count == 0) return;
+        _laatsteKortsluitingOm = _klok.Nu;   // BUG #117: ook deze kortsluiting telt voor 'kort geleden een kortsluiting' (blokproef overslaan)
         _log.Waarschuwing($"Dinamo meldt kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())} voordat de volgende stap begint ({stap}). Even wachten of dat vanzelf verdwijnt.");
         for (int i = 0; i < AlarmWachtPogingen && HuidigeAlarmBlokken().Count > 0; i++)
             await Wacht(TimeSpan.FromMilliseconds(300));
@@ -712,6 +714,23 @@ public partial class BaanVerkenner
         throw new NavigatieFout($"Dinamo meldt nog steeds kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())} terwijl de loc stilstaat ({stap}). De verkenner heeft zelf wissels geprobeerd zonder dat de kortsluiting wegging en rijdt niet verder.");
     }
     private const int AlarmWachtPogingen = 10;
+
+    /// <summary>BUG #117 (Marco 16:12, log 15:58): ProbeerAlarmWegTeKrijgen vond dat wissel 1 afbuigend de kortsluiting oplost ("de wissel blijft zo staan"),
+    /// maar de stap die daarna volgde zette alle wissels meteen weer in de stand van de route (wissel 1 rechtdoor): na 0,8 s was de kortsluiting terug en
+    /// de loc zat vast (11 minuten blokproef). De stand die het alarm weghaalde geldt nu voor de stap die er direct op volgt.</summary>
+    private readonly Dictionary<int, bool> _alarmStand = new();
+
+    /// <summary>BUG #117: past de wisselstand toe die net de kortsluiting heeft weggehaald (alleen tot de volgende alarmcontrole).</summary>
+    internal Configuratie MetAlarmStand(Configuratie c)
+    {
+        foreach (var kv in _alarmStand)
+        {
+            if (c.Bevat(kv.Key) == kv.Value) continue;
+            c = c.MetStand(kv.Key, kv.Value);
+            _log.Info($"Wissel {kv.Key} blijft {(kv.Value ? "afbuigend" : "rechtdoor")} staan voor de volgende stap: dat haalde de kortsluiting weg.");
+        }
+        return c;
+    }
 
     /// <summary>BUG #109: adressen van wissels die de kaart bij een van de bezette melders noemt (als melder voor het punt, of als tak erna). De loc
     /// staat er mogelijk met een deel op of tegen de tong aan: zulke wissels worden niet voor een proef omgezet.</summary>
@@ -749,6 +768,7 @@ public partial class BaanVerkenner
             {
                 _log.Vondst($"De kortsluiting ging weg nadat wissel {a} naar {(oud ? "rechtdoor" : "afbuigend")} is geschakeld ({stap}). De wissel blijft zo staan.");
                 _kortsluitingGemeld = false;
+                _alarmStand[a] = !oud;
                 return true;
             }
             await ZetWissel(a, oud, forceer: true);
@@ -845,6 +865,7 @@ public partial class BaanVerkenner
         // blokken; de sectie wordt gekoppeld zodra de loc er helemaal in staat.
 
         await ControleerGeenAlarmVoorStap($"rit {r.Tekst()} vanaf melder {start}");
+        cfgNu = MetAlarmStand(cfgNu);
 
         int snelheid = _ins.Verkensnelheid;
         _log.Rijden(doel.IsNavigatie
@@ -1236,7 +1257,7 @@ public partial class BaanVerkenner
                     // de blokkoppeling maar staat de loc waarschijnlijk op een open gereden of verkeerd staande wissel (log 15:14:
                     // 2 x 9 minuten blokproef met de loc vast op de kruiswissel, blok 8 bleef kortsluiting melden). Niet 18 blokken
                     // x 30 s proberen maar direct de gebruiker vragen de loc terug te zetten.
-                    if (!bevestigd && bekendBlok is not null && _klok.Nu - _laatsteKortsluitingOm < TimeSpan.FromMinutes(10))
+                    if (!bevestigd && bekendBlok is not null && (_klok.Nu - _laatsteKortsluitingOm < TimeSpan.FromMinutes(10) || HuidigeAlarmBlokken().Count > 0))
                     {
                         _log.Waarschuwing($"De loc vertrok niet van melder {start} terwijl het blok ({bekendBlok}) bekend is en er kort geleden een kortsluiting was: waarschijnlijk staat hij op een open gereden of verkeerd staande wissel (bijv. een kruiswissel met maar één van de twee motoren op afbuigend). De volledige blokproef wordt overgeslagen.");
                         await VraagLocTerugTeZetten(start, $"De loc rijdt niet weg van melder {start}, kort na een kortsluiting. Staat er een wissel (kruiswissel?) open gereden of in een gemengde stand? Zet de wissels goed en de loc op melder {start}.");

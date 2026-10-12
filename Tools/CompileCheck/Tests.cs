@@ -1150,6 +1150,50 @@ public static class Tests
         Eis(BaanVerkenner.VeiligeStops(k, achteruit, 14, new[] { 24 }).SetEquals(new[] { 24 }), "proefstop (#115): een wissel die niet bij de stopmelder ligt houdt de stop zoals hij was");
     }
 
+    // BUG #117 (Marco 16:12, log 15:58)
+    static void ProefOplossingTest()
+    {
+        var k = new Baankaart();
+        k.Kortsluitpunten.Add(new Kortsluitpunt
+        {
+            Id = 1, NaMelder = 12, Richting = Richting.Achteruit, Configuratie = new Configuratie(new[] { 2 }), Opgelost = true, OpgelostDoorAdres = 1, OpgelostMetAfbuigend = true,
+            Route = { new Etappe { Van = 13, Naar = 12, Richting = Richting.Achteruit, Pad = { 13, 5, 12 }, Configuratie = new Configuratie(new[] { 2 }) } }
+        });
+        var adressen = Enumerable.Range(1, 14).ToList();
+        var c = BaanVerkenner.ProefStandMetOplossing(k, adressen, 13, Richting.Achteruit, Configuratie.Basis, 2, out var extra);
+        Eis(c.Bevat(2) && c.Bevat(1) && extra.Count == 1 && extra[0] == (1, true), "proefstand (#117): wissel 2 afbuigend achteruit vanaf 13 krijgt de bekende oplossing, wissel 1 afbuigend (nu " + c + ")");
+        c = BaanVerkenner.ProefStandMetOplossing(k, adressen, 13, Richting.Vooruit, Configuratie.Basis, 2, out extra);
+        Eis(c.Equals(new Configuratie(new[] { 2 })) && extra.Count == 0, "proefstand (#117): andere richting -> geen extra wissel");
+        c = BaanVerkenner.ProefStandMetOplossing(k, adressen, 13, Richting.Achteruit, Configuratie.Basis, 3, out extra);
+        Eis(c.Equals(new Configuratie(new[] { 3 })) && extra.Count == 0, "proefstand (#117): ander proefadres -> geen extra wissel");
+        // kruiswissel-motoren blijven buiten beschouwing
+        k.Kortsluitpunten.Add(new Kortsluitpunt { Id = 2, NaMelder = 14, Richting = Richting.Achteruit, Configuratie = new Configuratie(new[] { 10 }), Opgelost = true, OpgelostDoorAdres = 5, OpgelostMetAfbuigend = true,
+            Route = { new Etappe { Van = 13, Naar = 14, Richting = Richting.Achteruit, Pad = { 13, 24, 14 }, Configuratie = new Configuratie(new[] { 10 }) } } });
+        c = BaanVerkenner.ProefStandMetOplossing(k, adressen, 13, Richting.Achteruit, Configuratie.Basis, 10, out extra);
+        Eis(c.Equals(new Configuratie(new[] { 10 })) && extra.Count == 0, "proefstand (#117): motor 10 wordt niet met een extra wissel getest (nu " + c + ")");
+
+        // na een opgeloste kortsluiting blijft de stand die het alarm wegnam gelden voor de volgende stap
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
+        var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+        var s1 = sim.NieuweSectie(1, 80, 1); var s2 = sim.NieuweSectie(2, 80, 2);
+        sim.Verbind(s1, B, s2, A); sim.PlaatsLoc(s1, 40, +1);
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 4, DinamoBlokken = "1-2" };
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var v = new BaanVerkenner(sim, ins, klok, new VerkenLog(klok), (_, _) => Task.FromResult(true), new VerkenStatus { Instellingen = ins });
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var check = typeof(BaanVerkenner).GetMethod("ControleerGeenAlarmVoorStap", bf)!;
+        var alarm = typeof(BaanVerkenner).GetMethod("HardwareMeldtBlokAlarm", bf)!;
+        var stand = (Dictionary<int, bool>)typeof(BaanVerkenner).GetField("_wisselStand", bf)!.GetValue(v)!;
+        alarm.Invoke(v, new object[] { 8, true });
+        klok.Getikt += _ => { if (stand.TryGetValue(1, out var af) && af) alarm.Invoke(v, new object[] { 8, false }); };
+        ((Task)check.Invoke(v, new object[] { "test" })!).GetAwaiter().GetResult();
+        var volgende = v.MetAlarmStand(new Configuratie(new[] { 2 }));
+        Eis(volgende.Bevat(1) && volgende.Bevat(2), "alarmstand (#117): de stap na de opgeloste kortsluiting houdt wissel 1 afbuigend (nu " + volgende + ")");
+        ((Task)check.Invoke(v, new object[] { "test" })!).GetAwaiter().GetResult();
+        Eis(v.MetAlarmStand(new Configuratie(new[] { 2 })).Equals(new Configuratie(new[] { 2 })), "alarmstand (#117): bij de volgende controle zonder alarm geldt hij niet meer");
+    }
+
     static void AltijdAfbuigendTest()
     {
         // BUG #112 (log 12:31): oplossing 'wissel 2 rechtdoor' (na melder 5 achteruit) hoort bij het pad naar 16, niet bij 5 -> 12.
@@ -1388,6 +1432,7 @@ public static class Tests
         AltijdAfbuigendTest();
         ProefStopTest();
         OverloopStraatTest();
+        ProefOplossingTest();
         TweedeMelderTest();
         VerkeerdeWisselVraagTest();
         WisselstraatImportTest();
