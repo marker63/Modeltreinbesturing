@@ -67,7 +67,7 @@ public static class ControleVergelijking
 
         bool verschillen = regels.Any(r => r.StartsWith("NIEUW") || r.StartsWith("WISSEL") || r.Contains("niet gereden") || r.Contains("niet teruggezien"));
         string sam = verschillen
-            ? $"Controle: {regels.Count} punt(en) om te bekijken; {bevestigd} onderdelen (overgangen, wissels, einden, kortsluitpunten) kwamen overeen met de kaart."
+            ? $"Controle: {regels.Count} verschil(len) om te bekijken; daarnaast kwamen {bevestigd} onderdelen (overgangen, wissels, einden, kortsluitpunten) wel overeen met de kaart."
             : $"Controle: geen verschillen met de kaart; {bevestigd} onderdelen (overgangen, wissels, einden, kortsluitpunten) kwamen overeen.";
         return new ControleVerslag { Datum = nu, Samenvatting = sam, Verschillen = verschillen, Regels = regels };
     }

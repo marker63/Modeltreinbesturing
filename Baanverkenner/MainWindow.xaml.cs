@@ -619,11 +619,8 @@ public partial class MainWindow : Window
                 BezigTekst.Text = "De bestaande kaart is ongewijzigd; het verslag staat in het rapport.";
                 ToonResultaat(verkenner.Status);
                 var vs = verkenner.Kaart.ControleVerslagen.LastOrDefault();
-                string regels = vs is null ? "" : string.Join("\n", vs.Regels.Take(12).Select(r => "•  " + r)) + (vs.Regels.Count > 12 ? $"\n… en nog {vs.Regels.Count - 12} regel(s) in het rapport." : "");
-                MessageBox.Show(this,
-                    (vs?.Samenvatting ?? "De controle is voltooid.") + (regels.Length > 0 ? "\n\n" + regels : "") +
-                    "\n\nStuur bij verschillen het rapport en het logboek, dan los ik ze op. Niet getest op de baan: dit was de eerste keer.",
-                    "Controle klaar", MessageBoxButton.OK, vs is { Verschillen: true } ? MessageBoxImage.Warning : MessageBoxImage.Information);
+                if (vs is null) MessageBox.Show(this, "De controle is voltooid.", "Controle klaar", MessageBoxButton.OK, MessageBoxImage.Information);
+                else ToonControleVerslag(vs);
                 return;
             }
             FaseTekst.Text = "Verkenning voltooid";
@@ -889,6 +886,42 @@ public partial class MainWindow : Window
         if (k is null)
             MessageBox.Show(this, "Er is nog geen resultaat. Start eerst een verkenning.", "Geen resultaat", MessageBoxButton.OK, MessageBoxImage.Information);
         return k;
+    }
+
+    /// <summary>BUG #112: het controleverslag in een eigen venster met alle regels, en knoppen om het op te slaan, te kopiëren of af te drukken.
+    /// Nog niet getest op de baan; dit WPF-deel is niet gecompileerd.</summary>
+    private void ToonControleVerslag(ControleVerslag vs)
+    {
+        string tekst = Rapport.ControleAlsTekst(vs) + "\nStuur bij verschillen dit verslag en het logboek, dan los ik ze op.\n";
+        var venster = new Window { Title = "Controle klaar", Owner = this, Width = 820, Height = 620, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        var raster = new Grid { Margin = new Thickness(12) };
+        raster.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        raster.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var box = new TextBox { Text = tekst, IsReadOnly = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, FontFamily = new FontFamily("Consolas"), FontSize = 13 };
+        Grid.SetRow(box, 0);
+        raster.Children.Add(box);
+        var knoppen = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) };
+        Button Knop(string t, RoutedEventHandler h) { var b = new Button { Content = t, Padding = new Thickness(14, 5, 14, 5), Margin = new Thickness(6, 0, 0, 0) }; b.Click += h; knoppen.Children.Add(b); return b; }
+        Knop("Opslaan als tekst", (_, _) => Schrijf(KiesBestand($"controle_{Datumstempel()}.txt", "Tekstbestand (*.txt)|*.txt"), tekst));
+        Knop("Opslaan als webpagina", (_, _) => Schrijf(KiesBestand($"controle_{Datumstempel()}.html", "Webpagina (*.html)|*.html"), Rapport.ControleAlsHtml(vs)));
+        Knop("Kopiëren", (_, _) => { try { Clipboard.SetText(tekst); } catch (Exception ex) { MessageBox.Show(venster, ex.Message, "Kopiëren mislukt", MessageBoxButton.OK, MessageBoxImage.Error); } });
+        Knop("Afdrukken", (_, _) =>
+        {
+            try
+            {
+                var dlg = new PrintDialog();
+                if (dlg.ShowDialog() != true) return;
+                var doc = new System.Windows.Documents.FlowDocument(new System.Windows.Documents.Paragraph(new System.Windows.Documents.Run(tekst)))
+                { FontFamily = new FontFamily("Consolas"), FontSize = 11, PagePadding = new Thickness(50), PageWidth = dlg.PrintableAreaWidth, PageHeight = dlg.PrintableAreaHeight, ColumnWidth = dlg.PrintableAreaWidth };
+                dlg.PrintDocument(((System.Windows.Documents.IDocumentPaginatorSource)doc).DocumentPaginator, "Controle van de baan");
+            }
+            catch (Exception ex) { MessageBox.Show(venster, ex.Message, "Afdrukken mislukt", MessageBoxButton.OK, MessageBoxImage.Error); }
+        });
+        Knop("Sluiten", (_, _) => venster.Close());
+        Grid.SetRow(knoppen, 1);
+        raster.Children.Add(knoppen);
+        venster.Content = raster;
+        venster.ShowDialog();
     }
 
     private string? KiesBestand(string standaardNaam, string filter)

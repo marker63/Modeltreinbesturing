@@ -1653,3 +1653,12 @@ Nu: `IVerbindingsBron.StilteGewijzigd` (Dinamo vuurt af bij begin en einde van d
 ("DINAMO ANTWOORDT NIET MEER ...") en een melding als Dinamo weer antwoordt (`DinamoStil`). De verkenner stopt niet zelf: stopcommando's komen bij een stille Dinamo toch niet aan.
 Test: `DinamoStilteTest` (2 regels). Nog niet getest op de baan (de echte Dinamo-koppeling is hier niet te draaien); het WPF-project is niet gecompileerd.
 Mogelijke uitbreiding: een pop-up in de WPF-app; de waarschuwing staat nu in het logboek.
+
+## #112 Controleresultaat niet op te slaan of af te drukken; "55 punten verschil" verkeerd gelezen (Marco 13:27)
+Het resultaat stond alleen in een MessageBox (max. 12 regels, niet te selecteren of op te slaan). Het rapport van 12:32 zegt: 25 punten om te bekijken, 55 onderdelen kwamen overeen;
+de oude zin "25 punt(en) om te bekijken; 55 onderdelen ... kwamen overeen" las als 55 verschillen.
+Oplossing: de zin is nu "Controle: N verschil(len) om te bekijken; daarnaast kwamen M onderdelen wel overeen met de kaart." Na de controle opent een eigen venster (`ToonControleVerslag`)
+met ALLE regels genummerd en de knoppen Opslaan als tekst, Opslaan als webpagina, Kopiëren, Afdrukken en Sluiten. `Rapport.ControleAlsTekst/ControleAlsHtml` maken de losse tekst.
+Het volledige verslag stond en staat ook in 'Rapport opslaan' (tekst/html) onder "Controles van de baan".
+Test: controle-test in CompileCheck (2 regels, tekst/html). Het WPF-venster en het afdrukken zijn NIET getest en niet gecompileerd (hier niet mogelijk); nog niet getest op de baan.
+Let op: de 25 verschillen van 12:32 komen uit een rit vóór #109/#110; een deel kan door de toenmalige wisselfouten komen. Stuur bij een nieuwe controle het verslag.

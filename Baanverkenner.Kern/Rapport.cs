@@ -373,4 +373,37 @@ ul{margin:6px 0 0 18px;padding:0}
         }
         return sb.ToString();
     }
+
+    /// <summary>BUG #112: één controleverslag als losse tekst (om op te slaan, te kopiëren of af te drukken).</summary>
+    public static string ControleAlsTekst(ControleVerslag v)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("BAANVERKENNER - CONTROLE VAN DE BAAN");
+        sb.AppendLine($"Datum: {v.Datum:dd-MM-yyyy HH:mm}");
+        sb.AppendLine();
+        sb.AppendLine(v.Samenvatting);
+        sb.AppendLine();
+        if (v.Regels.Count == 0) sb.AppendLine("Geen verschillen.");
+        else
+        {
+            sb.AppendLine($"Punten om te bekijken ({v.Regels.Count}):");
+            int n = 1;
+            foreach (var r in v.Regels) sb.AppendLine($"  {n++}. {r}");
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>BUG #112: één controleverslag als webpagina (afdrukbaar vanuit de browser).</summary>
+    public static string ControleAlsHtml(ControleVerslag v)
+    {
+        string E(string t) => System.Net.WebUtility.HtmlEncode(t);
+        var sb = new StringBuilder();
+        sb.Append("<!DOCTYPE html><html lang=\"nl\"><head><meta charset=\"utf-8\"><title>Controle van de baan</title>");
+        sb.Append("<style>body{font-family:Segoe UI,Arial,sans-serif;max-width:900px;margin:30px auto;padding:0 16px}li{margin:4px 0}</style></head><body>");
+        sb.Append($"<h1>Controle van de baan</h1><p>{v.Datum:dd-MM-yyyy HH:mm}</p><p><b>{E(v.Samenvatting)}</b></p>");
+        if (v.Regels.Count == 0) sb.Append("<p>Geen verschillen.</p>");
+        else { sb.Append($"<h2>Punten om te bekijken ({v.Regels.Count})</h2><ol>"); foreach (var r in v.Regels) sb.Append($"<li>{E(r)}</li>"); sb.Append("</ol>"); }
+        sb.Append("</body></html>");
+        return sb.ToString();
+    }
 }

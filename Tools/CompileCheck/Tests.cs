@@ -478,6 +478,10 @@ public static class Tests
         Console.WriteLine("  (controle: " + vs.Samenvatting + (vs.Regels.Count > 0 ? " | " + string.Join(" | ", vs.Regels) : "") + ")");
         Eis(!vs.Verschillen, "controle: dezelfde baan geeft geen verschillen");
         Eis(Rapport.AlsTekst(k).Contains("CONTROLES VAN DE BAAN") && Rapport.AlsHtml(k).Contains("Controles van de baan"), "controle: rapport toont het verslag");
+        var ct = Rapport.ControleAlsTekst(vs); var ch = Rapport.ControleAlsHtml(vs);
+        Eis(ct.Contains(vs.Samenvatting) && ch.Contains("Controle van de baan") && ch.Contains("<html"), "controle (#112): losse tekst en webpagina van het verslag");
+        var vz = new ControleVerslag { Datum = DateTime.Now, Samenvatting = "Controle: 2 verschil(len) om te bekijken; daarnaast kwamen 55 onderdelen wel overeen met de kaart.", Verschillen = true, Regels = { "NIEUW: a <b>", "WISSEL 3 anders" } };
+        Eis(Rapport.ControleAlsTekst(vz).Contains("Punten om te bekijken (2)") && Rapport.ControleAlsTekst(vz).Contains("  2. WISSEL 3 anders") && Rapport.ControleAlsHtml(vz).Contains("a &lt;b&gt;"), "controle (#112): alle regels genummerd, html veilig");
 
         // vergelijking: een weggelaten overgang en een extra overgang worden gemeld
         var oud = Baankaart.VanJson(k.AlsJson())!; oud.ControleVerslagen.Clear();
