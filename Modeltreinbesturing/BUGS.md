@@ -1646,3 +1646,10 @@ slaan die wissels over en melden dat in het log. Gevolg: een partner die bij mel
 vraagt dan zo nodig de gebruiker. Ritten die met de loc op de startmelder hun wissels zetten (de normale gang) zijn niet veranderd.
 Test: `StaartWisselTest` (2 regels). Nog niet getest op de baan.
 Open: of wissel 9 op 11:51:56 of op 11:52:09 de ontsporing veroorzaakte is uit het log niet af te leiden; beide gevallen zijn nu afgedekt.
+
+## #111 Melden als Dinamo niet meer antwoordt (Marco 12:17)
+Tot nu toe stond de stilte (geen enkel bericht, ook geen keepalive, sinds 2 s) alleen in de hardwarelog en pas bij een kortsluitmelding in het verkenner-log.
+Nu: `IVerbindingsBron.StilteGewijzigd` (Dinamo vuurt af bij begin en einde van de stilte); de verkenner zet direct een waarschuwing in zijn logboek
+("DINAMO ANTWOORDT NIET MEER ...") en een melding als Dinamo weer antwoordt (`DinamoStil`). De verkenner stopt niet zelf: stopcommando's komen bij een stille Dinamo toch niet aan.
+Test: `DinamoStilteTest` (2 regels). Nog niet getest op de baan (de echte Dinamo-koppeling is hier niet te draaien); het WPF-project is niet gecompileerd.
+Mogelijke uitbreiding: een pop-up in de WPF-app; de waarschuwing staat nu in het logboek.

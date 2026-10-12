@@ -656,6 +656,9 @@ public static class Tests
 
     sealed class StilteHw : Baanverkenner.Kern.Simulatie.SimulatieBaan, Modeltreinbesturing.Hardware.IVerbindingsBron
     {
+        public event Action<bool, double>? StilteGewijzigd { add { _stilteLuisteraar += value; } remove { _stilteLuisteraar -= value; } }
+        Action<bool, double>? _stilteLuisteraar;
+        public void Roep(bool stil, double s) => _stilteLuisteraar?.Invoke(stil, s);
         public double? Stilte { get; set; }
         public double? SecondenSindsLaatsteOntvangst => Stilte;
     }
@@ -672,6 +675,17 @@ public static class Tests
         var t = BaanVerkenner.StilteWaarschuwing(hw);
         Eis(t != null && t.Contains("7.5") && t.Contains("herstart Dinamo"), "stilte: 7.5 s geen bericht -> waarschuwing met herstart-advies (nu " + t + ")");
         Eis(BaanVerkenner.StilteWaarschuwing(new Baanverkenner.Kern.Simulatie.SimulatieBaan()) is null, "stilte: hardware zonder verbindingsbron -> geen waarschuwing");
+
+        // Marco 12:17: stilte van Dinamo (geen keepalive meer) komt als waarschuwing in het logboek van de verkenner en verdwijnt weer
+        var sim = new StilteHw { LocAdres = 5408 };
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 2 };
+        var klok = new VirtueleKlok(); var log = new VerkenLog(klok);
+        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true), new VerkenStatus { Instellingen = ins });
+        var m = typeof(BaanVerkenner).GetMethod("HardwareMeldtStilte", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        m.Invoke(v, new object[] { true, 2.4 });
+        Eis(v.DinamoStil && log.Regels.Any(r => r.Tekst.Contains("DINAMO ANTWOORDT NIET MEER") && r.Tekst.Contains("2.4")), "keepalive-stilte: waarschuwing in het logboek van de verkenner (nu " + string.Join(" | ", log.Regels.Select(r => r.Tekst)) + ")");
+        m.Invoke(v, new object[] { false, 5.0 });
+        Eis(!v.DinamoStil && log.Regels.Any(r => r.Tekst.Contains("antwoordt weer")), "keepalive-stilte: melding dat Dinamo weer antwoordt");
     }
 
     // BUG #82: een blokalarm van Dinamo vlak voor de volgende stap stopt wissels omzetten en rijden

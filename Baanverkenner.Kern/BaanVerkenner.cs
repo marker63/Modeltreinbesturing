@@ -217,6 +217,7 @@ public partial class BaanVerkenner
         _hw.BezetmeldingGewijzigd += _monitor.Ontvang;
         _hw.KortsluitingStatusGewijzigd += HardwareMeldtKortsluiting;
         if (_hw is IBlokAlarmBron alarmBron) alarmBron.BlokAlarmGewijzigd += HardwareMeldtBlokAlarm;
+        if (_hw is IVerbindingsBron stilteBron) stilteBron.StilteGewijzigd += HardwareMeldtStilte;
         try
         {
             bool uitbreiden = _status.Uitbreiden && _status.Kaart.StartMelder != 0;
@@ -318,6 +319,7 @@ public partial class BaanVerkenner
             _hw.BezetmeldingGewijzigd -= _monitor.Ontvang;
             _hw.KortsluitingStatusGewijzigd -= HardwareMeldtKortsluiting;
             if (_hw is IBlokAlarmBron alarmBron2) alarmBron2.BlokAlarmGewijzigd -= HardwareMeldtBlokAlarm;
+            if (_hw is IVerbindingsBron stilteBron2) stilteBron2.StilteGewijzigd -= HardwareMeldtStilte;
             MeldVoortgang();
         }
     }

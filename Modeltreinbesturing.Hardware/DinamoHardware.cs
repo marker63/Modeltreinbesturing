@@ -105,6 +105,8 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
     private long _stilteBegonTicks;
 
     /// <inheritdoc/>
+    public event Action<bool, double>? StilteGewijzigd;
+
     public double? SecondenSindsLaatsteOntvangst
     {
         get
@@ -123,6 +125,7 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
             _stilteGelogd = false;
             double s = (double)(nu - _stilteBegonTicks) / System.Diagnostics.Stopwatch.Frequency;
             HardwareCommunicatieLog.Log("Info", $"[Dinamo] Weer bericht van Dinamo ontvangen na {s:0.0} s stilte.");
+            try { StilteGewijzigd?.Invoke(false, s); } catch { /* een luisteraar mag de ontvangst nooit storen */ }
         }
     }
 
@@ -135,6 +138,7 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
         _stilteGelogd = true;
         _stilteBegonTicks = Interlocked.Read(ref _laatsteOntvangstTicks);
         HardwareCommunicatieLog.Log("Info", $"[Dinamo] GEEN bericht (ook geen keepalive) van Dinamo sinds {s:0.0} s terwijl wij wel blijven sturen: Dinamo reageert niet meer (vastgelopen of kabel los?).");
+        try { StilteGewijzigd?.Invoke(true, s.Value); } catch { /* idem */ }
     }
     // BUG #45: derde, hoogste voorrangs-wachtrij - ALLEEN voor Reset Fault en stopcommando's
     // (noodstop / stop bij verbinden of afsluiten). Wordt bij elke stuur-tik als EERSTE en

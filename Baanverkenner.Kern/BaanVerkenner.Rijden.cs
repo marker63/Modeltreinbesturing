@@ -107,6 +107,18 @@ public partial class BaanVerkenner
         if (kortsluiting && _klok.Nu >= _negeerKortsluitingTot) _kortsluitingGemeld = true;
     }
 
+    /// <summary>Marco 12:17: melden als Dinamo niet meer antwoordt (ook de keepalives blijven weg). Zonder antwoord ziet de verkenner geen
+    /// melders en geen kortsluiting meer en komen stopcommando's mogelijk niet aan; het staat dan meteen in het logboek van de verkenner.</summary>
+    internal volatile bool DinamoStil;
+    private void HardwareMeldtStilte(bool stil, double seconden)
+    {
+        DinamoStil = stil;
+        if (stil)
+            _log.Waarschuwing($"DINAMO ANTWOORDT NIET MEER: al {seconden:0.0} s geen enkel bericht, ook geen keepalive. Melders en kortsluitmeldingen komen nu niet meer binnen en stopcommando's komen mogelijk niet aan. Controleer de kabel en herstart zo nodig Dinamo.");
+        else
+            _log.Info($"Dinamo antwoordt weer (na {seconden:0.0} s stilte). Controleer de loc en de wisselstanden voordat de verkenning verdergaat.");
+    }
+
     private List<int> HuidigeAlarmBlokken()
     {
         lock (_alarmSlot) return _alarmBlokken.OrderBy(b => b).ToList();
