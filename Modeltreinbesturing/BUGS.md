@@ -1636,3 +1636,13 @@ vervolgen hetzelfde vragen. Is er niets bekend over de vervolgmelders, dan geldt
 Test: `StaartWisselTest` (3 nieuwe regels). Nog niet getest op de baan.
 Niet opgelost: kortsluiting in blok 3 na melder 14 vooruit (11:12:19, wissel 5 afbuigend, loc daarvoor door Marco neergezet) en 11:09:23 (wissel 4 afbuigend als proef,
 bedoelde bevinding). Eerste lijkt op het eerder 'tijdelijke' kortsluitpunt #2 (oplossing wissel 13 afbuigend, botst met #4); oorzaak nog onbekend.
+
+## #110 Wissel 9 omgezet terwijl de loc erop stond (log 11:51 en 11:37, Marco 12:03)
+Oorzaak: de partnerzoektocht (en sinds #108 de alarmherstel-proef) zette wissels om terwijl de loc op melder x stond, ook wissels die bij die melder liggen.
+11:51:56 en 11:52:09: wissel 9 (punt direct na melder 129) naar afbuigend en terug naar rechtdoor met de loc op 129; daarna kortsluiting en ontsporing.
+`WisselsOnderLoc` (BUG #80) kende alleen wissels met een kortsluiting-waarneming bij de melder, niet een gewone splitsing.
+Oplossing: `WisselsBijBezet` (elke wissel die de kaart bij een bezette melder noemt, als punt of als tak). De partnerzoektocht en `ProbeerAlarmWegTeKrijgen`
+slaan die wissels over en melden dat in het log. Gevolg: een partner die bij melder x ligt (bijv. wissel 5 bij 129) wordt niet meer automatisch bewezen; de verkenner
+vraagt dan zo nodig de gebruiker. Ritten die met de loc op de startmelder hun wissels zetten (de normale gang) zijn niet veranderd.
+Test: `StaartWisselTest` (2 regels). Nog niet getest op de baan.
+Open: of wissel 9 op 11:51:56 of op 11:52:09 de ontsporing veroorzaakte is uit het log niet af te leiden; beide gevallen zijn nu afgedekt.

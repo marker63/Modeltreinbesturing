@@ -865,6 +865,12 @@ public partial class BaanVerkenner
         var cA = o.Configuratie.Met(a);
         var kandidaten = PartnerVolgorde(_kaart, _ins.WisselAdressen(), a, x, o.Configuratie, _ins.MaxPartnerProeven);
         _log.Info($"Kortsluiting na melder {x} met adres {a} op afbuigend: dat wissel blijft afbuigend staan en de andere wissels worden één voor één meegeschakeld ({kandidaten.Count} adressen) om te zien of de kortsluiting verdwijnt (overloopwissels).");
+        // BUG #109 (Marco 12:03): de partnerproef zette wissel 9 om terwijl de loc op melder 129 stond, waar die wissel ligt (hij heeft daar zijn
+        // punt) en ontspoorde. Wissels die de kaart bij melder x noemen worden niet meer als partner geprobeerd.
+        var bijX = WisselsBijBezet(_kaart, new[] { x });
+        if (kandidaten.Any(bijX.Contains))
+            _log.Info($"Niet als partner geprobeerd: wissel {string.Join(", ", kandidaten.Where(bijX.Contains).OrderBy(k => k))} (ligt bij melder {x} waar de loc staat; omzetten met de loc erop laat hem ontsporen).");
+        kandidaten = kandidaten.Where(k => !bijX.Contains(k)).ToList();
         foreach (var b in kandidaten)
         {
             await PauzeMoment();

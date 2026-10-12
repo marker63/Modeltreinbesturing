@@ -374,6 +374,11 @@ public static class Tests
         Eis(T(BaanVerkenner.StaartWissels(k2, 24, Richting.Achteruit, a => false)) == "5R", "vooruitkijken: op 24 achteruit met wissel 10 rechtdoor gaat de loc naar 14 -> wissel 5 rechtdoor (nu " + T(BaanVerkenner.StaartWissels(k2, 24, Richting.Achteruit, a => false)) + ")");
         Eis(T(BaanVerkenner.StaartWissels(k2, 129, Richting.Achteruit, a => false)) == "5A", "vooruitkijken: op 129 achteruit -> wissel 5 afbuigend");
 
+        // BUG #110: wissels bij een bezette melder worden niet voor een proef omgezet (wissel 9 ligt bij melder 129)
+        var bij129 = BaanVerkenner.WisselsBijBezet(k, new[] { 129 });
+        Eis(bij129.Contains(9) && bij129.Contains(5) && !bij129.Contains(14), "bij bezette melder 129: wissel 9 (punt na 129) en 5 (tak 129) vallen af, wissel 14 niet (nu " + string.Join(",", bij129.OrderBy(x => x)) + ")");
+        Eis(BaanVerkenner.WisselsBijBezet(k, new[] { 99 }).Count == 0, "bij bezette melder: een onbekende melder geeft geen wissels");
+
         // simulatie: 4 -> 129 -> (wissel 5 van achteren, tak 'afbuigend') -> 14
         (Baanverkenner.Kern.Simulatie.SimulatieBaan, Baanverkenner.Kern.Simulatie.SimulatieBaan.Wissel, BaanVerkenner, VerkenLog, VirtueleKlok, System.Reflection.MethodInfo) Wereld()
         {

@@ -701,6 +701,17 @@ public partial class BaanVerkenner
     }
     private const int AlarmWachtPogingen = 10;
 
+    /// <summary>BUG #109: adressen van wissels die de kaart bij een van de bezette melders noemt (als melder voor het punt, of als tak erna). De loc
+    /// staat er mogelijk met een deel op of tegen de tong aan: zulke wissels worden niet voor een proef omgezet.</summary>
+    internal static HashSet<int> WisselsBijBezet(Baankaart kaart, IEnumerable<int> bezet)
+    {
+        var b = bezet.ToHashSet();
+        return kaart.Wissels.Where(w => w.Waarnemingen.Any(o => b.Contains(o.NaMelder)
+                                                              || (o.VolgendeBijRechtdoor is int r && b.Contains(r))
+                                                              || (o.VolgendeBijAfbuigend is int a && b.Contains(a))))
+                            .Select(w => w.Adres).ToHashSet();
+    }
+
     /// <summary>BUG #108 (log 09:29): na de lus (melder 129 opnieuw bereikt) meldde Dinamo kortsluiting in blok 9 terwijl de loc stilstond. De
     /// verkenner gaf op ("zet geen wissels om") en de gebruiker moest zelf wissel 6 omzetten, waarna de kortsluiting weg was. Een kortsluiting
     /// bij een stilstaande loc betekent dat er stroom weg is en dat een wissel verkeerd staat; de verkenner schakelt nu zelf één voor één
@@ -709,11 +720,13 @@ public partial class BaanVerkenner
     private async Task<bool> ProbeerAlarmWegTeKrijgen(string stap)
     {
         var bezet = _monitor.Bezet.ToHashSet();
-        var alle = _ins.WisselAdressen().Where(a => a != KruiswisselReferentie.Motor13 && a != KruiswisselReferentie.Motor10).ToList();
-        var dichtbij = alle.Where(a => _kaart.Wissels.Any(w => w.Adres == a && w.Waarnemingen.Any(o =>
-            bezet.Contains(o.NaMelder) || (o.VolgendeBijRechtdoor is int x && bezet.Contains(x)) || (o.VolgendeBijAfbuigend is int y && bezet.Contains(y))))).ToList();
-        var volgorde = dichtbij.Concat(alle.Except(dichtbij)).ToList();
-        _log.Waarschuwing($"Kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())} blijft terwijl de loc stilstaat ({stap}). De verkenner probeert zelf wissels om te zetten (eerst bij melder {string.Join(" en ", bezet.OrderBy(m => m))}).");
+        // BUG #109 (Marco 12:03: "wissel 9 werd geschakeld terwijl de loc er bovenop stond"): wissels die bij een bezette melder liggen (de kaart
+        // noemt die melder bij die wissel) worden nooit geprobeerd: de loc staat er met een deel op of tegen de tong aan.
+        var bijLoc = WisselsBijBezet(_kaart, bezet);
+        var alle = _ins.WisselAdressen().Where(a => a != KruiswisselReferentie.Motor13 && a != KruiswisselReferentie.Motor10 && !bijLoc.Contains(a)).ToList();
+        var volgorde = alle;
+        if (bijLoc.Count > 0) _log.Info($"Niet geprobeerd: wissel {string.Join(", ", bijLoc.OrderBy(a => a))} (ligt bij een bezette melder, de loc staat er mogelijk op).");
+        _log.Waarschuwing($"Kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())} blijft terwijl de loc stilstaat ({stap}). De verkenner probeert zelf wissels om te zetten, behalve die bij een bezette melder ({string.Join(" en ", bezet.OrderBy(m => m))}).");
         foreach (var a in volgorde)
         {
             bool oud = _wisselStand.TryGetValue(a, out var nu) && nu;
