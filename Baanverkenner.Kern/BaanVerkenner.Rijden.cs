@@ -336,7 +336,15 @@ public partial class BaanVerkenner
         var bezetNu = _monitor.Bezet;
         if (bezetNu.Count > 0 && _kaart.Wissels.Any(w => w.Adres == adres && w.Waarnemingen.Any(o => bezetNu.Contains(o.NaMelder))))
             await Wacht(TimeSpan.FromMilliseconds(ExtraWisselWachtMs));
+        // BUG #123 (log 14-10 08:52:55 en 08:53:15): wissel 14 staat in de kaart bij melder 8, maar twee keer kwam er kortsluiting 2 s na het omzetten
+        // van 14 terwijl de loc op melder 13 stond en 0,5-1,5 s later wegreed. De kaart kent niet altijd welke wissel bij welke melder ligt; staat de loc
+        // ergens op een melder, dan krijgt de tong daarom altijd een korte extra wachttijd, ook als de kaart de wissel niet bij die melder noemt.
+        else if (bezetNu.Count > 0)
+            await Wacht(TimeSpan.FromMilliseconds(ExtraWisselWachtOnbekendMs));
     }
+
+    /// <summary>BUG #123: extra wachttijd na het omzetten van een wissel terwijl de loc op een melder staat, als de kaart de wissel niet bij die melder noemt.</summary>
+    private const int ExtraWisselWachtOnbekendMs = 1500;
 
     /// <summary>BUG #93: extra wachttijd na het omzetten van een wissel die vlak achter de melder ligt waarop de loc staat.</summary>
     private const int ExtraWisselWachtMs = 2000;

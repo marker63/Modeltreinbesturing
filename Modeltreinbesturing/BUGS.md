@@ -1789,3 +1789,17 @@ Tests: `StartmelderVoorafTest` (5 regels: vooraf zetten, wissel bij loc blijft s
 Nog niet getest op de baan; het WPF-project is niet gecompileerd.
 Open: (a) oude 'oplossingen' kortsluitpunt #4 (24 vooruit, 13 rechtdoor) en #5 (5 achteruit, 2 rechtdoor) zijn in de kaart nog aanwezig en worden niet ingetrokken;
 (b) staat de loc bij de start al op de startmelder (geen aanloop), dan kunnen opdrachtwissels nog onder de loc omgezet worden; (c) wissel 6 van 17:24 is nog niet te verklaren.
+
+## #123 Controle 14-10 (08:07-09:00) nagekeken: twee kortsluitingen na wisselschakeling op melder 13 (Marco 09:05)
+Resultaat van de controleronde met de #122-build: geen valse vondsten meer (wissel 2 en 13 worden opnieuw bevestigd, 6/7/8/9 niet meer als splitsing na 24); opdracht #3
+(24 vooruit, 13 afbuigend + 14) en #4 (5 achteruit, 2 afbuigend + 1) liepen uiteindelijk goed; kortsluitpunten 12 en 5 (achteruit) kwamen niet meer voor; de kruiswissel
+kreeg motor 13 vóór het inrijden (geen blijvende kortsluiting in blok 8 meer, zoals op 12-10 18:07-18:13).
+Open: 08:52:55 (opdracht #3) en 08:53:15 (opdracht #4): kortsluiting 2 s na het omzetten van wissel 14 terwijl de loc op melder 13 stond en 0,5-1,5 s later wegreed. Wissel 14 staat
+in de kaart alleen bij melder 8 (het #93-mechanisme gaf dus geen extra wachttijd). Dezelfde commando's om 08:53:36 gaven geen kortsluiting. Fix: na elk wisselcommando terwijl de loc
+op een melder staat wacht de verkenner altijd extra (1,5 s als de kaart de wissel niet bij die melder noemt; 2 s als dat wel zo is: `ExtraWisselWachtOnbekendMs`).
+Niet te testen zonder baan. Nog niet getest op de baan; het WPF-project is niet gecompileerd. De oorzaak is een hypothese (tong nog onderweg); komt het terug, dan graag noteren waar wissel 14 fysiek ligt.
+Uitleg 'Adressen zonder gevonden effect' (nu 1,3,...,14): geen fout, in een controle zijn alleen wissel 2 en 13 opnieuw gevonden; de rest telt dan als 'geen effect'.
+Open: de 18 overgangen in het gebied 129/blok 1-4 en de wissels 5, 6, 9, 10, 14 worden door een controle niet opnieuw gereden, omdat de controle alleen opnieuw ontdekt wat ze
+via 'start vooruit/achteruit' tegenkomt. Oplossing vraagt een routeplanner uit de kaart voor opdrachten vanuit de kaart; nog niet gebouwd (wacht op akkoord van Marco).
+Opmerking opdracht #4: de wissels 1 en 2 worden hier nog NIET vooraf gezet (wissel 2 hangt in de kaart ook aan melder 13, wissel 1 is niet aan een melder gekoppeld); ze werden om 08:57:29
+op melder 5 omgezet en dat ging nu goed dankzij de wachttijd.
