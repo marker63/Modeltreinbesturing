@@ -826,7 +826,7 @@ public partial class BaanVerkenner
         // BUG #109 (Marco 12:03: "wissel 9 werd geschakeld terwijl de loc er bovenop stond"): wissels die bij een bezette melder liggen (de kaart
         // noemt die melder bij die wissel) worden nooit geprobeerd: de loc staat er met een deel op of tegen de tong aan.
         var bijLoc = WisselsBijBezet(_kaart, bezet);
-        var alle = _ins.WisselAdressen().Where(a => a != KruiswisselReferentie.Motor13 && a != KruiswisselReferentie.Motor10 && !bijLoc.Contains(a)).ToList();
+        var alle = _ins.WisselAdressen().Where(a => !Kruis.IsMotor(a) && !bijLoc.Contains(a)).ToList();
         var volgorde = alle;
         if (bijLoc.Count > 0) _log.Info($"Niet geprobeerd: wissel {string.Join(", ", bijLoc.OrderBy(a => a))} (ligt bij een bezette melder, de loc staat er mogelijk op).");
         _log.Waarschuwing($"Kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())} blijft terwijl de loc stilstaat ({stap}). De verkenner probeert zelf wissels om te zetten, behalve die bij een bezette melder ({string.Join(" en ", bezet.OrderBy(m => m))}).");
@@ -1491,7 +1491,7 @@ public partial class BaanVerkenner
         foreach (var (adres, afb) in StaartWissels(_kaart, melder, r, a => _wisselStand.TryGetValue(a, out var st) ? st : cfg.Bevat(a)))
         {
             if (doel.ProefAdres == adres) continue;
-            if (adres == KruiswisselReferentie.Motor13 || adres == KruiswisselReferentie.Motor10) continue;
+            if (Kruis.IsMotor(adres)) continue;
             if (!_ins.WisselAdressen().Contains(adres)) continue;
             if (doel.Configuratie.Bevat(adres) && !afb) continue;
             if (_wisselStand.TryGetValue(adres, out var nu) && nu == afb) { cfg = cfg.MetStand(adres, afb); continue; }
@@ -1513,7 +1513,7 @@ public partial class BaanVerkenner
     private async Task<bool> HerstelBekendeWisselstand(RitResultaat res)
     {
         var eisen = EisenLaatsteStap(_kaart, res.Reeks, res.Richting)
-            .Where(e => e.Adres != _ritDoel?.ProefAdres && e.Adres != KruiswisselReferentie.Motor13 && e.Adres != KruiswisselReferentie.Motor10
+            .Where(e => e.Adres != _ritDoel?.ProefAdres && !Kruis.IsMotor(e.Adres)
                         && _ins.WisselAdressen().Contains(e.Adres))
             .Where(e => !(_wisselStand.TryGetValue(e.Adres, out var nu) && nu == e.Afbuigend)).ToList();
         if (eisen.Count == 0) return false;

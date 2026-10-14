@@ -792,7 +792,7 @@ public static class Tests
         if (Environment.GetEnvironmentVariable("KRUIS_SVG") is { Length: > 0 } svgPad) File.WriteAllText(svgPad, svg);
         try { System.Xml.Linq.XDocument.Parse(svg); Eis(true, "kruis: SVG is geldige XML"); } catch (Exception ex) { Eis(false, "kruis: SVG is geldige XML: " + ex.Message); }
         Eis(new[] { "129", "14", "21", "8", "24" }.All(m => svg.Contains(">" + m + "<")), "kruis: alle benen staan in de tekening");
-        var k = Laad("baankaart_2026-10-11_1103.json");
+        var k = Laad("baankaart_2026-10-11_1103.json"); k.KruisReferentie = true; k.KruisMotoren = "10+13"; k.KruisMidden = new List<int> { 24 };
         // BUG #89: een lege baankaart (nieuwe verkenning) toont het kruis blanco; een gevonden melder verschijnt zodra hij gevonden is
         var leeg = new Baankaart();
         var svgLeeg = KruiswisselReferentie.AlsSvg(leeg);
@@ -985,6 +985,50 @@ public static class Tests
         ontvangen.Clear();
         hw.HerhaalBekendeMelderStanden();
         Eis(ontvangen.Count == 0, "opstartstand: een latere wijziging (13 vrij) wint van de opstartstand");
+    }
+
+    // BUG #129 (Marco 11:10): Engelse wissels worden bij de start opgegeven; de vaste referentie hoort alleen bij voorkennis
+    static void KruisKennisTest()
+    {
+        var a = KruisKennis.Parse("13+10");
+        Eis(a.IsMotor(13) && a.IsMotor(10) && !a.IsMotor(5) && a.Middens.Count == 0 && !a.MetReferentie, "kruiskennis (#129): '13+10' -> motoren 13 en 10, melder onbekend, geen referentie");
+        var b = KruisKennis.Parse("13+10@24, 3+4");
+        Eis(b.Motoren.SetEquals(new[] { 13, 10, 3, 4 }) && b.Middens.SetEquals(new[] { 24 }), "kruiskennis (#129): twee Engelse wissels en een opgegeven melder");
+        Eis(KruisKennis.Parse("").Motoren.Count == 0 && KruisKennis.Parse(null).Motoren.Count == 0 && KruisKennis.Parse("abc").Motoren.Count == 0, "kruiskennis (#129): leeg of onzin -> geen Engelse wissels");
+        Eis(!KruisKennis.Parse("13+10").OpKruis(new[] { 24 }), "kruiskennis (#129): zonder bekende melder nooit 'op de kruiswissel'");
+        Eis(KruisKennis.Parse("13+10@24").OpKruis(new[] { 24, 14 }) && !KruisKennis.Parse("13+10@24").OpKruis(new[] { 14 }), "kruiskennis (#129): opgegeven melder 24 herkend");
+
+        // kortsluiting met een kruismotor: zonder bekende melder telt elke zo'n kortsluiting (melder wordt ontdekt), met bekende melder alleen die melder
+        RitResultaat Rit(RitEinde e, params int[] reeks) { var r = new RitResultaat { Einde = e }; r.Reeks.AddRange(reeks); return r; }
+        Eis(BaanVerkenner.IsKruiswisselMotorKortsluiting(13, Rit(RitEinde.Kortsluiting, 14, 24), KruisKennis.Parse("13+10")), "kruiskennis (#129): onbekende melder -> kortsluiting met motor 13 telt als kruiswissel");
+        Eis(!BaanVerkenner.IsKruiswisselMotorKortsluiting(5, Rit(RitEinde.Kortsluiting, 14, 24), KruisKennis.Parse("13+10")), "kruiskennis (#129): gewone wissel 5 is geen kruismotor");
+        Eis(!BaanVerkenner.IsKruiswisselMotorKortsluiting(13, Rit(RitEinde.Kortsluiting, 14, 16), KruisKennis.Parse("13+10@24")), "kruiskennis (#129): bekende melder 24, kortsluiting elders telt niet");
+
+        // opstarten: wat is er actief?
+        (BaanVerkenner V, VerkenLog Log) Start(string motoren, bool? voorkennis)
+        {
+            var sim = new Baankaart(); _ = sim;
+            var simHw = new Baanverkenner.Kern.Simulatie.SimulatieBaan { LocAdres = 5408 };
+            var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 2, KruisMotoren = motoren };
+            var klok = new VirtueleKlok(); var log = new VerkenLog(klok);
+            var p = new LeerProfiel(); p.KortsluitOplossingen.Add(new KortsluitOplossing { NaMelder = 12, Richting = Richting.Achteruit, Stand = "2", Start = 13, Adres = 3, Afbuigend = true, Bron = "test" });
+            var v = new BaanVerkenner(simHw, ins, klok, log, (_, _) => Task.FromResult(true), new VerkenStatus { Instellingen = ins }) { Leerprofiel = p };
+            if (voorkennis is bool vk) v.VraagJaNee = (_, _) => Task.FromResult<bool?>(vk);
+            using var cts = new CancellationTokenSource(); cts.CancelAfter(50);
+            try { v.VoerUit(cts.Token).GetAwaiter().GetResult(); } catch { }
+            return (v, log);
+        }
+        var leeg = Start("", false);
+        Eis(leeg.V.Kruis.Motoren.Count == 0 && !leeg.V.Kruis.MetReferentie && leeg.V.Kaart.KruisMotoren == "" && !leeg.V.Kaart.KruisReferentie, "kruiskennis (#129): zonder opgave en zonder voorkennis -> geen kruiswissel-regels");
+        var eigen = Start("13+10", false);
+        Eis(eigen.V.Kruis.IsMotor(13) && eigen.V.Kruis.IsMotor(10) && eigen.V.Kruis.Middens.Count == 0 && !eigen.V.Kruis.MetReferentie && eigen.V.Kaart.KruisMotoren == "10+13", "kruiskennis (#129): opgegeven motoren, geen referentie, melder onbekend (nu " + eigen.V.Kaart.KruisMotoren + ")");
+        Eis(eigen.Log.AlsTekst().Contains("Alles wordt vanaf nul ontdekt"), "kruiskennis (#129): logboek meldt dat alles vanaf nul ontdekt wordt");
+        var metVoor = Start("", true);
+        Eis(metVoor.V.Kruis.MetReferentie && metVoor.V.Kruis.IsMotor(13) && metVoor.V.Kruis.Middens.Contains(24) && metVoor.V.Kaart.KruisReferentie, "kruiskennis (#129): voorkennis Ja -> vaste referentie (melder 24, motor 13 en 10) actief");
+
+        // rapport: zonder referentie geen 'bewezen'-rijen
+        var k = new Baankaart { KruisMotoren = "10+13" };
+        Eis(!Rapport.AlsHtml(k).Contains("Kruiswissel in melder 24") && Rapport.AlsHtml(k).Contains("Engelse wissel") && !Rapport.AlsTekst(k).Contains("REFERENTIE"), "kruiskennis (#129): rapport zonder referentie toont alleen de opgegeven Engelse wissel");
     }
 
     // BUG #128: voorkennis uit eerdere verkenningen alleen na bevestiging (Marco 10:48: alles vanaf nul leren)
@@ -1501,7 +1545,7 @@ public static class Tests
     // Blokkenschema-tekening (SVG) uit de baankaart van 17:07
     static void BlokkenschemaTest()
     {
-        var k = Laad("baankaart_lijn_5-30_voltooid_kruiswissel24_2026-10-10_1707.json");
+        var k = Laad("baankaart_lijn_5-30_voltooid_kruiswissel24_2026-10-10_1707.json"); k.KruisReferentie = true; k.KruisMotoren = "10+13"; k.KruisMidden = new List<int> { 24 };
         var t = SchemaTekening.Maak(k);
         Eis(t.Vakken.Count == 7, "blokkenschema: 7 vakken (nu " + t.Vakken.Count + ")");
         Eis(t.Verbindingen.Count >= 7, "blokkenschema: minstens 7 verbindingen (nu " + t.Verbindingen.Count + ")");
@@ -1666,6 +1710,7 @@ public static class Tests
         OpstartStandTest();
         MelderGeheugenWisTest();
         VoorkennisVraagTest();
+        KruisKennisTest();
         HerpogingVolgordeTest();
         RouteVerkortTest();
         KruisAankomstTest();

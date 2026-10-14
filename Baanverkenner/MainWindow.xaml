@@ -102,13 +102,16 @@
                             <RowDefinition/>
                             <RowDefinition/>
                             <RowDefinition/>
+                            <RowDefinition/>
                         </Grid.RowDefinitions>
                         <TextBlock Style="{StaticResource Label}" Text="Blokken"/>
                         <TextBox x:Name="DinamoBlokkenBox" Grid.Column="1" ToolTip="Bijv. 1-16 of 1-8,12,20-24"/>
                         <TextBlock Grid.Row="1" Style="{StaticResource Label}" Text="Hoogste meldernummer"/>
                         <TextBox x:Name="HoogsteMelderBox" Grid.Row="1" Grid.Column="1"/>
-                        <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Style="{StaticResource Uitleg}"
-                                   Text="Bij Dinamo gaat een rijcommando via een blok. De verkenner zoekt per sectie zelf uit welk blok de loc van rijstroom voorziet door de blokken één voor één te proberen."/>
+                        <TextBlock Grid.Row="2" Style="{StaticResource Label}" Text="Engelse wissels"/>
+                        <TextBox x:Name="KruisMotorenBox" Grid.Row="2" Grid.Column="1" ToolTip="Per Engelse wissel de motoren, bijv. 13+10 (één Engelse wissel met motor 13 en 10) of 13+10, 3+4 voor twee. Leeg = geen. Optioneel met de melder van de kruiswissel: 13+10@24."/>
+                        <TextBlock Grid.Row="3" Grid.ColumnSpan="2" Style="{StaticResource Uitleg}"
+                                   Text="Engelse wissels: geef per Engelse wissel de motoren op, bijv. 13+10 (de twee motoren van één Engelse wissel), meerdere gescheiden door een komma. Leeg = geen. De melder van de kruiswissel wordt zelf ontdekt, of geef hem op als 13+10@24.&#x0a;Bij Dinamo gaat een rijcommando via een blok. De verkenner zoekt per sectie zelf uit welk blok de loc van rijstroom voorziet door de blokken één voor één te proberen."/>
                     </Grid>
                 </GroupBox>
 

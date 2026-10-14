@@ -140,6 +140,7 @@ public partial class MainWindow : Window
         WisselPauzeBox.Text = i.WisselPauzeMs.ToString();
         DinamoBlokkenBox.Text = i.DinamoBlokken;
         HoogsteMelderBox.Text = i.HoogsteMelder.ToString();
+        KruisMotorenBox.Text = i.KruisMotoren ?? "";
         MaxSecBox.Text = i.MaxSecondenTussenMelders.ToString();
         SlimmeTimeoutCheck.IsChecked = i.SlimmeTimeout;
         MinSecBox.Text = i.MinSecondenTussenMelders.ToString();
@@ -182,6 +183,7 @@ public partial class MainWindow : Window
             WisselPauzeMs = Geheel(WisselPauzeBox, "Pauze na wisselcommando", 50, 10000),
             DinamoBlokken = DinamoBlokkenBox.Text.Trim(),
             HoogsteMelder = Geheel(HoogsteMelderBox, "Hoogste meldernummer", 1, 2048),
+            KruisMotoren = KruisMotorenBox.Text.Trim(),
             MaxSecondenTussenMelders = Geheel(MaxSecBox, "Max. seconden tussen melders", 5, 600),
             SlimmeTimeout = SlimmeTimeoutCheck.IsChecked == true,
             MinSecondenTussenMelders = Geheel(MinSecBox, "Min. seconden tussen melders", 2, 600),

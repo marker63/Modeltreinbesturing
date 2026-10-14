@@ -224,7 +224,8 @@ ul{margin:6px 0 0 18px;padding:0}
             sb.Append("</table>");
         }
 
-        sb.Append(KruiswisselReferentie.AlsHtml(k));
+        if (k.KruisReferentie) sb.Append(KruiswisselReferentie.AlsHtml(k));
+        else if (k.KruisMotoren != "") sb.Append("<h2>Engelse wissel</h2><p>Motor " + E(k.KruisMotoren) + " (opgegeven door de gebruiker); kruiswissel in melder " + (k.KruisMidden.Count > 0 ? string.Join(", ", k.KruisMidden) : "nog niet ontdekt") + ". Alles is in deze verkenning zelf gevonden; er is geen referentie uit eerdere verkenningen gebruikt.</p>");
         sb.Append("<h2>Blokkenschema</h2><p class=\"uitleg\">Automatisch getekend: de blokken staan in de volgorde waarin de testloc ze bereed. Een pijl betekent dat er in die richting gereden is; bij elke verbinding staan de melders, de rijrichting van de testloc en de wissel. Oranje = een melder met twee mogelijke vervolgen (bijv. de kruiswissel), stippellijn = Dinamo-blok onbekend.</p>");
         try { sb.Append("<div class=\"kaart\" style=\"overflow:auto\">" + SchemaTekening.Maak(k).AlsSvg() + "</div>"); }
         catch (Exception ex) { sb.Append("<p class=\"let\">Het blokkenschema kon niet getekend worden: " + E(ex.Message) + "</p>"); }
@@ -335,8 +336,13 @@ ul{margin:6px 0 0 18px;padding:0}
                     sb.AppendLine($"  melder {d.Melder} ({d.Richting.Tekst()}): vanaf {d.Via} → {d.Volgende}   [{string.Join(" / ", d.Configuraties.Select(c => Configuratie.VanSleutel(c).ToString()))}]  {d.AantalKeer}x");
         }
 
-        Kop("KRUISWISSEL MELDER 24 (REFERENTIE)");
-        sb.Append(KruiswisselReferentie.AlsTekst(k));
+        if (k.KruisReferentie) { Kop("KRUISWISSEL MELDER 24 (REFERENTIE)"); sb.Append(KruiswisselReferentie.AlsTekst(k)); }
+        else if (k.KruisMotoren != "")
+        {
+            Kop("ENGELSE WISSEL");
+            sb.AppendLine($"  Motor {k.KruisMotoren} (opgegeven door de gebruiker); kruiswissel in melder " + (k.KruisMidden.Count > 0 ? string.Join(", ", k.KruisMidden) : "nog niet ontdekt") + ".");
+            sb.AppendLine("  Alles is in deze verkenning zelf gevonden; er is geen referentie uit eerdere verkenningen gebruikt.");
+        }
 
         Kop("WISSELSTRATEN (VOORSTEL, NOG NIET GETEST OP DE BAAN)");
         var stratenT = WisselstraatVoorstel.Bereken(k);

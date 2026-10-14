@@ -7,6 +7,8 @@ public class VerkenInstellingen
     // ---- De testloc ----
     /// <summary>Decoderadres van de loc waarmee getest wordt.</summary>
     public int LocAdres { get; set; } = 3;
+    /// <summary>BUG #129: Engelse wissels (kruiswissels) van deze baan: motoren per wissel, bijv. "13+10" of "13+10, 3+4"; optioneel met melder "13+10@24". Leeg = geen.</summary>
+    public string KruisMotoren { get; set; } = "";
     /// <summary>Aantal snelheidsstappen van de decoder (14/28/126) - bepaalt bij Dinamo
     /// welk snelheidscommando gestuurd wordt.</summary>
     public int LocStappen { get; set; } = 28;

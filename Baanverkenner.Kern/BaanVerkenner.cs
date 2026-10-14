@@ -70,7 +70,8 @@ public class VerkenStatus
             StartMelder = o.StartMelder, WisselAdresVan = o.WisselAdresVan, WisselAdresTot = o.WisselAdresTot,
             EerdereStartMelders = o.EerdereStartMelders.ToList(),
             Melders = o.Melders.Select(m => new MelderInfo { Nummer = m.Nummer, DinamoBlok = m.DinamoBlok }).ToList(),
-            Wissels = Kloon(o.Wissels), Doorgangen = Kloon(o.Doorgangen), BekendeKortsluitOplossingen = Kloon(o.BekendeKortsluitOplossingen)
+            Wissels = Kloon(o.Wissels), Doorgangen = Kloon(o.Doorgangen), BekendeKortsluitOplossingen = Kloon(o.BekendeKortsluitOplossingen),
+            KruisMotoren = o.KruisMotoren, KruisMidden = o.KruisMidden.ToList(), KruisReferentie = o.KruisReferentie
         };
         ControleKaart = k;
         ControleWisselSeed = k.Wissels.ToDictionary(w => w.Adres, w => w.Waarnemingen.Count);
@@ -152,6 +153,8 @@ public partial class BaanVerkenner
     public LeerProfiel? Leerprofiel { get; set; }
     /// <summary>BUG #128: voorkennis uit eerdere verkenningen wordt alleen gebruikt als de gebruiker dat bij de start bevestigt (standaard: alles vanaf nul).</summary>
     private bool _voorkennis;
+    /// <summary>BUG #129: Engelse wissels van deze verkenning (door de gebruiker opgegeven of ontdekt).</summary>
+    internal KruisKennis Kruis { get; set; } = new();
     private LeerProfiel? Voorkennis => _voorkennis ? Leerprofiel : null;
     /// <summary>BUG #84: referentie uit een Koploper-export (blok per melder, wisselstraatblokken 8/9). Alleen een hulpmiddel voor de blokproef.</summary>
     public KoploperReferentie? Referentie { get; set; }
@@ -242,11 +245,12 @@ public partial class BaanVerkenner
             _voorkennis = false;
             if (!hervat && Leerprofiel is { } lp0 && (lp0.AantalMetingen > 0 || lp0.KortsluitOplossingen.Count > 0 || lp0.BlokHints.Count > 0))
             {
-                var vraag = $"Er zijn gegevens uit eerdere verkenningen bewaard: {lp0.Overgangen.Count} overgangen (reistijden), {lp0.KortsluitOplossingen.Count} kortsluitoplossingen en {lp0.BlokHints.Count} blokhints.\n\nJa = deze gegevens gebruiken (sneller, maar fouten uit eerdere verkenningen kunnen daardoor verborgen blijven)\nNee = helemaal vanaf nul leren (aanbevolen om te controleren of fouten echt zijn opgelost)";
+                var vraag = $"Er zijn gegevens uit eerdere verkenningen bewaard: {lp0.Overgangen.Count} overgangen (reistijden), {lp0.KortsluitOplossingen.Count} kortsluitoplossingen en {lp0.BlokHints.Count} blokhints, plus de vaste kruiswissel-referentie (melder {KruiswisselReferentie.Midden}, motor {KruiswisselReferentie.Motor13} en {KruiswisselReferentie.Motor10}).\n\nJa = deze gegevens gebruiken (sneller, maar fouten uit eerdere verkenningen kunnen daardoor verborgen blijven)\nNee = helemaal vanaf nul leren (aanbevolen om te controleren of fouten echt zijn opgelost)";
                 bool? antw = VraagJaNee is null ? false : await VraagJaNee("Gegevens van eerdere verkenningen gebruiken?", vraag);
                 _voorkennis = antw == true;
                 _log.Info(_voorkennis ? "Gegevens uit eerdere verkenningen worden gebruikt (gekozen door de gebruiker)." : "Alles begint vanaf nul: er wordt niets overgenomen uit eerdere verkenningen. Deze verkenning leert wel voor later.");
             }
+            InitKruis(hervat);
             // BUG #87: bewezen kortsluitoplossingen uit eerdere verkenningen meenemen.
             if (Voorkennis is { } lpo)
             {
@@ -354,6 +358,48 @@ public partial class BaanVerkenner
     // =====================================================================
     // Start
     // =====================================================================
+
+    /// <summary>BUG #129: bepaalt de Engelse wissels van deze verkenning: bij hervatten die uit de kaart, anders wat de gebruiker opgaf. De vaste referentie
+    /// (melder 24, motor 13/10) telt alleen mee als de gebruiker koos voor gegevens uit eerdere verkenningen.</summary>
+    private void InitKruis(bool hervat)
+    {
+        if (hervat && (_kaart.KruisMotoren != "" || _kaart.KruisReferentie))
+        {
+            Kruis = KruisKennis.Parse(_kaart.KruisMotoren);
+            foreach (var m in _kaart.KruisMidden) Kruis.Middens.Add(m);
+            Kruis.MetReferentie = _kaart.KruisReferentie;
+        }
+        else
+        {
+            Kruis = KruisKennis.Parse(_ins.KruisMotoren);
+            if (_voorkennis)
+            {
+                var r = KruisKennis.Referentie();
+                foreach (var m in r.Motoren) Kruis.Motoren.Add(m);
+                foreach (var m in r.Middens) Kruis.Middens.Add(m);
+                Kruis.MetReferentie = true;
+            }
+        }
+        BewaarKruis();
+        _log.Info(Kruis.Motoren.Count == 0
+            ? "Engelse wissels: geen opgegeven; er worden geen kruiswissel-regels toegepast."
+            : $"Engelse wissels: motor {Kruis.MotorenTekst}" + (Kruis.Middens.Count > 0 ? $", kruiswissel in melder {Kruis.MiddenTekst}" : ", melder nog onbekend (wordt ontdekt)") + (Kruis.MetReferentie ? "; vaste referentie uit eerdere verkenningen actief." : ". Alles wordt vanaf nul ontdekt."));
+    }
+
+    private void BewaarKruis()
+    {
+        _kaart.KruisMotoren = Kruis.MotorenTekst;
+        _kaart.KruisMidden = Kruis.Middens.OrderBy(x => x).ToList();
+        _kaart.KruisReferentie = Kruis.MetReferentie;
+    }
+
+    /// <summary>BUG #129: een kruiswissel-melder die onderweg ontdekt wordt (kortsluiting bij omzetten van een kruismotor met de loc erop).</summary>
+    private void LeerKruisMidden(int melder)
+    {
+        if (melder <= 0 || !Kruis.Middens.Add(melder)) return;
+        BewaarKruis();
+        _log.Vondst($"Melder {melder} is (waarschijnlijk) de kruiswissel van motor {Kruis.MotorenTekst}: omzetten van die motoren met de loc erop geeft kortsluiting.");
+    }
 
     private async Task BepaalStart(bool hervat)
     {
@@ -602,7 +648,7 @@ public partial class BaanVerkenner
         return c;
     }
 
-    internal static List<int> VoorspeldPad(Baankaart k, int start, Richting r, Configuratie c)
+    internal static List<int> VoorspeldPad(Baankaart k, int start, Richting r, Configuratie c, bool metReferentie = true)
     {
         var pad = new List<int> { start };
         for (int i = 0; i < 8; i++)
@@ -610,7 +656,7 @@ public partial class BaanVerkenner
             int cur = pad[^1];
             var kand = k.BekendeVolgende(cur, r, c);
             if (kand.Count == 0) kand = k.BekendeVolgende(cur, r);
-            if (cur == KruiswisselReferentie.Midden && pad.Count >= 2)
+            if (metReferentie && cur == KruiswisselReferentie.Midden && pad.Count >= 2)
             {
                 bool PastRef(int x) => KruiswisselReferentie.Zoek(pad[^2], x) is { Bewezen: true } v
                     && (v.Afbuigend13 is not bool a13 || a13 == c.Bevat(KruiswisselReferentie.Motor13))
@@ -644,7 +690,7 @@ public partial class BaanVerkenner
         // BUG #98 (Marco 16:24: "weer vergeten hoe wissel 14 moest staan"): niet alleen de eerste stap, het hele voorspelbare vervolg (ook door
         // de kruiswissel: 14 -> 24 -> 8 met motor 13 afbuigend) telt mee. 24 -> 8 vraagt wissel 14 afbuigend; dat was bekend maar werd pas
         // toegepast na de kortsluiting in blok 4.
-        var pad = VoorspeldPad(_kaart, o.Start, o.Richting, c);
+        var pad = VoorspeldPad(_kaart, o.Start, o.Richting, c, Kruis.MetReferentie);
         if (pad.Count >= 2)
         {
             var extra = _kaart.MetWisselEisen(pad, o.Richting, c, out _);
@@ -660,7 +706,8 @@ public partial class BaanVerkenner
         // BUG #98 (Marco 16:27: "weer het kruiswissel"): rijdt de loc volgens het voorspelde pad de kruiswissel in vanaf een been waarvan ALLE bewezen
         // verbindingen dezelfde stand van motor 13 (of 10) vragen, dan staat die motor vóór het inrijden goed, ook als de uitgang nog niet bekend is
         // (8 -> 24: alleen 14 is bewezen en vraagt motor 13 afbuigend; zonder dat gaf 8 -> 24 kortsluiting in blok 8).
-        c = KruisIngangStand(pad, c, o.BronAdres, out var kruisUitleg);
+        string? kruisUitleg = null;
+        if (Kruis.MetReferentie) c = KruisIngangStand(pad, c, o.BronAdres, out kruisUitleg);
         if (kruisUitleg is not null) _log.Info($"Opdracht #{o.Id}: {kruisUitleg} Rijstand: {c}.");
         return c;
     }
@@ -681,14 +728,14 @@ public partial class BaanVerkenner
             // BUG #96 (Marco 16:01: "weer kortsluiting in het kruiswissel en motor 13 staat verkeerd"): motor 13 of 10 omzetten terwijl de loc op melder 24
             // staat geeft ALTIJD kortsluiting (log 15:40, 15:48, 14:40). Is dat hier nodig en kon het niet vooraf (#95), dan wordt de opdracht
             // overgeslagen en de loc terug gebracht, in plaats van weer een kortsluiting te veroorzaken.
-            if (_monitor.Bezet.Contains(KruiswisselReferentie.Midden))
+            if (Kruis.OpKruis(_monitor.Bezet))
             {
                 var huidig = new Configuratie(_wisselStand.Where(w => w.Value).Select(w => w.Key).ToArray());
-                var omTeZetten = new[] { KruiswisselReferentie.Motor13, KruiswisselReferentie.Motor10 }
+                var omTeZetten = Kruis.Motoren.OrderBy(x => x)
                     .Where(a => (_wisselStand.TryGetValue(a, out var nu) ? nu : false) != rijstand.Bevat(a)).ToList();
                 if (omTeZetten.Count > 0)
                 {
-                    var tekst = $"Opdracht vanaf melder {o.Start} {o.Richting.Tekst()} ({o.Configuratie}) is overgeslagen: motor {string.Join(" en ", omTeZetten)} zou omgezet moeten worden terwijl de loc op de kruiswissel (melder {KruiswisselReferentie.Midden}) staat, en dat geeft altijd kortsluiting. Vanaf deze ingangskant is de combinatie niet bewezen; niets omgezet.";
+                    var tekst = $"Opdracht vanaf melder {o.Start} {o.Richting.Tekst()} ({o.Configuratie}) is overgeslagen: motor {string.Join(" en ", omTeZetten)} zou omgezet moeten worden terwijl de loc op de kruiswissel (melder {Kruis.MiddenTekst}) staat, en dat geeft altijd kortsluiting. Vanaf deze ingangskant is de combinatie niet bewezen; niets omgezet.";
                     _log.Waarschuwing(tekst);
                     _kaart.Waarschuwingen.Add(tekst);
                     await TerugNaarHuis(o.Route, huidig);
@@ -787,9 +834,9 @@ public partial class BaanVerkenner
 
                 // BUG #121 (log 18:12:55): adres 10 werd getest met de loc op melder 24 (de opdracht begon daar): motor 13 of 10 omzetten terwijl de loc op de
                 // kruiswissel staat geeft ALTIJD kortsluiting (zie #96), en de kortsluiting bleef daarna staan. Die adressen worden vanaf melder 24 niet getest.
-                if ((a == KruiswisselReferentie.Motor13 || a == KruiswisselReferentie.Motor10) && _monitor.Bezet.Contains(KruiswisselReferentie.Midden))
+                if (Kruis.IsMotor(a) && Kruis.OpKruis(_monitor.Bezet))
                 {
-                    _log.Info($"Adres {a} wordt in opdracht #{o.Id} niet getest: de loc staat op de kruiswissel (melder {KruiswisselReferentie.Midden}) en motor {a} omzetten onder de loc geeft altijd kortsluiting.");
+                    _log.Info($"Adres {a} wordt in opdracht #{o.Id} niet getest: de loc staat op de kruiswissel (melder {Kruis.MiddenTekst}) en motor {a} omzetten onder de loc geeft altijd kortsluiting.");
                     continue;
                 }
                 // BUG #121 (log 18:11:57): na een terugweg kan de stand afwijken van de rijstand (motor 13 stond rechtdoor terwijl de opdracht hem afbuigend
@@ -803,7 +850,7 @@ public partial class BaanVerkenner
                 await ZetWissel(a, true);
                 // BUG #117 (Marco 16:12, log 15:58): wissel 2 afbuigend (rit achteruit vanaf 13) reed weer in de kortsluiting na melder 12 die de kaart al
                 // kent én waarvan de oplossing bekend is (wissel 1 afbuigend). De proefrit krijgt die oplossing nu mee, net als een gewone opdracht.
-                var proefCfg = ProefStandMetOplossing(_kaart, _ins.WisselAdressen(), o.Start, o.Richting, rijstand, a, out var proefExtra);
+                var proefCfg = ProefStandMetOplossing(_kaart, _ins.WisselAdressen(), o.Start, o.Richting, rijstand, a, out var proefExtra, Kruis);
                 foreach (var (ex, st) in proefExtra) await ZetWissel(ex, st);
                 if (proefExtra.Count > 0)
                     _log.Info($"Adres {a} afbuigend gaf eerder kortsluiting; de proef rijdt met de bekende oplossing: {string.Join(", ", proefExtra.Select(x => $"{x.Adres} {(x.Afbuigend ? "afbuigend" : "rechtdoor")}"))}.");
@@ -839,10 +886,11 @@ public partial class BaanVerkenner
                 // kruiswissel stond, gaf het op ("zet geen wissels om") en liet Marco de loc terugzetten, terwijl de kortsluiting pas weg was toen
                 // wissel 10 weer rechtdoor stond (14:39:13 -> opgeheven 14:39:15). Motor 13 en 10 zijn geen overloopwissels: hun stand per rit staat
                 // in de kruiswissel-referentie. Dus geen partnerzoektocht; direct terugzetten (hieronder) en de kortsluiting als bevinding vastleggen.
-                if (IsKruiswisselMotorKortsluiting(a, proef))
+                if (IsKruiswisselMotorKortsluiting(a, proef, Kruis))
                 {
-                    _log.Vondst($"Adres {a} afbuigend geeft kortsluiting zodra de loc op melder {KruiswisselReferentie.Midden} (kruiswissel) komt ({Lijst(proef.Reeks)}). " +
-                                "Motor 13 en 10 zijn geen overloopwissels: geen partnerzoektocht, wissel wordt meteen teruggezet.");
+                    LeerKruisMidden(proef.Reeks[^1]);
+                    _log.Vondst($"Adres {a} afbuigend geeft kortsluiting zodra de loc op melder {proef.Reeks[^1]} (kruiswissel) komt ({Lijst(proef.Reeks)}). " +
+                                "Een kruiswissel-motor is geen overloopwissel: geen partnerzoektocht, wissel wordt meteen teruggezet.");
                 }
                 else if (proef.Einde == RitEinde.Kortsluiting && !zelfdeKortsluiting && proef.Reeks.Count >= 1)
                     partner = await PartnerwisselZoeken(o, a, proef, rijstand);
@@ -907,8 +955,7 @@ public partial class BaanVerkenner
             bool wens = rijstand.Bevat(adres);
             bool nu = _wisselStand.TryGetValue(adres, out var st) && st;
             if (nu == wens) continue;
-            bool kruisMotor = adres == KruiswisselReferentie.Motor13 || adres == KruiswisselReferentie.Motor10;
-            if (kruisMotor && _monitor.Bezet.Contains(KruiswisselReferentie.Midden)) return false;
+            if (Kruis.IsMotor(adres) && Kruis.OpKruis(_monitor.Bezet)) return false;
             if (bijBezet.Contains(adres)) continue;   // ligt bij de melder waar de loc staat: niet onder de loc omzetten (de staartwissels regelt de rit zelf, #107)
             teDoen.Add((adres, wens));
         }
@@ -929,9 +976,13 @@ public partial class BaanVerkenner
 
     /// <summary>BUG #92: eindigde de proefrit met wissel <paramref name="adres"/> afbuigend in kortsluiting op melder 24 en is dat adres een van de
     /// twee kruiswisselmotoren (13 of 10)?</summary>
-    internal static bool IsKruiswisselMotorKortsluiting(int adres, RitResultaat proef)
-        => (adres == KruiswisselReferentie.Motor13 || adres == KruiswisselReferentie.Motor10)
-           && proef.Einde == RitEinde.Kortsluiting && proef.Reeks.Count >= 1 && proef.Reeks[^1] == KruiswisselReferentie.Midden;
+    internal static bool IsKruiswisselMotorKortsluiting(int adres, RitResultaat proef, KruisKennis? kruis = null)
+    {
+        kruis ??= KruisKennis.Referentie();
+        if (!kruis.IsMotor(adres) || proef.Einde != RitEinde.Kortsluiting || proef.Reeks.Count < 1) return false;
+        // BUG #129: is de kruiswissel-melder nog niet bekend (vanaf nul), dan telt elke kortsluiting van een kruismotor als zodanig: die melder wordt dan ontdekt
+        return kruis.Middens.Count == 0 || kruis.Middens.Contains(proef.Reeks[^1]);
+    }
 
     private static bool ProefWijktAf(List<int> basis, List<int> proef)
     {
@@ -1179,15 +1230,16 @@ public partial class BaanVerkenner
     /// kortsluiting opgelost met een extra wissel, dan krijgt de proefrit die wissel mee. Kruiswissel-motoren (13 en 10) blijven buiten beschouwing:
     /// hun stand staat vast in de referentie en ze worden nooit extra omgezet. <paramref name="extra"/> = de extra wissels met hun stand in de proef.</summary>
     internal static Configuratie ProefStandMetOplossing(Baankaart kaart, IEnumerable<int> adressen, int start, Richting r, Configuratie basis, int a,
-                                                        out List<(int Adres, bool Afbuigend)> extra)
+                                                        out List<(int Adres, bool Afbuigend)> extra, KruisKennis? kruis = null)
     {
+        kruis ??= KruisKennis.Referentie();
         extra = new List<(int, bool)>();
         var cA = basis.Met(a);
-        if (a == KruiswisselReferentie.Motor13 || a == KruiswisselReferentie.Motor10) return cA;
+        if (kruis.IsMotor(a)) return cA;
         var metOpl = kaart.MetBekendeOplossingenVoorStart(start, r, cA, out _);
         foreach (var x in adressen)
             if (x != a && metOpl.Bevat(x) != cA.Bevat(x)) extra.Add((x, metOpl.Bevat(x)));
-        if (extra.Any(e => e.Adres == KruiswisselReferentie.Motor13 || e.Adres == KruiswisselReferentie.Motor10))
+        if (extra.Any(e => kruis.IsMotor(e.Adres)))
         {
             extra.Clear();
             return cA;
@@ -1574,7 +1626,8 @@ public partial class BaanVerkenner
         if (wijz2.Count > 0)
             _log.Info($"Wisselstand voor het pad {string.Join("-", pad)} ({r.Tekst()}) aangepast om een bekende kortsluiting te vermijden: {string.Join("; ", wijz2)}. Nieuwe stand: {metOplossing}.");
         // BUG #85: de vaste kruiswissel-referentie (motor 13 en 10 bij een rit door melder 24) gaat voor alles wat uit kortsluitingen is afgeleid.
-        var metKruis = KruiswisselReferentie.PasToe(pad, metOplossing, out var wijz3);
+        var wijz3 = new List<string>();
+        var metKruis = Kruis.MetReferentie ? KruiswisselReferentie.PasToe(pad, metOplossing, out wijz3) : metOplossing;
         if (wijz3.Count > 0)
             _log.Info($"Wisselstand voor het pad {string.Join("-", pad)} ({r.Tekst()}) aangepast aan de kruiswissel-referentie: {string.Join("; ", wijz3)}. Nieuwe stand: {metKruis}.");
         return metKruis;
@@ -1622,11 +1675,14 @@ public partial class BaanVerkenner
             var cfg = MetEisen(e.Pad, e.Richting, KiesBijIngang(e.Van, e.Richting, e.Pad, e.Configuratie));
             if (doel is not null && i == route.Count - 1)
             {
-                cfg = KruisAankomstStand(e, cfg, doel, out var uitleg);
-                if (uitleg is not null) _log.Info(uitleg);
-                cfg = KruisVoorafStand(e, cfg, doel, out var uitleg2);   // BUG #119
-                if (uitleg2 is not null) _log.Info(uitleg2);
-                cfg = StartmelderWisselsVooraf(_kaart, e, cfg, doel, out var uitleg4);   // BUG #122
+                if (Kruis.MetReferentie)
+                {
+                    cfg = KruisAankomstStand(e, cfg, doel, out var uitleg);
+                    if (uitleg is not null) _log.Info(uitleg);
+                    cfg = KruisVoorafStand(e, cfg, doel, out var uitleg2);   // BUG #119
+                    if (uitleg2 is not null) _log.Info(uitleg2);
+                }
+                cfg = StartmelderWisselsVooraf(_kaart, e, cfg, doel, out var uitleg4, Kruis);   // BUG #122
                 if (uitleg4 is not null) _log.Info(uitleg4);
             }
             else if (i < route.Count - 1)
@@ -1635,8 +1691,11 @@ public partial class BaanVerkenner
                 // melder 14 stond. De standen van de kruiswissel voor de volgende etappe worden daarom al in deze etappe gezet.
                 var volg = route[i + 1];
                 var cVolg = _kaart.MetWisselEisen(volg.Pad, volg.Richting, KiesBijIngang(volg.Van, volg.Richting, volg.Pad, volg.Configuratie), out _);
-                cfg = KruisVoorafStand(e, cfg, cVolg, out var uitleg3);
-                if (uitleg3 is not null) _log.Info(uitleg3);
+                if (Kruis.MetReferentie)
+                {
+                    cfg = KruisVoorafStand(e, cfg, cVolg, out var uitleg3);
+                    if (uitleg3 is not null) _log.Info(uitleg3);
+                }
             }
             await ControleerGeenAlarmVoorStap($"navigatie {e.Van} -> {e.Naar}");
             cfg = MetAlarmStand(cfg);
@@ -1649,8 +1708,9 @@ public partial class BaanVerkenner
     /// loc al op melder 5 stond: direct kortsluiting, een onterecht kortsluitpunt en een onterechte 'oplossing'. Dezelfde rit slaagde om 17:50 toen deze wissels
     /// gezet waren terwijl de loc nog op melder 13 stond. De wissels die de kaart bij de aankomstmelder van de laatste etappe noemt (en niet bij een
     /// melder waar de loc eerder op die etappe staat) krijgen daarom hun rijstand al tijdens de laatste etappe, dus voordat de loc aankomt.</summary>
-    internal static Configuratie StartmelderWisselsVooraf(Baankaart kaart, Etappe e, Configuratie cfg, Configuratie doel, out string? uitleg)
+    internal static Configuratie StartmelderWisselsVooraf(Baankaart kaart, Etappe e, Configuratie cfg, Configuratie doel, out string? uitleg, KruisKennis? kruis = null)
     {
+        kruis ??= KruisKennis.Referentie();
         uitleg = null;
         if (e.Pad.Count < 2) return cfg;
         // Onder de loc: wissels die de kaart ACHTER een melder noemt waar de loc nog staat of langskomt (NaMelder). Een wissel die alleen als vervolgmelder
@@ -1665,7 +1725,7 @@ public partial class BaanVerkenner
         var gezet = new List<string>();
         foreach (var a in bijStart.OrderBy(x => x))
         {
-            if (a == KruiswisselReferentie.Motor13 || a == KruiswisselReferentie.Motor10) continue;   // die hebben hun eigen regels (#95, #119)
+            if (kruis.IsMotor(a)) continue;   // die hebben hun eigen regels (#95, #119)
             if (onderLoc.Contains(a) || eis.Bevat(a) || cfg.Bevat(a) == doel.Bevat(a)) continue;
             cfg = cfg.MetStand(a, doel.Bevat(a));
             gezet.Add($"{a} {(doel.Bevat(a) ? "afbuigend" : "rechtdoor")}");
@@ -1680,7 +1740,7 @@ public partial class BaanVerkenner
     /// stand van de opdracht, als de referentie die combinatie vanaf deze ingangskant bewezen heeft.</summary>
     private Configuratie KruisStandBijTerugweg(List<int> pad, Richting r, int start, Configuratie cfg, Configuratie opdrachtStand)
     {
-        if (start != KruiswisselReferentie.Midden || pad.Count < 2) return cfg;
+        if (!Kruis.MetReferentie || start != KruiswisselReferentie.Midden || pad.Count < 2) return cfg;
         var nieuw = KruisAankomstStand(new Etappe { Van = pad[0], Naar = start, Richting = r, Pad = pad }, cfg, opdrachtStand, out var uitleg);
         if (uitleg is not null) _log.Info("Terugweg: " + uitleg);
         return nieuw;

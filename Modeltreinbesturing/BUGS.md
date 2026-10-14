@@ -1867,3 +1867,17 @@ geen pop-upfunctie = alles vanaf nul (standaard). Het profiel wordt in beide gev
 (de kaart bevat al wat die verkenning zelf leerde). De Koploper-referentie (#84) is geen eerdere verkenning en blijft ongemoeid. Test `VoorkennisVraagTest` (Ja, Nee, gesloten, geen functie).
 Gevolg: zonder voorkennis ziet een nieuwe verkenning ook de bekende kortsluitingen weer opnieuw (bv. wissel 1/13/14 bij bepaalde ritten); dat is de bedoeling om te kunnen controleren.
 Nog niet getest op de baan; het WPF-project is niet gecompileerd.
+
+## #129 Engelse wissels worden bij de start opgegeven; geen vaste kruiswissel meer in een nieuwe verkenning (Marco 11:08/11:10)
+Marco zag in een verkenning vanaf nul (log 1106) dat de verkenner al wist dat melder 24 een kruiswissel met motor 13 en 10 is. Oorzaak: `KruiswisselReferentie` (melder 24, motor 13/10, vier benen,
+'bewezen' verbindingen uit eerdere sessies/baankaarten) was vast in de code en werd altijd gebruikt: kruismotoren niet testen met de loc op 24, standen afdwingen, rapport en blokkenschema.
+Fix: nieuw invoerveld 'Engelse wissels' (sectie 4 van het startscherm; `VerkenInstellingen.KruisMotoren`): per Engelse wissel de motoren, bijv. `13+10` of `13+10, 3+4`; optioneel met melder `13+10@24`; leeg = geen.
+De verkenner houdt per verkenning een `KruisKennis` bij (motoren, kruiswissel-melder(s), referentie aan/uit; ook in de baankaart bewaard en bij hervatten teruggelezen).
+- Zonder referentie: kruismotoren worden niet als overloopwissel behandeld (geen partnerzoektocht), nooit omgezet met de loc op een bekende kruiswissel, en de melder van de kruiswissel wordt ontdekt:
+  kortsluiting bij omzetten van een kruismotor -> die melder telt vanaf dan als kruiswissel (`LeerKruisMidden`, logregel 'is (waarschijnlijk) de kruiswissel'). Tot dan is de eerste keer een kortsluiting
+  onvermijdelijk, tenzij de melder is opgegeven (`13+10@24`).
+- De vaste referentie (melder 24, motor 13/10, bewezen standen, vooraf zetten bij kruiswissel) is alleen actief als de gebruiker in de voorkennis-pop-up (#128) 'Ja' kiest; die pop-up noemt dat nu.
+- Rapport en blokkenschema tonen zonder referentie alleen 'Engelse wissel: motor ..., kruiswissel in melder ...'; het schema tekent het kruis alleen voor een bekende kruiswissel-melder.
+Tests: `KruisKennisTest` (12 controles). Nog niet getest op de baan; het WPF-project is niet gecompileerd (nieuw tekstveld in `MainWindow.xaml`/`.xaml.cs`).
+Let op: een bestaande instellingenbestand heeft geen Engelse wissels; voer eenmalig `13+10` in (of `13+10@24`). Oude baankaarten zonder deze velden tonen het kruis niet meer in het blokkenschema.
+Open: de 'Controle' van een voltooide kaart gebruikt de Engelse-wisselgegevens uit die kaart; alleen voorkennis 'Ja' schakelt de vaste referentie weer in.

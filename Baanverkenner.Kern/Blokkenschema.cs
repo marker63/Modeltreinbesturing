@@ -77,6 +77,7 @@ public class SchemaTekening
 
     public List<SchemaVak> Vakken { get; } = new();
     public List<SchemaVerbinding> Verbindingen { get; } = new();
+    private List<int> _kruisMidden = new();
     public double Breedte { get; private set; }
     public double Hoogte { get; private set; }
 
@@ -84,6 +85,7 @@ public class SchemaTekening
     {
         var blokken = k.VoorgesteldeBlokken.Count > 0 ? k.VoorgesteldeBlokken : BlokVoorstel.Bereken(k);
         var t = new SchemaTekening();
+        t._kruisMidden = k.KruisMidden.ToList();   // BUG #129: alleen de kruiswissel van DEZE verkenning (opgegeven of ontdekt)
         if (blokken.Count == 0) { t.Breedte = 400; t.Hoogte = 120; return t; }
 
         var blokVanMelder = new Dictionary<int, int>();
@@ -160,12 +162,13 @@ public class SchemaTekening
         var kruisBuren = new Dictionary<int, List<(int Melder, SchemaVak Buur)>>();
         foreach (var v in Vakken)
         {
-            if (!melderLijsten[v.Nummer].Contains(KruiswisselReferentie.Midden)) continue;
+            int midden = melderLijsten[v.Nummer].FirstOrDefault(m => _kruisMidden.Contains(m));
+            if (midden == 0) continue;
             var buren = new List<(int, SchemaVak)>();
             foreach (var vb in Verbindingen)
             {
-                if (vb.Van == v.Nummer && vb.VanMelder == KruiswisselReferentie.Midden) buren.Add((vb.NaarMelder, vak[vb.Naar]));
-                else if (vb.Naar == v.Nummer && vb.NaarMelder == KruiswisselReferentie.Midden) buren.Add((vb.VanMelder, vak[vb.Van]));
+                if (vb.Van == v.Nummer && vb.VanMelder == midden) buren.Add((vb.NaarMelder, vak[vb.Naar]));
+                else if (vb.Naar == v.Nummer && vb.NaarMelder == midden) buren.Add((vb.VanMelder, vak[vb.Van]));
             }
             buren = buren.GroupBy(x => x.Item1).Select(g => g.First()).ToList();
             if (buren.Count is >= 3 and <= 4) kruisBuren[v.Nummer] = buren;
@@ -209,7 +212,7 @@ public class SchemaTekening
                 int melder = isVan ? vb.VanMelder : vb.NaarMelder;
                 int buurMelder = isVan ? vb.NaarMelder : vb.VanMelder;
                 SchemaMelder chip;
-                if (eigen.Vorm == "kruis" && hoekChips.TryGetValue((eigen.Nummer, buurMelder), out var hc) && melder == KruiswisselReferentie.Midden) chip = hc;
+                if (eigen.Vorm == "kruis" && hoekChips.TryGetValue((eigen.Nummer, buurMelder), out var hc) && _kruisMidden.Contains(melder)) chip = hc;
                 else
                 {
                     int zijde = Zijde(eigen, buur.X, buur.Y);

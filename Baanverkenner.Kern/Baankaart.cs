@@ -256,6 +256,10 @@ public class Baankaart
 
     /// <summary>BUG #87: kortsluitoplossingen uit eerdere verkenningen (leerprofiel) of door de gebruiker aangewezen.</summary>
     public List<KortsluitOplossing> BekendeKortsluitOplossingen { get; set; } = new();
+    /// <summary>BUG #129: Engelse wissels van deze verkenning (motoren, bijv. "13+10"), de melder(s) van de kruiswissel (opgegeven of ontdekt) en of de vaste referentie is gebruikt.</summary>
+    public string KruisMotoren { get; set; } = "";
+    public List<int> KruisMidden { get; set; } = new();
+    public bool KruisReferentie { get; set; }
 
     private class OplossingItem { public Configuratie K = Configuratie.Basis; public int NaMelder; public int Start; public int Adres; public bool Afbuigend; public string Label = ""; }
 
