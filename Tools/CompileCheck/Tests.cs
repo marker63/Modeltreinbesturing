@@ -1443,6 +1443,42 @@ public static class Tests
         Eis(v.MetAlarmStand(new Configuratie(new[] { 2 })).Equals(new Configuratie(new[] { 2 })), "alarmstand (#117): bij de volgende controle zonder alarm geldt hij niet meer");
     }
 
+
+    // BUG #130 (Marco 11:42, log 11:32-11:36): lost de alarmcontrole een kortsluiting op door wissel a terug te zetten, dan bewijst de geslaagde
+    // rit GEEN overloopverbinding a+b. Zonder die controle werd "14 én 12 samen afbuigend" vastgelegd en veroorzaakte het een nieuwe kortsluiting.
+    static void PartnerAlarmIngreepTest()
+    {
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
+        var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+        var s1 = sim.NieuweSectie(1, 80, 1); var s2 = sim.NieuweSectie(2, 80, 2);
+        sim.Verbind(s1, B, s2, A); sim.PlaatsLoc(s1, 40, +1);
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 4, DinamoBlokken = "1-2" };
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var log = new VerkenLog(klok);
+        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true), new VerkenStatus { Instellingen = ins });
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var alarm = typeof(BaanVerkenner).GetMethod("HardwareMeldtBlokAlarm", bf)!;
+        var stand = (Dictionary<int, bool>)typeof(BaanVerkenner).GetField("_wisselStand", bf)!.GetValue(v)!;
+        stand[2] = true;                                   // wissel 2 (= a) staat afbuigend en geeft de kortsluiting
+        alarm.Invoke(v, new object[] { 8, true });
+        klok.Getikt += _ => { if (stand.TryGetValue(2, out var af) && !af) alarm.Invoke(v, new object[] { 8, false }); };   // pas weg als 2 weer rechtdoor staat
+        var mon = (MelderMonitor)typeof(BaanVerkenner).GetField("_monitor", bf)!.GetValue(v)!;
+        sim.BezetmeldingGewijzigd += mon.Ontvang;
+        mon.Ontvang(1, true);                              // de loc staat op melder 1
+        klok.Wacht(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult();
+        mon.Bijwerken();
+        var o = new Opdracht { Id = 1, Start = 1, Richting = Richting.Vooruit };
+        var proef = new RitResultaat { Einde = RitEinde.Kortsluiting }; proef.Reeks.Add(1);
+        var m = typeof(BaanVerkenner).GetMethod("PartnerwisselZoeken", bf)!;
+        var t = (Task)m.Invoke(v, new object?[] { o, 2, proef, null })!;
+        t.GetAwaiter().GetResult();
+        var uitkomst = t.GetType().GetProperty("Result")!.GetValue(t);
+        if (Environment.GetEnvironmentVariable("PARTNER_LOG") == "1") Console.WriteLine(log.AlsTekst());
+        Eis(uitkomst is null, "partner na alarmingreep (#130): geen partner vastgelegd als de alarmcontrole zelf wissel 2 terugzette");
+        Eis(log.AlsTekst().Contains("bewijst geen overloopverbinding"), "partner na alarmingreep (#130): het logboek legt uit waarom er niets vastgelegd is");
+    }
+
     static void AltijdAfbuigendTest()
     {
         // BUG #112 (log 12:31): oplossing 'wissel 2 rechtdoor' (na melder 5 achteruit) hoort bij het pad naar 16, niet bij 5 -> 12.
@@ -1681,6 +1717,7 @@ public static class Tests
         AltijdAfbuigendTest();
         ProefStopTest();
         OverloopStraatTest();
+        PartnerAlarmIngreepTest();
         ProefOplossingTest();
         KruisVoorafTest();
         OplossingLaterOpWegTest();

@@ -1881,3 +1881,15 @@ De verkenner houdt per verkenning een `KruisKennis` bij (motoren, kruiswissel-me
 Tests: `KruisKennisTest` (12 controles). Nog niet getest op de baan; het WPF-project is niet gecompileerd (nieuw tekstveld in `MainWindow.xaml`/`.xaml.cs`).
 Let op: een bestaande instellingenbestand heeft geen Engelse wissels; voer eenmalig `13+10` in (of `13+10@24`). Oude baankaarten zonder deze velden tonen het kruis niet meer in het blokkenschema.
 Open: de 'Controle' van een voltooide kaart gebruikt de Engelse-wisselgegevens uit die kaart; alleen voorkennis 'Ja' schakelt de vaste referentie weer in.
+
+## #130 Valse 'overloopverbinding' door de alarmcontrole: wissel 14 + 12 samen afbuigend gaf zelf een kortsluiting (Marco 11:42, log 1142)
+Marco zag in de verkenning van 10:58 (versie #128) bij wissel 14 een fout. Wat er gebeurde: wissel 14 afbuigend gaf kortsluiting zodra de loc op melder 8 kwam (11:32). In de partnerzoektocht (#63, partner 12) bleef de
+kortsluiting staan terwijl de loc stilstond; `ProbeerAlarmWegTeKrijgen` (#108) haalde haar weg door wissel 14 terug te zetten naar rechtdoor en de stap daarna (#117) hield 14 rechtdoor. De rit 8 -> 15 slaagde dus met 12 afbuigend en
+14 RECHTDOOR, maar de partnerzoektocht legde vast: 'overloopwissels, 14 én 12 samen afbuigend -> 15' (kortsluitpunt #2 opgelost, wissel 12 'alleen door te rijden als 14 én 12 afbuigend'). Daarna plande hij opdracht #9 met 12 en 14
+beide afbuigend; bij aankomst op melder 8 kwam meteen weer kortsluiting (blok 4), die ruim een minuut bleef staan terwijl de alarmcontrole alle andere wissels probeerde (12, 13, 14 zijn 'bij de loc' en worden niet omgezet, #109).
+Dinamo hield daarna op met terugmelden (11:37:16, melding #126) en Marco moest Dinamo herstarten en wissel 14 met de hand terugzetten.
+Fix: `PartnerwisselZoeken` ziet nu of de alarmcontrole tijdens de proefrit de wisselstand veranderd heeft (`_alarmStand`). Zo ja, dan bewijst de geslaagde rit geen overloopverbinding: er wordt geen partner en geen
+'verder voorbij kortsluitpunt'-opdracht vastgelegd, de zoektocht stopt (anders volgt per partner weer een minuut alarmcontrole) en het logboek legt uit waarom ('Dat bewijst geen overloopverbinding a+b'). De loc rijdt terug met de werkelijke stand.
+Test: `PartnerAlarmIngreepTest` (gesimuleerd dezelfde reeks als in het log; de echte overloop-test `OverloopTest` blijft groen). Nog niet getest op de baan.
+Let op voor oude kaarten: bevindingen uit dezelfde reeks in log 1142 zijn verdacht: wissel 12 'alleen met 14 erbij' en wissel 1 'alleen met 2 erbij' (11:15; daar reed 5 -> 16 met wissel 1 afbuigend en wissel 2 rechtdoor).
+Open: als de kortsluiting wél blijft staan en de schuldige wissel bij de loc ligt (#109), zet de verkenner hem niet zelf terug; de bestaande pop-up 'Staat er een wissel verkeerd?' (#79) vraagt Marco dan, zoals nu.

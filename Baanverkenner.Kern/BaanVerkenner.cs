@@ -1025,9 +1025,24 @@ public partial class BaanVerkenner
             MeldVoortgang();
             var cAb = cA.Met(b);
             await ZetWissel(b, true);
+            _alarmStand.Clear();
             var rit = await Rit(x, o.Richting, new RitDoel { Configuratie = cAb, Basis = new List<int> { x }, ExtraNaAfwijking = 0 });
-            await TerugNaar(x, rit, cAb);
+            // BUG #130 (Marco 11:42, log 11:32-11:36): de kortsluiting bleef staan terwijl de loc stilstond; ProbeerAlarmWegTeKrijgen haalde haar weg door
+            // wissel 14 (= a) terug te zetten naar rechtdoor en de rit lukte daarna. Dat de rit slaagde bewijst dan alleen dat a afbuigend de kortsluiting
+            // geeft, NIET dat a en b samen afbuigend een overloopverbinding vormen. De verkenner nam dat toch aan ("14 én 12 samen afbuigend"), plande daar
+            // een opdracht voor, stuurde beide wissels afbuigend en kreeg bij aankomst op melder 8 opnieuw een kortsluiting die 5 minuten bleef staan
+            // (Dinamo viel daarna uit). Is de stand tijdens de rit door de alarmcontrole veranderd, dan is de proef niet geldig.
+            var ingreep = _alarmStand.ToList();
+            bool alarmIngegrepen = ingreep.Count > 0;
+            var werkelijk = alarmIngegrepen ? MetAlarmStand(cAb) : cAb;
+            await TerugNaar(x, rit, werkelijk);
             await ZetWissel(b, false);
+            if (alarmIngegrepen)
+            {
+                _log.Waarschuwing($"Adres {a} afbuigend met adres {b} geeft kortsluiting die pas wegging toen de verkenner de stand veranderde ({string.Join(", ", ingreep.Select(kv =>$"wissel {kv.Key} {(kv.Value ? "afbuigend" : "rechtdoor")}"))}). " +
+                                  $"Dat bewijst geen overloopverbinding {a}+{b}: er wordt niets vastgelegd en geen verdere partner geprobeerd.");
+                return null;
+            }
             if (rit.Einde == RitEinde.Kortsluiting || rit.Reeks.Count < 2)
             {
                 _log.Rijden($"Adres {b} samen met {a}: {(rit.Einde == RitEinde.Kortsluiting ? "nog steeds kortsluiting" : "geen melder verder")}.");
