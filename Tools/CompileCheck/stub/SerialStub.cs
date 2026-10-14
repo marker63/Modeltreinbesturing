@@ -7,7 +7,7 @@ public class SerialPort : IDisposable {
   public SerialPort(string n, int b, Parity p, int d, StopBits s) {}
   public SerialPort() {}
   public static string[] GetPortNames() => new string[0];
-  public bool IsOpen => false; public int BytesToRead => 0; public bool DtrEnable {get;set;} public bool RtsEnable {get;set;}
+  public bool IsOpen => false; public int BytesToRead => 0; public int BytesToWrite => 0; public bool CtsHolding => false; public bool DsrHolding => false; public bool DtrEnable {get;set;} public bool RtsEnable {get;set;}
   public int ReadTimeout {get;set;} public int WriteTimeout {get;set;} public string PortName {get;set;}="" ; public int BaudRate {get;set;}
   public Parity Parity {get;set;} public int DataBits {get;set;} public StopBits StopBits {get;set;}
   public event SerialDataReceivedEventHandler? DataReceived;

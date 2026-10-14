@@ -109,6 +109,65 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
 
     private long _wisselBevestigingen;
 
+    // BUG #138: diagnose van Dinamo-uitval. Onthoudt de laatste wisselcommando's en telt per adres hoe vaak
+    // een uitval binnen 3 s na een commando begon, zodat het log laat zien of een bepaald adres/uitgang de oorzaak is.
+    private readonly List<(long Ticks, int Adres, bool Afbuigend)> _recenteWisselCommandos = new();
+    private readonly Dictionary<int, int> _uitvalNaAdres = new();
+    private readonly Dictionary<int, int> _commandosPerAdres = new();
+    private int _uitvalTeller;
+    private int _schrijfFouten;
+    private static double SecondenSinds(long ticks) => (double)(System.Diagnostics.Stopwatch.GetTimestamp() - ticks) / System.Diagnostics.Stopwatch.Frequency;
+
+    private void NoteerWisselCommando(int adres, bool afbuigend)
+    {
+        lock (_recenteWisselCommandos)
+        {
+            _recenteWisselCommandos.Add((System.Diagnostics.Stopwatch.GetTimestamp(), adres, afbuigend));
+            while (_recenteWisselCommandos.Count > 60) _recenteWisselCommandos.RemoveAt(0);
+            _commandosPerAdres[adres] = _commandosPerAdres.GetValueOrDefault(adres) + 1;
+        }
+    }
+
+    /// <summary>Tekst met de omstandigheden waaronder Dinamo ophield met reageren (voor het log).</summary>
+    private string UitvalDiagnose(long stilteBegonTicks)
+    {
+        var sb = new System.Text.StringBuilder();
+        lock (_recenteWisselCommandos)
+        {
+            _uitvalTeller++;
+            // Het laatste bericht van Dinamo kwam op stilteBegonTicks: welk wisselcommando ging daar direct aan vooraf of volgde erop?
+            var rond = _recenteWisselCommandos.Where(c => Math.Abs((double)(c.Ticks - stilteBegonTicks) / System.Diagnostics.Stopwatch.Frequency) <= 3.0).ToList();
+            var laatste = _recenteWisselCommandos.Where(c => c.Ticks <= System.Diagnostics.Stopwatch.GetTimestamp()).TakeLast(4).ToList();
+            sb.Append($"Uitval #{_uitvalTeller} in deze sessie. ");
+            if (rond.Count > 0)
+            {
+                foreach (var a in rond.Select(c => c.Adres).Distinct()) _uitvalNaAdres[a] = _uitvalNaAdres.GetValueOrDefault(a) + 1;
+                sb.Append("Wisselcommando's binnen 3 s rond het laatste bericht van Dinamo: " +
+                    string.Join(", ", rond.Select(c => $"wissel {c.Adres} {(c.Afbuigend ? "afbuigend" : "rechtdoor")} ({(double)(c.Ticks - stilteBegonTicks) / System.Diagnostics.Stopwatch.Frequency:+0.0;-0.0} s)")) + ". ");
+            }
+            else sb.Append("Geen wisselcommando binnen 3 s rond het laatste bericht van Dinamo. ");
+            if (laatste.Count > 0)
+                sb.Append("Laatste wisselcommando's: " + string.Join(", ", laatste.Select(c => $"{c.Adres} {(c.Afbuigend ? "afb" : "rd")} {SecondenSinds(c.Ticks):0.0} s geleden")) + ". ");
+            int laatste10 = _recenteWisselCommandos.Count(c => SecondenSinds(c.Ticks) <= 10);
+            int laatste60 = _recenteWisselCommandos.Count(c => SecondenSinds(c.Ticks) <= 60);
+            sb.Append($"Wisselcommando's de laatste 10 s: {laatste10}, laatste 60 s: {laatste60}. ");
+            if (_uitvalNaAdres.Count > 0)
+                sb.Append("Uitval na commando per wisseladres (deze sessie, uitvallen/commando's): " +
+                    string.Join(", ", _uitvalNaAdres.OrderByDescending(k => k.Value).Take(6).Select(k => $"wissel {k.Key}: {k.Value}/{_commandosPerAdres.GetValueOrDefault(k.Key)}")) + ". ");
+        }
+        lock (_vergrendeling)
+            sb.Append($"Wachtrijen: urgent {_teVersturenUrgent.Count}, wissel/sein {_teVersturenPrioriteit.Count}, overig {_teVersturen.Count}. ");
+        try
+        {
+            if (_poort is { IsOpen: true } p)
+                sb.Append($"Poort: IsOpen, BytesToWrite {p.BytesToWrite}, BytesToRead {p.BytesToRead}, CTS {(p.CtsHolding ? "hoog" : "laag")}, DSR {(p.DsrHolding ? "hoog" : "laag")}. ");
+            else sb.Append("Poort: niet open! ");
+        }
+        catch (Exception ex) { sb.Append($"Poortstatus onleesbaar ({ex.Message}). "); }
+        sb.Append($"Schrijffouten tot nu toe: {_schrijfFouten}. ");
+        return sb.ToString().TrimEnd();
+    }
+
     /// <inheritdoc/>
     public long AantalWisselBevestigingen => Interlocked.Read(ref _wisselBevestigingen);
 
@@ -144,6 +203,7 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
         _stilteBegonTicks = Interlocked.Read(ref _laatsteOntvangstTicks);
         HardwareCommunicatieLog.Log("Info", $"[Dinamo] GEEN bericht (ook geen keepalive) van Dinamo sinds {s:0.0} s terwijl wij wel blijven sturen: Dinamo reageert niet meer (vastgelopen of kabel los?).");
         // BUG #127: tijdens de stilte kunnen 'vrij'-meldingen gemist zijn; de onthouden bezetstand is dan niet meer te vertrouwen.
+        try { HardwareCommunicatieLog.Log("Info", "[Dinamo] Diagnose uitval (BUG #138): " + UitvalDiagnose(_stilteBegonTicks)); } catch { /* idem */ }
         try { WisMelderGeheugen(); } catch { /* idem */ }
         try { StilteGewijzigd?.Invoke(true, s.Value); } catch { /* idem */ }
     }
@@ -371,6 +431,7 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
         byte byte1 = (byte)(0b0001_0000 | ((afbuigend ? 1 : 0) << 2) | ((a >> 7) & 0x03));
         byte byte2 = (byte)(a & 0x7F);
         byte byte3 = 0x0c; // tijd - Koploper laat dit nooit weg, altijd deze waarde geobserveerd
+        NoteerWisselCommando(adres, afbuigend);
         for (int i = 0; i < AantalHerhalingenWisselcommando; i++)
             VerstuurDatagram(new byte[] { byte1, byte2, byte3 }, prioriteit: true);
     }
@@ -835,6 +896,8 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
         }
         catch (Exception ex)
         {
+            _schrijfFouten++;
+            HardwareCommunicatieLog.Log("Info", $"[Dinamo] SCHRIJFFOUT naar de poort (#{_schrijfFouten}): {ex.GetType().Name}: {ex.Message}");
             StatusBericht?.Invoke($"Fout bij versturen naar Dinamo: {ex.Message}");
         }
     }
