@@ -1416,6 +1416,37 @@ public static class Tests
 
     // BUG #135-#137 (Marco 14-10 14:12, log 14:07-14:11): kruiswissel-bewaking zonder vaste referentie, met het bewijs uit de EIGEN kaart
     // BUG #140: loc stond alleen op melder 30 (blok 7) en moest naar melder 20 (blok 6): het doelblok kreeg geen rijcommando en hij bleef staan
+    // BUG #142: melder 16 (loc langer dan de melder, staat altijd ook op melder 5 met bekend blok 3): blok vinden zonder de loc te isoleren
+    static void BuurmelderBlokproefTest()
+    {
+        Console.WriteLine("Test: blokproef met de loc op twee melders (BUG #142, log 14-10 15:48: melder 16 zonder blok)");
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        foreach (var richting in new[] { Richting.Vooruit })
+        {
+            var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, StaatStilZonderBlokcommando = true, LocAdres = 5408, LocLengte = 20 };
+            var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+            var s15 = sim.NieuweSectie(15, 100, 4); var s16 = sim.NieuweSectie(16, 15, 2); var s5 = sim.NieuweSectie(5, 100, 3);
+            sim.Verbind(s15, B, s16, A); sim.Verbind(s16, B, s5, A);
+            sim.PlaatsLocOpGrens(s16, 12, 1, s5); // voorste deel in melder 5, achterste deel in melder 16
+            var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 1, DinamoBlokken = "1-4" };
+            sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+            var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+            var log = new VerkenLog(klok);
+            var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true));
+            var monitor = (MelderMonitor)typeof(BaanVerkenner).GetField("_monitor", bf)!.GetValue(v)!;
+            sim.BezetmeldingGewijzigd += monitor.Ontvang;
+            v.Kaart.Melders.Add(new MelderInfo { Nummer = 15, DinamoBlok = 4 }); v.Kaart.Melders.Add(new MelderInfo { Nummer = 5, DinamoBlok = 3 }); v.Kaart.Melders.Add(new MelderInfo { Nummer = 16, DinamoBlok = null });
+            foreach (var mm in new[] { 5, 15, 16 }) sim.VraagMelderStatusOp(mm);
+            klok.Wacht(TimeSpan.FromSeconds(1)).GetAwaiter().GetResult();
+            monitor.Bijwerken();
+            Eis(monitor.IsBezet(16) && monitor.IsBezet(5), "buurmelder (#142): de loc staat vooraf op melder 16 en 5 (nu bezet: " + string.Join(",", monitor.Bezet) + ")");
+            bool gelukt = ((Task<bool>)typeof(BaanVerkenner).GetMethod("BlokZoekenMetBuurmelder", bf)!.Invoke(v, new object?[] { 16, new List<int> { 5 }, richting })!).GetAwaiter().GetResult();
+            Eis(gelukt, "buurmelder (#142): het blok van melder 16 is gevonden terwijl de loc ook op melder 5 staat");
+            Eis(v.Kaart.Melder(16).DinamoBlok == 2, "buurmelder (#142): melder 16 hoort bij blok 2 (nu " + v.Kaart.Melder(16).DinamoBlok + ")");
+            Eis(log.Regels.Any(r => r.Tekst.Contains("Blokproef met alleen de overige blokken (1, 2, 4)")), "buurmelder (#142): blok 3 (van melder 5) krijgt geen commando, de rest wel (log: " + string.Join(" | ", log.Regels.Where(r => r.Tekst.Contains("Blokproef")).Select(r => r.Tekst)) + ")");
+        }
+    }
+
     // BUG #141: aanhoudende kortsluiting bij stilstaande loc op de proefwissel -> die gaat terug naar rechtdoor
     static void StatischeKortsluitingTest()
     {
@@ -1958,6 +1989,7 @@ public static class Tests
         WisselTerugmeldingTest();
         NastellenAnderBlokTest();
         StatischeKortsluitingTest();
+        BuurmelderBlokproefTest();
         TweedeMelderTest();
         VerkeerdeWisselVraagTest();
         WisselstraatImportTest();

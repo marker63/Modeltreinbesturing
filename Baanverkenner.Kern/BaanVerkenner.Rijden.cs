@@ -71,6 +71,8 @@ public partial class BaanVerkenner
     /// geprobeerd, bij een volgende rit; daarna stuurt de verkenner voor die melder naar alle blokken).</summary>
     private readonly Dictionary<int, int> _proefPogingen = new();
     private const int MaxProefPogingen = 2;
+    /// <summary>BUG #142: melders waar de loc na het stoppen altijd ook op een buurmelder staat (loc langer dan de melder).</summary>
+    private readonly HashSet<int> _nietIsoleerbaar = new();
     private bool ProefMogelijk(int melder) => BlokVan(melder) is null && _proefPogingen.GetValueOrDefault(melder) < MaxProefPogingen;
 
     private bool BlokVereist => _hw.LocCommandoVereistBlok;
@@ -655,6 +657,43 @@ public partial class BaanVerkenner
             }
             await StuurNaarBlok(blok, r, 0);
             _log.Rijden($"Blok {blok}: geen beweging ({r.Tekst()}).");
+        }
+        return false;
+    }
+
+    /// <summary>BUG #142: blokproef voor een melder waar de loc nooit alleen op kan staan (loc langer dan de melder). De loc staat
+    /// op <paramref name="melder"/> én op de buurmelder(s) <paramref name="buren"/> waarvan het blok al bekend is. Die blokken
+    /// krijgen geen rijcommando; elk ander blok om beurten wel. Beweegt de loc, dan voedt dat blok het deel van de loc dat in
+    /// <paramref name="melder"/> staat. De loc rijdt daarbij een stukje in de rijrichting en wordt daarna gestopt.</summary>
+    private async Task<bool> BlokZoekenMetBuurmelder(int melder, IReadOnlyList<int> buren, Richting r)
+    {
+        var uit = buren.Select(b => BlokVan(b)!.Value).ToHashSet();
+        var kandidaten = BlokKandidaten(null, melder).Where(b => !uit.Contains(b)).ToList();
+        _log.Stap($"Melder {melder}: de loc staat ook op melder {Lijst(buren)} (blok {string.Join(", ", uit.OrderBy(x => x))}). Blokproef met alleen de overige blokken ({string.Join(", ", kandidaten)}).");
+        foreach (var blok in kandidaten)
+        {
+            _token.ThrowIfCancellationRequested();
+            _monitor.Bijwerken();
+            var t0 = _klok.Nu;
+            await StuurNaarBlok(blok, r, _ins.Verkensnelheid);
+            var eind = _klok.Nu + TimeSpan.FromSeconds(_ins.BlokproefKortSeconden);
+            bool gewijzigd = false;
+            while (_klok.Nu < eind)
+            {
+                await Wacht(Poll);
+                if (_monitor.Bijwerken().Any(x => x.Tijd >= t0)) { gewijzigd = true; break; }
+                if (ProefKortsluitingGemeld()) break;
+            }
+            if (_proefKortsluiting && !gewijzigd) { await StuurNaarBlok(blok, r, 0); return false; }
+            if (gewijzigd)
+            {
+                KoppelBlok(melder, blok);
+                _hw.ZetLocSnelheid(_ins.LocAdres, 0, r == Richting.Vooruit, blok, _ins.LocStappen);
+                await StopLoc();
+                return true;
+            }
+            await StuurNaarBlok(blok, r, 0);
+            _log.Rijden($"Blok {blok}: geen beweging.");
         }
         return false;
     }
@@ -1259,15 +1298,41 @@ public partial class BaanVerkenner
                 if (!(naStop.Count == 1 && naStop.Contains(proefMelder)))
                 {
                     _log.Info($"Melder {proefMelder}: de loc staat na het stoppen op meerdere melders ({Lijst(naStop)}); eerst terugzetten voordat het blok gezocht wordt.");
-                    if (naStop.Contains(proefMelder) && naStop.FirstOrDefault(x => x != proefMelder, -1) is int andere and >= 0)
+                    // BUG #142: een melder die al eens niet te isoleren was (de loc is langer dan de melder), niet opnieuw
+                    // tot anderhalve minuut proberen terug te kruipen: meteen de proef met twee melders.
+                    if (!_nietIsoleerbaar.Contains(proefMelder) && naStop.Contains(proefMelder) && naStop.FirstOrDefault(x => x != proefMelder, -1) is int andere and >= 0)
                         await Nastellen(proefMelder, r, voor: andere);
                     _monitor.Bijwerken();
                     naStop = _monitor.Bezet;
                     if (!(naStop.Count == 1 && naStop.Contains(proefMelder)))
                     {
-                        // Lukt dat niet (of de loc staat inmiddels helemaal in de volgende melder): geen proef nu, de rit gaat
-                        // door; het blok van deze melder wordt bij een volgende rit alsnog gezocht.
-                        _log.Waarschuwing($"Melder {proefMelder}: kon de loc niet op alleen die melder zetten - blokproef overgeslagen, rit gaat door.");
+                        _nietIsoleerbaar.Add(proefMelder);
+                        // BUG #142 (log 15:48: melder 16 en 129 bleven zonder Dinamo-blok, 5 x ruim 80 s verloren): de loc is langer
+                        // dan de melder en staat dus altijd ook op een buurmelder. Is van die buurmelder(s) het blok bekend, dan
+                        // kan toch gemeten worden: die blokken krijgen geen rijcommando, de overige om beurten. Beweegt de loc,
+                        // dan voedt dat blok het deel van de loc dat in deze melder staat.
+                        var buren = naStop.Where(x => x != proefMelder).ToList();
+                        if (naStop.Contains(proefMelder) && buren.Count > 0 && buren.All(x => BlokVan(x) is not null) && ProefMogelijk(proefMelder))
+                        {
+                            _proefPogingen[proefMelder] = _proefPogingen.GetValueOrDefault(proefMelder) + 1;
+                            _proefKortsluiting = false;
+                            bool tweeGelukt = await BlokZoekenMetBuurmelder(proefMelder, buren, r);
+                            if (_proefKortsluiting)
+                            {
+                                _proefKortsluiting = false;
+                                _proefPogingen[proefMelder]--;
+                                _log.Waarschuwing($"Kortsluiting tijdens de blokproef bij melder {proefMelder}. Staat de loc met een poot tegen een wisseltong die niet goed staat?");
+                                return await Kortsluiting(res, $"kortsluiting tijdens de blokproef bij melder {proefMelder}");
+                            }
+                            if (!tweeGelukt)
+                                _log.Waarschuwing($"Voor melder {proefMelder} is ook met de loc op meerdere melders geen Dinamo-blok gevonden{(_proefPogingen[proefMelder] < MaxProefPogingen ? " - bij een volgende rit wordt het nog eens geprobeerd" : "")}.");
+                        }
+                        else
+                        {
+                            // Geen bruikbare buurblokken: geen proef nu, de rit gaat door; het blok wordt bij een volgende rit alsnog gezocht.
+                            _log.Waarschuwing($"Melder {proefMelder}: kon de loc niet op alleen die melder zetten - blokproef overgeslagen, rit gaat door.");
+                        }
+                        _monitor.Bijwerken();
                         await StuurSnelheid(r, doelInzicht ? _ins.Kruipsnelheid : snelheid);
                         laatsteWijziging = _klok.Nu;
                         onderbroken = true;

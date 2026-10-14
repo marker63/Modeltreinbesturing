@@ -153,6 +153,16 @@ public class SimulatieBaan : IHardwareInterface
         _spoor.Add((van, tot, s));
     }
 
+    /// <summary>BUG #142 (test): zet de loc op <paramref name="s"/> en laat hem met de kop al op de aansluitende sectie
+    /// <paramref name="volgende"/> staan (de loc is langer dan de melder en staat dus op twee secties tegelijk).</summary>
+    public void PlaatsLocOpGrens(Sectie s, double pos, int orientatie, Sectie volgende)
+    {
+        PlaatsLoc(s, pos, orientatie);
+        var eerste = _spoor[0];
+        if (_orientatie > 0) _spoor.Add((eerste.Tot, eerste.Tot + volgende.Lengte, volgende));
+        else _spoor.Add((eerste.Van - volgende.Lengte, eerste.Van, volgende));
+    }
+
     /// <summary>"De gebruiker zet de loc met de hand terug": midden op de sectie met deze
     /// melder, zelfde rijrichting van de loc t.o.v. de sectie als voorheen (best effort).</summary>
     public bool ZetLocOpMelder(int melder)
