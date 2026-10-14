@@ -793,6 +793,34 @@ public static class Tests
         Eis(c.Bevat(3), "alarmoplossing: de volgende rit over dit punt zet wissel 3 meteen afbuigend (MetBekendeKortsluitOplossingen)");
     }
 
+    // BUG #145: een oplossing die bij aankomst op de startmelder niet blijkt te werken wordt ingetrokken en de opdracht wordt niet herhaald
+    static void AankomstOplossingWeerlegdTest()
+    {
+        Console.WriteLine("Test: aankomst-oplossing weerleggen (BUG #145)");
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
+        var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+        var s1 = sim.NieuweSectie(1, 80, 1); var s2 = sim.NieuweSectie(2, 80, 2);
+        sim.Verbind(s1, B, s2, A); sim.PlaatsLoc(s1, 40, +1);
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 4, DinamoBlokken = "1-2" };
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var status = new VerkenStatus { Instellingen = ins };
+        var v = new BaanVerkenner(sim, ins, klok, new VerkenLog(klok), (_, _) => Task.FromResult(true), status);
+        var kaart = status.Kaart;
+        var kp = new Kortsluitpunt { Id = 1, NaMelder = 2, Richting = Richting.Vooruit, Soort = KortsluitpuntSoort.Kortsluiting, Configuratie = Configuratie.Basis.Met(2),
+            Opgelost = true, OpgelostDoorAdres = 1, OpgelostMetAfbuigend = true, AantalKortsluitingen = 1,
+            Route = new List<Etappe> { new Etappe { Van = 1, Naar = 2, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis.Met(2), Pad = new List<int> { 1, 2 } } } };
+        kaart.Kortsluitpunten.Add(kp);
+        var o = new Opdracht { Id = 4, Start = 2, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis.Met(1).Met(2) };
+        var rijstand = Configuratie.Basis.Met(1).Met(2);
+        Eis(v.BekendeAankomstKortsluiting(o, rijstand) is null, "aankomst: een (nog) opgelost kortsluitpunt blokkeert de opdracht niet vooraf");
+        Eis(v.WeerlegAankomstOplossing(o, rijstand), "aankomst: kortsluiting bij aankomst met dezelfde stand weerlegt het punt");
+        Eis(!kp.Opgelost && kp.OpgelostDoorAdres is null && kp.Opgegeven, "aankomst: de oplossing (wissel 1) is ingetrokken en het punt is opgegeven");
+        Eis(kaart.MetBekendeKortsluitOplossingen(new List<int> { 1, 2 }, Richting.Vooruit, Configuratie.Basis.Met(2), out _).Equals(Configuratie.Basis.Met(2)), "aankomst: wissel 1 wordt niet meer als oplossing toegevoegd");
+        Eis(v.BekendeAankomstKortsluiting(o, rijstand) is { Id: 1 }, "aankomst: dezelfde opdracht wordt voortaan overgeslagen");
+        Eis(v.BekendeAankomstKortsluiting(new Opdracht { Id = 5, Start = 2, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis }, Configuratie.Basis) is null, "aankomst: een opdracht zonder die wissel afbuigend blijft gewoon mogelijk");
+    }
+
     // BUG #83: een opgelost kortsluitpunt wordt ook op routes en terugwegen toegepast
     static void KoploperReferentieTest()
     {
@@ -2074,6 +2102,7 @@ public static class Tests
         DinamoStilteTest();
         AlarmVoorStapTest();
         AlarmOplossingVastleggenTest();
+        AankomstOplossingWeerlegdTest();
         HerstelBlijftStaanTest();
         KortsluitOplossingTest();
         KoploperReferentieTest();

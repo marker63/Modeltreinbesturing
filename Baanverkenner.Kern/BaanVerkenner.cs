@@ -722,9 +722,17 @@ public partial class BaanVerkenner
         MeldVoortgang();
         _log.Stap($"Opdracht #{o.Id}: {_bezig} - {o.Reden}.");
 
+        var rijstand = RijStand(o);
+        // BUG #145: een opdracht waarvan de aankomst op de startmelder al kortsluiting gaf (en niet bewezen oplosbaar is) wordt niet opnieuw gereden.
+        if (BekendeAankomstKortsluiting(o, rijstand) is { } bekend)
+        {
+            var t = $"Opdracht #{o.Id} (vanaf melder {o.Start} {o.Richting.Tekst()}, {o.Configuratie}) is overgeslagen: aankomst op melder {o.Start} met {bekend.Configuratie} geeft kortsluiting (kortsluitpunt #{bekend.Id}) en daar is geen werkende oplossing voor gevonden.";
+            _log.Waarschuwing(t);
+            if (!_kaart.Waarschuwingen.Contains(t)) _kaart.Waarschuwingen.Add(t);
+            return;
+        }
         try
         {
-            var rijstand = RijStand(o);
             await NaarStartVan(o.Route, rijstand);
             // BUG #96 (Marco 16:01: "weer kortsluiting in het kruiswissel en motor 13 staat verkeerd"): motor 13 of 10 omzetten terwijl de loc op melder 24
             // staat geeft ALTIJD kortsluiting (log 15:40, 15:48, 14:40). Is dat hier nodig en kon het niet vooraf (#95), dan wordt de opdracht
@@ -922,6 +930,7 @@ public partial class BaanVerkenner
         catch (NavigatieFout nf)
         {
             _log.Waarschuwing($"Opdracht #{o.Id}: {nf.Message}");
+            if (nf.Kortsluiting && WeerlegAankomstOplossing(o, rijstand)) o.Pogingen = 2;   // BUG #145: niet nog eens dezelfde rit
             await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);
             if (!await ProbeerZelfTerugNaarStart(o.Route, nf))
                 await VraagLocTerugTeZetten(_kaart.StartMelder, $"{nf.Message}\n\nDe verkenner gaat terug naar de startmelder.");
@@ -1192,6 +1201,32 @@ public partial class BaanVerkenner
 
     /// <summary>BUG #136: het kortsluitpunt van de kortsluiting met deze melder en richting; bij meer punten dat met dezelfde wisselstand, anders het nieuwste
     /// nog niet opgeloste.</summary>
+    /// <summary>BUG #145: kortsluitpunt waarbij de loc via dezelfde aankomst op <paramref name="o"/>.Start (de route eindigt daar) met een wisselstand
+    /// die in <paramref name="rijstand"/> zit kortsluiting gaf en dat niet bewezen is op te lossen.</summary>
+    internal Kortsluitpunt? BekendeAankomstKortsluiting(Opdracht o, Configuratie rijstand)
+        => _kaart.Kortsluitpunten.Where(k => k.Soort == KortsluitpuntSoort.Kortsluiting && !k.Opgelost && k.Opgegeven
+                                             && k.NaMelder == o.Start && k.Richting == o.Richting && k.Configuratie.Afbuigend.Length > 0
+                                             && k.Route.Count > 0 && k.Route[^1].Naar == o.Start
+                                             && k.Configuratie.Afbuigend.All(rijstand.Bevat))
+                                .OrderByDescending(k => k.Id).FirstOrDefault();
+
+    /// <summary>BUG #145 (Marco 17:29, steeds weer wissel 2): gaf de aankomst op de startmelder opnieuw kortsluiting terwijl een eerder kortsluitpunt daar als
+    /// 'opgelost door wissel X' stond, dan klopte die oplossing niet voor deze aankomst (hij was gevonden met de loc stilstaand). De oplossing wordt
+    /// ingetrokken en het punt telt als opgegeven, zodat de opdracht niet telkens weer tegen dezelfde kortsluiting aanrijdt.</summary>
+    internal bool WeerlegAankomstOplossing(Opdracht o, Configuratie rijstand)
+    {
+        var kp = _kaart.Kortsluitpunten.Where(k => k.Soort == KortsluitpuntSoort.Kortsluiting && k.NaMelder == o.Start && k.Richting == o.Richting
+                                                    && k.Configuratie.Afbuigend.Length > 0 && k.Route.Count > 0 && k.Route[^1].Naar == o.Start
+                                                    && k.Configuratie.Afbuigend.All(rijstand.Bevat) && !k.Opgegeven)
+                                       .OrderByDescending(k => k.Id).FirstOrDefault();
+        if (kp is null) return false;
+        if (kp.Opgelost) _log.Vondst($"Kortsluitpunt #{kp.Id}: de oplossing (wissel {kp.OpgelostDoorAdres}) werkt niet bij aankomst op melder {o.Start}; de kortsluiting kwam terug met {rijstand}. De oplossing wordt ingetrokken.");
+        kp.Opgelost = false; kp.OpgelostDoorAdres = null; kp.OpgelostMetAfbuigend = null;
+        kp.Opgegeven = true; kp.AantalKortsluitingen++;
+        BewaarNu();
+        return true;
+    }
+
     private Kortsluitpunt? ZoekKortsluitpunt(int melder, Richting r, Configuratie stand)
     {
         var kand = _kaart.Kortsluitpunten.Where(k => k.Soort == KortsluitpuntSoort.Kortsluiting && k.NaMelder == melder && k.Richting == r).ToList();

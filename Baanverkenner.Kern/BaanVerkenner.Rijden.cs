@@ -51,6 +51,8 @@ public class NavigatieFout : Exception
     public int? Onverwacht { get; init; }
     /// <summary>BUG #97: de loc staat andersom (de eerste melder klopt alleen voor de tegengestelde richting).</summary>
     public bool LocAndersom { get; init; }
+    /// <summary>BUG #145: de fout is een blijvende kortsluiting terwijl de loc stilstaat.</summary>
+    public bool Kortsluiting { get; init; }
 }
 
 public partial class BaanVerkenner
@@ -900,10 +902,10 @@ public partial class BaanVerkenner
         if (Kruis.OpKruis(_monitor.Bezet))
         {
             _log.Waarschuwing($"De loc staat op de kruiswissel (melder {Kruis.MiddenTekst}): de alarmroutine probeert geen losse wissels, de gebruiker wordt gevraagd welke motor verkeerd staat.");
-            throw new NavigatieFout($"Dinamo meldt nog steeds kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())} terwijl de loc op de kruiswissel (melder {Kruis.MiddenTekst}) stilstaat ({stap}). Waarschijnlijk staat motor 10 of 13 verkeerd.");
+            throw new NavigatieFout($"Dinamo meldt nog steeds kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())} terwijl de loc op de kruiswissel (melder {Kruis.MiddenTekst}) stilstaat ({stap}). Waarschijnlijk staat motor 10 of 13 verkeerd.") { Kortsluiting = true };
         }
         if (await ProbeerAlarmWegTeKrijgen(stap)) return; // BUG #108
-        throw new NavigatieFout($"Dinamo meldt nog steeds kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())} terwijl de loc stilstaat ({stap}). De verkenner heeft zelf wissels geprobeerd zonder dat de kortsluiting wegging en rijdt niet verder.");
+        throw new NavigatieFout($"Dinamo meldt nog steeds kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())} terwijl de loc stilstaat ({stap}). De verkenner heeft zelf wissels geprobeerd zonder dat de kortsluiting wegging en rijdt niet verder.") { Kortsluiting = true };
     }
     private const int AlarmWachtPogingen = 10;
 

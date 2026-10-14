@@ -1992,3 +1992,14 @@ Dat kan niet: de loc is langer dan een melder, dus achteruit rijden geeft 16+5 -
 Oplossing: is het alarm weg en staat de loc nog op melder x plus alleen melders die bij de kortsluiting ook bezet waren, dan blijft hij staan en rijdt de
 herstelroutine niet. Het oude gedrag blijft voor alle andere gevallen (bijv. alarm blijft, of de loc is al verder verschoven).
 Test: `HerstelBlijftStaanTest` (faalt zonder de fix: loc werd verplaatst). Nog niet getest op de baan.
+
+## BUG #145 – wissel 2 geeft steeds opnieuw kortsluiting bij aankomst op melder 5 (Marco 17:29, log 17:20–17:29)
+Opdracht #4 (vanaf melder 5 vooruit, afbuigend 1+2) reed eerst naar melder 5 (vanaf 16, met de loc deels op 16) en zette daarbij 1 en 2 al afbuigend.
+Kortsluitpunt #1 (aankomst op 5 met wissel 2 afbuigend, ook bezet 16) stond als 'opgelost door wissel 1', maar die oplossing was gevonden met de loc
+stilstaand (alarmroutine) en geldt niet voor de aankomst: 17:25 gaf 1+2 afbuigend opnieuw kortsluiting in blok 3 en 4. Daarna werd de opdracht nog een
+keer geprobeerd en bleef het punt 'opgelost'.
+Oplossing: (1) kortsluiting (blijvend alarm) bij de aankomst op de startmelder van een opdracht met een stand die het kortsluitpunt bevat trekt de
+oplossing in (`WeerlegAankomstOplossing`), het punt telt als opgegeven en de opdracht wordt niet opnieuw gepland; (2) een opdracht waarvan de aankomst
+zo'n opgegeven kortsluitpunt raakt wordt voortaan overgeslagen en als bevinding gemeld (`BekendeAankomstKortsluiting`). Wissel 2 afbuigend blijft in het
+rapport dus 'kortsluiting'. Let op: een kaart waarin kortsluitpunt #1 nog als opgelost staat rijdt deze aankomst nog één keer (daarna is het ingetrokken).
+Test: `AankomstOplossingWeerlegdTest`. Nog niet getest op de baan.
