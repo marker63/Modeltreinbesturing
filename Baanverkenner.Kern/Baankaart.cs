@@ -282,6 +282,28 @@ public class Baankaart
         return res;
     }
 
+    /// <summary>BUG #146 (Marco 17:50, kortsluitpunt #2): wissel 2 afbuigend alleen gaf kortsluiting na melder 12 (achteruit), terwijl dezelfde combinatie
+    /// (2 met 1) na melder 5 (vooruit) al als overloop bewezen was. Een overloop-paar geldt in beide richtingen: is voor wissel <c>w</c> bewezen dat wissel
+    /// <c>p</c> er afbuigend bij moet (een gereden oplossing van wissel <c>p</c>, of oplossingen in beide richtingen), dan krijgt een rit met <c>w</c>
+    /// afbuigend ook <c>p</c> afbuigend. <paramref name="behalve"/> is het adres dat de opdracht zelf test.</summary>
+    public Configuratie MetOverloopPartners(Configuratie c, int? behalve, KruisKennis? kruis, out List<string> wijz)
+    {
+        wijz = new List<string>();
+        foreach (var k in Kortsluitpunten.Where(k => k.Soort == KortsluitpuntSoort.Kortsluiting && k.Opgelost && k.OpgelostMetAfbuigend == true
+                                                     && k.OpgelostDoorAdres is not null && k.Configuratie.Afbuigend.Length == 1).OrderBy(k => k.Id))
+        {
+            int w = k.Configuratie.Afbuigend[0], p = k.OpgelostDoorAdres!.Value;
+            if (!c.Bevat(w) || c.Bevat(p) || p == behalve || (kruis?.IsMotor(p) ?? false)) continue;
+            bool gereden = Wissels.Any(x => x.Adres == p && x.Waarnemingen.Any(o => o.Soort == WaarnemingSoort.LostKortsluitingOp && o.Configuratie == k.Configuratie.ToString()));
+            bool beideRichtingen = Kortsluitpunten.Any(o => o.Id != k.Id && o.Opgelost && o.OpgelostDoorAdres == p && o.OpgelostMetAfbuigend == true
+                                                           && o.Configuratie.Equals(k.Configuratie) && o.Richting != k.Richting);
+            if (!gereden && !beideRichtingen) continue;
+            c = c.MetStand(p, true);
+            wijz.Add($"{p} afbuigend (wissel {w} afbuigend heeft {p} als overloop-partner, kortsluitpunt #{k.Id})");
+        }
+        return c;
+    }
+
     /// <summary>Alle bewezen oplossingen (uit opgeloste kortsluitpunten en bekende oplossingen), om in het leerprofiel te bewaren.</summary>
     public List<KortsluitOplossing> AlleKortsluitOplossingen()
     {

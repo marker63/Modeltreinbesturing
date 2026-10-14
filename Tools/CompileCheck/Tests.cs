@@ -821,6 +821,27 @@ public static class Tests
         Eis(v.BekendeAankomstKortsluiting(new Opdracht { Id = 5, Start = 2, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis }, Configuratie.Basis) is null, "aankomst: een opdracht zonder die wissel afbuigend blijft gewoon mogelijk");
     }
 
+    // BUG #146: aankomst zonder kortsluit-wissels en overloop-partner in beide richtingen
+    static void AankomstEnOverloopTest()
+    {
+        Console.WriteLine("Test: aankomst zonder kortsluit-wissels + overloop-partner (BUG #146)");
+        var kaart = new Baankaart();
+        var etappe = new Etappe { Van = 13, Naar = 5, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis.Met(2), Pad = new List<int> { 13, 14, 16, 5 } };
+        kaart.Kortsluitpunten.Add(new Kortsluitpunt { Id = 1, NaMelder = 5, Richting = Richting.Vooruit, Soort = KortsluitpuntSoort.Kortsluiting, Configuratie = Configuratie.Basis.Met(2),
+            Opgelost = true, OpgelostDoorAdres = 1, OpgelostMetAfbuigend = true, Route = new List<Etappe> { etappe } });
+        var nav = new Etappe { Van = 13, Naar = 5, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis, Pad = new List<int> { 13, 14, 16, 5 } };
+        var c = Baanverkenner.Kern.BaanVerkenner.AankomstZonderKortsluitWissels(kaart, nav, Configuratie.Basis.Met(1).Met(2).Met(7), out var uitleg);
+        Eis(!c.Bevat(1) && !c.Bevat(2) && c.Bevat(7) && uitleg is not null, "aankomst: 1 en 2 blijven rechtdoor tijdens de aankomst op 5, andere wissels (7) blijven staan");
+        var andere = new Etappe { Van = 13, Naar = 8, Richting = Richting.Vooruit, Pad = new List<int> { 13, 8 } };
+        Eis(Baanverkenner.Kern.BaanVerkenner.AankomstZonderKortsluitWissels(kaart, andere, Configuratie.Basis.Met(1).Met(2), out _).Equals(Configuratie.Basis.Met(1).Met(2)), "aankomst: een andere aankomstmelder blijft ongemoeid");
+        // overloop: wissel 2 afbuigend (achteruit, kortsluitpunt bij melder 12) krijgt wissel 1 erbij, omdat 2+1 vooruit al bewezen is
+        kaart.Wissel(1).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.LostKortsluitingOp, NaMelder = 5, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis.Met(2).ToString() });
+        var r = kaart.MetOverloopPartners(Configuratie.Basis.Met(2), null, null, out var wijz);
+        Eis(r.Bevat(1) && r.Bevat(2) && wijz.Count == 1, "overloop: rit met wissel 2 afbuigend krijgt wissel 1 erbij (beide richtingen)");
+        Eis(!kaart.MetOverloopPartners(Configuratie.Basis.Met(2), 1, null, out _).Bevat(1), "overloop: de opdracht die wissel 1 zelf test, krijgt hem niet automatisch erbij");
+        Eis(!kaart.MetOverloopPartners(Configuratie.Basis, null, null, out _).Bevat(1), "overloop: zonder wissel 2 afbuigend verandert er niets");
+    }
+
     // BUG #83: een opgelost kortsluitpunt wordt ook op routes en terugwegen toegepast
     static void KoploperReferentieTest()
     {
@@ -2103,6 +2124,7 @@ public static class Tests
         AlarmVoorStapTest();
         AlarmOplossingVastleggenTest();
         AankomstOplossingWeerlegdTest();
+        AankomstEnOverloopTest();
         HerstelBlijftStaanTest();
         KortsluitOplossingTest();
         KoploperReferentieTest();

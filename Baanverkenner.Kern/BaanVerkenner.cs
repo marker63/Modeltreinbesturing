@@ -710,6 +710,9 @@ public partial class BaanVerkenner
         string? kruisUitleg = null;
         if (Kruis.MetReferentie) c = KruisIngangStand(pad, c, o.BronAdres, out kruisUitleg);
         if (kruisUitleg is not null) _log.Info($"Opdracht #{o.Id}: {kruisUitleg} Rijstand: {c}.");
+        // BUG #146: een bewezen overloop-paar (wissel 2 met 1) geldt in beide richtingen.
+        c = _kaart.MetOverloopPartners(c, o.BronAdres, Kruis, out var partnerWijz);
+        if (partnerWijz.Count > 0) _log.Info($"Opdracht #{o.Id}: {string.Join("; ", partnerWijz)}. Rijstand: {c}.");
         return c;
     }
 
@@ -1799,11 +1802,38 @@ public partial class BaanVerkenner
                 cfg = KruisVoorafStand(e, cfg, cVolg, Kruis, out var uitleg3);   // BUG #135: ook zonder vaste referentie
                 if (uitleg3 is not null) _log.Info(uitleg3);
             }
+            if (doel is not null && i == route.Count - 1)
+            {
+                // BUG #146 (Marco 17:29/17:50, wissel 2 bij melder 5): zie AankomstZonderKortsluitWissels
+                cfg = AankomstZonderKortsluitWissels(_kaart, e, cfg, out var uitleg5);
+                if (uitleg5 is not null) _log.Info(uitleg5);
+            }
             await ControleerGeenAlarmVoorStap($"navigatie {e.Van} -> {e.Naar}");
             cfg = MetAlarmStand(cfg);
             await ZetConfiguratie(cfg);
             await Rit(e.Van, e.Richting, new RitDoel { Configuratie = cfg, DoelMelder = e.Naar, VerwachtPad = e.Pad });
         }
+    }
+
+    /// <summary>BUG #146 (Marco 17:29 en 17:50): reed de loc eerder via DEZELFDE laatste etappe (zelfde aankomstmelder en -richting) in een kortsluiting terwijl
+    /// wissel(s) W afbuigend stonden (kortsluitpunt met die route), dan blijven W (en de wissel die daar als oplossing bij hoort) tijdens die aankomst rechtdoor.
+    /// Ze worden pas gezet als de loc op de startmelder staat, zoals de partnerrit deed die wissel 1+2 wel goed reed (5 -> 13). Zo botst #122 (wissels bij de
+    /// startmelder vooraf zetten) niet meer met een bekende kortsluiting bij het aanrijden vanaf melder 16.</summary>
+    internal static Configuratie AankomstZonderKortsluitWissels(Baankaart kaart, Etappe e, Configuratie cfg, out string? uitleg)
+    {
+        uitleg = null;
+        var wissels = new SortedSet<int>();
+        foreach (var k in kaart.Kortsluitpunten.Where(k => k.Soort == KortsluitpuntSoort.Kortsluiting && k.Configuratie.Afbuigend.Length > 0 && k.Route.Count > 0
+                                                           && k.Route[^1].Naar == e.Naar && k.Route[^1].Richting == e.Richting && k.NaMelder == e.Naar))
+        {
+            foreach (var a in k.Configuratie.Afbuigend) wissels.Add(a);
+            if (k.Opgelost && k.OpgelostMetAfbuigend == true && k.OpgelostDoorAdres is int oa) wissels.Add(oa);
+        }
+        var weg = wissels.Where(cfg.Bevat).ToList();
+        if (weg.Count == 0) return cfg;
+        foreach (var a in weg) cfg = cfg.MetStand(a, false);
+        uitleg = $"Aankomst op melder {e.Naar}: wissel {string.Join(" en ", weg)} blijft nog rechtdoor (de aankomst met die wissel afbuigend gaf eerder kortsluiting); ze worden gezet zodra de loc op melder {e.Naar} staat.";
+        return cfg;
     }
 
     /// <summary>BUG #122 (log 18:18, opdracht #4 vanaf melder 5, wissel 2 afbuigend): de wissels 1 en 2 liggen bij startmelder 5 en werden pas omgezet toen de

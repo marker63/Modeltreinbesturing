@@ -2003,3 +2003,16 @@ oplossing in (`WeerlegAankomstOplossing`), het punt telt als opgegeven en de opd
 zo'n opgegeven kortsluitpunt raakt wordt voortaan overgeslagen en als bevinding gemeld (`BekendeAankomstKortsluiting`). Wissel 2 afbuigend blijft in het
 rapport dus 'kortsluiting'. Let op: een kaart waarin kortsluitpunt #1 nog als opgelost staat rijdt deze aankomst nog één keer (daarna is het ingetrokken).
 Test: `AankomstOplossingWeerlegdTest`. Nog niet getest op de baan.
+
+## BUG #146 – wissel 1+2 al afbuigend tijdens het aanrijden van melder 5, en wissel 2 alleen afbuigend achteruit (Marco 17:50, log 17:20–17:50)
+Twee oorzaken achter de steeds terugkerende wissel-2-kortsluiting:
+(1) Opdracht #4 (vanaf melder 5 vooruit, 1+2 afbuigend) zette 1 en 2 al afbuigend tijdens het aanrijden vanaf 16 (#122 + bekende oplossing van
+kortsluitpunt #1). De kaart toont dat precies die aankomst (route eindigt op 5, vooruit) kortsluiting gaf. De partnerrit die 5 -> 13 wel goed reed,
+zette 1+2 pas toen de loc op melder 5 stond. Nu: `AankomstZonderKortsluitWissels` houdt de wissels van zo'n kortsluitpunt (en de bijbehorende oplossingswissel)
+tijdens die aankomst rechtdoor; `ZetConfiguratie(rijstand)` zet ze direct na aankomst, zoals de partnerrit.
+(2) Opdracht #3 (13 achteruit, wissel 2 afbuigend) reed alleen met wissel 2 en gaf kortsluiting na melder 12 (kortsluitpunt #2); de gebruiker moest wissel 1
+aanwijzen. Het overloop-paar 2+1 was vooruit al bewezen maar gold alleen in die richting. Nu: `MetOverloopPartners` (in `RijStand`) voegt de partner
+in beide richtingen toe zodra het paar bewezen is (gereden oplossing of oplossingen in beide richtingen); de opdracht die de partner zelf test krijgt hem niet.
+Naast #145 (intrekken bij herhaalde kortsluiting) blijft dit vangnet bestaan. Test: `AankomstEnOverloopTest`. Nog niet getest op de baan.
+Open: of wissel 1+2 zetten terwijl de loc op melder 5 staat veilig is (Marco's regel: niet onder de loc omzetten) - de partnerrit deed het eerder zonder
+probleem, maar dat is de eerste keer op de baan.
