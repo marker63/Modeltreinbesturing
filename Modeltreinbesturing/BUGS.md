@@ -2026,3 +2026,12 @@ loc mag proberen; de wissels waarvan de kaart al weet dat afbuigend daar kortslu
 oplossing van het kortsluitpunt vastgelegd (#144). Bij Nee verandert er niets (de regel van #109 blijft). Test: `AlarmWisselBijLocTest`. Nog niet getest op de baan.
 Open (niet gedaan): de eerste kortsluiting voorkomen door bij een nieuwe aankomstkant van een samenvoegende wissel (14 bij melder 8 vanaf 24) die wissel
 vooraf afbuigend te zetten; daarvoor is de kaart te onzeker (eerdere 24 -> 8-ritten stonden als gelukt terwijl Dinamo toen geen wissels uitvoerde).
+
+## BUG #148 – motor 13 niet vooraf gezet bij 15 -> 8 -> 24 achteruit met wissel 14 afbuigend (Marco 18:50, log 18:44–18:48)
+Opdracht #8 (vanaf melder 15 achteruit, wissel 14 afbuigend) reed de kruiswissel (melder 24) in vanaf melder 8 met motor 13 rechtdoor: kortsluiting in
+blok 8; de gebruiker moest motor 13 aanwijzen (kortsluitpunt #6). De vooruitblik van #135 (`ZetKruisVooraf`) had dat moeten voorkomen: 24 -> 8 met 13 en 14
+afbuigend was net bewezen. Oorzaak: de kaart bevatte ook een waarneming 17 -> 8 met alleen wissel 14 afbuigend (ruis), dus gold 17 als enig vervolg van 8 en
+`VolgendeBijStand` keek niet verder naar de kruiswissel. Nu: bij een niet-lege stand (zonder de kruismotoren) telt een kruiswissel-vervolg dat exact bij die stand
+gezien is naast het exacte vervolg mee; bij de lege stand (gewone lus 15 -> 8 -> 17) verandert er niets. Test: `KruisRuisVoorafTest` (kaart van 18:49).
+Nog niet getest op de baan. Opmerking: "13,14" in veel andere ritten is geen doorgeven van de oplossing: opdracht #7 (13 afbuigend) en de oplossing 14 werden
+daarna als rijstand gebruikt; dat is bedoeld.

@@ -93,9 +93,19 @@ public static class KruisBewijs
     public static List<int> VolgendeBijStand(Baankaart kaart, KruisKennis kruis, int van, Richting r, Configuratie cfg)
     {
         var exact = kaart.BekendeVolgende(van, r, cfg);
-        if (exact.Count > 0) return exact;
         var rest = ZonderMotoren(cfg, kruis.Motoren);
         bool Past(Overgang o) => o.GezienBijConfiguraties.Any(s => ZonderMotoren(Configuratie.VanSleutel(s), kruis.Motoren).Equals(rest));
+        if (exact.Count > 0)
+        {
+            // BUG #148 (Marco 18:50, log 18:46): de kaart had voor 17 -> 8 ook een waarneming met alleen wissel 14 afbuigend (ruis), dus gold 8 -> 17 als
+            // enig vervolg en motor 13 werd niet vooraf gezet; 15 -> 8 -> 24 gaf kortsluiting. Is er bij een NIET-lege stand (zonder de kruismotoren)
+            // ook een kruiswissel-vervolg dat exact bij die stand gezien is, dan telt dat vervolg mee. Bij de lege stand (de gewone lus) niet.
+            if (rest.Afbuigend.Length == 0) return exact;
+            var extra = kaart.Overgangen.Where(o => o.Van == van && o.Richting == r && Past(o)).Select(o => o.Naar)
+                .Concat(kaart.Overgangen.Where(o => o.Naar == van && o.Richting == r.Om() && Past(o)).Select(o => o.Van))
+                .Where(kruis.Middens.Contains);
+            return exact.Concat(extra).Distinct().OrderBy(x => x).ToList();
+        }
         return kaart.Overgangen.Where(o => o.Van == van && o.Richting == r && Past(o)).Select(o => o.Naar)
             .Concat(kaart.Overgangen.Where(o => o.Naar == van && o.Richting == r.Om() && Past(o)).Select(o => o.Van))
             .Distinct().OrderBy(x => x).ToList();

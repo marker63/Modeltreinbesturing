@@ -843,6 +843,23 @@ public static class Tests
     }
 
     // BUG #147: het alarm blijft en alleen de wissel bij de bezette melder lost het op -> vragen en dan proberen
+    /// <summary>BUG #148 (Marco 18:50): 15 -> 8 -> 24 achteruit met alleen wissel 14 afbuigend reed met motor 13 rechtdoor de kruiswissel in, omdat de kaart
+    /// door ruis (17 -> 8 met 14 afbuigend) alleen 17 als vervolg van 8 zag.</summary>
+    static void KruisRuisVoorafTest()
+    {
+        var kaart = Laad("baankaart_2026-10-14_1849.json");
+        var kruis = KruisKennis.Parse("10+13@24");
+        var ing = KruisBewijs.Ingangen(kaart, kruis, 15, Richting.Achteruit, Configuratie.Basis.Met(14));
+        Eis(ing.Contains((24, 8)), "kruis (#148): 15 achteruit met 14 afbuigend rijdt via 8 de kruiswissel in, ook met ruis in de kaart (nu " + string.Join(";", ing) + ")");
+        Eis(KruisBewijs.Ingangen(kaart, kruis, 15, Richting.Achteruit, Configuratie.Basis).Count == 0, "kruis (#148): de gewone lus (alles rechtdoor) raakt de kruiswissel niet");
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 14 };
+        var klok = new VirtueleKlok(); var hw = new EchoHw();
+        var v = new BaanVerkenner(hw, ins, klok, new VerkenLog(klok), (_, _) => Task.FromResult(true), new VerkenStatus { Instellingen = ins, Kaart = kaart });
+        v.Kruis = KruisKennis.Parse("10+13@24");
+        var c = ((Task<Configuratie>)typeof(BaanVerkenner).GetMethod("ZetKruisVooraf", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.Invoke(v, new object[] { 15, Richting.Achteruit, Configuratie.Basis.Met(14), new RitDoel { Configuratie = Configuratie.Basis.Met(14), StaartWissels = true } })!).GetAwaiter().GetResult();
+        Eis(c.Bevat(13) && c.Bevat(14), "kruis (#148): motor 13 gaat vooraf naar afbuigend voor de rit 15 -> 8 -> 24 (nu " + c + ")");
+    }
+
     static void AlarmWisselBijLocTest()
     {
         Console.WriteLine("Test: alarm - wissel bij de loc met toestemming proberen (BUG #147)");
@@ -2166,6 +2183,7 @@ public static class Tests
         AankomstOplossingWeerlegdTest();
         AankomstEnOverloopTest();
         AlarmWisselBijLocTest();
+        KruisRuisVoorafTest();
         HerstelBlijftStaanTest();
         KortsluitOplossingTest();
         KoploperReferentieTest();
