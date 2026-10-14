@@ -1811,6 +1811,21 @@ public static class Tests
         Eis(k.MetWisselEisen(new List<int> { 30, 20, 27 }, Richting.Vooruit, c, out var w5).Equals(c) && w5.Count == 0, "wisselEisen: gewoon spoor zonder wissels verandert niets");
     }
 
+    // BUG #143: wissel 1 en 2 (overloopwissel-paar, melder 12 / 5 / 13) werden door de verkenner zelf omgezet terwijl de loc in de kruising stond
+    static void OverloopPaarEisenTest()
+    {
+        Console.WriteLine("Test: splitsing met twee gelijke uitgangen geeft geen wisseleis (BUG #143, baankaart 14-10 16:20)");
+        var k = Laad("baankaart_2026-10-14_1621.json");
+        var c12 = new Configuratie(new[] { 1, 2 });
+        var n = k.MetWisselEisen(new List<int> { 12, 5, 13 }, Richting.Vooruit, c12, out var w);
+        Eis(n.Equals(c12) && w.Count == 0, "overloop (#143): pad 12-5-13 vooruit met wissel 1 en 2 afbuigend blijft ongewijzigd (nu " + n + ")");
+        var n2 = k.MetWisselEisen(new List<int> { 13, 5, 12 }, Richting.Achteruit, c12, out _);
+        Eis(n2.Equals(c12), "overloop (#143): pad 13-5-12 achteruit met wissel 1 en 2 afbuigend blijft ongewijzigd (nu " + n2 + ")");
+        Eis(!k.WisselEisenVoorStap(5, 13, Richting.Vooruit).Any(e => e.Adres == 2), "overloop (#143): stap 5 -> 13 vooruit stelt geen eis aan wissel 2");
+        // andere splitsingen blijven werken (wissel 5: 14 -> 24 rechtdoor, 14 -> 129 afbuigend; wissel 14: 8 -> 24 achteruit afbuigend)
+        Eis(k.WisselEisenVoorStap(14, 24, Richting.Vooruit).Any(e => e.Adres == 5 && !e.Afbuigend) && k.WisselEisenVoorStap(14, 129, Richting.Vooruit).Any(e => e.Adres == 5 && e.Afbuigend), "overloop (#143): gewone splitsing (wissel 5) vraagt nog steeds de juiste stand");
+    }
+
     // BUG #78: wisselstraten-voorstel uit de baankaart van 19:03
     static void WisselstratenTest()
     {
@@ -1990,6 +2005,7 @@ public static class Tests
         NastellenAnderBlokTest();
         StatischeKortsluitingTest();
         BuurmelderBlokproefTest();
+        OverloopPaarEisenTest();
         TweedeMelderTest();
         VerkeerdeWisselVraagTest();
         WisselstraatImportTest();

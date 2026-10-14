@@ -486,6 +486,10 @@ public class Baankaart
         foreach (var w in Wissels)
             foreach (var o in w.Waarnemingen.Where(x => x.Soort == WaarnemingSoort.Splitsing))
             {
+                // BUG #143 (log 16:13, wissel 1 en 2): een splitsing waarvan rechtdoor en afbuigend naar DEZELFDE melder gaan (de beide
+                // standen van een overloopwissel-paar leiden naar melder 5) zegt niets over de stand die een stap vraagt. Eerder werd
+                // daar 'rechtdoor' uit gehaald en zette de verkenner wissel 1 en 2 om terwijl de loc in de kruising stond.
+                if (o.VolgendeBijRechtdoor is int rd && o.VolgendeBijAfbuigend is int af && rd == af) continue;
                 bool kop = van == o.NaMelder && r == o.Richting;
                 bool achter = naar == o.NaMelder && r == o.Richting.Om();
                 if (kop && o.VolgendeBijRechtdoor == naar) res.Add((w.Adres, false, false));
