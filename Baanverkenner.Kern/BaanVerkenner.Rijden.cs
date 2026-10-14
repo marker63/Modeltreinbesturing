@@ -468,7 +468,7 @@ public partial class BaanVerkenner
         if (melder is int km && Referentie?.BlokVan(km) is int kb && alle.Contains(kb)) res.Add(kb);
         // BUG #62: een blok dat uit een eerdere verkenning van deze baan bekend is voor deze melder, eerst proberen
         // (een verkeerde hint kost hooguit één korte poging).
-        if (melder is int mm && Leerprofiel?.BlokHint(mm) is int hint && alle.Contains(hint)) res.Add(hint);
+        if (melder is int mm && Voorkennis?.BlokHint(mm) is int hint && alle.Contains(hint)) res.Add(hint);
         if (eerst is int e0 && alle.Contains(e0) && !res.Contains(e0)) { res.Add(e0); eerst = null; }
         if (eerst is int e && alle.Contains(e) && !res.Contains(e)) res.Add(e);
         res.AddRange(alle.Where(b => !gebruikt.Contains(b) && !res.Contains(b)));
@@ -702,7 +702,7 @@ public partial class BaanVerkenner
             if (m == doel) continue;
             var o = _kaart.Overgangen.FirstOrDefault(x => x.AantalMetingen > 0 && ((x.Van == m && x.Naar == doel) || (x.Van == doel && x.Naar == m)));
             if (o is not null) return o.GemiddeldeSeconden * RefSnelheid / v;
-            if (Leerprofiel is { } lp)
+            if (Voorkennis is { } lp)
             {
                 var richtingen = new[] { Richting.Vooruit, Richting.Achteruit };
                 foreach (var rr in richtingen)
@@ -749,7 +749,7 @@ public partial class BaanVerkenner
         if (!_ins.SlimmeTimeout) return TimeSpan.FromSeconds(max);
         double langste = _kaart.LangsteReistijd() * RefSnelheid / Math.Max(1, _ins.Verkensnelheid);
         int geleerd = 0;
-        if (Leerprofiel is { AantalMetingen: > 0 } lp)
+        if (Voorkennis is { AantalMetingen: > 0 } lp)
         {
             langste = Math.Max(langste, lp.LangsteVerwacht(_ins.Verkensnelheid)); // BUG #59
             geleerd = Math.Min(3, lp.AantalMetingen);

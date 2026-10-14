@@ -150,6 +150,9 @@ public partial class BaanVerkenner
 
     /// <summary>BUG #59: geleerde tijden uit eerdere verkenningen (mag null zijn).</summary>
     public LeerProfiel? Leerprofiel { get; set; }
+    /// <summary>BUG #128: voorkennis uit eerdere verkenningen wordt alleen gebruikt als de gebruiker dat bij de start bevestigt (standaard: alles vanaf nul).</summary>
+    private bool _voorkennis;
+    private LeerProfiel? Voorkennis => _voorkennis ? Leerprofiel : null;
     /// <summary>BUG #84: referentie uit een Koploper-export (blok per melder, wisselstraatblokken 8/9). Alleen een hulpmiddel voor de blokproef.</summary>
     public KoploperReferentie? Referentie { get; set; }
     /// <summary>Wordt na elke rit aangeroepen zodat het programma het profiel kan bewaren.</summary>
@@ -235,8 +238,17 @@ public partial class BaanVerkenner
             if (_kaart.RefSnelheid <= 0) _kaart.RefSnelheid = _ins.Verkensnelheid;
             _startVerkensnelheid = _ins.Verkensnelheid;
             _log.Stap(_status.Controle ? "Voltooide baan wordt nogmaals gecontroleerd (de bestaande kaart blijft ongewijzigd; aan het eind volgt een vergelijking)." : uitbreiden ? "Voltooide verkenning wordt uitgebreid met een tweede traject." : hervat ? "Verkenning wordt hervat." : "Verkenning start.");
+            // BUG #128: niets uit eerdere verkenningen meenemen zonder bevestiging van de gebruiker (Marco 10:48: alles vanaf nul leren om te controleren of fouten echt zijn opgelost).
+            _voorkennis = false;
+            if (!hervat && Leerprofiel is { } lp0 && (lp0.AantalMetingen > 0 || lp0.KortsluitOplossingen.Count > 0 || lp0.BlokHints.Count > 0))
+            {
+                var vraag = $"Er zijn gegevens uit eerdere verkenningen bewaard: {lp0.Overgangen.Count} overgangen (reistijden), {lp0.KortsluitOplossingen.Count} kortsluitoplossingen en {lp0.BlokHints.Count} blokhints.\n\nJa = deze gegevens gebruiken (sneller, maar fouten uit eerdere verkenningen kunnen daardoor verborgen blijven)\nNee = helemaal vanaf nul leren (aanbevolen om te controleren of fouten echt zijn opgelost)";
+                bool? antw = VraagJaNee is null ? false : await VraagJaNee("Gegevens van eerdere verkenningen gebruiken?", vraag);
+                _voorkennis = antw == true;
+                _log.Info(_voorkennis ? "Gegevens uit eerdere verkenningen worden gebruikt (gekozen door de gebruiker)." : "Alles begint vanaf nul: er wordt niets overgenomen uit eerdere verkenningen. Deze verkenning leert wel voor later.");
+            }
             // BUG #87: bewezen kortsluitoplossingen uit eerdere verkenningen meenemen.
-            if (Leerprofiel is { } lpo)
+            if (Voorkennis is { } lpo)
             {
                 int nieuwOpl = 0;
                 foreach (var o in lpo.KortsluitOplossingen)
@@ -247,7 +259,7 @@ public partial class BaanVerkenner
             // BUG #98: overgangen uit ritten met de loc andersom (spiegelbeeld van een veel vaker gereden overgang) uit de kaart halen.
             foreach (var t in _kaart.VerwijderSpiegelOvergangen())
                 _log.Waarschuwing($"Overgang {t} is verwijderd: de omgekeerde overgang in dezelfde richting is veel vaker gereden (waarschijnlijk met de loc andersom).");
-            if (Leerprofiel is { AantalMetingen: > 0 } lp) _log.Info($"Leerprofiel: {lp.Overgangen.Count} overgangen uit eerdere verkenningen (tijden worden omgerekend naar verkensnelheid {_ins.Verkensnelheid}).");
+            if (Voorkennis is { AantalMetingen: > 0 } lp) _log.Info($"Leerprofiel: {lp.Overgangen.Count} overgangen uit eerdere verkenningen (tijden worden omgerekend naar verkensnelheid {_ins.Verkensnelheid}).");
             _log.Info($"Hardware: {_hw.Naam}. Testloc adres {_ins.LocAdres} ({_ins.LocStappen} stappen), verkensnelheid {_ins.Verkensnelheid}, kruipsnelheid {_ins.Kruipsnelheid}.");
             _log.Info($"Wisseladressen {_kaart.WisselAdresVan} t/m {_kaart.WisselAdresTot}." + (BlokVereist ? $" Dinamo-blokken: {_ins.DinamoBlokken}." : ""));
 

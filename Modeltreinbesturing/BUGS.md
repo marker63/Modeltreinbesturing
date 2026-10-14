@@ -1858,3 +1858,12 @@ Let op: staat de loc echt op 13 en wordt 13 ook gewist, dan komt er geen nieuwe 
 Nog niet getest op de baan; het WPF-project is niet gecompileerd.
 Open: het leerprofiel (94 overgangen, 13 kortsluitoplossingen uit eerdere verkenningen) wordt ook bij een nieuwe verkenning overgenomen; Marco zegt dat niets van eerdere verkenningen onthouden mag
 worden. Dat is een bewuste eerdere keuze (#122/#124); wacht op bevestiging wat er precies uit moet.
+
+## #128 Niets uit eerdere verkenningen meenemen zonder bevestiging (Marco 10:41/10:48)
+Marco: bij een nieuwe verkenning mag niets van eerdere verkenningen onthouden worden; het is de bedoeling alles vanaf nul te leren om te controleren of fouten echt opgelost zijn.
+Het leerprofiel (reistijden, blokhints, kortsluitoplossingen) werd tot nu toe stilzwijgend gebruikt (log 1033: '13 kortsluitoplossing(en) uit eerdere verkenningen overgenomen', 'Leerprofiel: 94 overgangen').
+Nu: bij het starten van een nieuwe verkenning (niet bij hervatten) verschijnt een pop-up 'Gegevens van eerdere verkenningen gebruiken?' met de aantallen; Ja = gebruiken, Nee of venster sluiten of
+geen pop-upfunctie = alles vanaf nul (standaard). Het profiel wordt in beide gevallen wel verder bijgewerkt voor later. Bij hervatten van een onderbroken verkenning wordt niets extra overgenomen
+(de kaart bevat al wat die verkenning zelf leerde). De Koploper-referentie (#84) is geen eerdere verkenning en blijft ongemoeid. Test `VoorkennisVraagTest` (Ja, Nee, gesloten, geen functie).
+Gevolg: zonder voorkennis ziet een nieuwe verkenning ook de bekende kortsluitingen weer opnieuw (bv. wissel 1/13/14 bij bepaalde ritten); dat is de bedoeling om te kunnen controleren.
+Nog niet getest op de baan; het WPF-project is niet gecompileerd.

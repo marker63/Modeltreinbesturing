@@ -84,7 +84,7 @@ public static class Tests
         sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
         var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
         var log = new VerkenLog(klok);
-        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true)) { Leerprofiel = profiel };
+        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true)) { Leerprofiel = profiel, VraagJaNee = (_, _) => Task.FromResult<bool?>(true) };
         using var cts = new CancellationTokenSource();
         try { v.VoerUit(cts.Token).GetAwaiter().GetResult(); } catch (Exception ex) { Console.WriteLine("  (verkenner stopte met: " + ex.Message + ")"); }
         if (Environment.GetEnvironmentVariable("PENDEL_LOG") == "1") Console.WriteLine(log.AlsTekst());
@@ -987,6 +987,38 @@ public static class Tests
         Eis(ontvangen.Count == 0, "opstartstand: een latere wijziging (13 vrij) wint van de opstartstand");
     }
 
+    // BUG #128: voorkennis uit eerdere verkenningen alleen na bevestiging (Marco 10:48: alles vanaf nul leren)
+    static void VoorkennisVraagTest()
+    {
+        LeerProfiel Profiel()
+        {
+            var p = new LeerProfiel();
+            p.KortsluitOplossingen.Add(new KortsluitOplossing { NaMelder = 12, Richting = Richting.Achteruit, Stand = "2", Start = 13, Adres = 3, Afbuigend = true, Bron = "test" });
+            p.BlokHints.Add(new LeerProfiel.BlokHintItem { Melder = 13, Blok = 3 });
+            return p;
+        }
+        (string Log, int Vragen, string? Titel, int Opl) Run(bool? antwoord, bool metVraagfunctie)
+        {
+            var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { LocAdres = 5408 };
+            var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 2 };
+            var klok = new VirtueleKlok(); var log = new VerkenLog(klok);
+            int vragen = 0; string? titel = null;
+            var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true), new VerkenStatus { Instellingen = ins }) { Leerprofiel = Profiel() };
+            if (metVraagfunctie) v.VraagJaNee = (t, _) => { vragen++; titel = t; return Task.FromResult(antwoord); };
+            using var cts = new CancellationTokenSource(); cts.CancelAfter(50);
+            try { v.VoerUit(cts.Token).GetAwaiter().GetResult(); } catch { }
+            return (log.AlsTekst(), vragen, titel, v.Kaart.BekendeKortsluitOplossingen.Count);
+        }
+        var nee = Run(false, true);
+        Eis(nee.Vragen == 1 && nee.Titel!.Contains("eerdere verkenningen") && nee.Opl == 0 && nee.Log.Contains("vanaf nul"), "voorkennis (#128): Nee -> niets overgenomen (vragen " + nee.Vragen + ", oplossingen " + nee.Opl + ")");
+        var ja = Run(true, true);
+        Eis(ja.Vragen == 1 && ja.Opl == 1, "voorkennis (#128): Ja -> kortsluitoplossing overgenomen (oplossingen " + ja.Opl + ")");
+        var geen = Run(null, false);
+        Eis(geen.Opl == 0, "voorkennis (#128): geen vraagfunctie -> vanaf nul (oplossingen " + geen.Opl + ")");
+        var gesloten = Run(null, true);
+        Eis(gesloten.Opl == 0, "voorkennis (#128): pop-up gesloten -> vanaf nul");
+    }
+
     // BUG #127 (Marco 10:40): melder 14 bleef na een Dinamo-herstart en in nieuwe verkenningen 'bezet' (gemiste vrij-melding in het geheugen van het programma)
     static void MelderGeheugenWisTest()
     {
@@ -1633,6 +1665,7 @@ public static class Tests
         BotsendeOplossingenTest();
         OpstartStandTest();
         MelderGeheugenWisTest();
+        VoorkennisVraagTest();
         HerpogingVolgordeTest();
         RouteVerkortTest();
         KruisAankomstTest();
