@@ -150,7 +150,10 @@ public partial class BaanVerkenner
     /// <summary>BUG #61: de blokken die het laatste rijcommando kregen (leeg = de loc staat stil).</summary>
     private readonly HashSet<int> _voedingBlokken = new();
 
-    private async Task StuurSnelheid(Richting r, int stap)
+    /// <summary>BUG #140: met <paramref name="ookBlokVanMelder"/> krijgt ook het blok van die melder (het doel) het rijcommando,
+    /// ook als de loc er nog niet op staat. Zonder dat stopt een loc die op de grens naar het volgende blok kruipt, omdat dat blok
+    /// geen rijstroom heeft (log 15:01: loc bleef 1,5 minuut op een recht stuk voor melder 20 staan met alleen blok 7 onder stroom).</summary>
+    private async Task StuurSnelheid(Richting r, int stap, int? ookBlokVanMelder = null)
     {
         bool vooruit = r == Richting.Vooruit;
         _voedingBlokken.Clear();
@@ -161,6 +164,8 @@ public partial class BaanVerkenner
             return;
         }
         var blokken = BlokkenVoorHuidigePlek();
+        if (blokken is not null && ookBlokVanMelder is int extraMelder && BlokVan(extraMelder) is int extraBlok && !blokken.Contains(extraBlok))
+            blokken.Add(extraBlok);
         blokken ??= _ins.DinamoBlokLijst();
         foreach (var b in blokken) _hw.ZetLocSnelheid(_ins.LocAdres, stap, vooruit, b, _ins.LocStappen);
         if (stap > 0) _voedingBlokken.UnionWith(blokken);
@@ -687,11 +692,17 @@ public partial class BaanVerkenner
         else r = laatsteRichting;
 
         _log.Rijden($"Neerzetten op melder {doel} (nu bezet: {Lijst(bezet)}), kruipen {r.Tekst()}.");
+        int stilstaandePogingen = 0;
         for (int wissel = 0; wissel < 3; wissel++)
         {
             if (wissel > 0) _log.Rijden($"Neerzetten op melder {doel}: nu {r.Tekst()} (bezet: {Lijst(_monitor.Bezet)}).");
-            bool doelWasBezet = _monitor.IsBezet(doel);
-            await StuurSnelheid(r, _ins.Kruipsnelheid);
+            // BUG #140: kroop de vorige poging niet vooruit (zelfde melders bezet), dan iets meer snelheid (maximaal de verkensnelheid).
+            int stapNu = Math.Min(Math.Max(_ins.Kruipsnelheid, _ins.Verkensnelheid), _ins.Kruipsnelheid + 2 * stilstaandePogingen);
+            await StuurSnelheid(r, stapNu, doel);
+            _monitor.Bijwerken();
+            bool doelWasBezet = _monitor.IsBezet(doel); // vers gemeten: een melder die net wegviel telt niet als 'doel bereikt en voorbij'
+            var bezetBijStart = _monitor.Bezet.ToList();
+            _log.Rijden($"Neerzetten op melder {doel}: snelheid {stapNu} {r.Tekst()} naar blok {string.Join(", ", _voedingBlokken.OrderBy(b => b))}.");
             // BUG #58: bij kruipsnelheid kost een stuk spoor veel tijd; de tijd per poging verdubbelt (15, 30, 60 s)
             // zodat de loc niet "net voor de melder" wordt afgebroken en daarna weer van richting wisselt.
             double basisTijd = Math.Max(15, _ins.MinSecondenTussenMelders);
@@ -721,6 +732,12 @@ public partial class BaanVerkenner
             _monitor.Bijwerken();
             bezet = _monitor.Bezet;
             if (bezet.Count == 1 && bezet.Contains(doel)) return;
+            if (bezet.OrderBy(x => x).SequenceEqual(bezetBijStart.OrderBy(x => x)) && !omdraaien)
+            {
+                stilstaandePogingen++;
+                _log.Waarschuwing($"Neerzetten op melder {doel}: de loc is niet verplaatst (nog steeds bezet: {Lijst(bezet)}) na een poging met snelheid {stapNu}{(stilstaandePogingen < 3 ? "; de volgende poging krijgt iets meer snelheid" : "")}.");
+            }
+            else stilstaandePogingen = 0;
             if (!omdraaien && bezet.Contains(doel) && bezet.Count > 1 && wissel > 0) break;
             r = !bezet.Contains(doel) ? (RichtingNaarDoel(bezet, doel) ?? r.Om()) : r.Om();
         }

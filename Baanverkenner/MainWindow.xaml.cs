@@ -326,7 +326,7 @@ public partial class MainWindow : Window
     {
         int i = tekst.IndexOf("[Dinamo] ", StringComparison.Ordinal);
         if (i < 0) return false;
-        var hex = tekst[(i + 9)..].Trim();
+        var hex = new string(tekst[(i + 9)..].Trim().TakeWhile(Uri.IsHexDigit).ToArray()); // BUG #140: achter de hex-bytes staat nu ook de vertaling
         if (hex.Length < 8) return false;
         bool a = hex.StartsWith("4A", StringComparison.Ordinal);
         bool b = hex.StartsWith("0A", StringComparison.Ordinal);

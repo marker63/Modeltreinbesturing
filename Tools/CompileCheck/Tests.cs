@@ -1415,12 +1415,54 @@ public static class Tests
 
 
     // BUG #135-#137 (Marco 14-10 14:12, log 14:07-14:11): kruiswissel-bewaking zonder vaste referentie, met het bewijs uit de EIGEN kaart
+    // BUG #140: loc stond alleen op melder 30 (blok 7) en moest naar melder 20 (blok 6): het doelblok kreeg geen rijcommando en hij bleef staan
+    static void NastellenAnderBlokTest()
+    {
+        Console.WriteLine("Test: neerzetten op een melder in een ander Dinamo-blok (BUG #140, log 14-10 15:01)");
+        foreach (var metFix in new[] { true })
+        {
+            var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, StaatStilZonderBlokcommando = true, LocAdres = 5408 };
+            var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+            var s20 = sim.NieuweSectie(20, 150, 6); var s30 = sim.NieuweSectie(30, 200, 7); var s29 = sim.NieuweSectie(29, 200, 7);
+            sim.Verbind(s20, B, s30, A); sim.Verbind(s30, B, s29, A);
+            sim.PlaatsLoc(s30, 4, -1); // alleen op melder 30, vlak voor de grens met blok 6, rijdt (vooruit) richting melder 20
+            var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 1, DinamoBlokken = "6-7" };
+            sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+            var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+            var log = new VerkenLog(klok);
+            var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true));
+            var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var monitor = (MelderMonitor)typeof(BaanVerkenner).GetField("_monitor", bf)!.GetValue(v)!;
+            sim.BezetmeldingGewijzigd += monitor.Ontvang;
+            v.Kaart.Melders.Add(new MelderInfo { Nummer = 20, DinamoBlok = 6 }); v.Kaart.Melders.Add(new MelderInfo { Nummer = 30, DinamoBlok = 7 }); v.Kaart.Melders.Add(new MelderInfo { Nummer = 29, DinamoBlok = 7 });
+            foreach (var mm in new[] { 20, 29, 30 }) sim.VraagMelderStatusOp(mm);
+            klok.Wacht(TimeSpan.FromSeconds(1)).GetAwaiter().GetResult();
+            var nast = typeof(BaanVerkenner).GetMethod("Nastellen", bf)!;
+            Exception? fout = null;
+            try { ((Task)nast.Invoke(v, new object?[] { 20, Richting.Vooruit, null, null })!).GetAwaiter().GetResult(); } catch (Exception ex) { fout = ex.InnerException ?? ex; }
+            monitor.Bijwerken();
+            Eis(fout is null && monitor.Bezet.Count == 1 && monitor.IsBezet(20), "neerzetten (#140): loc komt vanuit blok 7 netjes op melder 20 in blok 6 (nu bezet: " + string.Join(",", monitor.Bezet) + (fout is null ? "" : ", fout: " + fout.Message) + ")");
+            Eis(log.Regels.Any(r => r.Tekst.Contains("naar blok 6, 7")), "neerzetten (#140): het log laat zien dat blok 6 en 7 het rijcommando kregen");
+        }
+    }
+
     static void WisselTerugmeldingTest()
     {
         Console.WriteLine("Test: terugmelding van een wissel wordt leesbaar gelogd (BUG #139), voorbeeld uit hardwarelog 14-10 14:11");
         // echte regels: 4A 90 80 (wissel 1 rechtdoor), 0A 90 81 (wissel 2), 0A 94 89 (wissel 10 afbuigend)
         Eis(Modeltreinbesturing.Hardware.DinamoLogVertaler.WisselTerugmeldingTekst(0x10, 0x00, out string s1) == "1" && s1 == "rechtdoor", "terugmelding (#139): 90 80 = wissel 1 rechtdoor");
         Eis(Modeltreinbesturing.Hardware.DinamoLogVertaler.WisselTerugmeldingTekst(0x10, 0x01, out string s2) == "2" && s2 == "rechtdoor", "terugmelding (#139): 90 81 = wissel 2 rechtdoor");
+        // BUG #140: korte vertaling voor het live log, echte regels uit hardwarelog 14-10 15:01
+        string K(string r, string hex) => Modeltreinbesturing.Hardware.DinamoLogVertaler.KortTekst(r, Convert.FromHexString(hex));
+        Eis(K("In", "4A9080A6") == "terugmelding wissel 1 rechtdoor", "live (#140): In 4A9080A6 = terugmelding wissel 1 rechtdoor (nu: " + K("In", "4A9080A6") + ")");
+        Eis(K("In", "4AD09DC9") == "melder 30 bezet", "live (#140): In 4AD09DC9 = melder 30 bezet (nu: " + K("In", "4AD09DC9") + ")");
+        Eis(K("In", "4AC093E3") == "melder 20 vrij", "live (#140): In 4AC093E3 = melder 20 vrij (nu: " + K("In", "4AC093E3") + ")");
+        Eis(K("In", "0AB282C2").Contains("KORTSLUITING") && K("In", "0AB282C2").Contains("3"), "live (#140): In 0AB282C2 = kortsluiting blok 3 (nu: " + K("In", "0AB282C2") + ")");
+        Eis(K("Uit", "4B90808C99").StartsWith("wissel/sein 1 rechtdoor"), "live (#140): Uit 4B90808C99 = wissel 1 rechtdoor (nu: " + K("Uit", "4B90808C99") + ")");
+        Eis(K("Uit", "4DA885E5A0AAD7").Contains("blok 6") && K("Uit", "4DA885E5A0AAD7").Contains("snelheid 5") && K("Uit", "4DA885E5A0AAD7").Contains("vooruit"), "live (#140): kruip vooruit blok 6 (nu: " + K("Uit", "4DA885E5A0AAD7") + ")");
+        Eis(K("Uit", "0DA886E0A0AA9B").StartsWith("STOP blok 7"), "live (#140): stop blok 7 (nu: " + K("Uit", "0DA886E0A0AA9B") + ")");
+        Eis(K("Uit", "4DA886ECA0AACF").Contains("snelheid 12") , "live (#140): snelheid 12 (nu: " + K("Uit", "4DA886ECA0AACF") + ")");
+        Eis(K("Uit", "4A8180B5") == "Reset Fault (foutstatus wissen)" || K("Uit", "4A8180B5").Length >= 0, "live (#140): geen fout bij onbekend patroon");
         Eis(Modeltreinbesturing.Hardware.DinamoLogVertaler.WisselTerugmeldingTekst(0x14, 0x09, out string s3) == "10" && s3 == "afbuigend", "terugmelding (#139): 94 89 = wissel 10 afbuigend");
     }
 
@@ -1876,6 +1918,7 @@ public static class Tests
         HoortestEnKruisTest();
         KruisZonderReferentieTest();
         WisselTerugmeldingTest();
+        NastellenAnderBlokTest();
         TweedeMelderTest();
         VerkeerdeWisselVraagTest();
         WisselstraatImportTest();

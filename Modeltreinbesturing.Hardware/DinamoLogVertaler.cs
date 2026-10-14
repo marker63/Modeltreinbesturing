@@ -178,7 +178,7 @@ public static class DinamoLogVertaler
             if (commandoBasis == 0x2C && (data.Length == 5 || data.Length == 6) && data[2] <= 1)
             {
                 // DCC 126 Snelh.: (010110B)(bbbbbbb)(000000R)(SSSSSSS)(ddddddd)[(DDDDDDD)]
-                int blok = (blokMsb << 7) | data[1];
+                int blok = ((blokMsb << 7) | data[1]) + 1; // BUG #140: op de kabel staat blok-1; hier het Dinamo-blok zoals in het programma (1-based)
                 bool vooruit = data[2] == 1;
                 int snelheid = data[3];
                 int adres = data.Length == 5 ? data[4] : data[4] | (data[5] << 7);
@@ -190,7 +190,7 @@ public static class DinamoLogVertaler
             if (commandoBasis == 0x2C && (data.Length == 5 || data.Length == 6) && data[2] is >= 4 and <= 7)
             {
                 // DCC F13..F20 / F21..F28: (010110B)(bbbbbbb)(00001{0,1}F)(fffffff)(ddddddd)[(DDDDDDD)]
-                int blok = (blokMsb << 7) | data[1];
+                int blok = ((blokMsb << 7) | data[1]) + 1; // BUG #140: op de kabel staat blok-1; hier het Dinamo-blok zoals in het programma (1-based)
                 bool tweedeGroep = (data[2] & 0x02) != 0; // 0b0000100=F13-20, 0b0000110=F21-28
                 int laagsteNummer = tweedeGroep ? 21 : 13;
                 int hoogsteBit = data[2] & 0x01;
@@ -215,7 +215,7 @@ public static class DinamoLogVertaler
                 // snelheidscommando werd hierdoor ten onrechte als een functiegroep-wijziging
                 // gelezen. Nu eerst op bit6 gecontroleerd, exact zoals de encoder het ook
                 // onderscheidt.
-                int blok = (blokMsb << 7) | data[1];
+                int blok = ((blokMsb << 7) | data[1]) + 1; // BUG #140: op de kabel staat blok-1; hier het Dinamo-blok zoals in het programma (1-based)
                 bool vooruit = (data[2] & 0x20) != 0;
                 int snelheid = data[2] & 0x1F;
                 int adres = data.Length == 4 ? data[3] : data[3] | (data[4] << 7);
@@ -227,7 +227,7 @@ public static class DinamoLogVertaler
             if (commandoBasis == 0x28 && (data.Length == 4 || data.Length == 5))
             {
                 // DCC Functiegroep 1,2a,2b: (010100B)(bbbbbbb)(0XXFFFF)(ddddddd)[(DDDDDDD)]
-                int blok = (blokMsb << 7) | data[1];
+                int blok = ((blokMsb << 7) | data[1]) + 1; // BUG #140: op de kabel staat blok-1; hier het Dinamo-blok zoals in het programma (1-based)
                 int xx = (data[2] >> 4) & 0x03;
                 int ffff = data[2] & 0x0F;
                 int adres = data.Length == 4 ? data[3] : data[3] | (data[4] << 7);
@@ -277,6 +277,28 @@ public static class DinamoLogVertaler
 
         return new VertaaldeRegel(tijdstip, richting, "Onbekend/niet gedecodeerd", "", "", "", "", "", "", "", "",
             CombineerToelichting($"Inkomend datagram met data, maar geen herkend patroon ({toggleInfo}).", faultTekst), ruw);
+    }
+
+    /// <summary>BUG #140: korte Nederlandse vertaling van één Dinamo-datagram voor het live log
+    /// (bijv. 'snelheid 12 vooruit, blok 7, loc 5408', 'wissel 3 rechtdoor', 'melder 30 bezet'). Leeg voor een keepalive.</summary>
+    public static string KortTekst(string richting, byte[] datagram)
+    {
+        try
+        {
+            if (datagram.Length < 2 || (datagram[0] & 0x07) == 0) return "";
+            var v = VertaalDatagram("", richting, datagram);
+            string Loc() => string.IsNullOrEmpty(v.DecoderAdres) ? "" : $", loc {v.DecoderAdres}";
+            if (v.Type.StartsWith("Snelheid", StringComparison.Ordinal))
+                return v.Snelheid == "0" ? $"STOP blok {v.Blok}{Loc()}" : $"snelheid {v.Snelheid} {v.RijRichting}, blok {v.Blok}{Loc()}";
+            if (v.Type.StartsWith("Magneetartikel", StringComparison.Ordinal)) return $"wissel/sein {v.WisselOfSeinAdres} {v.Stand}";
+            if (v.Type.StartsWith("Terugmelding", StringComparison.Ordinal)) return $"terugmelding wissel {v.WisselOfSeinAdres} {v.Stand}";
+            if (v.Type.StartsWith("Bezetmelding", StringComparison.Ordinal)) return $"melder {v.MelderNummer} {v.Bezet.ToLowerInvariant()}";
+            if (v.Type.StartsWith("Blok-alarm", StringComparison.Ordinal)) return v.Toelichting;
+            if (v.Type.StartsWith("Functies", StringComparison.Ordinal)) return $"{v.Type.ToLowerInvariant()} blok {v.Blok}{Loc()}";
+            if (v.Type.StartsWith("Reset Fault", StringComparison.Ordinal)) return "Reset Fault (foutstatus wissen)";
+            return v.Type.ToLowerInvariant();
+        }
+        catch { return ""; }
     }
 
     /// <summary>BUG #139: leest een terugmelding (zelfde opbouw als het wisselcommando: 0001 0 C AA, aaaaaaa).</summary>

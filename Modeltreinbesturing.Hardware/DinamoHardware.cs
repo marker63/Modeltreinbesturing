@@ -897,7 +897,8 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
             byte checksum = (byte)(0x80 | ((128 - (som % 128)) % 128));
             pakket[^1] = checksum;
             _poort!.Write(pakket, 0, pakket.Length);
-            HardwareCommunicatieLog.Log("Uit", $"[Dinamo] {Convert.ToHexString(pakket)}{(payload.Length == 0 ? " (keepalive)" : "")}", keepalive: payload.Length == 0);
+            string uitVertaling = payload.Length == 0 ? "" : DinamoLogVertaler.KortTekst("Uit", pakket);
+            HardwareCommunicatieLog.Log("Uit", $"[Dinamo] {Convert.ToHexString(pakket)}{(payload.Length == 0 ? " (keepalive)" : uitVertaling.Length > 0 ? "  = " + uitVertaling : "")}", keepalive: payload.Length == 0);
         }
         catch (Exception ex)
         {
@@ -1058,16 +1059,16 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
 
                 bool ditIsKeepalive = aantalDataBytes == 0;
                 NoteerOntvangst();
-                // BUG #139: een terugmelding van een wissel/sein krijgt meteen leesbare tekst in het log (adres + stand) en wordt onthouden.
-                string terugTekst = "";
+                // BUG #139/#140: elke regel krijgt meteen de Nederlandse vertaling (bij een terugmelding van een wissel wordt die ook onthouden).
+                var frameBytes = _ontvangstBuffer.GetRange(i, berichtLengte).ToArray();
                 if (aantalDataBytes >= 2 && (_ontvangstBuffer[i + 1] & 0x70) == 0x10)
                 {
                     byte t1 = (byte)(_ontvangstBuffer[i + 1] & 0x7F), t2 = (byte)(_ontvangstBuffer[i + 2] & 0x7F);
                     string tAdres = DinamoLogVertaler.WisselTerugmeldingTekst(t1, t2, out string tStand);
-                    terugTekst = $"  <- terugmelding: wissel {tAdres} {tStand}";
                     lock (_laatsteTerugmeldingen) _laatsteTerugmeldingen[int.Parse(tAdres)] = (System.Diagnostics.Stopwatch.GetTimestamp(), tStand);
                 }
-                HardwareCommunicatieLog.Log("In", $"[Dinamo] {Convert.ToHexString(_ontvangstBuffer.GetRange(i, berichtLengte).ToArray())}{terugTekst}", keepalive: ditIsKeepalive);
+                string vertaling = DinamoLogVertaler.KortTekst("In", frameBytes);
+                HardwareCommunicatieLog.Log("In", $"[Dinamo] {Convert.ToHexString(frameBytes)}{(vertaling.Length > 0 ? "  = " + vertaling : "")}", keepalive: ditIsKeepalive);
 
                 framesDezeKeer++;
                 if ((_ontvangstBuffer[i] & 0x20) != 0) dinamoMeldtFout = true; // Dinamo's eigen F-bit
