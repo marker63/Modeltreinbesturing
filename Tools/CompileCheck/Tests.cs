@@ -1213,6 +1213,17 @@ public static class Tests
         Eis(r2.Bevat(6), "startmelder vooraf (#122): wissel onder de loc wordt niet omgezet");
         var kp = new Kortsluitpunt { Id = 5, NaMelder = 5, Richting = Richting.Achteruit, Configuratie = Configuratie.Basis.Met(2) };
         Eis(!k.RegistreerHandmatigeOplossing(kp, 2, false), "oplossing (#122): de geteste wissel zelf terugzetten is geen oplossing");
+        // kaart van 14-10: wissel 2 hangt bij 5 (NaMelder) en 13 (vervolg), wissel 1 is onbekend; opdracht 5 achteruit met 1 en 2 afbuigend
+        var k4 = new Baankaart();
+        k4.Wissel(2).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.KortsluitingBijOmzetten, NaMelder = 5, Richting = Richting.Vooruit, VolgendeBijRechtdoor = 13 });
+        var e4 = new Etappe { Van = 13, Naar = 5, Richting = Richting.Achteruit, Pad = new List<int> { 13, 5 } };
+        var r4 = BaanVerkenner.StartmelderWisselsVooraf(k4, e4, Configuratie.Basis, Configuratie.Basis.Met(1).Met(2), out _);
+        Eis(r4.Bevat(1) && r4.Bevat(2), "startmelder vooraf (#124): wissel 2 (ook vervolgmelder 13) en onbekende wissel 1 worden vooraf gezet (nu " + r4 + ")");
+        // een triviale oplossing komt niet in het leerprofiel
+        var k5 = new Baankaart();
+        k5.BekendeKortsluitOplossingen.Add(new KortsluitOplossing { NaMelder = 24, Richting = Richting.Vooruit, Stand = Configuratie.Basis.Met(13).Sleutel, Start = 14, Adres = 13, Afbuigend = false });
+        k5.BekendeKortsluitOplossingen.Add(new KortsluitOplossing { NaMelder = 12, Richting = Richting.Achteruit, Stand = Configuratie.Basis.Met(2).Sleutel, Start = 13, Adres = 1, Afbuigend = true });
+        Eis(k5.AlleKortsluitOplossingen().Count == 1 && k5.AlleKortsluitOplossingen()[0].Adres == 1, "leerprofiel (#124): 'wissel 13 terugzetten' wordt niet bewaard, een echte extra wissel wel");
         // keten: stand 2 + wissel 1 geeft kortsluiting, stand 1+2 + wissel 5 lost op
         var k3 = new Baankaart();
         k3.BekendeKortsluitOplossingen.Add(new KortsluitOplossing { NaMelder = 12, Richting = Richting.Achteruit, Stand = Configuratie.Basis.Met(2).Sleutel, Start = 13, Adres = 1, Afbuigend = true });

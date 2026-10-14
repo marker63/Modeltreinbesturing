@@ -1803,3 +1803,13 @@ Open: de 18 overgangen in het gebied 129/blok 1-4 en de wissels 5, 6, 9, 10, 14 
 via 'start vooruit/achteruit' tegenkomt. Oplossing vraagt een routeplanner uit de kaart voor opdrachten vanuit de kaart; nog niet gebouwd (wacht op akkoord van Marco).
 Opmerking opdracht #4: de wissels 1 en 2 worden hier nog NIET vooraf gezet (wissel 2 hangt in de kaart ook aan melder 13, wissel 1 is niet aan een melder gekoppeld); ze werden om 08:57:29
 op melder 5 omgezet en dat ging nu goed dankzij de wachttijd.
+
+## #124 Voorbereiding op een volledig nieuwe verkenning (Marco 09:22)
+1. Vooraf zetten bij de startmelder (#122) was te voorzichtig: opdracht #4 van 14-10 zette wissel 1 en 2 pas op melder 5 om (08:57:29), omdat wissel 2 in de kaart ook aan melder 13 hangt
+   (vervolgmelder) en wissel 1 nog niet aan een melder gekoppeld is. Nu telt alleen een wissel die de kaart ACHTER een melder noemt waar de loc nog staat of langskomt (NaMelder)
+   als 'onder de loc'; wissels die alleen als vervolgmelder aan die melder hangen en wissels waar de kaart nog niets van weet (maar die de rijstand afbuigend wil) worden vooraf gezet.
+2. Het leerprofiel nam 'oplossingen' over waarbij de oplossende wissel zelf in de geteste stand zat (kortsluitpunt #4: 13 afbuigend -> 13 rechtdoor; #5: 2 afbuigend -> 2 rechtdoor).
+   Die ontstonden uit wissels die onder de loc omgezet werden (zie #122) en zouden een nieuwe verkenning meteen verkeerd sturen (13 rechtdoor bij 24 vooruit, terwijl 13 afbuigend 24 -> 8
+   bewezen is). Ze worden niet meer in het leerprofiel bewaard en niet meer uit een bestaand leerprofiel overgenomen.
+Tests: `startmelder vooraf (#124)`, `leerprofiel (#124)` in `StartmelderVoorafTest`. Nog niet getest op de baan; het WPF-project is niet gecompileerd.
+Open: de controle rijdt het gebied rond 129 niet opnieuw (zie #123); oorzaak van de twee kortsluitingen na wissel 14 op melder 13 blijft een hypothese.

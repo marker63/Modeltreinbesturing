@@ -285,7 +285,8 @@ public class Baankaart
         foreach (var r in new[] { Richting.Vooruit, Richting.Achteruit })
             foreach (var o in Oplossingen(r))
                 res.Add(new KortsluitOplossing { NaMelder = o.NaMelder, Richting = r, Stand = o.K.Sleutel, Start = o.Start, Adres = o.Adres, Afbuigend = o.Afbuigend, Bron = o.Label });
-        return res.GroupBy(x => x.Sleutel).Select(g => g.First()).ToList();
+        // BUG #124: oplossingen waarbij de oplossende wissel zelf in de geteste stand zit, komen niet in het leerprofiel (ze ontstonden uit wissels die onder de loc omgezet werden).
+        return res.Where(x => !Configuratie.VanSleutel(x.Stand).Bevat(x.Adres)).GroupBy(x => x.Sleutel).Select(g => g.First()).ToList();
     }
 
     /// <summary>BUG #87: de gebruiker heeft aangewezen dat wissel <paramref name="adres"/> verkeerd stond en nu op <paramref name="afbuigend"/> staat;

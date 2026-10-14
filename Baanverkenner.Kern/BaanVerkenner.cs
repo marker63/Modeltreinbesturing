@@ -240,7 +240,8 @@ public partial class BaanVerkenner
             {
                 int nieuwOpl = 0;
                 foreach (var o in lpo.KortsluitOplossingen)
-                    if (!_kaart.BekendeKortsluitOplossingen.Any(x => x.Sleutel == o.Sleutel)) { _kaart.BekendeKortsluitOplossingen.Add(o); nieuwOpl++; }
+                    if (Configuratie.VanSleutel(o.Stand).Bevat(o.Adres)) continue;   // BUG #124: 'wissel uit de geteste stand terugzetten' is geen oplossing (alleen een andere stand)
+                    else if (!_kaart.BekendeKortsluitOplossingen.Any(x => x.Sleutel == o.Sleutel)) { _kaart.BekendeKortsluitOplossingen.Add(o); nieuwOpl++; }
                 if (nieuwOpl > 0) _log.Info($"{nieuwOpl} kortsluitoplossing(en) uit eerdere verkenningen overgenomen (bv. een extra wissel die bij een stand hoort); die worden meteen toegepast.");
             }
             // BUG #98: overgangen uit ritten met de loc andersom (spiegelbeeld van een veel vaker gereden overgang) uit de kaart halen.
@@ -1633,8 +1634,14 @@ public partial class BaanVerkenner
     {
         uitleg = null;
         if (e.Pad.Count < 2) return cfg;
-        var onderLoc = WisselsBijBezet(kaart, e.Pad.Take(e.Pad.Count - 1));
+        // Onder de loc: wissels die de kaart ACHTER een melder noemt waar de loc nog staat of langskomt (NaMelder). Een wissel die alleen als vervolgmelder
+        // aan zo'n melder hangt (wissel 2 bij 13, 14 -> 5) ligt ertussen en mag vooraf (17:50 op 12-10 ging dat goed).
+        var wachtMelders = e.Pad.Take(e.Pad.Count - 1).ToHashSet();
+        var onderLoc = kaart.Wissels.Where(w => w.Waarnemingen.Any(o => wachtMelders.Contains(o.NaMelder))).Select(w => w.Adres).ToHashSet();
         var bijStart = WisselsBijBezet(kaart, new[] { e.Naar });
+        // Wissels waarvan de kaart nog niets weet (bv. wissel 1, alleen bekend als oplossing) en die de rijstand afbuigend wil: ook vooraf.
+        foreach (var a in doel.Afbuigend)
+            if (!kaart.Wissels.Any(w => w.Adres == a && w.Waarnemingen.Count > 0)) bijStart.Add(a);
         var eis = kaart.MetWisselEisen(e.Pad, e.Richting, Configuratie.Basis, out _);
         var gezet = new List<string>();
         foreach (var a in bijStart.OrderBy(x => x))
