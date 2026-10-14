@@ -1893,3 +1893,29 @@ Fix: `PartnerwisselZoeken` ziet nu of de alarmcontrole tijdens de proefrit de wi
 Test: `PartnerAlarmIngreepTest` (gesimuleerd dezelfde reeks als in het log; de echte overloop-test `OverloopTest` blijft groen). Nog niet getest op de baan.
 Let op voor oude kaarten: bevindingen uit dezelfde reeks in log 1142 zijn verdacht: wissel 12 'alleen met 14 erbij' en wissel 1 'alleen met 2 erbij' (11:15; daar reed 5 -> 16 met wissel 1 afbuigend en wissel 2 rechtdoor).
 Open: als de kortsluiting wél blijft staan en de schuldige wissel bij de loc ligt (#109), zet de verkenner hem niet zelf terug; de bestaande pop-up 'Staat er een wissel verkeerd?' (#79) vraagt Marco dan, zoals nu.
+
+## #131 Na 'Dinamo is hersteld' eerst een hoortest: een willekeurige wissel gaat heen en weer (Marco 13:25)
+Marco: 'Als ik op "Is Dinamo hersteld?" ja antwoord, schakel dan een willekeurige wissel heen en weer en vraag of ik dat gehoord heb. Zo nee, dan moet Dinamo nogmaals herstart worden.'
+Fix: `HoortestNaHerstel` (Baanverkenner.Rijden.cs) draait in beide 'Dinamo hersteld'-vragen (#125 'Dinamo reageert niet' en #126 'Dinamo voert wissels niet uit'), vóór het opnieuw sturen van alle wissels.
+Een willekeurige wissel (nooit een kruismotor, nooit een wissel onder de loc) gaat naar de andere stand en terug (1,5 s wachttijd per commando); daarna de vraag 'Heeft u de wissel horen klikken?'. Nee -> pop-up 'Dinamo opnieuw herstarten' ->
+de test wordt herhaald, tot het klikt (venster sluiten = verkenning stopt; 'Nee' op de herstartvraag = toch doorgaan, gelogd). De wisselstanden in het programma blijven ongewijzigd. De terugmeldingen van Dinamo tijdens de test staan in het log (alleen ter info, Marco's gehoor is leidend).
+Test: `HoortestEnKruisTest` (Nee -> herstart -> Ja, twee commando's per poging, standen ongewijzigd) en de aangepaste echo-test. Nog niet getest op de baan.
+
+## #132 Handmatige oplossing werd aan het verkeerde kortsluitpunt gehangen (Marco 13:25, kaart 1323)
+Kaart 1323: 'wissel 10 afbuigend' was de oplossing van de kortsluiting na melder 24 (kortsluitpunt #2), maar werd bij het oudere #1 (na melder 12) vastgelegd (`LastOrDefault` van alle onopgeloste punten; #2 wordt pas na de rit geregistreerd).
+#2 bleef onopgelost en werd om 13:19 opnieuw geprobeerd; #1 kreeg een onjuiste oplossing. LET OP in de kaart 1323: 'KP#1 opgelost door 10' is onjuist (hoort bij #2), en de tekst 'ook in volgende verkenningen' klopte niet (alleen bij voorkennis 'Ja', #128).
+Fix: de oplossing wacht (`_wachtendeHandOplossing`, met melder en richting van de lopende kortsluiting) en wordt in `RegistreerKortsluitpunt` aan het kortsluitpunt met dezelfde melder en richting gekoppeld (nieuw of bestaand). De logtekst is gecorrigeerd.
+Test: `HoortestEnKruisTest` (#12 blijft open, #24 opgelost door 10). Nog niet getest op de baan.
+
+## #133 Kruismotor omzetten terwijl de loc op de kruiswissel staat (kaart 1323, 13:13:03)
+Wissel 10 werd om 13:13:03 teruggezet naar rechtdoor terwijl de loc op melder 24 stond: zelf veroorzaakte kortsluiting. `VoerOpdrachtUit` bewaakte dit (#96), maar `ZetConfiguratie` ook bij handmatige plaatsing en herstel wordt aangeroepen.
+Fix: `ZetConfiguratie` slaat een kruismotor over zolang de loc op de kruiswissel staat (logmelding 'Motor X wordt nu NIET omgezet'); hij gaat om zodra de loc weg is. Test: `HoortestEnKruisTest`. Nog niet getest op de baan.
+
+## #134 Alarmroutine draaide 75 s lang 22 wissels om op de kruiswissel (kaart 1323, 13:19:52)
+Bleef een kortsluiting staan met de loc op de kruiswissel, dan probeerde `ProbeerAlarmWegTeKrijgen` alle andere wissels (de schuldige is daar een kruismotor, die nooit geprobeerd wordt): 75 s en 22 commando's zonder resultaat, en veel commando's vergroten de kans op een Dinamo-uitval (zie hieronder).
+Fix: staat de loc op de kruiswissel, dan geeft `ControleerGeenAlarmVoorStap` meteen een navigatiefout, waarna de pop-up 'Staat er een wissel verkeerd?' (#79) Marco vraagt welke motor verkeerd staat. Test: `HoortestEnKruisTest`. Nog niet getest op de baan.
+
+## Onderzoek: waarom reageert Dinamo niet meer? (Marco 13:25; geen code-oorzaak gevonden)
+Analyse van alle hardwarelogs van 14-10: van ongeveer 12 uitvalmomenten begonnen er 8 bij een commando naar wissel 9 (of 10). Er zijn korte en lange uitvallen; tijdens korte uitvallen worden commando's in de wachtrij later alsnog uitgevoerd. Het ligt NIET aan kortsluiting, F-bit, toggle-bit of tellers in ons protocol (die staan bij uitval gewoon goed).
+Bronnen (dinamousers.net, koploperforum.nl): wissels worden aangestuurd door een OC32-module (maximaal 16 wissels per module, rode led brandt bij schakelen); een defecte of te warme OC32 kan ophouden met reageren. Dit is een hypothese, niet bewezen.
+Advies: controleer de module waar wissel 9 (en 10) op zit (bedrading hoeft niet, maar warmte, voeding en de rode led bij schakelen wel). Voorstel (wacht op Marco): een lijst met over te slaan wisseladressen (bijv. 9) en een snellere wisselinitialisatie (nu ~30 s).

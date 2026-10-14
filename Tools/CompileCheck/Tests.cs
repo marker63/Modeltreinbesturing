@@ -1358,7 +1358,59 @@ public static class Tests
         var hw4 = new EchoHw(); var log4 = new VerkenLog(new VirtueleKlok()); int ja = 0;
         var v4 = Maak(hw4, log4, (_, _) => { ja++; hw4.Levend = true; return Task.FromResult<bool?>(true); });
         Zet(v4, 1, true); hw4.Levend = false; Zet(v4, 2, true); Zet(v4, 3, true); Zet(v4, 4, true);
-        Eis(ja == 1 && log4.Regels.Any(r => r.Tekst.Contains("Dinamo hersteld volgens de gebruiker")), "echo (#126): 'Ja' -> opnieuw sturen en doorgaan (vragen " + ja + ")");
+        Eis(ja == 2 && log4.Regels.Any(r => r.Tekst.Contains("Dinamo hersteld volgens de gebruiker")) && log4.Regels.Any(r => r.Tekst.Contains("Hoortest geslaagd")), "echo (#126/#131): 'Ja' -> hoortest (tweede vraag), dan opnieuw sturen en doorgaan (vragen " + ja + ")");
+    }
+
+
+    // BUG #131-#134 (Marco 14-10 13:25)
+    static void HoortestEnKruisTest()
+    {
+        Console.WriteLine("Test: hoortest na herstel van Dinamo (BUG #131) en kruiswissel-fixes (BUG #132-#134)");
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        // 131: Ja -> hoortest; 'niet gehoord' -> opnieuw herstarten -> hoortest herhaald -> gehoord
+        var hw = new EchoHw(); var log = new VerkenLog(new VirtueleKlok()); var titels = new List<string>(); int hoor = 0;
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 8 };
+        var v = new BaanVerkenner(hw, ins, new VirtueleKlok(), log, (_, _) => Task.FromResult(true), new VerkenStatus { Instellingen = ins })
+        {
+            VraagJaNee = (t, _) => { titels.Add(t); if (t.Contains("Hoortest")) return Task.FromResult<bool?>(++hoor >= 2); return Task.FromResult<bool?>(true); }
+        };
+        var stand = (Dictionary<int, bool>)typeof(BaanVerkenner).GetField("_wisselStand", bf)!.GetValue(v)!;
+        stand[3] = true;
+        long voor = hw.AantalWisselBevestigingen;
+        ((Task)typeof(BaanVerkenner).GetMethod("HoortestNaHerstel", bf)!.Invoke(v, null)!).GetAwaiter().GetResult();
+        Eis(titels.Count == 3 && titels[1].Contains("opnieuw herstarten") && hoor == 2, "hoortest (#131): niet gehoord -> Dinamo opnieuw herstarten -> hoortest herhaald (vragen: " + string.Join(" | ", titels) + ")");
+        Eis(hw.AantalWisselBevestigingen - voor == 4, "hoortest (#131): elke poging stuurt twee commando's (heen en weer) (nu " + (hw.AantalWisselBevestigingen - voor) + ")");
+        Eis(stand[3] == true && stand.Count(kv => kv.Value) == 1, "hoortest (#131): de wisselstanden zijn na de test ongewijzigd");
+
+        // 132: de hand-oplossing hoort bij het kortsluitpunt van de lopende kortsluiting, niet bij het laatste onopgeloste
+        var k = new BaanVerkenner(new EchoHw(), ins, new VirtueleKlok(), new VerkenLog(new VirtueleKlok()), (_, _) => Task.FromResult(true), new VerkenStatus { Instellingen = ins });
+        var reg = typeof(BaanVerkenner).GetMethod("RegistreerKortsluitpunt", bf)!;
+        var o = new Opdracht { Id = 1, Start = 13, Richting = Richting.Achteruit };
+        reg.Invoke(k, new object?[] { o, new List<int> { 13, 5, 12 }, Configuratie.Basis.Met(2), new List<Etappe>(), Richting.Achteruit, KortsluitpuntSoort.Kortsluiting });
+        var wacht = typeof(BaanVerkenner).GetField("_wachtendeHandOplossing", bf)!;
+        wacht.SetValue(k, (24, Richting.Vooruit, 10, true, DateTime.Now));
+        reg.Invoke(k, new object?[] { o, new List<int> { 14, 24 }, Configuratie.Basis.Met(5), new List<Etappe>(), Richting.Vooruit, KortsluitpuntSoort.Kortsluiting });
+        var kaart = k.Kaart;
+        var kp1 = kaart.Kortsluitpunten.First(x => x.NaMelder == 12); var kp2 = kaart.Kortsluitpunten.First(x => x.NaMelder == 24);
+        Eis(!kp1.Opgelost && kp2.Opgelost && kp2.OpgelostDoorAdres == 10, "hand (#132): wissel 10 lost kortsluitpunt na melder 24 op, het oudere punt na melder 12 blijft open");
+        Eis(wacht.GetValue(k) is null, "hand (#132): de wachtende oplossing is verwerkt");
+
+        // 133 en 134: loc op de kruiswissel
+        var hw2 = new EchoHw(); var klok = new VirtueleKlok(); var log2 = new VerkenLog(klok);
+        var v2 = new BaanVerkenner(hw2, ins, klok, log2, (_, _) => Task.FromResult(true), new VerkenStatus { Instellingen = ins });
+        v2.Kruis = KruisKennis.Parse("3+4@1");
+        var mon = (MelderMonitor)typeof(BaanVerkenner).GetField("_monitor", bf)!.GetValue(v2)!;
+        mon.Ontvang(1, true); klok.Wacht(TimeSpan.FromSeconds(1)).GetAwaiter().GetResult(); mon.Bijwerken();
+        ((Task)typeof(BaanVerkenner).GetMethod("ZetConfiguratie", bf)!.Invoke(v2, new object[] { Configuratie.Basis.Met(3).Met(5), false })!).GetAwaiter().GetResult();
+        var st2 = (Dictionary<int, bool>)typeof(BaanVerkenner).GetField("_wisselStand", bf)!.GetValue(v2)!;
+        Eis(!(st2.TryGetValue(3, out var m3) && m3) && st2.TryGetValue(5, out var m5) && m5, "kruismotor (#133): met de loc op de kruiswissel blijft motor 3 staan, gewone wissel 5 gaat wel om");
+        Eis(log2.Regels.Any(r => r.Tekst.Contains("Motor 3 wordt nu NIET omgezet")), "kruismotor (#133): de melding staat in het log");
+        var alarm = typeof(BaanVerkenner).GetMethod("HardwareMeldtBlokAlarm", bf)!;
+        alarm.Invoke(v2, new object[] { 8, true });
+        string? fout = null;
+        try { ((Task)typeof(BaanVerkenner).GetMethod("ControleerGeenAlarmVoorStap", bf)!.Invoke(v2, new object[] { "test" })!).GetAwaiter().GetResult(); }
+        catch (Exception ex) { fout = (ex.InnerException ?? ex).GetType().Name; }
+        Eis(fout == "NavigatieFout" && !log2.Regels.Any(r => r.Tekst.Contains("probeert zelf wissels")), "alarmroutine (#134): op de kruiswissel geen wissels doorproberen, meteen navigatiefout (nu " + fout + ")");
     }
 
     static void StartmelderVoorafTest()
@@ -1723,6 +1775,7 @@ public static class Tests
         OplossingLaterOpWegTest();
         StartmelderVoorafTest();
         WisselBevestigingTest();
+        HoortestEnKruisTest();
         TweedeMelderTest();
         VerkeerdeWisselVraagTest();
         WisselstraatImportTest();

@@ -96,6 +96,10 @@ public partial class BaanVerkenner
     private readonly HashSet<int> _alarmBlokken = new();
     private List<int> _laatsteKortsluitBlokken = new();
     private DateTime _laatsteKortsluitingOm = DateTime.MinValue;
+    /// <summary>BUG #132: melder en richting van de laatste kortsluiting in een rit (het kortsluitpunt zelf wordt pas na de rit geregistreerd).</summary>
+    private (int Melder, Richting Richting)? _laatsteKortsluitContext;
+    /// <summary>BUG #132: door de gebruiker aangewezen oplossing die op het kortsluitpunt van de lopende kortsluiting wacht (wordt in RegistreerKortsluitpunt toegepast).</summary>
+    private (int Melder, Richting Richting, int Adres, bool Afbuigend, DateTime Tijd)? _wachtendeHandOplossing;
 
     private void HardwareMeldtBlokAlarm(int blok, bool kortsluiting)
     {
@@ -388,6 +392,7 @@ public partial class BaanVerkenner
             _log.Info("Gebruiker: de wissels gaan wel om. De controle op terugmeldingen van Dinamo staat voor de rest van deze sessie uit.");
             return;
         }
+        await HoortestNaHerstel();
         _echo.Herstel();
         _log.Info("Dinamo hersteld volgens de gebruiker: alle wissels worden opnieuw gestuurd. Bevindingen sinds de eerste ontbrekende terugmelding zijn niet betrouwbaar.");
         foreach (var kv in _wisselStand.ToList())
@@ -404,6 +409,44 @@ public partial class BaanVerkenner
         {
             _log.Waarschuwing("Dinamo meldt na het herstel nog steeds niets terug: de verkenning stopt.");
             throw new OperationCanceledException("Dinamo meldt na het herstel nog steeds geen wissel-commando's terug.");
+        }
+    }
+
+    /// <summary>BUG #131 (Marco 14-10 13:25): zegt de gebruiker 'Dinamo is hersteld', dan wordt dat eerst getest: een willekeurige wissel gaat heen en weer en de
+    /// gebruiker hoort of dat gebeurt. Hoort hij niets, dan moet Dinamo opnieuw worden herstart; dat herhaalt zich tot het klikt (of de gebruiker stopt).
+    /// Het beeld van de wisselstanden blijft ongewijzigd (de wissel gaat terug naar zijn stand). Geeft false als de gebruiker toch zonder test doorgaat.</summary>
+    private async Task<bool> HoortestNaHerstel()
+    {
+        if (VraagJaNee is null) return true;
+        var rnd = new Random();
+        for (int poging = 1; ; poging++)
+        {
+            var onder = WisselsOnderLoc();
+            var kand = _ins.WisselAdressen().Where(a => !Kruis.IsMotor(a) && !onder.ContainsKey(a)).ToList();
+            if (kand.Count == 0) return true;   // geen veilige wissel om te testen
+            int adres = kand[rnd.Next(kand.Count)];
+            bool stand = _wisselStand.TryGetValue(adres, out var h) && h;
+            long voor = (_hw as IWisselBevestiging)?.AantalWisselBevestigingen ?? 0;
+            _log.Info($"Hoortest (poging {poging}): wissel {adres} gaat heen en weer ({(stand ? "afbuigend" : "rechtdoor")} → {(!stand ? "afbuigend" : "rechtdoor")} → {(stand ? "afbuigend" : "rechtdoor")}).");
+            foreach (var wens in new[] { !stand, stand })
+            {
+                _hw.ZetWissel(adres, wens);
+                await Wacht(TimeSpan.FromMilliseconds(Math.Max(100, _ins.WisselPauzeMs)));
+                for (int i = 0; i < 40 && !_hw.KlaarVoorVolgendeWisselCommando; i++) await Wacht(DinamoCyclus);
+                await Wacht(TimeSpan.FromMilliseconds(1500));
+            }
+            _wisselStand[adres] = stand;
+            long na = (_hw as IWisselBevestiging)?.AantalWisselBevestigingen ?? 0;
+            if (_hw is IWisselBevestiging) _log.Info($"Hoortest: Dinamo meldde {na - voor} keer een uitgevoerd commando terug.");
+            var gehoord = await VraagJaNee("Dinamo hersteld? Hoortest",
+                $"Wissel {adres} is zojuist twee keer omgezet (heen en weer). Heeft u de wissel horen klikken en zien bewegen?\n\nJa = ja, gehoord: Dinamo werkt weer\nNee = niets gehoord: Dinamo moet nogmaals worden herstart\n(venster sluiten = verkenning stoppen)");
+            if (gehoord is null) throw new OperationCanceledException("Gebruiker stopte: hoortest na het herstel van Dinamo.");
+            if (gehoord == true) { _log.Info($"Hoortest geslaagd: de gebruiker hoorde wissel {adres} omgaan."); return true; }
+            _log.Waarschuwing($"Hoortest mislukt: de gebruiker hoorde wissel {adres} niet omgaan. Dinamo moet opnieuw worden herstart.");
+            var opnieuw = await VraagJaNee("Dinamo opnieuw herstarten",
+                "Dinamo reageert nog steeds niet. Zet Dinamo en de baanspanning uit, wacht een paar seconden, zet ze weer aan en controleer de kabel.\n\nJa = opnieuw herstart, de hoortest wordt herhaald\nNee = toch doorgaan zonder werkende Dinamo (niet aanbevolen)\n(venster sluiten = verkenning stoppen)");
+            if (opnieuw is null) throw new OperationCanceledException("Gebruiker stopte: Dinamo reageert na herstart nog niet.");
+            if (opnieuw == false) { _log.Waarschuwing("Gebruiker gaat door ondanks mislukte hoortest."); return false; }
         }
     }
 
@@ -441,6 +484,13 @@ public partial class BaanVerkenner
             if (onder.TryGetValue(a, out var m) && !(_wisselStand.TryGetValue(a, out var nu) && nu == wens))
             {
                 _log.Waarschuwing($"Wissel {a} wordt nu NIET omgezet: de loc staat op melder {m} waar die wissel ligt (omzetten met de loc erop laat hem ontsporen). Hij wordt omgezet zodra de loc daar weg is.");
+                continue;
+            }
+            // BUG #133: motor 10 of 13 omzetten terwijl de loc op de kruiswissel staat geeft altijd kortsluiting (#96). VoerOpdrachtUit controleert dat vooraf, maar
+            // ZetConfiguratie wordt ook na een handmatige plaatsing en bij herstel aangeroepen (13:13:03 kaart 1323: wissel 10 werd zo onder de loc teruggezet).
+            if (Kruis.IsMotor(a) && Kruis.OpKruis(_monitor.Bezet) && !(_wisselStand.TryGetValue(a, out var kn) && kn == wens))
+            {
+                _log.Waarschuwing($"Motor {a} wordt nu NIET omgezet: de loc staat op de kruiswissel (melder {Kruis.MiddenTekst}) en omzetten geeft kortsluiting.");
                 continue;
             }
             await ZetWissel(a, wens);
@@ -782,6 +832,13 @@ public partial class BaanVerkenner
         var nog = HuidigeAlarmBlokken();
         if (nog.Count == 0) { _log.Info("Het alarm is verdwenen; de verkenner gaat verder."); return; }
         _hw.Noodstop();
+        // BUG #134 (kaart 1323, 13:19:52): op de kruiswissel zelf draaide de alarmroutine 75 s lang 22 wissels om zonder iets te vinden (de oorzaak is daar een
+        // kruismotor, die de routine nooit aanraakt) en dat vergroot de kans dat Dinamo vastloopt. Op de kruiswissel meteen de gebruiker laten kijken.
+        if (Kruis.OpKruis(_monitor.Bezet))
+        {
+            _log.Waarschuwing($"De loc staat op de kruiswissel (melder {Kruis.MiddenTekst}): de alarmroutine probeert geen losse wissels, de gebruiker wordt gevraagd welke motor verkeerd staat.");
+            throw new NavigatieFout($"Dinamo meldt nog steeds kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())} terwijl de loc op de kruiswissel (melder {Kruis.MiddenTekst}) stilstaat ({stap}). Waarschijnlijk staat motor 10 of 13 verkeerd.");
+        }
         if (await ProbeerAlarmWegTeKrijgen(stap)) return; // BUG #108
         throw new NavigatieFout($"Dinamo meldt nog steeds kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())} terwijl de loc stilstaat ({stap}). De verkenner heeft zelf wissels geprobeerd zonder dat de kortsluiting wegging en rijdt niet verder.");
     }
@@ -1349,6 +1406,8 @@ public partial class BaanVerkenner
                         if (antwoord is null) throw new OperationCanceledException("Gebruiker stopte: Dinamo reageert niet.");
                         if (antwoord == true)
                         {
+                            await HoortestNaHerstel();
+                            _echo.Herstel();
                             foreach (var kv in _wisselStand.ToList()) await ZetWissel(kv.Key, kv.Value, forceer: true);
                             _log.Info("Dinamo hersteld volgens de gebruiker: alle wissels zijn opnieuw gestuurd; de rit wordt hervat.");
                             bevestigd = true;
@@ -1555,6 +1614,7 @@ public partial class BaanVerkenner
         _laatsteKortsluitMelders = _monitor.Bezet.Where(m => m != x).OrderBy(m => m).ToList();
         _hw.Noodstop();
         _laatsteKortsluitingOm = _klok.Nu;
+        _laatsteKortsluitContext = (x, res.Richting);
         string alarmTekst = _laatsteKortsluitBlokken.Count > 0
             ? $" Dinamo meldt kortsluiting in blok {string.Join(" en ", _laatsteKortsluitBlokken)}."
             : "";
@@ -1655,12 +1715,13 @@ public partial class BaanVerkenner
             geschakeld = true;
             // BUG #87 (Marco 13:01: "telkens zet ik wissel 1 in de juiste stand en dan is de kortsluiting weg, waarom wordt dit niet vastgehouden?"):
             // dat de gebruiker deze wissel na een kortsluiting corrigeerde is de oplossing van dat kortsluitpunt, en wordt voortaan toegepast.
-            var kpHand = _kaart.Kortsluitpunten.LastOrDefault(k => !k.Opgelost && !k.Opgegeven && !k.Tijdelijk && k.Soort == KortsluitpuntSoort.Kortsluiting);
-            if (kpHand is not null && (_klok.Nu - _laatsteKortsluitingOm).TotalMinutes < 15 && _kaart.RegistreerHandmatigeOplossing(kpHand, a, afbuigend))
+            // BUG #132 (kaart 14-10 13:23): de oplossing werd aan het LAATSTE onopgeloste kortsluitpunt gehangen (de oudere KP#1), terwijl het om de nieuwe kortsluiting
+            // ging (KP#2, die pas na de rit wordt geregistreerd). KP#2 bleef onopgelost en werd later opnieuw geprobeerd. Nu wacht de oplossing op het kortsluitpunt
+            // van de melder en richting van de lopende kortsluiting en wordt in RegistreerKortsluitpunt toegepast.
+            if (_laatsteKortsluitContext is { } kc && (_klok.Nu - _laatsteKortsluitingOm).TotalMinutes < 15)
             {
-                _log.Vondst($"Kortsluitpunt #{kpHand.Id} (na melder {kpHand.NaMelder}, {kpHand.Richting.Tekst()}, {kpHand.Configuratie}) is volgens de gebruiker opgelost door wissel {a} op {(afbuigend ? "afbuigend" : "rechtdoor")}. Dit wordt onthouden en voortaan meteen toegepast (ook in volgende verkenningen).");
-                _handmatigeOplossingGemeld = true; // BUG #102
-                BewaarNu();
+                _wachtendeHandOplossing = (kc.Melder, kc.Richting, a, afbuigend, _klok.Nu);
+                _log.Info($"Wissel {a} op {(afbuigend ? "afbuigend" : "rechtdoor")} geldt als oplossing van de kortsluiting na melder {kc.Melder} ({kc.Richting.Tekst()}); wordt bij dat kortsluitpunt vastgelegd.");
             }
         }
         if (!geschakeld) return false;

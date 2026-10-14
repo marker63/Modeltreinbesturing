@@ -1196,6 +1196,21 @@ public partial class BaanVerkenner
     // krijgt er een Soort bij, zodat het rapport een opengereden wissel niet meer "kortsluiting"
     // noemt - de boekhouding (StopBijMelders, LosKortsluitpuntenOp) blijft ongewijzigd, die mag
     // beide soorten gewoon blijven vermijden/proberen op te lossen.
+    /// <summary>BUG #132: past een door de gebruiker aangewezen oplossing toe op het kortsluitpunt van de kortsluiting waarbij hij is gegeven (zelfde melder en richting).</summary>
+    private void PasWachtendeHandOplossingToe(Kortsluitpunt kp)
+    {
+        if (_wachtendeHandOplossing is not { } w) return;
+        if (w.Melder != kp.NaMelder || w.Richting != kp.Richting) return;
+        _wachtendeHandOplossing = null;
+        if ((_klok.Nu - w.Tijd).TotalMinutes >= 15 || kp.Soort != KortsluitpuntSoort.Kortsluiting) return;
+        if (_kaart.RegistreerHandmatigeOplossing(kp, w.Adres, w.Afbuigend))
+        {
+            _log.Vondst($"Kortsluitpunt #{kp.Id} (na melder {kp.NaMelder}, {kp.Richting.Tekst()}, {kp.Configuratie}) is volgens de gebruiker opgelost door wissel {w.Adres} op {(w.Afbuigend ? "afbuigend" : "rechtdoor")}. Dit wordt voortaan in deze verkenning meteen toegepast; in een volgende verkenning alleen als u bij de voorkennis-vraag 'Ja' antwoordt.");
+            _handmatigeOplossingGemeld = true; // BUG #102
+            BewaarNu();
+        }
+    }
+
     private void RegistreerKortsluitpunt(Opdracht o, List<int> reeks, Configuratie c, List<Etappe> route, Richting r,
         KortsluitpuntSoort soort = KortsluitpuntSoort.Kortsluiting)
     {
@@ -1208,6 +1223,7 @@ public partial class BaanVerkenner
             foreach (var t in tweede) if (!bestaand.TweedeMelders.Contains(t)) bestaand.TweedeMelders.Add(t);
             bestaand.AantalKortsluitingen++;
             foreach (var b in alarmBlokken) if (!bestaand.AlarmBlokken.Contains(b)) bestaand.AlarmBlokken.Add(b);
+            PasWachtendeHandOplossingToe(bestaand);
             return;
         }
         var k = new Kortsluitpunt
@@ -1223,6 +1239,7 @@ public partial class BaanVerkenner
             AantalKortsluitingen = 1
         };
         _kaart.Kortsluitpunten.Add(k);
+        PasWachtendeHandOplossingToe(k);
         _log.Vondst(soort == KortsluitpuntSoort.OnverwachteTerugweg
             ? $"Onverwachte terugweg #{k.Id}: direct na melder {x} ({r.Tekst()}, {c}) kwam de loc terug via een andere melder dan verwacht. Geen kortsluiting - mogelijk een wissel die van achteren in de verkeerde stand bereden wordt, mogelijk een melder die de eerste keer niet geregistreerd is; wordt zo mogelijk later opgelost."
             : $"Kortsluitpunt #{k.Id}: direct na melder {x} ({r.Tekst()}, {c})." + (alarmBlokken.Count > 0 ? $" Dinamo meldde kortsluiting in blok {string.Join(" en ", alarmBlokken)}." : "") + (tweede.Count > 0 ? $" Ook bezet: melder {string.Join(" en ", tweede)}." : "") + " Waarschijnlijk een wissel die van achteren in de verkeerde stand bereden wordt; wordt later opgelost.");
