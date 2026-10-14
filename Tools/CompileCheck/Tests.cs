@@ -1413,6 +1413,95 @@ public static class Tests
         Eis(fout == "NavigatieFout" && !log2.Regels.Any(r => r.Tekst.Contains("probeert zelf wissels")), "alarmroutine (#134): op de kruiswissel geen wissels doorproberen, meteen navigatiefout (nu " + fout + ")");
     }
 
+
+    // BUG #135-#137 (Marco 14-10 14:12, log 14:07-14:11): kruiswissel-bewaking zonder vaste referentie, met het bewijs uit de EIGEN kaart
+    static void KruisZonderReferentieTest()
+    {
+        Console.WriteLine("Test: kruiswissel zonder vaste referentie (BUG #135-#137), echte kaart van 14-10 14:11");
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var kruis = KruisKennis.Parse("10+13@24");
+        Eis(!kruis.MetReferentie && kruis.Middens.Contains(24), "kruis (#135): verkenning vanaf nul heeft melder 24 en geen vaste referentie");
+        var kaart = Laad("baankaart_2026-10-14_1411.json");
+        Etappe E(Richting r, params int[] pad) => new Etappe { Van = pad[0], Naar = pad[^1], Richting = r, Pad = pad.ToList() };
+
+        // 137: kortsluitpunt #1 (route 13-5-12) is nooit door motor 10 opgelost; #2 (na melder 24) wel
+        Eis(kaart.Kortsluitpunten.First(x => x.Id == 1).OpgelostDoorAdres == 10 && kaart.Kortsluitpunten.First(x => x.Id == 2).OpgelostDoorAdres == 10, "kaart (#137): de opgeslagen kaart heeft de verkeerde oplossing bij #1 (uitgangssituatie)");
+        var hersteld = kaart.HerstelOnmogelijkeKruisOplossingen(kruis);
+        var kp1 = kaart.Kortsluitpunten.First(x => x.Id == 1); var kp2 = kaart.Kortsluitpunten.First(x => x.Id == 2);
+        Eis(hersteld.Count == 1 && !kp1.Opgelost && kp1.OpgelostDoorAdres is null && !kp1.GeprobeerdeAdressen.Contains(10), "kaart (#137): #1 staat weer open (nu " + hersteld.Count + " hersteld)");
+        Eis(kp2.Opgelost && kp2.OpgelostDoorAdres == 10, "kaart (#137): #2 (na melder 24) blijft opgelost door motor 10");
+        Eis(!kaart.RegistreerHandmatigeOplossing(kp1, 10, true, kruis) && kp1.Opgelost == false, "kaart (#137): motor 10 wordt ook niet opnieuw aan #1 gehangen");
+        Eis(kaart.RegistreerHandmatigeOplossing(kp1, 1, true, kruis), "kaart (#137): een gewone wissel (1) mag #1 wel oplossen");
+        kp1.Opgelost = false; kp1.OpgelostDoorAdres = null; kp1.OpgelostMetAfbuigend = null;
+
+        // 135: opdracht 24 vooruit met motor 13 afbuigend: motor 13 gaat al om vóór melder 24 (ingang 14: 14 -> 24 -> 8 is met 13 gezien)
+        var r1 = BaanVerkenner.KruisAankomstStand(E(Richting.Vooruit, 13, 14, 24), Configuratie.Basis, Configuratie.Basis.Met(13), kruis, kaart, out var u1);
+        Eis(r1.Bevat(13) && !r1.Bevat(10) && u1 is not null && u1.Contains("eigen kaart"), "kruis (#135): opdracht 24 vooruit (13 afbuigend) zet motor 13 vóór het inrijden, zonder referentie (nu " + r1 + ")");
+        var r2 = BaanVerkenner.KruisAankomstStand(E(Richting.Achteruit, 13, 14, 24), Configuratie.Basis, Configuratie.Basis.Met(10), kruis, new Baankaart(), out var u2);
+        Eis(r2.Equals(Configuratie.Basis) && u2 is null, "kruis (#135): zonder bewijs in de kaart verandert er niets");
+        var r3 = BaanVerkenner.KruisAankomstStand(E(Richting.Achteruit, 29, 21, 24), Configuratie.Basis, Configuratie.Basis.Met(13), kruis, kaart, out _);
+        Eis(r3.Equals(Configuratie.Basis), "kruis (#135): vanaf melder 21 is motor 13 afbuigend nooit gezien -> niets aangepast");
+        var r4 = BaanVerkenner.KruisVoorafStand(E(Richting.Vooruit, 13, 14), Configuratie.Basis, Configuratie.Basis.Met(10), kruis, out var u4);
+        Eis(r4.Bevat(10) && u4 is not null, "kruis (#135): motor 10 gaat al om voordat de loc op melder 14 aankomt, ook zonder referentie");
+        var andere = KruisKennis.Parse("3+4@7");
+        var r5 = BaanVerkenner.KruisVoorafStand(E(Richting.Vooruit, 5, 6), Configuratie.Basis, Configuratie.Basis.Met(4).Met(12), andere, out _);
+        Eis(r5.Bevat(4) && !r5.Bevat(12), "kruis (#135): werkt voor elke Engelse wissel die de gebruiker opgeeft (3+4 bij melder 7), niet alleen 13/10 bij 24");
+
+        // 135: de vooruitblik: ingangen volgens de kaart
+        var motoren = kruis.Motoren.OrderBy(x => x).ToList();
+        var ing = KruisBewijs.Ingangen(kaart, kruis, 15, Richting.Achteruit, Configuratie.Basis.Met(14));
+        Eis(ing.Count == 1 && ing[0] == (24, 8), "kruis (#135): vanaf melder 15 achteruit met wissel 14 afbuigend rijdt de loc via 8 de kruiswissel in (nu " + string.Join(";", ing) + ")");
+        Eis(KruisBewijs.Ingangen(kaart, kruis, 15, Richting.Achteruit, Configuratie.Basis).Count == 0, "kruis (#135): de gewone lus 15 -> 8 -> 17 (wissel 14 rechtdoor) raakt de kruiswissel niet");
+        Eis(KruisBewijs.Ingangen(kaart, kruis, 8, Richting.Vooruit, Configuratie.Basis).Count == 0, "kruis (#135): vooruit vanaf 8 gaat naar 15, niet de kruiswissel in");
+        var gezien8 = KruisBewijs.GezienBijIngang(kaart, kruis, 24, 8);
+        Eis(gezien8.Count == 1 && gezien8[0].Equals(Configuratie.Basis.Met(13)), "kruis (#135): vanaf melder 8 is alleen met motor 13 afbuigend door de kruiswissel gereden (nu " + string.Join("|", gezien8) + ")");
+        Eis(KruisBewijs.KiesStand(gezien8, Configuratie.Basis.Met(14), motoren, new HashSet<int>())?.Equals(Configuratie.Basis.Met(13)) == true, "kruis (#135): met wissel 14 afbuigend en 13 rechtdoor kiest de vooruitblik motor 13 afbuigend");
+        Eis(KruisBewijs.KiesStand(gezien8, Configuratie.Basis.Met(13), motoren, new HashSet<int>()) is null, "kruis (#135): staat 13 al afbuigend, dan verandert er niets");
+        Eis(KruisBewijs.KiesStand(gezien8, Configuratie.Basis, motoren, new HashSet<int> { 13 }) is null, "kruis (#135): een motor die de rit zelf rechtdoor wil (vast) wordt niet aangepast");
+        Eis(KruisBewijs.KiesStand(new List<Configuratie>(), Configuratie.Basis, motoren, new HashSet<int>()) is null, "kruis (#135): zonder bewijs niets doen");
+
+        // 135: volledige stap in de verkenner (zoals 14:08:52): loc op melder 15, wissel 14 afbuigend, rijdt achteruit -> motor 13 gaat vooraf om
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 14 };
+        BaanVerkenner Maak(Baankaart k, out VirtueleKlok klok, out EchoHw hw)
+        {
+            klok = new VirtueleKlok(); hw = new EchoHw();
+            var v = new BaanVerkenner(hw, ins, klok, new VerkenLog(klok), (_, _) => Task.FromResult(true), new VerkenStatus { Instellingen = ins, Kaart = k });
+            v.Kruis = KruisKennis.Parse("10+13@24");
+            return v;
+        }
+        async Task<Configuratie> Vooruitblik(BaanVerkenner v, int melder, Richting r, Configuratie cfg, RitDoel doel)
+            => await (Task<Configuratie>)typeof(BaanVerkenner).GetMethod("ZetKruisVooraf", bf)!.Invoke(v, new object[] { melder, r, cfg, doel })!;
+        Dictionary<int, bool> Stand(BaanVerkenner v) => (Dictionary<int, bool>)typeof(BaanVerkenner).GetField("_wisselStand", bf)!.GetValue(v)!;
+        var vA = Maak(kaart, out var kA, out _);
+        var cA = Vooruitblik(vA, 15, Richting.Achteruit, Configuratie.Basis.Met(14), new RitDoel { Configuratie = Configuratie.Basis.Met(14), StaartWissels = true }).GetAwaiter().GetResult();
+        Eis(cA.Bevat(13) && cA.Bevat(14) && Stand(vA).TryGetValue(13, out var s13) && s13, "kruis (#135): verkenningsrit 15 achteruit (14 afbuigend) zet motor 13 vóór het wegrijden (nu " + cA + ")");
+        var vB = Maak(kaart, out _, out _);
+        var cB = Vooruitblik(vB, 15, Richting.Achteruit, Configuratie.Basis.Met(14), new RitDoel { Configuratie = Configuratie.Basis.Met(14), ProefAdres = 13 }).GetAwaiter().GetResult();
+        Eis(!cB.Bevat(13), "kruis (#135): test de rit zelf motor 13, dan blijft die ongemoeid");
+        var vC = Maak(kaart, out _, out _);
+        var cC = Vooruitblik(vC, 15, Richting.Achteruit, Configuratie.Basis, new RitDoel { Configuratie = Configuratie.Basis }).GetAwaiter().GetResult();
+        Eis(cC.Equals(Configuratie.Basis) && Stand(vC).Count == 0, "kruis (#135): de gewone lus 15 -> 8 -> 17 krijgt geen extra commando's");
+        var vD = Maak(kaart, out var kD, out _);
+        var mon = (MelderMonitor)typeof(BaanVerkenner).GetField("_monitor", bf)!.GetValue(vD)!;
+        mon.Ontvang(24, true); kD.Wacht(TimeSpan.FromSeconds(1)).GetAwaiter().GetResult(); mon.Bijwerken();
+        var cD = Vooruitblik(vD, 8, Richting.Achteruit, Configuratie.Basis.Met(14), new RitDoel { Configuratie = Configuratie.Basis.Met(14) }).GetAwaiter().GetResult();
+        Eis(!cD.Bevat(13), "kruis (#135/#133): staat de loc al op de kruiswissel, dan wordt er niets omgezet");
+
+        // 136: de hand-oplossing van 14:09:58 hoort bij kortsluitpunt #3 (dat al bestond)
+        var kaart2 = Laad("baankaart_2026-10-14_1411.json");
+        var vE = Maak(kaart2, out var kE, out _);
+        kaart2.HerstelOnmogelijkeKruisOplossingen(vE.Kruis);
+        typeof(BaanVerkenner).GetField("_laatsteKortsluitContext", bf)!.SetValue(vE, (24, Richting.Achteruit, Configuratie.Basis.Met(14)));
+        typeof(BaanVerkenner).GetField("_laatsteKortsluitingOm", bf)!.SetValue(vE, kE.Nu);
+        var zoek = typeof(BaanVerkenner).GetMethod("ZoekKortsluitpunt", bf)!;
+        var koppel = typeof(BaanVerkenner).GetMethod("KoppelHandOplossing", bf)!;
+        var gevonden = (Kortsluitpunt?)zoek.Invoke(vE, new object[] { 24, Richting.Achteruit, Configuratie.Basis.Met(14) });
+        Eis(gevonden is not null && gevonden.Id == 3, "hand (#136): bij de kortsluiting na melder 24 achteruit hoort kortsluitpunt #3 (nu #" + gevonden?.Id + ")");
+        Eis((bool)koppel.Invoke(vE, new object[] { gevonden!, 13, true })! && gevonden!.Opgelost && gevonden.OpgelostDoorAdres == 13, "hand (#136): wissel 13 afbuigend lost #3 op");
+        Eis(!kaart2.Kortsluitpunten.First(x => x.Id == 2).GeprobeerdeAdressen.Contains(13) && kaart2.Kortsluitpunten.First(x => x.Id == 1).Opgelost == false, "hand (#136): de andere kortsluitpunten blijven zoals ze waren");
+        Eis(kaart2.MetBekendeOplossingenVoorStart(15, Richting.Achteruit, Configuratie.Basis.Met(14), out _).Bevat(13), "hand (#136): opdracht 15 achteruit met wissel 14 rijdt voortaan met motor 13 afbuigend (nu " + kaart2.MetBekendeOplossingenVoorStart(15, Richting.Achteruit, Configuratie.Basis.Met(14), out _) + ")");
+    }
+
     static void StartmelderVoorafTest()
     {
         var k = new Baankaart();
@@ -1776,6 +1865,7 @@ public static class Tests
         StartmelderVoorafTest();
         WisselBevestigingTest();
         HoortestEnKruisTest();
+        KruisZonderReferentieTest();
         TweedeMelderTest();
         VerkeerdeWisselVraagTest();
         WisselstraatImportTest();

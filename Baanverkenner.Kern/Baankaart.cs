@@ -295,8 +295,10 @@ public class Baankaart
 
     /// <summary>BUG #87: de gebruiker heeft aangewezen dat wissel <paramref name="adres"/> verkeerd stond en nu op <paramref name="afbuigend"/> staat;
     /// daarmee verdween de kortsluiting van <paramref name="kp"/>: dat is dus de oplossing van dat kortsluitpunt.</summary>
-    public bool RegistreerHandmatigeOplossing(Kortsluitpunt kp, int adres, bool afbuigend)
+    public bool RegistreerHandmatigeOplossing(Kortsluitpunt kp, int adres, bool afbuigend, KruisKennis? kruis = null)
     {
+        // BUG #137: een kruismotor kan alleen een kortsluiting oplossen waar de loc langs de kruiswissel komt.
+        if (kruis is not null && !KruisOplossingMogelijk(kp, adres, kruis)) return false;
         // BUG #122: een wissel die zelf in de geteste stand zit terugzetten (bv. wissel 2 rechtdoor bij stand '2 afbuigend') is geen extra wissel
         // die de kortsluiting oplost, maar gewoon een andere stand; die zou later ten onrechte als 'oplossing' worden toegepast.
         if (kp.Opgelost || kp.Configuratie.Bevat(adres) || !afbuigend) return false;
@@ -305,6 +307,33 @@ public class Baankaart
         kp.OpgelostMetAfbuigend = afbuigend;
         if (!kp.GeprobeerdeAdressen.Contains(adres)) kp.GeprobeerdeAdressen.Add(adres);
         return true;
+    }
+
+    /// <summary>BUG #137 (kaart 14:11): kortsluitpunt #1 (na melder 12, route 13-5-12) stond "opgelost door motor 10", terwijl die route niet langs de kruiswissel
+    /// komt: de oplossing van een ander kortsluitpunt was aan het verkeerde punt gehangen (#132). Een kruismotor kan een kortsluiting alleen oplossen als de
+    /// melder, de tweede melder of de route van het punt de kruiswissel raakt. Is de kruiswissel nog onbekend (geen melder), dan wordt niets afgekeurd.</summary>
+    public static bool KruisOplossingMogelijk(Kortsluitpunt kp, int adres, KruisKennis kruis)
+    {
+        if (!kruis.IsMotor(adres) || kruis.Middens.Count == 0) return true;
+        return kruis.Middens.Contains(kp.NaMelder) || kp.TweedeMelders.Any(kruis.Middens.Contains)
+            || kp.Route.Any(e => e.Pad.Any(kruis.Middens.Contains));
+    }
+
+    /// <summary>BUG #137: heropent kortsluitpunten waarvan de "oplossing" een kruismotor is die daar onmogelijk iets kan oplossen (zie
+    /// <see cref="KruisOplossingMogelijk"/>). Geeft per heropend punt een uitleg terug.</summary>
+    public List<string> HerstelOnmogelijkeKruisOplossingen(KruisKennis kruis)
+    {
+        var res = new List<string>();
+        foreach (var kp in Kortsluitpunten.Where(k => k.Opgelost && k.OpgelostDoorAdres is int a && !KruisOplossingMogelijk(k, a, kruis)).ToList())
+        {
+            int adres = kp.OpgelostDoorAdres!.Value;
+            kp.Opgelost = false;
+            kp.OpgelostDoorAdres = null;
+            kp.OpgelostMetAfbuigend = null;
+            kp.GeprobeerdeAdressen.Remove(adres);
+            res.Add($"Kortsluitpunt #{kp.Id} (na melder {kp.NaMelder}, {kp.Richting.Tekst()}, {kp.Configuratie}) stond als opgelost door motor {adres}, maar die route komt niet langs de kruiswissel (melder {string.Join(", ", kruis.Middens.OrderBy(x => x))}); de oplossing hoorde bij een ander kortsluitpunt. Het punt staat weer open.");
+        }
+        return res;
     }
 
     /// <summary>BUG #87: een opdracht begint op <paramref name="start"/> in richting <paramref name="r"/> met stand <paramref name="c"/>. Is daar eerder

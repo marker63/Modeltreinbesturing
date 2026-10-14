@@ -97,7 +97,7 @@ public partial class BaanVerkenner
     private List<int> _laatsteKortsluitBlokken = new();
     private DateTime _laatsteKortsluitingOm = DateTime.MinValue;
     /// <summary>BUG #132: melder en richting van de laatste kortsluiting in een rit (het kortsluitpunt zelf wordt pas na de rit geregistreerd).</summary>
-    private (int Melder, Richting Richting)? _laatsteKortsluitContext;
+    private (int Melder, Richting Richting, Configuratie Stand)? _laatsteKortsluitContext;
     /// <summary>BUG #132: door de gebruiker aangewezen oplossing die op het kortsluitpunt van de lopende kortsluiting wacht (wordt in RegistreerKortsluitpunt toegepast).</summary>
     private (int Melder, Richting Richting, int Adres, bool Afbuigend, DateTime Tijd)? _wachtendeHandOplossing;
 
@@ -1001,6 +1001,7 @@ public partial class BaanVerkenner
             ? $"Rijden {r.Tekst()} van melder {start} naar melder {doel.DoelMelder}."
             : $"Verkenningsrit {r.Tekst()} vanaf melder {start} ({doel.Configuratie}).");
         if (doel.StaartWissels && !doel.IsNavigatie) cfgNu = await ZetStaartWissels(start, r, cfgNu, doel);
+        if (!doel.IsNavigatie) cfgNu = await ZetKruisVooraf(start, r, cfgNu, doel);   // BUG #135
         await StuurSnelheid(r, snelheid);
 
         var laatsteWijziging = _klok.Nu;
@@ -1212,6 +1213,7 @@ public partial class BaanVerkenner
                 }
                 // BUG #107: de rit gaat door; ligt voor de loc een wissel waar hij van achteren op af rijdt, dan nu goed zetten.
                 if (doel.StaartWissels) cfgNu = await ZetStaartWissels(m, r, cfgNu, doel);
+                if (!doel.IsNavigatie) cfgNu = await ZetKruisVooraf(m, r, cfgNu, doel);   // BUG #135
             }
 
             // ---- Helemaal in een nieuwe, nog onbekende sectie (Dinamo): blokproef ----
@@ -1561,6 +1563,36 @@ public partial class BaanVerkenner
         return cfg;
     }
 
+    /// <summary>BUG #135 (Marco 14:12, log 14:08:52-14:09:08): de verkenningsrit 15 -> 8 -> 24 met wissel 14 afbuigend reed de kruiswissel in vanaf melder 8 met motor
+    /// 13 rechtdoor: kortsluiting. De eigen kaart had al twee keer gezien dat een loc vanaf melder 8 alleen met motor 13 afbuigend door de kruiswissel komt.
+    /// Rijdt de loc volgens de kaart (bij de huidige wisselstand, kruismotoren niet meegeteld) binnen twee stappen een kruiswissel in, en is voor die ingang
+    /// een andere motorstand bewezen dan nu staat, dan worden de motoren nu gezet, terwijl de loc er nog niet is. Wat de rit zelf wil (de motoren van de opdracht
+    /// en het geteste adres) blijft ongemoeid; staat de loc al op de kruiswissel, dan gebeurt er niets. Zonder bewijs verandert er niets.</summary>
+    private async Task<Configuratie> ZetKruisVooraf(int melder, Richting r, Configuratie cfg, RitDoel doel)
+    {
+        if (Kruis.Middens.Count == 0 || Kruis.Motoren.Count == 0 || Kruis.OpKruis(_monitor.Bezet)) return cfg;
+        var ingangen = KruisBewijs.Ingangen(_kaart, Kruis, melder, r, cfg);
+        if (ingangen.Count == 0) return cfg;
+        var motoren = Kruis.Motoren.OrderBy(x => x).ToList();
+        var vast = motoren.Where(m => doel.Configuratie.Bevat(m) || doel.ProefAdres == m).ToHashSet();
+        var keuzes = new List<(Configuratie Stand, int Midden, int Ingang)>();
+        foreach (var (midden, ingang) in ingangen)
+            if (KruisBewijs.KiesStand(KruisBewijs.GezienBijIngang(_kaart, Kruis, midden, ingang), cfg, motoren, vast) is { } stand)
+                keuzes.Add((stand, midden, ingang));
+        if (keuzes.Count == 0 || keuzes.Select(k => k.Stand.Sleutel).Distinct().Count() > 1) return cfg;   // geen bewijs, of tegenstrijdig: niets doen
+        var (doelStand, kruisMelder, via) = keuzes[0];
+        var wijzig = motoren.Where(m => !vast.Contains(m) && cfg.Bevat(m) != doelStand.Bevat(m)).ToList();
+        if (wijzig.Count == 0) return cfg;
+        _log.Info($"Melder {melder}: de loc rijdt {r.Tekst()} de kruiswissel (melder {kruisMelder}) in vanaf melder {via}. Vanaf die kant is eerder alleen gereden met {KruisBewijs.StandTekst(motoren, doelStand)}; " +
+                  $"{string.Join(" en ", wijzig.Select(m => $"motor {m}"))} {(wijzig.Count == 1 ? "gaat" : "gaan")} nu om voordat de loc er is.");
+        foreach (var m in wijzig)
+        {
+            await ZetWissel(m, doelStand.Bevat(m));
+            cfg = cfg.MetStand(m, doelStand.Bevat(m));
+        }
+        return cfg;
+    }
+
     /// <summary>BUG #107: de wissels die de laatste stap van de rit van achteren doorloopt, met de stand die de kaart daarvoor kent.</summary>
     internal static List<(int Adres, bool Afbuigend)> EisenLaatsteStap(Baankaart kaart, List<int> reeks, Richting r) =>
         reeks.Count < 2 ? new()
@@ -1614,7 +1646,7 @@ public partial class BaanVerkenner
         _laatsteKortsluitMelders = _monitor.Bezet.Where(m => m != x).OrderBy(m => m).ToList();
         _hw.Noodstop();
         _laatsteKortsluitingOm = _klok.Nu;
-        _laatsteKortsluitContext = (x, res.Richting);
+        _laatsteKortsluitContext = (x, res.Richting, new Configuratie(_wisselStand.Where(w => w.Value).Select(w => w.Key).ToArray()));
         string alarmTekst = _laatsteKortsluitBlokken.Count > 0
             ? $" Dinamo meldt kortsluiting in blok {string.Join(" en ", _laatsteKortsluitBlokken)}."
             : "";
@@ -1715,13 +1747,18 @@ public partial class BaanVerkenner
             geschakeld = true;
             // BUG #87 (Marco 13:01: "telkens zet ik wissel 1 in de juiste stand en dan is de kortsluiting weg, waarom wordt dit niet vastgehouden?"):
             // dat de gebruiker deze wissel na een kortsluiting corrigeerde is de oplossing van dat kortsluitpunt, en wordt voortaan toegepast.
-            // BUG #132 (kaart 14-10 13:23): de oplossing werd aan het LAATSTE onopgeloste kortsluitpunt gehangen (de oudere KP#1), terwijl het om de nieuwe kortsluiting
-            // ging (KP#2, die pas na de rit wordt geregistreerd). KP#2 bleef onopgelost en werd later opnieuw geprobeerd. Nu wacht de oplossing op het kortsluitpunt
-            // van de melder en richting van de lopende kortsluiting en wordt in RegistreerKortsluitpunt toegepast.
+            // BUG #132 (kaart 14-10 13:23): de oplossing hoort bij het kortsluitpunt van de lopende kortsluiting (zelfde melder en richting), niet bij het
+            // laatste onopgeloste punt. BUG #136 (log 14:09:58): dat punt bestaat meestal al (de rit is dan afgelopen en geregistreerd); alleen als het er nog niet is,
+            // wacht de oplossing tot RegistreerKortsluitpunt het aanmaakt.
             if (_laatsteKortsluitContext is { } kc && (_klok.Nu - _laatsteKortsluitingOm).TotalMinutes < 15)
             {
-                _wachtendeHandOplossing = (kc.Melder, kc.Richting, a, afbuigend, _klok.Nu);
-                _log.Info($"Wissel {a} op {(afbuigend ? "afbuigend" : "rechtdoor")} geldt als oplossing van de kortsluiting na melder {kc.Melder} ({kc.Richting.Tekst()}); wordt bij dat kortsluitpunt vastgelegd.");
+                var kpBestaand = ZoekKortsluitpunt(kc.Melder, kc.Richting, kc.Stand);
+                if (kpBestaand is not null) KoppelHandOplossing(kpBestaand, a, afbuigend);
+                else
+                {
+                    _wachtendeHandOplossing = (kc.Melder, kc.Richting, a, afbuigend, _klok.Nu);
+                    _log.Info($"Wissel {a} op {(afbuigend ? "afbuigend" : "rechtdoor")} geldt als oplossing van de kortsluiting na melder {kc.Melder} ({kc.Richting.Tekst()}); wordt bij dat kortsluitpunt vastgelegd.");
+                }
             }
         }
         if (!geschakeld) return false;
