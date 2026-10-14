@@ -860,6 +860,26 @@ public static class Tests
         Eis(c.Bevat(13) && c.Bevat(14), "kruis (#148): motor 13 gaat vooraf naar afbuigend voor de rit 15 -> 8 -> 24 (nu " + c + ")");
     }
 
+    /// <summary>BUG #149: opdracht 5 vooruit met wissel 1+2 afbuigend moet melder 5 binnenkomen vanaf 12 (bewezen), niet vanaf 16.</summary>
+    static void AankomstViaIngangTest()
+    {
+        var kaart = Laad("baankaart_2026-10-14_1855.json");
+        var kruis = KruisKennis.Parse("10+13@24");
+        var normaal = kaart.Kortsluitpunten.First(x => x.Id == 1).Route.Select(e => new Etappe { Configuratie = e.Configuratie, Richting = e.Richting, Van = e.Van, Naar = e.Naar, Pad = e.Pad.ToList() }).ToList();
+        var o = new Opdracht { Id = 4, Start = 5, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis.Met(2), Route = normaal };
+        var rs = Configuratie.Basis.Met(1).Met(2);
+        var alt = BaanVerkenner.AankomstViaBewezenIngang(kaart, o, rs, kruis, out var uitleg);
+        Eis(alt is { Count: 1 } && alt[0].Pad.SequenceEqual(new[] { 13, 14, 129, 4, 11, 12, 5 }), "ingang (#149): 5 vooruit met 1+2 afbuigend komt via 14-129-4-11-12 aan (nu " + (alt is null ? "geen" : string.Join("-", alt[0].Pad)) + ")");
+        Eis(alt is not null && alt[0].Configuratie.Bevat(1) && alt[0].Configuratie.Bevat(2) && alt[0].Configuratie.Bevat(5), "ingang (#149): de etappe zet 1, 2 en 5 afbuigend vooraf (nu " + alt?[0].Configuratie + ")");
+        Eis(uitleg is not null && uitleg.Contains("melder 12"), "ingang (#149): uitleg noemt de bewezen ingang");
+        var o2 = new Opdracht { Id = 5, Start = 5, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis.Met(2), Route = normaal };
+        Eis(BaanVerkenner.AankomstViaBewezenIngang(kaart, o2, Configuratie.Basis, kruis, out _) is null, "ingang (#149): zonder afbuigende wissels verandert de route niet");
+        var alt2 = BaanVerkenner.AankomstZonderKortsluitWissels(kaart, alt![0], alt[0].Configuratie, out var u5);
+        Eis(alt2.Bevat(1) && alt2.Bevat(2) && u5 is null, "ingang (#149): aankomst vanaf 12 houdt wissel 1+2 niet meer rechtdoor (nu " + alt2 + ")");
+        var kaart2 = Laad("baankaart_2026-10-14_1849.json");
+        Eis(BaanVerkenner.AankomstViaBewezenIngang(kaart2, new Opdracht { Id = 8, Start = 15, Richting = Richting.Achteruit, Configuratie = Configuratie.Basis.Met(14), Route = normaal }, Configuratie.Basis.Met(13).Met(14), kruis, out _) is null, "ingang (#149): andere opdrachten (start 15) blijven ongemoeid");
+    }
+
     static void AlarmWisselBijLocTest()
     {
         Console.WriteLine("Test: alarm - wissel bij de loc met toestemming proberen (BUG #147)");
@@ -2184,6 +2204,7 @@ public static class Tests
         AankomstEnOverloopTest();
         AlarmWisselBijLocTest();
         KruisRuisVoorafTest();
+        AankomstViaIngangTest();
         HerstelBlijftStaanTest();
         KortsluitOplossingTest();
         KoploperReferentieTest();

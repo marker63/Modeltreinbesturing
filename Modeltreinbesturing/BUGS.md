@@ -2035,3 +2035,13 @@ afbuigend was net bewezen. Oorzaak: de kaart bevatte ook een waarneming 17 -> 8 
 gezien is naast het exacte vervolg mee; bij de lege stand (gewone lus 15 -> 8 -> 17) verandert er niets. Test: `KruisRuisVoorafTest` (kaart van 18:49).
 Nog niet getest op de baan. Opmerking: "13,14" in veel andere ritten is geen doorgeven van de oplossing: opdracht #7 (13 afbuigend) en de oplossing 14 werden
 daarna als rijstand gebruikt; dat is bedoeld.
+
+## BUG #149 – wissel bij de startmelder (1+2 bij melder 5) werd steeds onder de staande loc omgezet (Marco 17:29, 17:50, 18:41, 18:57; log 18:50–18:54)
+Opdracht #4 (5 vooruit, 1+2 afbuigend) reed de loc via melder 16 naar melder 5 en zette 1 en 2 pas om toen hij er stond: kortsluiting in blok 3, "geen
+enkele wissel haalt het weg", gebruiker moet ingrijpen. Dit is de oorzaak van alle wissel-2-problemen van vanmiddag: een samenvoegende wissel staat voor
+één ingang goed (16 -> 5: rechtdoor; 12 -> 5: 1 en 2 afbuigend) en kan niet omgezet worden terwijl de loc op het samenkomstpunt staat. De kaart wist dit al
+(Doorgangen: melder 5 vooruit vanaf 12 met 1,2; vanaf 16 alleen zonder 2). Nu: `AankomstViaBewezenIngang` kiest, als een wissel van de rijstand bij de startmelder
+ligt en alleen een andere ingang bewezen is dan die van de normale route, een bekende weg in de rijrichting naar die ingang (`ZoekWegInRichting`, kortste weg over
+eerder gereden overgangen, kleinste bewezen wisselstand per overgang; hier 13-14-129-4-11-12-5 met 5, 1, 2 afbuigend) en rijdt de loc daar naartoe, met de wissels al gezet
+vóór de aankomst. #146 (wissels pas na aankomst zetten) geldt alleen nog voor dezelfde ingang als het kortsluitpunt. Test: `AankomstViaIngangTest` (kaart 18:55).
+Nog niet getest op de baan. Open: werkt alleen als de kaart de ingang al bewezen heeft en er een weg in dezelfde rijrichting naartoe bekend is; anders blijft de normale route.

@@ -716,6 +716,77 @@ public partial class BaanVerkenner
         return c;
     }
 
+    /// <summary>BUG #149 (Marco 18:57: "hoe meer je leerde, des te meer fouten"): een opdracht met een wissel BIJ de startmelder (wissel 1 en 2 bij melder 5) die
+    /// afbuigend moet, vraagt dat de loc de startmelder binnenkomt vanaf de kant waar die stand bij hoort (12 -> 5 met 1 en 2 afbuigend; 16 -> 5 met beide
+    /// rechtdoor). Eerder werd de loc steeds vanaf de verkeerde kant (16) aangereden en werden 1 en 2 daarna onder de staande loc omgezet: kortsluiting
+    /// (17:29, 17:50, 18:41, 18:51). De kaart weet dit al (Doorgangen). Is voor de gewenste stand alleen een andere ingang bewezen dan die van de normale route,
+    /// en is er een bekende weg in de rijrichting van de opdracht naar die ingang, dan wordt de loc daarlangs naar de startmelder gebracht.
+    /// Anders null (normale route).</summary>
+    internal static List<Etappe>? AankomstViaBewezenIngang(Baankaart kaart, Opdracht o, Configuratie rijstand, KruisKennis kruis, out string? uitleg)
+    {
+        uitleg = null;
+        if (o.Route.Count == 0 || rijstand.Afbuigend.Length == 0) return null;
+        var laatste = o.Route[^1];
+        if (laatste.Naar != o.Start || laatste.Pad.Count < 2) return null;
+        // alleen als een wissel van de rijstand bij de startmelder zelf ligt
+        var bijStart = WisselsBijBezet(kaart, new[] { o.Start }).Where(a => rijstand.Bevat(a) && !kruis.IsMotor(a)).ToList();
+        if (bijStart.Count == 0) return null;
+        int normaleIngang = laatste.Pad[^2];
+        var doorgangen = kaart.Doorgangen.Where(d => d.Melder == o.Start && d.Richting == o.Richting && d.Configuraties.Contains(rijstand.Sleutel)).ToList();
+        if (doorgangen.Count == 0 || doorgangen.Any(d => d.Via == normaleIngang)) return null;
+        var kandidaten = doorgangen.Select(d => d.Via).Distinct().OrderBy(x => x).ToList();
+        int thuis = o.Route[0].Van;
+        foreach (int via in kandidaten)
+        {
+            var weg = ZoekWegInRichting(kaart, thuis, o.Start, via, o.Richting, out var cfg);
+            if (weg is null) continue;
+            var c = cfg;
+            foreach (var a in rijstand.Afbuigend) c = c.MetStand(a, true);
+            uitleg = $"Opdracht #{o.Id} vraagt wissel {string.Join(" en ", bijStart)} afbuigend bij startmelder {o.Start}. Dat is alleen bewezen als de loc melder {o.Start} binnenkomt vanaf melder {via} " +
+                     $"(vanaf melder {normaleIngang} niet). De loc rijdt daarom {o.Richting.Tekst()} via {string.Join(" - ", weg)} ({c}) en de wissels staan al goed voordat hij op melder {o.Start} komt.";
+            return new List<Etappe> { new Etappe { Configuratie = c, Richting = o.Richting, Van = weg[0], Naar = o.Start, Pad = weg } };
+        }
+        return null;
+    }
+
+    /// <summary>BUG #149: kortste weg van <paramref name="van"/> naar <paramref name="doel"/> die uitsluitend over eerder in richting <paramref name="r"/> gereden
+    /// overgangen loopt (ook de omgekeerde van de tegenovergestelde richting) en het doel binnenkomt vanaf <paramref name="via"/>. <paramref name="cfg"/> is de
+    /// vereniging van de kleinste gereden wisselstand per overgang.</summary>
+    internal static List<int>? ZoekWegInRichting(Baankaart kaart, int van, int doel, int via, Richting r, out Configuratie cfg)
+    {
+        cfg = Configuratie.Basis;
+        var kleinste = new Dictionary<(int, int), Configuratie>();
+        foreach (var ov in kaart.Overgangen)
+        {
+            if (ov.GezienBijConfiguraties.Count == 0) continue;
+            var k = ov.GezienBijConfiguraties.Select(Configuratie.VanSleutel).OrderBy(x => x.Afbuigend.Length).ThenBy(x => x.Sleutel, StringComparer.Ordinal).First();
+            if (ov.Richting == r) { if (!kleinste.TryGetValue((ov.Van, ov.Naar), out var b) || k.Afbuigend.Length < b.Afbuigend.Length) kleinste[(ov.Van, ov.Naar)] = k; }
+            else if (ov.Richting == r.Om()) { if (!kleinste.TryGetValue((ov.Naar, ov.Van), out var b) || k.Afbuigend.Length < b.Afbuigend.Length) kleinste[(ov.Naar, ov.Van)] = k; }
+        }
+        var vorige = new Dictionary<int, int> { [van] = van };
+        var rij = new Queue<int>(); rij.Enqueue(van);
+        while (rij.Count > 0)
+        {
+            int cur = rij.Dequeue();
+            if (cur == via && kleinste.ContainsKey((via, doel))) break;
+            foreach (var (kant, _) in kleinste.Where(x => x.Key.Item1 == cur).OrderBy(x => x.Key.Item2))
+            {
+                int n = kant.Item2;
+                if (vorige.ContainsKey(n) || n == doel) continue;
+                vorige[n] = cur; rij.Enqueue(n);
+            }
+        }
+        if (!vorige.ContainsKey(via) || !kleinste.ContainsKey((via, doel))) return null;
+        var pad = new List<int> { doel };
+        for (int x = via; ; x = vorige[x]) { pad.Insert(0, x); if (x == van) break; }
+        if (pad.Count < 2 || pad.Take(pad.Count - 1).Distinct().Count() != pad.Count - 1) return null;
+        var c = Configuratie.Basis;
+        for (int i = 0; i + 1 < pad.Count; i++)
+            foreach (var a in kleinste[(pad[i], pad[i + 1])].Afbuigend) c = c.MetStand(a, true);
+        cfg = c;
+        return pad;
+    }
+
     private async Task VoerOpdrachtUit(Opdracht o)
     {
         _handmatigeOplossingGemeld = false;
@@ -727,7 +798,10 @@ public partial class BaanVerkenner
 
         var rijstand = RijStand(o);
         // BUG #145: een opdracht waarvan de aankomst op de startmelder al kortsluiting gaf (en niet bewezen oplosbaar is) wordt niet opnieuw gereden.
-        if (BekendeAankomstKortsluiting(o, rijstand) is { } bekend)
+        // BUG #149: liever vanaf de bewezen ingang aankomen dan een wissel bij de startmelder onder de staande loc omzetten.
+        var viaIngang = AankomstViaBewezenIngang(_kaart, o, rijstand, Kruis, out var ingangUitleg);
+        if (ingangUitleg is not null) _log.Info(ingangUitleg);
+        if (viaIngang is null && BekendeAankomstKortsluiting(o, rijstand) is { } bekend)
         {
             var t = $"Opdracht #{o.Id} (vanaf melder {o.Start} {o.Richting.Tekst()}, {o.Configuratie}) is overgeslagen: aankomst op melder {o.Start} met {bekend.Configuratie} geeft kortsluiting (kortsluitpunt #{bekend.Id}) en daar is geen werkende oplossing voor gevonden.";
             _log.Waarschuwing(t);
@@ -736,7 +810,7 @@ public partial class BaanVerkenner
         }
         try
         {
-            await NaarStartVan(o.Route, rijstand);
+            await NaarStartVan(viaIngang ?? o.Route, rijstand);
             // BUG #96 (Marco 16:01: "weer kortsluiting in het kruiswissel en motor 13 staat verkeerd"): motor 13 of 10 omzetten terwijl de loc op melder 24
             // staat geeft ALTIJD kortsluiting (log 15:40, 15:48, 14:40). Is dat hier nodig en kon het niet vooraf (#95), dan wordt de opdracht
             // overgeslagen en de loc terug gebracht, in plaats van weer een kortsluiting te veroorzaken.
@@ -1824,7 +1898,8 @@ public partial class BaanVerkenner
         uitleg = null;
         var wissels = new SortedSet<int>();
         foreach (var k in kaart.Kortsluitpunten.Where(k => k.Soort == KortsluitpuntSoort.Kortsluiting && k.Configuratie.Afbuigend.Length > 0 && k.Route.Count > 0
-                                                           && k.Route[^1].Naar == e.Naar && k.Route[^1].Richting == e.Richting && k.NaMelder == e.Naar))
+                                                           && k.Route[^1].Naar == e.Naar && k.Route[^1].Richting == e.Richting && k.NaMelder == e.Naar
+                                                           && (k.Route[^1].Pad.Count < 2 || e.Pad.Count < 2 || k.Route[^1].Pad[^2] == e.Pad[^2])))   // BUG #149: alleen dezelfde ingang
         {
             foreach (var a in k.Configuratie.Afbuigend) wissels.Add(a);
             if (k.Opgelost && k.OpgelostMetAfbuigend == true && k.OpgelostDoorAdres is int oa) wissels.Add(oa);
