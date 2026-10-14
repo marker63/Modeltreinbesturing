@@ -1972,3 +1972,14 @@ Oorzaak: de splitsing van wissel 2 (na melder 13 achteruit: rechtdoor -> melder 
 Fix: `Baankaart.WisselEisenVoorStapDetail` slaat een splitsing over waarvan rechtdoor en afbuigend naar dezelfde melder gaan. Test: `OverloopPaarEisenTest` (echte baankaart van 16:20, `testdata/baankaart_2026-10-14_1621.json`); zonder de fix wordt wissel 2 weer rechtdoor gezet (getest), met de fix blijft '1, 2 afbuigend' staan. Gewone splitsingen (wissel 5, 14) werken nog.
 Nog niet getest op de baan. Open: het blijft riskant om een wissel om te zetten terwijl de loc in de kruising staat; ik heb dat niet breder verboden omdat gewone ritten wissels juist bij de startmelder zetten.
 Overig in dit log (zelfde run als #142, dus nog zonder #141/#142): melder 12 heeft nog geen blok (loc staat op 12 en 5; #142 dekt dat nu); wissel 13 (kruismotor) afbuigend gaf kortsluiting op melder 24 en is in ~85 s hersteld; wissel 14 gevonden (na 8 achteruit: rechtdoor 17, afbuigend 24: de binnenring); wissel 1 + 2 samen als overloop-paar bewezen (afbuigend 1+2 geeft 12).
+
+## #144 Wissel 9 afbuigend haalde de kortsluiting na melder 129 weg, maar werd nergens vastgelegd (Marco 16:29, log 16:27)
+16:23:20 kortsluiting in blok 9 bij de rit 4 -> 129 (achteruit); de loc zat 3 minuten vast op 129+4. Op 16:25:46 haalde wissel 9 afbuigend het alarm weg
+(0,8 s na het commando; wissel 5 stond al sinds 16:23:18 afbuigend en kon dus niet de oorzaak zijn). De alarmroutine (`ProbeerAlarmWegTeKrijgen`) onthield
+dat alleen voor de eerstvolgende stap: kortsluitpunt #2 bleef 'open', wissel 9 stond nergens in het rapport en de volgende rit 4 -> 129 zou weer met wissel 9
+rechtdoor beginnen (opnieuw kortsluiting en weer ~50 s wissels proberen).
+Oplossing: `RegistreerAlarmOplossing` legt de wissel die het alarm wegnam vast als oplossing van het nieuwste nog niet opgeloste kortsluitpunt waarvan de melder
+(of tweede melder) bezet is. Daarna past `MetBekendeKortsluitOplossingen` hem voortaan zelf toe. Test: `AlarmOplossingVastleggenTest` (faalt zonder de fix).
+Overig uit dit log: (D) de kortsluiting op 16:26:53 na melder 5 is #143 (nog de oude versie); (A) wissel 5 om 16:23:18 was NIET de oorzaak; (C) Dinamo gaf na het
+commando voor wissel 9 (16:25:46) geen terugmeldingen meer (bekend patroon rond wissel 9/10, zie #138-notities); wissel 2 en 5 zijn toen niet uitgevoerd,
+de gebruiker herstelde Dinamo en alle wissels zijn daarna opnieuw gestuurd. Nog niet getest op de baan.

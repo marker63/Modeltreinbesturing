@@ -961,12 +961,30 @@ public partial class BaanVerkenner
                 _log.Vondst($"De kortsluiting ging weg nadat wissel {a} naar {(oud ? "rechtdoor" : "afbuigend")} is geschakeld ({stap}). De wissel blijft zo staan.");
                 _kortsluitingGemeld = false;
                 _alarmStand[a] = !oud;
+                RegistreerAlarmOplossing(a, !oud, bezet);
                 return true;
             }
             await ZetWissel(a, oud, forceer: true);
         }
         _log.Waarschuwing("Geen enkele wissel haalde de kortsluiting weg.");
         return false;
+    }
+
+    /// <summary>BUG #144 (Marco 16:29, log 16:23-16:26): wissel 9 afbuigend haalde de kortsluiting na melder 129 (rit 4 -> 129) weg, maar dat werd alleen
+    /// voor de eerstvolgende stap onthouden en niet bij het kortsluitpunt vastgelegd: #2 bleef 'open', de wissel stond nergens in het rapport en de
+    /// volgende rit 4 -> 129 zou weer met wissel 9 rechtdoor beginnen (opnieuw kortsluiting, opnieuw 50 s wissels proberen). Nu wordt de wissel die het
+    /// alarm wegnam als oplossing vastgelegd bij het nieuwste nog niet opgeloste kortsluitpunt waarvan de melder bezet is (de loc staat er nog).
+    /// Een wissel die al in de stand van het punt zit, een kruismotor die daar niets kan oplossen of een wissel die op rechtdoor werd gezet telt niet.</summary>
+    private void RegistreerAlarmOplossing(int adres, bool afbuigend, IEnumerable<int> bezet)
+    {
+        var b = bezet.ToHashSet();
+        var kp = _kaart.Kortsluitpunten.Where(k => k.Soort == KortsluitpuntSoort.Kortsluiting && !k.Opgelost && !k.Opgegeven
+                                                   && (b.Contains(k.NaMelder) || k.TweedeMelders.Any(b.Contains)))
+                                       .OrderByDescending(k => k.Id).FirstOrDefault();
+        if (kp is null || !_kaart.RegistreerHandmatigeOplossing(kp, adres, afbuigend, Kruis)) return;
+        _log.Vondst($"Kortsluitpunt #{kp.Id} (na melder {kp.NaMelder}, {kp.Richting.Tekst()}, {kp.Configuratie}) is opgelost door wissel {adres} op afbuigend: " +
+                    "het alarm verdween meteen nadat de verkenner die wissel omzette. Dit wordt voortaan in deze verkenning meteen toegepast (nog niet getest op de baan).");
+        BewaarNu();
     }
 
     /// <summary>BUG #93 (log 15:20): na kortsluitpunt #2 (wissel 5 afbuigend na melder 14) lukte dezelfde rit meteen daarna, zonder dat er iets

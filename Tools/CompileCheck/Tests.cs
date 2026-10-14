@@ -732,6 +732,40 @@ public static class Tests
         Eis(stand.Where(kv => kv.Key != 3).All(kv => !kv.Value), "alarm voor stap #108: de eerder geprobeerde wissels staan weer in hun oude stand");
     }
 
+    // BUG #144: de wissel die het alarm bij een stilstaande loc wegneemt wordt bij het kortsluitpunt vastgelegd
+    static void AlarmOplossingVastleggenTest()
+    {
+        Console.WriteLine("Test: alarmoplossing vastleggen (BUG #144)");
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
+        var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+        var s1 = sim.NieuweSectie(1, 80, 1); var s2 = sim.NieuweSectie(2, 80, 2);
+        sim.Verbind(s1, B, s2, A); sim.PlaatsLoc(s1, 40, +1);
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 4, DinamoBlokken = "1-2" };
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var status = new VerkenStatus { Instellingen = ins };
+        var v = new BaanVerkenner(sim, ins, klok, new VerkenLog(klok), (_, _) => Task.FromResult(true), status);
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var kaart = status.Kaart;
+        kaart.Kortsluitpunten.Add(new Kortsluitpunt { Id = 1, NaMelder = 1, Richting = Richting.Vooruit, Soort = KortsluitpuntSoort.Kortsluiting, Configuratie = Configuratie.Basis.Met(2), AlarmBlokken = new() { 1 } });
+        var check = typeof(BaanVerkenner).GetMethod("ControleerGeenAlarmVoorStap", bf)!;
+        var alarm = typeof(BaanVerkenner).GetMethod("HardwareMeldtBlokAlarm", bf)!;
+        var stand = (Dictionary<int, bool>)typeof(BaanVerkenner).GetField("_wisselStand", bf)!.GetValue(v)!;
+        var mon = (MelderMonitor)typeof(BaanVerkenner).GetField("_monitor", bf)!.GetValue(v)!;
+        mon.Ontvang(1, true);
+        klok.Wacht(TimeSpan.FromSeconds(1)).GetAwaiter().GetResult();
+        mon.Bijwerken();
+        alarm.Invoke(v, new object[] { 1, true });
+        klok.Getikt += _ => { if (stand.TryGetValue(3, out var af) && af) alarm.Invoke(v, new object[] { 1, false }); };
+        bool ok = true;
+        try { ((Task)check.Invoke(v, new object[] { "test" })!).GetAwaiter().GetResult(); } catch (NavigatieFout) { ok = false; }
+        var kp = kaart.Kortsluitpunten.First();
+        Eis(ok && kp.Opgelost && kp.OpgelostDoorAdres == 3 && kp.OpgelostMetAfbuigend == true, "alarmoplossing: wissel 3 afbuigend haalde het alarm weg -> kortsluitpunt #1 staat als opgelost door wissel 3 (kreeg: " + kp.Opgelost + "/" + kp.OpgelostDoorAdres + ")");
+        var pad = new List<int> { 1, 2 };
+        var c = kaart.MetBekendeKortsluitOplossingen(pad, Richting.Vooruit, Configuratie.Basis.Met(2), out _);
+        Eis(c.Bevat(3), "alarmoplossing: de volgende rit over dit punt zet wissel 3 meteen afbuigend (MetBekendeKortsluitOplossingen)");
+    }
+
     // BUG #83: een opgelost kortsluitpunt wordt ook op routes en terugwegen toegepast
     static void KoploperReferentieTest()
     {
@@ -2012,6 +2046,7 @@ public static class Tests
         WisselOnderLocTest();
         DinamoStilteTest();
         AlarmVoorStapTest();
+        AlarmOplossingVastleggenTest();
         KortsluitOplossingTest();
         KoploperReferentieTest();
         KruiswisselReferentieTest();
