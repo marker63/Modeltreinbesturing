@@ -1224,6 +1224,11 @@ public static class Tests
         k5.BekendeKortsluitOplossingen.Add(new KortsluitOplossing { NaMelder = 24, Richting = Richting.Vooruit, Stand = Configuratie.Basis.Met(13).Sleutel, Start = 14, Adres = 13, Afbuigend = false });
         k5.BekendeKortsluitOplossingen.Add(new KortsluitOplossing { NaMelder = 12, Richting = Richting.Achteruit, Stand = Configuratie.Basis.Met(2).Sleutel, Start = 13, Adres = 1, Afbuigend = true });
         Eis(k5.AlleKortsluitOplossingen().Count == 1 && k5.AlleKortsluitOplossingen()[0].Adres == 1, "leerprofiel (#124): 'wissel 13 terugzetten' wordt niet bewaard, een echte extra wissel wel");
+        // BUG #125: vertrek van een melder die eerder bewezen vertrok = Dinamo-probleem, geen blokprobleem
+        var k6 = new Baankaart();
+        k6.RegistreerOvergang(13, 14, Richting.Vooruit, Configuratie.Basis, 3.0);
+        Eis(BaanVerkenner.VertrekWasBewezen(k6, 13, Richting.Vooruit), "dinamo stil (#125): van melder 13 vooruit is eerder vertrokken");
+        Eis(!BaanVerkenner.VertrekWasBewezen(k6, 13, Richting.Achteruit) && !BaanVerkenner.VertrekWasBewezen(k6, 5, Richting.Vooruit), "dinamo stil (#125): andere richting/melder is niet bewezen -> gewone blokproef");
         // keten: stand 2 + wissel 1 geeft kortsluiting, stand 1+2 + wissel 5 lost op
         var k3 = new Baankaart();
         k3.BekendeKortsluitOplossingen.Add(new KortsluitOplossing { NaMelder = 12, Richting = Richting.Achteruit, Stand = Configuratie.Basis.Met(2).Sleutel, Start = 13, Adres = 1, Afbuigend = true });

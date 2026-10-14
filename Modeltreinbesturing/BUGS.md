@@ -1813,3 +1813,14 @@ op melder 5 omgezet en dat ging nu goed dankzij de wachttijd.
    bewezen is). Ze worden niet meer in het leerprofiel bewaard en niet meer uit een bestaand leerprofiel overgenomen.
 Tests: `startmelder vooraf (#124)`, `leerprofiel (#124)` in `StartmelderVoorafTest`. Nog niet getest op de baan; het WPF-project is niet gecompileerd.
 Open: de controle rijdt het gebied rond 129 niet opnieuw (zie #123); oorzaak van de twee kortsluitingen na wissel 14 op melder 13 blijft een hypothese.
+
+## #125 Dinamo reageert niet meer, zonder melding (Marco 09:46, log 09:10-09:43)
+Het log van 09:10-09:41 is schoon (geen enkele kortsluiting in 30 minuten, 12 adressen getest, wisselschakelingen vooraf/wachttijden werkten). Om 09:41:59 vertrok de loc niet meer van
+melder 13; Marco zag dat de wissels niet meer schakelden en onderbrak de netspanning van Dinamo, zonder melding. Oorzaak: de interface bleef berichten (keepalives) sturen, dus de
+stiltemelding (#81, 'geen enkel bericht') ging niet af; de verkenner zag alleen 'loc vertrok niet' en startte een blokproef (blok 3 telkens opnieuw, minuten lang) die niets kan vinden.
+Fix: vertrekt de loc niet van een melder waar hij in deze kaart al eerder wel van vertrok (`VertrekWasBewezen`: bekende overgang vanaf die melder in die richting), dan is de blokkoppeling
+bewezen. De verkenner meldt dan 'DINAMO REAGEERT WAARSCHIJNLIJK NIET OP COMMANDO'S' in het logboek, toont een pop-up (Ja = hersteld, alle wissels opnieuw sturen en de rit hervatten;
+Nee = toch blokproef; sluiten = stoppen) en slaat de blokproef over.
+Beperking: of Dinamo de WISSELcommando's uitvoert, meldt de centrale niet terug; de herkenning werkt dus pas bij de eerstvolgende rit waarbij de loc niet vertrekt. Nog niet getest op de baan;
+het WPF-project is niet gecompileerd (de pop-up gebruikt de bestaande VraagJaNee van het hoofdvenster). Test `dinamo stil (#125)`.
+Open: een directe controle 'reageert Dinamo?' (bijv. de baanspanning of een antwoord op elk commando) is niet mogelijk zonder meer protocolkennis.

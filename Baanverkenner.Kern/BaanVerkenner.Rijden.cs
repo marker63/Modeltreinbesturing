@@ -119,6 +119,11 @@ public partial class BaanVerkenner
             _log.Info($"Dinamo antwoordt weer (na {seconden:0.0} s stilte). Controleer de loc en de wisselstanden voordat de verkenning verdergaat.");
     }
 
+    /// <summary>BUG #125: is er in de kaart al een rit gemaakt die van <paramref name="start"/> in richting <paramref name="r"/> is vertrokken (een vervolgmelder
+    /// gezien)? Dan is de blokkoppeling bewezen en wijst een loc die niet vertrekt op Dinamo/baanspanning, niet op het blok.</summary>
+    internal static bool VertrekWasBewezen(Baankaart k, int start, Richting r) =>
+        k.Overgangen.Any(o => o.Van == start && o.Richting == r && o.AantalKeer > 0);
+
     private List<int> HuidigeAlarmBlokken()
     {
         lock (_alarmSlot) return _alarmBlokken.OrderBy(b => b).ToList();
@@ -1270,6 +1275,25 @@ public partial class BaanVerkenner
                         _log.Waarschuwing($"De loc vertrok niet van melder {start} terwijl het blok ({bekendBlok}) bekend is en er kort geleden een kortsluiting was: waarschijnlijk staat hij op een open gereden of verkeerd staande wissel (bijv. een kruiswissel met maar één van de twee motoren op afbuigend). De volledige blokproef wordt overgeslagen.");
                         await VraagLocTerugTeZetten(start, $"De loc rijdt niet weg van melder {start}, kort na een kortsluiting. Staat er een wissel (kruiswissel?) open gereden of in een gemengde stand? Zet de wissels goed en de loc op melder {start}.");
                         bevestigd = true;
+                    }
+                    // BUG #125 (Marco 14-10 09:42: Dinamo reageerde niet meer, wissels schakelden niet, na het uitzetten van de netspanning kwam er geen melding): de
+                    // interface bleef keepalives sturen, dus de stiltemelding (#81) ging niet af. De loc vertrok om 09:41:59 niet van melder 13, terwijl hij daar de hele
+                    // ochtend probleemloos vertrok met blok 3: dat is geen blokprobleem. Vroeger volgde een blokproef van minuten die ook niets kon vinden.
+                    if (!bevestigd && bekendBlok is not null && VertrekWasBewezen(_kaart, start, r))
+                    {
+                        var tekst = $"De loc vertrok niet van melder {start} (blok {bekendBlok}), terwijl hij van deze melder eerder in deze verkenning wel gewoon vertrok. Dat lijkt geen blokprobleem maar een Dinamo of baanspanning die niet meer reageert (wissels schakelen dan ook niet).";
+                        _log.Waarschuwing("DINAMO REAGEERT WAARSCHIJNLIJK NIET OP COMMANDO'S: " + tekst);
+                        _kaart.Waarschuwingen.Add(tekst);
+                        if (VraagJaNee is null) throw new OperationCanceledException(tekst);
+                        var antwoord = await VraagJaNee("Dinamo reageert niet",
+                            tekst + "\n\nControleer de netspanning/baanspanning van Dinamo en de kabel; herstart Dinamo zo nodig en zet de loc op melder " + start + ".\n\nJa = Dinamo is hersteld, opnieuw proberen (alle wissels worden opnieuw gestuurd)\nNee = het ligt aan de blokkoppeling, blokproef starten\n(venster sluiten = verkenning stoppen)");
+                        if (antwoord is null) throw new OperationCanceledException("Gebruiker stopte: Dinamo reageert niet.");
+                        if (antwoord == true)
+                        {
+                            foreach (var kv in _wisselStand.ToList()) await ZetWissel(kv.Key, kv.Value, forceer: true);
+                            _log.Info("Dinamo hersteld volgens de gebruiker: alle wissels zijn opnieuw gestuurd; de rit wordt hervat.");
+                            bevestigd = true;
+                        }
                     }
                     if (!bevestigd)
                     {
