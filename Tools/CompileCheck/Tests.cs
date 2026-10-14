@@ -732,6 +732,33 @@ public static class Tests
         Eis(stand.Where(kv => kv.Key != 3).All(kv => !kv.Value), "alarm voor stap #108: de eerder geprobeerde wissels staan weer in hun oude stand");
     }
 
+    // BUG #144b: na een kortsluiting blijft een loc die op melder x en de vorige melder staat staan (niet achteruit rijden)
+    static void HerstelBlijftStaanTest()
+    {
+        Console.WriteLine("Test: herstel blijft staan (BUG #144b)");
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
+        var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+        var s1 = sim.NieuweSectie(1, 80, 1); var s2 = sim.NieuweSectie(2, 80, 2);
+        sim.Verbind(s1, B, s2, A); sim.PlaatsLocOpGrens(s1, 75, +1, s2);
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 4, DinamoBlokken = "1-2" };
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var log = new VerkenLog(klok);
+        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true), new VerkenStatus { Instellingen = ins });
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var mon = (MelderMonitor)typeof(BaanVerkenner).GetField("_monitor", bf)!.GetValue(v)!;
+        mon.Ontvang(1, true); mon.Ontvang(2, true);
+        klok.Wacht(TimeSpan.FromSeconds(1)).GetAwaiter().GetResult();
+        mon.Bijwerken();
+        typeof(BaanVerkenner).GetField("_laatsteKortsluitMelders", bf)!.SetValue(v, new List<int> { 1 });
+        var herstel = typeof(BaanVerkenner).GetMethod("HerstelNaKortsluiting", bf)!;
+        double voor = sim.LocPositieTest();
+        ((Task)herstel.Invoke(v, new object[] { 2, Richting.Vooruit })!).GetAwaiter().GetResult();
+        mon.Bijwerken();
+        Eis(mon.Bezet.OrderBy(x => x).SequenceEqual(new[] { 1, 2 }), "herstel #144b: de loc staat nog op melder 1 en 2 (kreeg: " + string.Join(",", mon.Bezet.OrderBy(x => x)) + ")");
+        Eis(Math.Abs(sim.LocPositieTest() - voor) < 0.01, "herstel #144b: de loc is niet verplaatst");
+    }
+
     // BUG #144: de wissel die het alarm bij een stilstaande loc wegneemt wordt bij het kortsluitpunt vastgelegd
     static void AlarmOplossingVastleggenTest()
     {
@@ -2047,6 +2074,7 @@ public static class Tests
         DinamoStilteTest();
         AlarmVoorStapTest();
         AlarmOplossingVastleggenTest();
+        HerstelBlijftStaanTest();
         KortsluitOplossingTest();
         KoploperReferentieTest();
         KruiswisselReferentieTest();

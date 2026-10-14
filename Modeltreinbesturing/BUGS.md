@@ -1983,3 +1983,12 @@ Oplossing: `RegistreerAlarmOplossing` legt de wissel die het alarm wegnam vast a
 Overig uit dit log: (D) de kortsluiting op 16:26:53 na melder 5 is #143 (nog de oude versie); (A) wissel 5 om 16:23:18 was NIET de oorzaak; (C) Dinamo gaf na het
 commando voor wissel 9 (16:25:46) geen terugmeldingen meer (bekend patroon rond wissel 9/10, zie #138-notities); wissel 2 en 5 zijn toen niet uitgevoerd,
 de gebruiker herstelde Dinamo en alle wissels zijn daarna opnieuw gestuurd. Nog niet getest op de baan.
+
+## #144b Loc stond na de kortsluiting midden op een recht stuk stil (Marco 16:54, log 16:53)
+16:51:12 kortsluiting na melder 5 (rit 16 -> 5 met alleen wissel 2 afbuigend; de proefwissel, bekend gedrag). De loc stond op melder 16 + 5. Wissel 2 ging terug
+naar rechtdoor en het alarm was om 16:51:21 weg. Daarna reed `HerstelNaKortsluiting` de loc 'achteruit terug naar melder 5' en wachtte tot ALLEEN melder 5 bezet was.
+Dat kan niet: de loc is langer dan een melder, dus achteruit rijden geeft 16+5 -> 16 -> 16+15 -> 15 en nooit '5 alleen'. De loc stond zo op melder 15
+(midden op het rechte stuk, geen wissel in de buurt) en de gebruiker moest hem terugzetten (16:52:59).
+Oplossing: is het alarm weg en staat de loc nog op melder x plus alleen melders die bij de kortsluiting ook bezet waren, dan blijft hij staan en rijdt de
+herstelroutine niet. Het oude gedrag blijft voor alle andere gevallen (bijv. alarm blijft, of de loc is al verder verschoven).
+Test: `HerstelBlijftStaanTest` (faalt zonder de fix: loc werd verplaatst). Nog niet getest op de baan.

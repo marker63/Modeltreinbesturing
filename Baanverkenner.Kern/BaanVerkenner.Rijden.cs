@@ -1803,6 +1803,18 @@ public partial class BaanVerkenner
             await LosMakenProefWissel();
             await Wacht(TimeSpan.FromSeconds(1));
             _kortsluitingGemeld = false;
+            // BUG #144b (Marco 16:54, log 16:51): de loc stond na de kortsluiting op melder 5 en met zijn achterkant nog op melder 16 (de loc is langer dan
+            // een melder). 'Alleen op melder 5' kan door terugrijden nooit bereikt worden: de loc reed 16 en 5 voorbij naar melder 15, bleef midden op het
+            // rechte stuk staan en de gebruiker moest hem terugzetten. Is het alarm weg en staat de loc nog precies waar hij bij de kortsluiting stond
+            // (melder x en alleen de melders die toen ook bezet waren), dan blijft hij staan.
+            _monitor.Bijwerken();
+            var nuBezet = _monitor.Bezet;
+            if (nuBezet.Contains(melder) && nuBezet.Count > 1 && HuidigeAlarmBlokken().Count == 0
+                && nuBezet.All(m => m == melder || _laatsteKortsluitMelders.Contains(m)))
+            {
+                _log.Info($"Loc staat nog op melder {melder} en deels op melder {string.Join(" en ", nuBezet.Where(m => m != melder).OrderBy(m => m))} (de loc is langer dan één melder) en het alarm is weg: hij blijft staan waar hij staat.");
+                return;
+            }
             _negeerKortsluitingTot = _klok.Nu + TimeSpan.FromSeconds(12);
             _log.Rijden($"Herstel: loc {terug.Tekst()} terug naar melder {melder} (poging {poging}).");
             // Naar alle blokken: de loc staat op een stuk waarvan het blok onbekend is.

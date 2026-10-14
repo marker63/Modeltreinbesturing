@@ -103,6 +103,8 @@ public class SimulatieBaan : IHardwareInterface
 
     private object? _element;            // Sectie of Wissel
     private double _pos;                 // positie in het element (0..lengte)
+    /// <summary>Alleen voor tests: positie van de loc in zijn huidige element.</summary>
+    public double LocPositieTest() => _pos;
     private int _orientatie = 1;         // baanrichting (+1/-1 in het frame van het element) bij "vooruit"
     private Poort _wisselIn, _wisselUit; // frame binnen een wissel: 0 = ingang, lengte = uitgang
     private int _decoderStap;
