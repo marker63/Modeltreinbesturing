@@ -979,7 +979,16 @@ public partial class BaanVerkenner
                                 "Een kruiswissel-motor is geen overloopwissel: geen partnerzoektocht, wissel wordt meteen teruggezet.");
                 }
                 else if (proef.Einde == RitEinde.Kortsluiting && !zelfdeKortsluiting && proef.Reeks.Count >= 1)
-                    partner = await PartnerwisselZoeken(o, a, proef, rijstand);
+                {
+                    // BUG #150 (nagebouwde baan, 35 kortsluitingen in één verkenning waarvan 25 partnerproeven): reed de loc met dit adres afbuigend precies dezelfde melders
+                    // als de basisrit en volgt daarna de kortsluiting, dan wordt de wissel van achteren (samenvoegend) bereden en is afbuigend gewoon de verkeerde stand voor
+                    // deze ingang (bijv. wissel 2 afbuigend voor 16 -> 5). Een partnerwissel kan dat niet oplossen: elke proef is dan een extra, nutteloze kortsluiting.
+                    // Een partner heeft alleen zin als de afbuigende stand de loc een ANDERE weg laat nemen dan de basisrit (de tak verschilt).
+                    if (!afwijkendePad)
+                        _log.Info($"Kortsluiting na melder {proef.Reeks[^1]} met adres {a} afbuigend, terwijl de loc dezelfde melders reed als bij rechtdoor ({Lijst(proef.Reeks)}): de wissel wordt hier van achteren bereden en afbuigend is voor deze ingang verkeerd. Geen partnerzoektocht (die kan dit niet oplossen en kost alleen extra kortsluitingen).");
+                    else
+                        partner = await PartnerwisselZoeken(o, a, proef, rijstand);
+                }
 
                 if (afwijkendePad)
                 {
@@ -1088,7 +1097,7 @@ public partial class BaanVerkenner
         int x = proef.Reeks[^1];
         var cBasis = rijstand ?? o.Configuratie;   // BUG #118: de werkelijke rijstand, niet de nominale stand van de opdracht
         var cA = cBasis.Met(a);
-        var kandidaten = PartnerVolgorde(_kaart, _ins.WisselAdressen(), a, x, cBasis, _ins.MaxPartnerProeven);
+        var kandidaten = PartnerVolgorde(_kaart, _ins.WisselAdressen(), a, x, cBasis, _ins.MaxPartnerProeven, Kruis.Motoren.ToList());
         _log.Info($"Kortsluiting na melder {x} met adres {a} op afbuigend: dat wissel blijft afbuigend staan en de andere wissels worden één voor één meegeschakeld ({kandidaten.Count} adressen) om te zien of de kortsluiting verdwijnt (overloopwissels).");
         // BUG #109 (Marco 12:03): de partnerproef zette wissel 9 om terwijl de loc op melder 129 stond, waar die wissel ligt (hij heeft daar zijn
         // punt) en ontspoorde. Wissels die de kaart bij melder x noemen worden niet meer als partner geprobeerd.
@@ -1150,11 +1159,19 @@ public partial class BaanVerkenner
     /// <summary>BUG #66: volgorde waarin partnerwissels geprobeerd worden. Eerst de wissels waarvan al een waarneming bij melder
     /// <paramref name="x"/> bestaat (bijv. de tweede motor van een Engelse wissel/kruiswissel), daarna de rest op afstand van
     /// adres <paramref name="a"/>. Al afbuigende wissels en <paramref name="a"/> zelf vallen af.</summary>
-    internal static List<int> PartnerVolgorde(Baankaart kaart, IEnumerable<int> alle, int a, int x, Configuratie c, int max)
+    internal static List<int> PartnerVolgorde(Baankaart kaart, IEnumerable<int> alle, int a, int x, Configuratie c, int max, IReadOnlyCollection<int>? kruisMotoren = null)
+    {
+        kruisMotoren ??= Array.Empty<int>();
+        return PartnerVolgordeIntern(kaart, alle, a, x, c, max, kruisMotoren);
+    }
+
+    private static List<int> PartnerVolgordeIntern(Baankaart kaart, IEnumerable<int> alle, int a, int x, Configuratie c, int max, IReadOnlyCollection<int> kruisMotoren)
     {
         bool BijMelder(int b) => kaart.Wissels.Any(w => w.Adres == b && w.Waarnemingen.Any(o => o.NaMelder == x || o.VolgendeBijRechtdoor == x || o.VolgendeBijAfbuigend == x));
+        // BUG #150: de motoren van de Engelse wissel (door de gebruiker opgegeven) zijn verreweg de meest voorkomende partners (kruiswissel-referentie, 14-10: 24 vooruit met wissel 5 afbuigend
+        // vroeg wissel 10): die gaan vóór de rest op afstand, ook als de kruiswissel-melder nog niet ontdekt is. Zonder opgegeven motoren verandert er niets.
         return alle.Where(b => b != a && !c.Bevat(b))
-            .OrderBy(b => BijMelder(b) ? 0 : 1).ThenBy(b => Math.Abs(b - a)).ThenBy(b => b)
+            .OrderBy(b => BijMelder(b) ? 0 : kruisMotoren.Contains(b) ? 1 : 2).ThenBy(b => Math.Abs(b - a)).ThenBy(b => b)
             .Take(Math.Max(0, max)).ToList();
     }
 

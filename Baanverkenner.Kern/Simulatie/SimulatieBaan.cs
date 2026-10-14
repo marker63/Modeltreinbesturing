@@ -12,12 +12,12 @@ namespace Baanverkenner.Kern.Simulatie;
 /// Gebruik: om de Baanverkenner zonder echte baan uit te proberen, en voor de
 /// geautomatiseerde test van het verkenalgoritme.
 /// </summary>
-public class SimulatieBaan : IHardwareInterface
+public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
 {
     // ---------------- Opbouw ----------------
 
     public enum Eind { A, B }
-    public enum Poort { Stam, Recht, Af }
+    public enum Poort { Stam, Recht, Af, KA1, KA2, KB1, KB2 }
 
     public class Sectie
     {
@@ -34,7 +34,14 @@ public class SimulatieBaan : IHardwareInterface
         public bool Afbuigend;
         public double Lengte = 12;
         public int Blok;
-        public Aansluiting?[] Poorten = new Aansluiting?[3];
+        public Aansluiting?[] Poorten = new Aansluiting?[7];
+        /// <summary>Engelse wissel (BUG #150): vier benen KA1/KA2 (kant A) en KB1/KB2 (kant B) en twee motoren (<see cref="Adres"/> voor KA1, <see cref="Adres2"/> voor KA2).
+        /// Een loc van kant A kiest zijn been op de motor van het been waar hij vandaan komt; van kant B naar A wordt de wissel van achteren bereden.</summary>
+        public bool Kruis;
+        public int Adres2;
+        public bool Afbuigend2;
+        /// <summary>Melder die de wissel zelf bewaakt (0 = geen; de kruiswissel is zelf een melder-sectie).</summary>
+        public int Melder;
     }
 
     /// <summary>Waar een uiteinde op aansluit: een sectie-einde of een wisselpoort.</summary>
@@ -67,6 +74,47 @@ public class SimulatieBaan : IHardwareInterface
     {
         w.Poorten[(int)p] = new Aansluiting(s, e, null, Poort.Stam);
         s.Einden[(int)e] = new Aansluiting(null, Eind.A, w, p);
+    }
+
+    /// <summary>Twee wissels direct aan elkaar (geen sectie ertussen).</summary>
+    public void Verbind(Wissel a, Poort pa, Wissel b, Poort pb)
+    {
+        a.Poorten[(int)pa] = new Aansluiting(null, Eind.A, b, pb);
+        b.Poorten[(int)pb] = new Aansluiting(null, Eind.A, a, pa);
+    }
+
+    /// <summary>BUG #150: Engelse wissel (kruiswissel) met eigen melder.</summary>
+    public Wissel NieuweKruis(int adres, int adres2, int melder, int blok, double lengte)
+    {
+        var w = new Wissel { Adres = adres, Adres2 = adres2, Gepolariseerd = true, Blok = blok, Kruis = true, Melder = melder, Lengte = lengte };
+        _wissels.Add(w);
+        return w;
+    }
+
+    /// <summary>BUG #150: een wissel omzetten terwijl de loc er (deels) op staat geeft kortsluiting/ontsporing (zoals op de echte baan).</summary>
+    public bool OmzettenOnderLocGeeftKortsluiting { get; set; }
+    private List<(Wissel W, bool Stand1, bool Stand2)>? _omzetOud;
+    /// <summary>Echte Dinamo (logs 14-10): bij een kortsluiting blijven de melders staan zoals ze waren ("Ook bezet op dat moment: melder X"). Standaard aan.</summary>
+    public bool MeldersBevrorenBijKortsluiting { get; set; }
+    private HashSet<int>? _bevroren;
+
+    /// <summary>De uitgang van een Engelse wissel voor een loc die via <paramref name="inn"/> binnenkomt, en of dat een kortsluiting geeft.</summary>
+    internal static (Poort Uit, bool Kort) KruisUit(Wissel w, Poort inn)
+    {
+        bool m1 = w.Afbuigend, m2 = w.Afbuigend2;   // motor 13 (KA1) en motor 10 (KA2)
+        Poort uit; bool kort = false;
+        switch (inn)
+        {
+            case Poort.KA1: uit = m1 ? Poort.KB2 : Poort.KB1; break;
+            case Poort.KA2: uit = m2 ? Poort.KB1 : Poort.KB2; break;
+            case Poort.KB1: uit = m2 ? Poort.KA2 : Poort.KA1; kort = uit == Poort.KA1 && m1; break;
+            default: uit = m1 ? Poort.KA1 : Poort.KA2; kort = uit == Poort.KA2 && m2; break;
+        }
+        // De kruiswissel is klein en grenst direct aan de volgende wissel: staat die tegen de ingang van de loc in (van achteren bereden), dan
+        // ontstaat de kortsluiting al zodra de loc op de kruiswissel staat (zoals op de echte baan: log 14:38, opgeheven door de motor terug te zetten).
+        if (!kort && w.Poorten[(int)uit] is { Wissel: { Kruis: false, Gepolariseerd: true } buur, WisselPoort: var bp } && bp != Poort.Stam && (bp == Poort.Af) != buur.Afbuigend)
+            kort = true;
+        return (uit, kort);
     }
 
     // ---------------- Instellingen van het gedrag ----------------
@@ -146,7 +194,7 @@ public class SimulatieBaan : IHardwareInterface
         _element = s;
         _pos = Math.Clamp(pos, 0, s.Lengte);
         _orientatie = orientatie >= 0 ? 1 : -1;
-        _kortsluiting = false;
+        _kortsluiting = false; _omzetOud = null; AlarmUit();
         _x = 0;
         _spoor.Clear();
         // Interval van het huidige element: element-positie p = _pos + oriëntatie * (x - 0)
@@ -180,6 +228,11 @@ public class SimulatieBaan : IHardwareInterface
 
     public IReadOnlyList<Wissel> Wissels => _wissels;
 
+    /// <summary>Alleen voor tests/foutzoeken: waar staat de loc nu?</summary>
+    public string ToestandTest() => (_element switch { Sectie s => $"sectie {s.Melder}", Wissel w => w.Kruis ? $"kruis {w.Melder} in {_wisselIn} uit {_wisselUit}" : $"wissel {w.Adres} in {_wisselIn} uit {_wisselUit}", _ => "geen" })
+        + $" pos {_pos:0.0} orient {_orientatie} stap {_decoderStap} {(_decoderVooruit ? "vooruit" : "achteruit")} kortsluiting {_kortsluiting} bezet [{string.Join(",", BezetteMelders().OrderBy(x => x))}]";
+
+
     // ---------------- IHardwareInterface ----------------
 
     public bool Verbonden { get; private set; }
@@ -189,6 +242,22 @@ public class SimulatieBaan : IHardwareInterface
     public bool KlaarVoorVolgendeWisselCommando => true;
 
     public event Action<int, bool>? BezetmeldingGewijzigd;
+    /// <summary>Dinamo meldt een kortsluiting per blok (BUG #43). Alleen als <see cref="MeldBlokAlarm"/> aan staat.</summary>
+    public event Action<int, bool>? BlokAlarmGewijzigd;
+    public bool MeldBlokAlarm { get; set; }
+    private readonly HashSet<int> _alarmBlokken = new();
+    private void AlarmAan(params int[] blokken) { if (!MeldBlokAlarm) return; foreach (var b in blokken) if (_alarmBlokken.Add(b)) BlokAlarmGewijzigd?.Invoke(b, true); }
+    /// <summary>Echte Dinamo: de kortsluiting wordt een fractie van een seconde NA het ontstaan gemeld (eerst zie je de melder bezet worden).</summary>
+    public double KortsluitMeldVertraging { get; set; } = 0.8;
+    private DateTime? _meldKortOp;
+    private int _meldKortBlok;
+    private void MeldKortsluitingStraks(int blok, DateTime nu)
+    {
+        _meldKortBlok = blok;
+        if (KortsluitMeldVertraging <= 0) { AlarmAan(blok); if (MeldtKortsluiting) KortsluitingStatusGewijzigd?.Invoke(true); }
+        else _meldKortOp = nu + TimeSpan.FromSeconds(KortsluitMeldVertraging);
+    }
+    private void AlarmUit() { _meldKortOp = null; if (!MeldBlokAlarm) return; foreach (var b in _alarmBlokken.ToList()) { _alarmBlokken.Remove(b); BlokAlarmGewijzigd?.Invoke(b, false); } }
     public event Action<string>? StatusBericht;
     public event Action<bool>? KortsluitingStatusGewijzigd;
 
@@ -207,15 +276,41 @@ public class SimulatieBaan : IHardwareInterface
 
     public virtual void ZetWissel(int adres, bool afbuigend) => InWachtrij(() =>
     {
-        foreach (var w in _wissels.Where(w => w.Adres == adres))
+        foreach (var w in _wissels.Where(w => w.Adres == adres || (w.Kruis && w.Adres2 == adres)))
         {
-            w.Afbuigend = afbuigend;
+            bool tweede = w.Kruis && w.Adres2 == adres && w.Adres != adres;
+            bool oud1 = w.Afbuigend, oud2 = w.Afbuigend2;
+            if (tweede) w.Afbuigend2 = afbuigend; else w.Afbuigend = afbuigend;
+            bool veranderd = oud1 != w.Afbuigend || oud2 != w.Afbuigend2;
+            // BUG #150: omzetten terwijl de loc er (deels) op staat = kortsluiting/ontsporing
+            if (veranderd && OmzettenOnderLocGeeftKortsluiting && !_kortsluiting && _element is not null
+                && (ReferenceEquals(_element, w) || ElementenOnderLoc().Any(e => ReferenceEquals(e, w))))
+            {
+                _bevroren = BezetteMelders();
+                _kortsluiting = true;
+                BijwerkenMelders(false);
+                _omzetOud = new() { (w, oud1, oud2) };
+                _volgendeHerstelpoging = (_vorigeTik ?? DateTime.Now) + TimeSpan.FromSeconds(2);
+                StatusBericht?.Invoke($"[Simulatie] KORTSLUITING: wissel {adres} omgezet terwijl de loc erop stond.");
+                MeldKortsluitingStraks(w.Blok, _vorigeTik ?? DateTime.Now);
+                continue;
+            }
+            // Terugzetten van de wissel die onder de loc is omgezet haalt de kortsluiting weg
+            if (_kortsluiting && _omzetOud is { } oudeLijst && oudeLijst.All(o => o.W.Afbuigend == o.Stand1 && o.W.Afbuigend2 == o.Stand2))
+            {
+                _kortsluiting = false; _omzetOud = null; AlarmUit();
+                if (MeldtKortsluiting) KortsluitingStatusGewijzigd?.Invoke(false);
+            }
             // Zoals op de echte baan (log 09:24:50): een loc die van achteren tegen een verkeerd staande wissel kortgesloten zit, is vrij zodra de
             // wissel naar de tak wordt gezet waar de loc vandaan komt.
-            if (_kortsluiting && ReferenceEquals(_element, w) && (_wisselIn == Poort.Af) == afbuigend)
+            else if (_kortsluiting && _omzetOud is null && ReferenceEquals(_element, w))
             {
-                _kortsluiting = false;
-                if (MeldtKortsluiting) KortsluitingStatusGewijzigd?.Invoke(false);
+                bool vrij = w.Kruis ? !KruisUit(w, _wisselIn).Kort : (_wisselIn == Poort.Af) == afbuigend;
+                if (vrij)
+                {
+                    _kortsluiting = false; AlarmUit();
+                    if (MeldtKortsluiting) KortsluitingStatusGewijzigd?.Invoke(false);
+                }
             }
         }
         HardwareCommunicatieLog.Log("Uit", $"[Simulatie] wissel {adres} -> {(afbuigend ? "afbuigend" : "rechtdoor")}");
@@ -291,6 +386,11 @@ public class SimulatieBaan : IHardwareInterface
             }
         }
 
+        if (_meldKortOp is DateTime mk && nu >= mk)
+        {
+            _meldKortOp = null;
+            if (_kortsluiting) { AlarmAan(_meldKortBlok); if (MeldtKortsluiting) KortsluitingStatusGewijzigd?.Invoke(true); }
+        }
         if (_kortMeldTijd is DateTime km && nu >= km) { _kortMeldTijd = null; KortsluitingStatusGewijzigd?.Invoke(true); }
         Beweeg(nu, dt);
         if (FlikkerMelder > 0 && _geflikkerd < FlikkerKeer && nu >= _flikkerVolgende && nu >= _flikkerTot)
@@ -340,7 +440,7 @@ public class SimulatieBaan : IHardwareInterface
             // naar de ingang van de wissel) verdwijnt de kortsluiting.
             if (_orientatie * v < 0)
             {
-                _kortsluiting = false;
+                _kortsluiting = false; _omzetOud = null; AlarmUit();
                 if (MeldtKortsluiting) KortsluitingStatusGewijzigd?.Invoke(false);
             }
             else return;
@@ -395,7 +495,25 @@ public class SimulatieBaan : IHardwareInterface
         var nw = volgende.Wissel!;
         var inPoort = volgende.WisselPoort;
         Poort uit;
-        if (inPoort == Poort.Stam) uit = nw.Afbuigend ? Poort.Af : Poort.Recht;
+        if (nw.Kruis)
+        {
+            var (kUit, kort) = KruisUit(nw, inPoort);
+            if (kort)
+            {
+                _element = nw; _wisselIn = inPoort; _wisselUit = inPoort; _pos = 0.5;
+                _orientatie = 1 * v;
+                _omzetOud = null;
+                _bevroren = BezetteMelders();
+                _kortsluiting = true;
+                BijwerkenMelders(false);
+                _volgendeHerstelpoging = nu + TimeSpan.FromSeconds(2);
+                StatusBericht?.Invoke($"[Simulatie] KORTSLUITING op de kruiswissel (melder {nw.Melder}).");
+                MeldKortsluitingStraks(nw.Blok, nu);
+                return false;
+            }
+            uit = kUit;
+        }
+        else if (inPoort == Poort.Stam) uit = nw.Afbuigend ? Poort.Af : Poort.Recht;
         else
         {
             bool klopt = (inPoort == Poort.Af) == nw.Afbuigend;
@@ -404,10 +522,13 @@ public class SimulatieBaan : IHardwareInterface
                 // Van achteren tegen een verkeerd staande wissel: kortsluiting op het puntstuk
                 _element = nw; _wisselIn = inPoort; _wisselUit = Poort.Stam; _pos = 0.5;
                 _orientatie = 1 * v;
+                _omzetOud = null;
+                _bevroren = BezetteMelders();
                 _kortsluiting = true;
+                BijwerkenMelders(false);
                 _volgendeHerstelpoging = nu + TimeSpan.FromSeconds(2);
                 StatusBericht?.Invoke($"[Simulatie] KORTSLUITING op wissel {nw.Adres}.");
-                if (MeldtKortsluiting) KortsluitingStatusGewijzigd?.Invoke(true);
+                MeldKortsluitingStraks(nw.Blok, nu);
                 return false;
             }
             uit = Poort.Stam; // ongepolariseerd: wordt opengereden
@@ -447,11 +568,16 @@ public class SimulatieBaan : IHardwareInterface
     private HashSet<int> BezetteMelders()
     {
         var res = new HashSet<int>();
+        if (_kortsluiting && MeldersBevrorenBijKortsluiting && _bevroren is not null) return new HashSet<int>(_bevroren);
         if (_kortsluiting || _element is null) return res; // geen spanning = geen stroomdetectie
         if (_element is Sectie s && s.Melder > 0) res.Add(s.Melder);
+        if (_element is Wissel kw && kw.Melder > 0) res.Add(kw.Melder);
         if (_spookTot is not null) res.Add(_spookMelder);
         foreach (var e in ElementenOnderLoc())
+        {
             if (e is Sectie sec && sec.Melder > 0) res.Add(sec.Melder);
+            else if (e is Wissel wk && wk.Melder > 0) res.Add(wk.Melder);
+        }
         if (FlikkerMelder > 0 && _flikkerTotActief()) res.Remove(FlikkerMelder);
         return res;
     }
@@ -469,7 +595,7 @@ public class SimulatieBaan : IHardwareInterface
     private void BijwerkenMelders(bool forceer)
     {
         var bezet = BezetteMelders();
-        foreach (var m in _secties.Where(x => x.Melder > 0).Select(x => x.Melder).Distinct())
+        foreach (var m in _secties.Where(x => x.Melder > 0).Select(x => x.Melder).Concat(_wissels.Where(x => x.Melder > 0).Select(x => x.Melder)).Distinct())
         {
             bool b = bezet.Contains(m);
             bool oud = _gemeld.TryGetValue(m, out var g) && g;

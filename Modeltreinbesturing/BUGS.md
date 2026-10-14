@@ -2045,3 +2045,16 @@ ligt en alleen een andere ingang bewezen is dan die van de normale route, een be
 eerder gereden overgangen, kleinste bewezen wisselstand per overgang; hier 13-14-129-4-11-12-5 met 5, 1, 2 afbuigend) en rijdt de loc daar naartoe, met de wissels al gezet
 vóór de aankomst. #146 (wissels pas na aankomst zetten) geldt alleen nog voor dezelfde ingang als het kortsluitpunt. Test: `AankomstViaIngangTest` (kaart 18:55).
 Nog niet getest op de baan. Open: werkt alleen als de kaart de ingang al bewezen heeft en er een weg in dezelfde rijrichting naartoe bekend is; anders blijft de normale route.
+
+## BUG #150 – grote ronde zonder fouten, daarna fout na fout: verspilde proeven en vastzittende loc (Marco 19:24, alle logs van de afgelopen weken)
+Er is nu een nagebouwde Miniworld-baan in de simulator (`MiniworldBaan`, hypothese uit de kaarten: NIET door Marco bevestigd) met Dinamo-gedrag (blokalarm, kortsluiting
+kort na de melder, "ook bezet op dat moment", gepolariseerde wissels, kruiswissel 24). De volledige verkenning vanaf nul wordt daarop herhaald (`MiniworldRitTest`).
+Gevonden en opgelost:
+1. Partnerzoektocht na elke kortsluiting (8-9 extra kortsluitingen per fout, 30 -> 7 in de simulatie): alleen nog als de loc een afwijkend pad reed; anders geen partnerzoektocht;
+   de kruismotoren komen in de partnervolgorde vóór de rest.
+2. Blijft het alarm aan nadat de loc is gestopt (Dinamo meldt niet opnieuw), dan telt dat nu ook als vastzittende loc: de proefwissel gaat terug naar rechtdoor (#141) in plaats van dat
+   de loc blind achteruit rijdt tot melder 15 (zelfde fout als #144b in het echte log). Kruismotoren blijven buiten schot (#96, regressietest #141).
+Stand: de eerste kortsluiting is nu hersteld zonder dat de gebruiker ingrijpt (simulatie vanaf melder 17). Een volledige rit zonder enige kortsluiting is NIET gehaald: bij de eerste
+aankomst op een onbekende samenvoegende wissel en de kruiswissel is een kortsluiting inherent aan beginnen zonder voorkennis; na de kruiswissel-kortsluiting blijft de loc vastzitten
+(motor 13 mag niet onder de loc worden omgezet, #96) en moet de gebruiker de loc terugzetten. Nog niet getest op de baan.
+Open: voorkennis-run meten (0 kortsluitingen als doel), kortsluitoplossingen per ingang i.p.v. per volledige stand, misleidende hint in `Kortsluiting()`, wissel 10 weergave.

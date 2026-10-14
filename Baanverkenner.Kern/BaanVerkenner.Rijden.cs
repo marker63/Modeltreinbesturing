@@ -1820,7 +1820,8 @@ public partial class BaanVerkenner
     /// verdachte, dan gaat die meteen terug naar rechtdoor. Kruismotoren blijven buiten schot (#96). De partnerzoektocht zet hem zo nodig weer afbuigend.</summary>
     private async Task<bool> LosMakenProefWissel()
     {
-        if (!_statischeKortsluiting) return false;
+        // BUG #150: blijft het alarm ook na de stop aan (Dinamo meldt niet opnieuw), dan telt dat ook als vastzittende loc.
+        if (!_statischeKortsluiting && HuidigeAlarmBlokken().Count == 0) return false;
         if (_ritDoel?.ProefAdres is not int pa || Kruis.IsMotor(pa) || !_wisselStand.TryGetValue(pa, out var afb) || !afb) return false;
         _statischeKortsluiting = false;
         _log.Waarschuwing($"De kortsluiting komt steeds terug terwijl de loc stilstaat: hij zit klem op wissel {pa} (afbuigend). Die wissel gaat nu terug naar rechtdoor om de loc vrij te maken; anders blijft Dinamo de stroom steeds even terugzetten en weer afsluiten.");

@@ -2089,6 +2089,66 @@ public static class Tests
     }
 
     // De geslaagde, volledige rit van 10-10 11:38 (blokken 10, 11, 12): referentie voor importer en leerprofiel
+    /// <summary>BUG #150: een volledige verkenning vanaf nul op de nagebouwde Miniworld-baan (zie MiniworldBaan). Geeft het aantal kortsluitingen terug.</summary>
+    static (BaanVerkenner V, VerkenLog Log, int Kortsluitingen, double Seconden, string Einde) MiniworldRit(int startMelder, double maxUren = 6, Action<BaanVerkenner>? voorbereiding = null, bool omzettenOnderLoc = true)
+    {
+        var sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(omzettenOnderLoc, startMelder);
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 14, DinamoBlokken = "1-12", KruisMotoren = "10+13", HoogsteMelder = 150 };
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var log = new VerkenLog(klok);
+        var status = new VerkenStatus { Instellingen = ins };
+        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true), status) { VraagJaNee = (_, _) => Task.FromResult<bool?>(true) };
+        voorbereiding?.Invoke(v);
+        using var cts = new CancellationTokenSource();
+        var t0 = klok.Nu;
+        var vorigeSpoor = DateTime.MinValue;
+        klok.Getikt += nu => { if ((nu - t0).TotalHours > maxUren) cts.Cancel(); if (Environment.GetEnvironmentVariable("MINI_TRACE") == "1" && (nu - vorigeSpoor).TotalSeconds >= 1.0) { vorigeSpoor = nu; log.Info("[sim] " + sim.ToestandTest()); } };
+        string einde = "klaar";
+        try { v.VoerUit(cts.Token).GetAwaiter().GetResult(); } catch (OperationCanceledException) { einde = "tijdslimiet"; } catch (Exception ex) { einde = "gestopt: " + ex.Message; }
+        if (Environment.GetEnvironmentVariable("MINI_LOG") == "1") Console.WriteLine(log.AlsTekst());
+        int kort = log.Regels.Count(r => r.Tekst.Contains("KORTSLUITING/ONTSPORING vermoed"));
+        return (v, log, kort, (klok.Nu - t0).TotalSeconds, einde);
+    }
+
+    static void MiniworldFoutzoek()
+    {
+        var sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(true, 13);
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        sim.ZetLocSnelheid(5408, 28, true, 3);
+        for (int i = 0; i < 40; i++) { klok.Wacht(TimeSpan.FromSeconds(1)).GetAwaiter().GetResult(); sim.ZetLocSnelheid(5408, 28, true, 3); sim.ZetLocSnelheid(5408, 28, true, 8); sim.ZetLocSnelheid(5408, 28, true, 7); Console.WriteLine($"  t={i + 1}s {sim.ToestandTest()}"); }
+    }
+
+    static void MiniworldRitTest()
+    {
+        Console.WriteLine("Test: volledige verkenning vanaf nul op de nagebouwde Miniworld-baan (BUG #150)");
+        foreach (var start in (Environment.GetEnvironmentVariable("MINI_START") ?? "13").Split(',').Select(int.Parse))
+        {
+            var r = MiniworldRit(start);
+            Console.WriteLine($"  start {start}: {r.Einde}, {r.Seconden / 60:0} min, {r.Kortsluitingen} kortsluiting(en), melders: {string.Join(",", r.V.Kaart.Melders.Select(m => m.Nummer).OrderBy(x => x))}, voltooid: {r.V.Kaart.Voltooid}");
+            foreach (var l in r.Log.Regels.Where(x => x.Tekst.Contains("KORTSLUITING/ONTSPORING vermoed") || x.Tekst.Contains("VONDST")).Take(40)) Console.WriteLine("    " + l.Tekst.Substring(0, Math.Min(200, l.Tekst.Length)));
+        }
+    }
+
+    // Hulpmiddel (BUG #150): alle kaarten in testdata samenvoegen tot één lijst bewezen kortsluitoplossingen.
+    static void ZaadAllesTest()
+    {
+        var lp = new LeerProfiel();
+        var map = Path.Combine(AppContext.BaseDirectory, "testdata");
+        foreach (var f in Directory.GetFiles(map, "baankaart_*.json").OrderBy(x => x))
+        {
+            Baankaart? k; try { k = Baankaart.VanJson(File.ReadAllText(f)); } catch { continue; }
+            if (k is null) continue;
+            lp.LeerBlokHints(k);
+            Console.WriteLine($"  {Path.GetFileName(f)}: {k.AlleKortsluitOplossingen().Count} oplossingen");
+        }
+        foreach (var o in lp.KortsluitOplossingen.OrderBy(x => x.NaMelder).ThenBy(x => x.Richting))
+            Console.WriteLine($"  na {o.NaMelder} {o.Richting} stand [{o.Stand}] start {o.Start}: wissel {o.Adres} {(o.Afbuigend ? "af" : "recht")} ({o.Bron})");
+        var uit = Environment.GetEnvironmentVariable("ZAAD_ALLES");
+        if (!string.IsNullOrEmpty(uit)) File.WriteAllText(uit, lp.AlsJson());
+    }
+
     static void GeslaagdeRitTest()
     {
         var k = Laad("baankaart_pendel_2026-10-10_1138_geslaagd.json");
@@ -2205,6 +2265,9 @@ public static class Tests
         AlarmWisselBijLocTest();
         KruisRuisVoorafTest();
         AankomstViaIngangTest();
+        ZaadAllesTest();
+        if (Environment.GetEnvironmentVariable("MINI_DEBUG") == "1") MiniworldFoutzoek();
+        MiniworldRitTest();
         HerstelBlijftStaanTest();
         KortsluitOplossingTest();
         KoploperReferentieTest();
