@@ -93,6 +93,11 @@ public interface IHardwareInterface
     /// BezetmeldingGewijzigd. Nodig omdat de Dinamo melder-aanvragen niet beantwoordt. Standaard doet dit niets.</summary>
     void HerhaalBekendeMelderStanden() { }
 
+    /// <summary>BUG #127: vergeet de onthouden bezetstand van de gegeven melders (null = alle) en meldt ze als vrij via BezetmeldingGewijzigd.
+    /// De Dinamo meldt alleen wijzigingen en nooit welke melders vrij zijn: een gemiste 'vrij'-melding (Dinamo herstart, stilte) liet een melder
+    /// anders voor altijd bezet staan, ook in een nieuwe verkenning. Standaard doet dit niets.</summary>
+    void WisMelderGeheugen(IEnumerable<int>? melders = null) { }
+
     /// <summary>Meldt een gewijzigde bezetmelding: (meldernummer, bezet).</summary>
     event Action<int, bool>? BezetmeldingGewijzigd;
 

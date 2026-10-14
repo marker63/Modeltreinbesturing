@@ -1844,3 +1844,17 @@ na ~2 u 10 min; wel bijzonder dat de stroom van de interface bleef doorgaan). No
 Vervolg #126 (Marco 10:35, log 1033: netspanning onderbroken, melding kwam, maar traag): in log 1033 kostte elk commando zonder terugmelding 3,6 s (10:33:23 -> 10:33:27), omdat de extra wachttijden
 van #93/#123 (1,5-2 s, tong laten uitzwaaien) ook doorliepen terwijl er niets beweegt, plus 1,5 s wachten op de terugmelding. Nu: eerst 1,0 s op de terugmelding wachten, en blijft die uit dan vervalt de
 extra wachttijd. Zonder eerdere terugmelding in de sessie is het alarm na 4 commando's (was 6): ongeveer 4 x 1,4 s i.p.v. 6 x 3,6 s. Test aangepast. Nog niet getest op de baan; het WPF-project is niet gecompileerd.
+
+## #127 Melder 14 blijft 'bezet' bij elke nieuwe verkenning, ook na Dinamo herstarten (Marco 10:40)
+Oorzaak: de Dinamo meldt alleen WIJZIGINGEN en nooit welke melders vrij zijn; bij een aanvraag antwoordt hij niet (#101). `DinamoHardware` onthoudt daarom de laatst gemelde stand per melder
+(`_bekendeStand`) en `BepaalStart` geeft die bij elke nieuwe verkenning door als 'bezet'. De hardware blijft verbonden zolang je in de Baanverkenner niet opnieuw op Verbinden klikt, dus dat
+geheugen overleeft meerdere verkenningen. Is een 'vrij'-melding gemist (Dinamo herstart of de verbinding viel stil terwijl melder 14 bezet was), dan blijft 14 voor altijd bezet. Het venster
+'Meerdere melders bezet' hielp niet: OK vroeg alleen opnieuw dezelfde onthouden stand door. Dat sluit aan op de waarneming van Marco: de loc staat alleen op 13, het programma meldt 13 en 14.
+In log 1033 is dit zelf nog niet te zien (daar kwam 14 pas bezet door de blokproef); de aangeleverde bestanden zijn dezelfde als die van 10:35 en bevatten de herstarte verkenning niet.
+Fix: nieuwe `IHardwareInterface.WisMelderGeheugen(melders)` (Dinamo: wist de onthouden stand en meldt de gewiste bezette melders als vrij). Aangeroepen (1) na OK in 'Meerdere melders bezet'
+voor precies die melders, zodat een spookmelder verdwijnt; (2) automatisch voor alle melders zodra Dinamo stil valt (`ControleerStilte`). Het logboek toont nu bij de start
+'Bezet bij de start volgens Dinamo (laatst gemelde stand): ...'. Test `MelderGeheugenWisTest` (5 controles).
+Let op: staat de loc echt op 13 en wordt 13 ook gewist, dan komt er geen nieuwe melding tot de loc beweegt; de verkenner zoekt de loc dan zelf (bestaand pad 'Geen bezette melder bekend').
+Nog niet getest op de baan; het WPF-project is niet gecompileerd.
+Open: het leerprofiel (94 overgangen, 13 kortsluitoplossingen uit eerdere verkenningen) wordt ook bij een nieuwe verkenning overgenomen; Marco zegt dat niets van eerdere verkenningen onthouden mag
+worden. Dat is een bewuste eerdere keuze (#122/#124); wacht op bevestiging wat er precies uit moet.

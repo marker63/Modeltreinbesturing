@@ -357,6 +357,7 @@ public partial class BaanVerkenner
         }
         else await Wacht(TimeSpan.FromMilliseconds(_ins.OntdenderMs + 500));
         _monitor.Bijwerken();
+        _log.Info("Bezet bij de start volgens Dinamo (laatst gemelde stand): " + (_monitor.Bezet.Count == 0 ? "geen" : Lijst(_monitor.Bezet)) + ".");
 
         if (hervat)
         {
@@ -374,6 +375,12 @@ public partial class BaanVerkenner
             bool verder = await _vraag("Meerdere melders bezet",
                 $"Er zijn meerdere melders bezet ({Lijst(bezet)}).\n\nAlleen de testloc mag op de baan staan, helemaal binnen één melder. Haal andere voertuigen weg of zet de loc iets op, en klik OK.");
             if (!verder) throw new OperationCanceledException();
+            // BUG #127: de Dinamo meldt alleen wijzigingen. Een melder die in het geheugen van het programma 'bezet' staat maar waarvan de 'vrij'-melding gemist is
+            // (Dinamo herstart, stilte), bleef na OK voor altijd bezet. Het geheugen van deze melders wordt nu gewist: wat echt bezet is, meldt zich opnieuw (loc
+            // iets opzetten) of wordt door de loc zelf gevonden.
+            _hw.WisMelderGeheugen(bezet);
+            _log.Info($"Onthouden bezetstand van melder {Lijst(bezet)} gewist; alleen nieuwe meldingen van Dinamo tellen.");
+            _monitor.Bijwerken();
             if (_hw.KanMelderStatusOpvragen) foreach (var m in bezet) _hw.VraagMelderStatusOp(m);
             await Wacht(TimeSpan.FromSeconds(2));
             _monitor.Bijwerken();

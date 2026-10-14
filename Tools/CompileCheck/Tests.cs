@@ -987,6 +987,35 @@ public static class Tests
         Eis(ontvangen.Count == 0, "opstartstand: een latere wijziging (13 vrij) wint van de opstartstand");
     }
 
+    // BUG #127 (Marco 10:40): melder 14 bleef na een Dinamo-herstart en in nieuwe verkenningen 'bezet' (gemiste vrij-melding in het geheugen van het programma)
+    static void MelderGeheugenWisTest()
+    {
+        var hw = new Modeltreinbesturing.Hardware.DinamoHardware();
+        var t = typeof(Modeltreinbesturing.Hardware.DinamoHardware);
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        t.GetField("_poort", bf)!.SetValue(hw, new System.IO.Ports.SerialPort("COM0", 19200, System.IO.Ports.Parity.Odd, 8, System.IO.Ports.StopBits.One));
+        var buf = (List<byte>)t.GetField("_ontvangstBuffer", bf)!.GetValue(hw)!;
+        var verwerk = t.GetMethod("VerwerkOntvangenData", bf)!;
+        void Voer(string hex) { buf.AddRange(Convert.FromHexString(hex)); verwerk.Invoke(hw, null); }
+        var ontvangen = new List<(int, bool)>();
+        hw.BezetmeldingGewijzigd += (m, b) => ontvangen.Add((m, b));
+        Voer("0AD08C9A"); Voer("4AD08DD9"); // melder 13 en 14 bezet gemeld
+        Eis(ontvangen.SequenceEqual(new[] { (13, true), (14, true) }), "geheugen wissen (#127): beide melders komen als bezet binnen (nu " + string.Join(",", ontvangen) + ")");
+        ontvangen.Clear();
+        hw.WisMelderGeheugen(new[] { 14 });
+        Eis(ontvangen.SequenceEqual(new[] { (14, false) }), "geheugen wissen (#127): melder 14 wordt als vrij doorgegeven (nu " + string.Join(",", ontvangen) + ")");
+        ontvangen.Clear();
+        hw.HerhaalBekendeMelderStanden();
+        Eis(ontvangen.SequenceEqual(new[] { (13, true) }), "geheugen wissen (#127): alleen melder 13 blijft onthouden (nu " + string.Join(",", ontvangen) + ")");
+        ontvangen.Clear();
+        Voer("0AD08DD9".Replace("0AD08DD9", "4AD08DD9")); // melder 14 meldt zich later echt weer
+        Eis(ontvangen.SequenceEqual(new[] { (14, true) }), "geheugen wissen (#127): een nieuwe melding van 14 telt gewoon weer (nu " + string.Join(",", ontvangen) + ")");
+        ontvangen.Clear();
+        hw.WisMelderGeheugen();
+        hw.HerhaalBekendeMelderStanden();
+        Eis(ontvangen.Count(x => !x.Item2) == 2 && ontvangen.Count(x => x.Item2) == 0, "geheugen wissen (#127): alles wissen geeft alles vrij en onthoudt niets (nu " + string.Join(",", ontvangen) + ")");
+    }
+
     // BUG #102 (Marco 17:01): na "wissel 1 is de oplossing" moet de opdracht meteen opnieuw, niet achteraan de wachtrij
     static void HerpogingVolgordeTest()
     {
@@ -1603,6 +1632,7 @@ public static class Tests
         KruisIngangTest();
         BotsendeOplossingenTest();
         OpstartStandTest();
+        MelderGeheugenWisTest();
         HerpogingVolgordeTest();
         RouteVerkortTest();
         KruisAankomstTest();

@@ -143,6 +143,8 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
         _stilteGelogd = true;
         _stilteBegonTicks = Interlocked.Read(ref _laatsteOntvangstTicks);
         HardwareCommunicatieLog.Log("Info", $"[Dinamo] GEEN bericht (ook geen keepalive) van Dinamo sinds {s:0.0} s terwijl wij wel blijven sturen: Dinamo reageert niet meer (vastgelopen of kabel los?).");
+        // BUG #127: tijdens de stilte kunnen 'vrij'-meldingen gemist zijn; de onthouden bezetstand is dan niet meer te vertrouwen.
+        try { WisMelderGeheugen(); } catch { /* idem */ }
         try { StilteGewijzigd?.Invoke(true, s.Value); } catch { /* idem */ }
     }
     // BUG #45: derde, hoogste voorrangs-wachtrij - ALLEEN voor Reset Fault en stopcommando's
@@ -932,6 +934,23 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
         {
             _laatstDoorgegevenStatus[m] = true;
             BezetmeldingGewijzigd?.Invoke(m, true);
+        }
+    }
+
+    /// <inheritdoc/>
+    public void WisMelderGeheugen(IEnumerable<int>? melders = null)
+    {
+        List<int> weg;
+        lock (_bekendeStandSlot)
+        {
+            weg = (melders is null ? _bekendeStand.Keys.ToList() : melders.ToList());
+            foreach (var m in weg) _bekendeStand.Remove(m);
+        }
+        foreach (var m in weg)
+        {
+            bool wasBezet = _laatstDoorgegevenStatus.TryGetValue(m, out bool v) && v;
+            _laatstDoorgegevenStatus.Remove(m);
+            if (wasBezet) BezetmeldingGewijzigd?.Invoke(m, false);
         }
     }
 
