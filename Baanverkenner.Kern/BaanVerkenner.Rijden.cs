@@ -968,6 +968,39 @@ public partial class BaanVerkenner
             }
             await ZetWissel(a, oud, forceer: true);
         }
+        // BUG #147 (Marco 18:41: "nu weer wissel 14"; ook wissel 2 bij melder 5 om 17:27): de wissel die de kortsluiting veroorzaakt ligt bijna altijd bij de
+        // melder waar de loc staat en werd dus nooit geprobeerd; de gebruiker moest hem elke keer zelf aanwijzen. Omzetten met de loc erop kan ontsporen
+        // (#109), dus nooit zonder toestemming: de verkenner vraagt één keer of hij die wissels toch mag proberen (de loc staat stil), met de meest
+        // verdachte eerst (de wissels waarvan de kaart al weet dat afbuigend kortsluiting geeft bij deze melder).
+        var verdacht = bijLoc.Where(a => !Kruis.IsMotor(a) && _ins.WisselAdressen().Contains(a))
+            .OrderByDescending(a => _kaart.Wissel(a).Waarnemingen.Any(o => o.Soort == WaarnemingSoort.KortsluitingBijOmzetten && bezet.Contains(o.NaMelder)))
+            .ThenBy(a => a).ToList();
+        if (verdacht.Count > 0 && VraagJaNee is not null)
+        {
+            string lijst = string.Join(" en ", verdacht);
+            var mag = await VraagJaNee("Wissel bij de loc proberen?",
+                $"Geen enkele andere wissel haalt de kortsluiting weg. Waarschijnlijk staat wissel {lijst} verkeerd: die ligt bij melder {string.Join(" en ", bezet.OrderBy(x => x))}, waar de loc nu staat.\n\n" +
+                $"Ja = de verkenner probeert wissel {lijst} één voor één om te zetten (de loc staat stil; kleine kans dat hij daarbij ontspoort).\nNee = u zet hem zelf goed.");
+            if (mag == true)
+            {
+                foreach (var a in verdacht)
+                {
+                    bool oud = _wisselStand.TryGetValue(a, out var nu) && nu;
+                    await ZetWissel(a, !oud, forceer: true);
+                    var eind = _klok.Nu + TimeSpan.FromSeconds(2.5);
+                    while (HuidigeAlarmBlokken().Count > 0 && _klok.Nu < eind) await Wacht(TimeSpan.FromMilliseconds(300));
+                    if (HuidigeAlarmBlokken().Count == 0)
+                    {
+                        _log.Vondst($"De kortsluiting ging weg nadat wissel {a} (ligt bij de loc, met toestemming van de gebruiker) naar {(oud ? "rechtdoor" : "afbuigend")} is geschakeld ({stap}). De wissel blijft zo staan.");
+                        _kortsluitingGemeld = false;
+                        _alarmStand[a] = !oud;
+                        RegistreerAlarmOplossing(a, !oud, bezet);
+                        return true;
+                    }
+                    await ZetWissel(a, oud, forceer: true);
+                }
+            }
+        }
         _log.Waarschuwing("Geen enkele wissel haalde de kortsluiting weg.");
         return false;
     }

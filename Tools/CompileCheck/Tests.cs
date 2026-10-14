@@ -842,6 +842,46 @@ public static class Tests
         Eis(!kaart.MetOverloopPartners(Configuratie.Basis, null, null, out _).Bevat(1), "overloop: zonder wissel 2 afbuigend verandert er niets");
     }
 
+    // BUG #147: het alarm blijft en alleen de wissel bij de bezette melder lost het op -> vragen en dan proberen
+    static void AlarmWisselBijLocTest()
+    {
+        Console.WriteLine("Test: alarm - wissel bij de loc met toestemming proberen (BUG #147)");
+        foreach (bool toestemming in new[] { true, false })
+        {
+            var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
+            var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+            var s1 = sim.NieuweSectie(1, 80, 1); var s2 = sim.NieuweSectie(2, 80, 2);
+            sim.Verbind(s1, B, s2, A); sim.PlaatsLoc(s1, 40, +1);
+            var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 4, DinamoBlokken = "1-2" };
+            sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+            var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+            var status = new VerkenStatus { Instellingen = ins };
+            var v = new BaanVerkenner(sim, ins, klok, new VerkenLog(klok), (_, _) => Task.FromResult(true), status);
+            int gevraagd = 0;
+            v.VraagJaNee = (_, _) => { gevraagd++; return Task.FromResult<bool?>(toestemming); };
+            var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var kaart = status.Kaart;
+            kaart.Wissel(3).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.KortsluitingBijOmzetten, NaMelder = 1, Richting = Richting.Vooruit, VolgendeBijRechtdoor = 2, Configuratie = "alle wissels rechtdoor" });
+            kaart.Kortsluitpunten.Add(new Kortsluitpunt { Id = 1, NaMelder = 1, Richting = Richting.Vooruit, Soort = KortsluitpuntSoort.Kortsluiting, Configuratie = Configuratie.Basis.Met(4), AlarmBlokken = new List<int> { 1 } });
+            var check = typeof(BaanVerkenner).GetMethod("ControleerGeenAlarmVoorStap", bf)!;
+            var alarm = typeof(BaanVerkenner).GetMethod("HardwareMeldtBlokAlarm", bf)!;
+            var stand = (Dictionary<int, bool>)typeof(BaanVerkenner).GetField("_wisselStand", bf)!.GetValue(v)!;
+            var mon = (MelderMonitor)typeof(BaanVerkenner).GetField("_monitor", bf)!.GetValue(v)!;
+            mon.Ontvang(1, true);
+            klok.Wacht(TimeSpan.FromSeconds(1)).GetAwaiter().GetResult();
+            mon.Bijwerken();
+            alarm.Invoke(v, new object[] { 1, true });
+            klok.Getikt += _ => { if (stand.TryGetValue(3, out var af) && af) alarm.Invoke(v, new object[] { 1, false }); };
+            bool ok = true;
+            try { ((Task)check.Invoke(v, new object[] { "test" })!).GetAwaiter().GetResult(); } catch (NavigatieFout) { ok = false; }
+            var kp = kaart.Kortsluitpunten.First();
+            if (toestemming)
+                Eis(ok && gevraagd == 1 && kp.Opgelost && kp.OpgelostDoorAdres == 3, "alarm bij loc: met toestemming lost wissel 3 (ligt bij bezette melder 1) het alarm op en staat als oplossing vastgelegd");
+            else
+                Eis(!ok && gevraagd == 1 && !(stand.TryGetValue(3, out var af3) && af3) && !kp.Opgelost, "alarm bij loc: zonder toestemming blijft wissel 3 ongemoeid en volgt de gewone melding");
+        }
+    }
+
     // BUG #83: een opgelost kortsluitpunt wordt ook op routes en terugwegen toegepast
     static void KoploperReferentieTest()
     {
@@ -2125,6 +2165,7 @@ public static class Tests
         AlarmOplossingVastleggenTest();
         AankomstOplossingWeerlegdTest();
         AankomstEnOverloopTest();
+        AlarmWisselBijLocTest();
         HerstelBlijftStaanTest();
         KortsluitOplossingTest();
         KoploperReferentieTest();

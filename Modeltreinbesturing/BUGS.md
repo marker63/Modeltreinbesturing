@@ -2016,3 +2016,13 @@ in beide richtingen toe zodra het paar bewezen is (gereden oplossing of oplossin
 Naast #145 (intrekken bij herhaalde kortsluiting) blijft dit vangnet bestaan. Test: `AankomstEnOverloopTest`. Nog niet getest op de baan.
 Open: of wissel 1+2 zetten terwijl de loc op melder 5 staat veilig is (Marco's regel: niet onder de loc omzetten) - de partnerrit deed het eerder zonder
 probleem, maar dat is de eerste keer op de baan.
+
+## BUG #147 – de verkenner vindt de schuldige wissel bij de loc zelf niet (wissel 14 bij melder 8; Marco 18:41, log 18:32–18:37)
+Opdracht #7 (24 vooruit, wissel 13 afbuigend) kreeg kortsluiting bij melder 8; wissel 14 (ligt bij melder 8) moest afbuigend. De alarmroutine
+(#108/#109) slaat wissels bij een bezette melder over (omzetten met de loc erop kan ontsporen), terwijl juist die wissel bijna altijd de oorzaak is
+(ook wissel 2 bij melder 5 om 17:27). Resultaat: "Geen enkele wissel haalde de kortsluiting weg" en de gebruiker moest hem zelf aanwijzen.
+Oplossing: haalt geen andere wissel het alarm weg, dan vraagt de verkenner één keer (Ja/Nee) of hij de wissel(s) bij de bezette melder met de stilstaande
+loc mag proberen; de wissels waarvan de kaart al weet dat afbuigend daar kortsluiting geeft, eerst. Bij Ja en een verdwenen alarm wordt de wissel als
+oplossing van het kortsluitpunt vastgelegd (#144). Bij Nee verandert er niets (de regel van #109 blijft). Test: `AlarmWisselBijLocTest`. Nog niet getest op de baan.
+Open (niet gedaan): de eerste kortsluiting voorkomen door bij een nieuwe aankomstkant van een samenvoegende wissel (14 bij melder 8 vanaf 24) die wissel
+vooraf afbuigend te zetten; daarvoor is de kaart te onzeker (eerdere 24 -> 8-ritten stonden als gelukt terwijl Dinamo toen geen wissels uitvoerde).
