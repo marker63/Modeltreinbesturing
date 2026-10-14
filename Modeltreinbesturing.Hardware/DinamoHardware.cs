@@ -34,7 +34,7 @@ namespace Modeltreinbesturing.Hardware;
 /// kan dus geen commando verstuurd worden - dat wordt dan duidelijk gemeld i.p.v. blok 0
 /// (een ander, geldig blok) te gebruiken. Nog NIET getest tegen echte hardware.
 /// </summary>
-public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBron
+public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBron, IWisselBevestiging
 {
     private SerialPort? _poort;
     private System.Threading.Timer? _stuurTimer;
@@ -106,6 +106,11 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
 
     /// <inheritdoc/>
     public event Action<bool, double>? StilteGewijzigd;
+
+    private long _wisselBevestigingen;
+
+    /// <inheritdoc/>
+    public long AantalWisselBevestigingen => Interlocked.Read(ref _wisselBevestigingen);
 
     public double? SecondenSindsLaatsteOntvangst
     {
@@ -977,6 +982,10 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
                 // latere antwoord op de statusopvraag dan als "ongewijzigd" onderdrukken.
                 // BUG #101: ook wat de Dinamo tijdens het verbinden meldt is de echte stand (log 16:35: loc stond al op melder 13, de verkenner
                 // zag niets omdat de Dinamo melder-aanvragen nooit beantwoordt). Hier alleen onthouden; HerhaalBekendeMelderStanden geeft het door.
+                // BUG #126: Dinamo meldt elk UITGEVOERD wissel-commando terug in een statusbericht met dezelfde twee databytes (9x yy, bit 6 en 5 = 0, bit 4 = 1).
+                // Blijft dat weg terwijl wij commando's sturen, dan voert Dinamo (of de baanspanning) de commando's niet meer uit.
+                if (aantalDataBytes >= 2 && (_ontvangstBuffer[i + 1] & 0x70) == 0x10)
+                    Interlocked.Increment(ref _wisselBevestigingen);
                 if (aantalDataBytes >= 2 && _opstartFaseActief)
                 {
                     byte d1 = (byte)(_ontvangstBuffer[i + 1] & 0x7F);

@@ -325,6 +325,7 @@ public partial class BaanVerkenner
     private async Task ZetWissel(int adres, bool afbuigend, bool forceer = false)
     {
         if (!forceer && _wisselStand.TryGetValue(adres, out var huidig) && huidig == afbuigend) return;
+        long bevestigingenVoor = (_hw as IWisselBevestiging)?.AantalWisselBevestigingen ?? 0;
         _hw.ZetWissel(adres, afbuigend);
         _wisselStand[adres] = afbuigend;
         _laatsteWisselCommando = (adres, afbuigend, _klok.Nu, _monitor.Bezet.OrderBy(x => x).ToList());
@@ -346,6 +347,56 @@ public partial class BaanVerkenner
         // ergens op een melder, dan krijgt de tong daarom altijd een korte extra wachttijd, ook als de kaart de wissel niet bij die melder noemt.
         else if (bezetNu.Count > 0)
             await Wacht(TimeSpan.FromMilliseconds(ExtraWisselWachtOnbekendMs));
+        await ControleerWisselBevestiging(adres, afbuigend, bevestigingenVoor);
+    }
+
+    /// <summary>BUG #126: bewaakt of Dinamo de wissel-commando's terugmeldt (zie <see cref="EchoWaakhond"/>).</summary>
+    private readonly EchoWaakhond _echo = new();
+
+    /// <summary>BUG #126 (logs 14-10 0904, 0943 en 1022): Dinamo hield op met het uitvoeren van wissel-commando's (0904 vanaf 08:47:23, 1022 vanaf 10:19:38, 0943 de
+    /// hele sessie) terwijl de interface keepalives bleef sturen. De wissels bewogen niet meer, de verkenner dacht van wel en 'ontdekte' daardoor wissels die er niet
+    /// bij horen en kortsluitingen. Een wissel-commando dat Dinamo uitvoert, wordt in een statusbericht teruggemeld; blijft dat meerdere commando's achter elkaar weg,
+    /// dan stopt de verkenner en vraagt de gebruiker Dinamo te controleren.</summary>
+    private async Task ControleerWisselBevestiging(int adres, bool afbuigend, long bevestigingenVoor)
+    {
+        if (_hw is not IWisselBevestiging bron) return;
+        for (int i = 0; i < 15 && bron.AantalWisselBevestigingen <= bevestigingenVoor; i++) await Wacht(TimeSpan.FromMilliseconds(100));
+        bool bevestigd = bron.AantalWisselBevestigingen > bevestigingenVoor;
+        if (bevestigd) { _echo.Noteer(true); return; }
+        _log.Rijden($"Wissel {adres}: geen terugmelding van Dinamo op het commando ({_echo.Reeks + 1} achter elkaar zonder).");
+        if (!_echo.Noteer(false)) return;
+        var tekst = _echo.OoitBevestigd
+            ? $"Dinamo meldt de laatste {_echo.Reeks} wissel-commando's niet meer terug (laatste: wissel {adres} → {(afbuigend ? "afbuigend" : "rechtdoor")}), terwijl dat eerder in deze sessie wel gebeurde. De wissels worden dan niet meer omgezet."
+            : $"Dinamo heeft in deze sessie nog geen enkel wissel-commando teruggemeld ({_echo.Reeks} commando's). Waarschijnlijk worden de wissels niet omgezet.";
+        _log.Waarschuwing("DINAMO VOERT WISSELCOMMANDO'S NIET UIT: " + tekst);
+        _kaart.Waarschuwingen.Add(tekst);
+        if (VraagJaNee is null) throw new OperationCanceledException(tekst);
+        var antwoord = await VraagJaNee("Dinamo voert wissels niet uit",
+            tekst + "\n\nWat u op de baan hoort en ziet is leidend: gaan er wissels om? Zet Dinamo en de baanspanning uit en weer aan (of controleer de kabel).\n\nJa = Dinamo is hersteld, alle wissels opnieuw sturen en doorgaan\nNee = de wissels gaan wel om, doorgaan zonder deze controle\n(venster sluiten = verkenning stoppen)");
+        if (antwoord is null) throw new OperationCanceledException("Gebruiker stopte: Dinamo voert wissel-commando's niet uit.");
+        if (antwoord == false)
+        {
+            _echo.Negeren = true;
+            _log.Info("Gebruiker: de wissels gaan wel om. De controle op terugmeldingen van Dinamo staat voor de rest van deze sessie uit.");
+            return;
+        }
+        _echo.Herstel();
+        _log.Info("Dinamo hersteld volgens de gebruiker: alle wissels worden opnieuw gestuurd. Bevindingen sinds de eerste ontbrekende terugmelding zijn niet betrouwbaar.");
+        foreach (var kv in _wisselStand.ToList())
+        {
+            long voor = bron.AantalWisselBevestigingen;
+            _hw.ZetWissel(kv.Key, kv.Value);
+            _laatsteWisselCommando = (kv.Key, kv.Value, _klok.Nu, _monitor.Bezet.OrderBy(x => x).ToList());
+            await Wacht(TimeSpan.FromMilliseconds(Math.Max(100, _ins.WisselPauzeMs)));
+            for (int i = 0; i < 40 && !_hw.KlaarVoorVolgendeWisselCommando; i++) await Wacht(DinamoCyclus);
+            for (int i = 0; i < 15 && bron.AantalWisselBevestigingen <= voor; i++) await Wacht(TimeSpan.FromMilliseconds(100));
+            _echo.Noteer(bron.AantalWisselBevestigingen > voor);
+        }
+        if (_echo.Reeks >= EchoWaakhond.Drempel(_echo.OoitBevestigd))
+        {
+            _log.Waarschuwing("Dinamo meldt na het herstel nog steeds niets terug: de verkenning stopt.");
+            throw new OperationCanceledException("Dinamo meldt na het herstel nog steeds geen wissel-commando's terug.");
+        }
     }
 
     /// <summary>BUG #123: extra wachttijd na het omzetten van een wissel terwijl de loc op een melder staat, als de kaart de wissel niet bij die melder noemt.</summary>
@@ -1778,4 +1829,25 @@ public partial class BaanVerkenner
         var l = melders.ToList();
         return l.Count == 0 ? "geen" : string.Join(", ", l);
     }
+}
+
+/// <summary>BUG #126: telt achter elkaar verstuurde wissel-commando's zonder terugmelding van Dinamo. Na 3 (eerder wel terugmeldingen gezien) of 6 (nog nooit)
+/// is het alarm. Een terugmelding zet de teller terug. Na "Nee" van de gebruiker (de wissels gaan wel om) blijft het stil.</summary>
+internal sealed class EchoWaakhond
+{
+    public int Reeks { get; private set; }
+    public bool OoitBevestigd { get; private set; }
+    public bool Negeren { get; set; }
+    public static int Drempel(bool ooitBevestigd) => ooitBevestigd ? 3 : 6;
+
+    /// <returns>true als het alarm nu af moet gaan.</returns>
+    public bool Noteer(bool bevestigd)
+    {
+        if (bevestigd) { Reeks = 0; OoitBevestigd = true; return false; }
+        Reeks++;
+        return !Negeren && Reeks >= Drempel(OoitBevestigd);
+    }
+
+    /// <summary>Na herstel door de gebruiker: de reeks begint opnieuw; een tweede uitval wordt na 3 commando's weer gemeld.</summary>
+    public void Herstel() { Reeks = 0; }
 }

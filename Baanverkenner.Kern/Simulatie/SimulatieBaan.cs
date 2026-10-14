@@ -193,7 +193,7 @@ public class SimulatieBaan : IHardwareInterface
 
     public void Ontkoppelen() => Verbonden = false;
 
-    public void ZetWissel(int adres, bool afbuigend) => InWachtrij(() =>
+    public virtual void ZetWissel(int adres, bool afbuigend) => InWachtrij(() =>
     {
         foreach (var w in _wissels.Where(w => w.Adres == adres))
         {

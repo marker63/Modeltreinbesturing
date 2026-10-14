@@ -16,3 +16,11 @@ public interface IVerbindingsBron
     /// en als er weer bericht komt (stil = false, tweede waarde = duur van de stilte). Komt op een achtergrondthread binnen.</summary>
     event Action<bool, double>? StilteGewijzigd;
 }
+
+/// <summary>BUG #126: Dinamo meldt elk uitgevoerd wissel-commando terug in een statusbericht. Deze teller loopt op bij elke zo'n terugmelding;
+/// loopt hij niet op terwijl er wissel-commando's verstuurd worden, dan voert Dinamo ze niet uit. Alleen Dinamo.</summary>
+public interface IWisselBevestiging
+{
+    /// <summary>Aantal terugmeldingen van wissel-commando's sinds het verbinden.</summary>
+    long AantalWisselBevestigingen { get; }
+}

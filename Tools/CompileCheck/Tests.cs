@@ -1198,6 +1198,64 @@ public static class Tests
     }
 
     // BUG #122 (controle 18:36): wissels bij de startmelder vooraf zetten; geen triviale oplossingen; oplossingsketen
+    sealed class EchoHw : Baanverkenner.Kern.Simulatie.SimulatieBaan, Modeltreinbesturing.Hardware.IWisselBevestiging
+    {
+        public long AantalWisselBevestigingen { get; private set; }
+        public bool Levend = true;
+        public override void ZetWissel(int adres, bool afbuigend) { base.ZetWissel(adres, afbuigend); if (Levend) AantalWisselBevestigingen++; }
+    }
+
+    // BUG #126: Dinamo meldt elk uitgevoerd wissel-commando terug; blijft dat weg, dan stopt de verkenner met een melding
+    static void WisselBevestigingTest()
+    {
+        var w = new EchoWaakhond();
+        Eis(!w.Noteer(false) && !w.Noteer(false) && !w.Noteer(false) && !w.Noteer(false) && !w.Noteer(false) && w.Noteer(false), "echo (#126): zonder ooit een terugmelding gaat het alarm na 6 commando's af");
+        var w2 = new EchoWaakhond(); w2.Noteer(true);
+        Eis(!w2.Noteer(false) && !w2.Noteer(false) && w2.Noteer(false), "echo (#126): na eerdere terugmeldingen gaat het alarm al na 3 commando's af");
+        var w3 = new EchoWaakhond(); w3.Noteer(true); w3.Noteer(false); w3.Noteer(false); w3.Noteer(true);
+        Eis(w3.Reeks == 0 && !w3.Noteer(false), "echo (#126): een terugmelding zet de teller terug");
+        var w4 = new EchoWaakhond { Negeren = true }; w4.Noteer(true);
+        Eis(!w4.Noteer(false) && !w4.Noteer(false) && !w4.Noteer(false) && !w4.Noteer(false), "echo (#126): na 'Nee' van de gebruiker blijft het stil");
+
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        BaanVerkenner Maak(EchoHw hw, VerkenLog log, Func<string, string, Task<bool?>>? vraag)
+        {
+            var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 8 };
+            var klok = new VirtueleKlok();
+            return new BaanVerkenner(hw, ins, klok, log, (_, _) => Task.FromResult(true), new VerkenStatus { Instellingen = ins }) { VraagJaNee = vraag };
+        }
+        void Zet(BaanVerkenner v, int a, bool b) => ((Task)typeof(BaanVerkenner).GetMethod("ZetWissel", bf)!.Invoke(v, new object[] { a, b, true })!).GetAwaiter().GetResult();
+
+        // gezond: elk commando wordt teruggemeld -> nooit een vraag
+        var hw1 = new EchoHw(); var log1 = new VerkenLog(new VirtueleKlok()); int vragen1 = 0;
+        var v1 = Maak(hw1, log1, (_, _) => { vragen1++; return Task.FromResult<bool?>(true); });
+        for (int i = 1; i <= 8; i++) Zet(v1, i, i % 2 == 0);
+        Eis(vragen1 == 0, "echo (#126): gezonde Dinamo -> geen melding (nu " + vragen1 + ")");
+
+        // uitval na twee gelukte commando's: melding na het derde commando zonder terugmelding
+        var hw2 = new EchoHw(); var log2 = new VerkenLog(new VirtueleKlok()); var titels = new List<string>();
+        var v2 = Maak(hw2, log2, (t, _) => { titels.Add(t); return Task.FromResult<bool?>(false); });
+        Zet(v2, 1, true); Zet(v2, 2, true); hw2.Levend = false;
+        Zet(v2, 3, true); Zet(v2, 4, true);
+        Eis(titels.Count == 0, "echo (#126): twee commando's zonder terugmelding is nog geen alarm");
+        Zet(v2, 5, true);
+        Eis(titels.Count == 1 && titels[0].Contains("Dinamo voert wissels niet uit") && log2.Regels.Any(r => r.Tekst.Contains("DINAMO VOERT WISSELCOMMANDO'S NIET UIT")), "echo (#126): derde commando zonder terugmelding -> melding en logregel (nu " + titels.Count + ")");
+        Zet(v2, 6, true); Zet(v2, 7, true); Zet(v2, 8, true);
+        Eis(titels.Count == 1, "echo (#126): na 'Nee' geen herhaalde meldingen");
+
+        // zonder vraagfunctie: de verkenning stopt
+        var hw3 = new EchoHw { Levend = false }; var v3 = Maak(hw3, new VerkenLog(new VirtueleKlok()), null);
+        bool gestopt = false;
+        try { for (int i = 1; i <= 8; i++) Zet(v3, i, true); } catch (Exception ex) when (ex is OperationCanceledException || ex.InnerException is OperationCanceledException) { gestopt = true; }
+        Eis(gestopt, "echo (#126): geen terugmelding sinds het begin en geen vraagfunctie -> verkenning stopt");
+
+        // herstel: 'Ja' stuurt alle wissels opnieuw en gaat door als Dinamo weer terugmeldt
+        var hw4 = new EchoHw(); var log4 = new VerkenLog(new VirtueleKlok()); int ja = 0;
+        var v4 = Maak(hw4, log4, (_, _) => { ja++; hw4.Levend = true; return Task.FromResult<bool?>(true); });
+        Zet(v4, 1, true); hw4.Levend = false; Zet(v4, 2, true); Zet(v4, 3, true); Zet(v4, 4, true);
+        Eis(ja == 1 && log4.Regels.Any(r => r.Tekst.Contains("Dinamo hersteld volgens de gebruiker")), "echo (#126): 'Ja' -> opnieuw sturen en doorgaan (vragen " + ja + ")");
+    }
+
     static void StartmelderVoorafTest()
     {
         var k = new Baankaart();
@@ -1522,6 +1580,7 @@ public static class Tests
         KruisVoorafTest();
         OplossingLaterOpWegTest();
         StartmelderVoorafTest();
+        WisselBevestigingTest();
         TweedeMelderTest();
         VerkeerdeWisselVraagTest();
         WisselstraatImportTest();

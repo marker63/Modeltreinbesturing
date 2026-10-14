@@ -1824,3 +1824,19 @@ Nee = toch blokproef; sluiten = stoppen) en slaat de blokproef over.
 Beperking: of Dinamo de WISSELcommando's uitvoert, meldt de centrale niet terug; de herkenning werkt dus pas bij de eerstvolgende rit waarbij de loc niet vertrekt. Nog niet getest op de baan;
 het WPF-project is niet gecompileerd (de pop-up gebruikt de bestaande VraagJaNee van het hoofdvenster). Test `dinamo stil (#125)`.
 Open: een directe controle 'reageert Dinamo?' (bijv. de baanspanning of een antwoord op elk commando) is niet mogelijk zonder meer protocolkennis.
+
+## #126 Dinamo voert wissel-commando's niet meer uit, verkenner merkt het niet (Marco 10:23/10:24, logs 0904, 0943, 1022)
+Dinamo meldt elk UITGEVOERD wissel-commando terug in een statusbericht met dezelfde twee databytes (commando `4B 94 81 8C` -> terugmelding `4A 94 81 A1`; data1 = 0b001xxxxx, dus bit 6 en 5 nul, bit 4 één).
+Gemeten in de hardwarelogs: log 1022 meldde elk commando terug tot 10:19:35; vanaf 10:19:38 geen enkele meer (32 commando's lang). Daarna 'ontdekte' de verkenner wissels 3, 4, 5, 6 en maakte opdracht #5-#8,
+omdat de wissels niet bewogen (dat verklaart ook 'wissels waar hij niet in de buurt rijdt' en de loc die heen en weer reed tussen blok 3 en 2). Log 0943: de hele sessie geen enkele terugmelding.
+Log 0904, tot nu toe als 'schoon' beoordeeld: de terugmeldingen stopten om 08:47:23 en kwamen tot het einde (09:00) niet meer terug (25 commando's). De twee 'onverklaarde' kortsluitingen van
+08:52:55 en 08:53:15 (wissel 14, #123) vielen daar middenin; het is dus waarschijnlijker dat de wissel toen niet omging dan dat de tong 'nog onderweg' was. Wat de kaart van 0904 na 08:47:23 aan
+wissel-bevindingen bevat (vooral wissels 8 t/m 13) is daarom niet betrouwbaar.
+Eerdere logs (3, 4, 10, 11 oktober) hebben vaak lange reeksen zonder terugmelding; de terugmelding bestaat dus niet altijd of is toen niet vastgelegd.
+Fix: `DinamoHardware` telt de terugmeldingen (`IWisselBevestiging.AantalWisselBevestigingen`). `BaanVerkenner.ZetWissel` wacht na elk commando tot 1,5 s op een terugmelding (`ControleerWisselBevestiging`).
+Na 3 commando's zonder terugmelding (eerder in de sessie wel gezien) of 6 (nog nooit gezien) staat 'DINAMO VOERT WISSELCOMMANDO'S NIET UIT' in het logboek en in de kaartwaarschuwingen, en verschijnt
+een pop-up: Ja = Dinamo hersteld (alle wissels opnieuw sturen, blijft het stil dan stopt de verkenning), Nee = de wissels gaan wel om (controle uit voor de rest van de sessie), sluiten = stoppen.
+Zonder pop-upfunctie stopt de verkenning. Tests: `echo (#126)` (10 controles). Gezonde Dinamo geeft nooit een melding.
+Nog niet getest op de baan; het WPF-project is niet gecompileerd. Kleine bijwerking: elk wisselcommando duurt tot ~0,4 s langer (wachten op de terugmelding).
+Open: bevindingen van de paar commando's tot het alarm (maximaal 3) worden niet teruggedraaid; een rit die al liep gaat na 'Ja' gewoon door. Wat Dinamo doet uitvallen is onbekend (0904 na ~39 min, 1022
+na ~2 u 10 min; wel bijzonder dat de stroom van de interface bleef doorgaan). Notitie bij #125: de beperking 'Dinamo meldt niet terug' gold niet; #126 gebruikt die terugmelding wel.
