@@ -1833,10 +1833,14 @@ Log 0904, tot nu toe als 'schoon' beoordeeld: de terugmeldingen stopten om 08:47
 08:52:55 en 08:53:15 (wissel 14, #123) vielen daar middenin; het is dus waarschijnlijker dat de wissel toen niet omging dan dat de tong 'nog onderweg' was. Wat de kaart van 0904 na 08:47:23 aan
 wissel-bevindingen bevat (vooral wissels 8 t/m 13) is daarom niet betrouwbaar.
 Eerdere logs (3, 4, 10, 11 oktober) hebben vaak lange reeksen zonder terugmelding; de terugmelding bestaat dus niet altijd of is toen niet vastgelegd.
-Fix: `DinamoHardware` telt de terugmeldingen (`IWisselBevestiging.AantalWisselBevestigingen`). `BaanVerkenner.ZetWissel` wacht na elk commando tot 1,5 s op een terugmelding (`ControleerWisselBevestiging`).
-Na 3 commando's zonder terugmelding (eerder in de sessie wel gezien) of 6 (nog nooit gezien) staat 'DINAMO VOERT WISSELCOMMANDO'S NIET UIT' in het logboek en in de kaartwaarschuwingen, en verschijnt
+Fix: `DinamoHardware` telt de terugmeldingen (`IWisselBevestiging.AantalWisselBevestigingen`). `BaanVerkenner.ZetWissel` wacht na elk commando tot 1,0 s op een terugmelding (`WachtOpBevestiging`/`VerwerkBevestiging`).
+Na 3 commando's zonder terugmelding (eerder in de sessie wel gezien) of 4 (nog nooit gezien) staat 'DINAMO VOERT WISSELCOMMANDO'S NIET UIT' in het logboek en in de kaartwaarschuwingen, en verschijnt
 een pop-up: Ja = Dinamo hersteld (alle wissels opnieuw sturen, blijft het stil dan stopt de verkenning), Nee = de wissels gaan wel om (controle uit voor de rest van de sessie), sluiten = stoppen.
 Zonder pop-upfunctie stopt de verkenning. Tests: `echo (#126)` (10 controles). Gezonde Dinamo geeft nooit een melding.
 Nog niet getest op de baan; het WPF-project is niet gecompileerd. Kleine bijwerking: elk wisselcommando duurt tot ~0,4 s langer (wachten op de terugmelding).
 Open: bevindingen van de paar commando's tot het alarm (maximaal 3) worden niet teruggedraaid; een rit die al liep gaat na 'Ja' gewoon door. Wat Dinamo doet uitvallen is onbekend (0904 na ~39 min, 1022
 na ~2 u 10 min; wel bijzonder dat de stroom van de interface bleef doorgaan). Notitie bij #125: de beperking 'Dinamo meldt niet terug' gold niet; #126 gebruikt die terugmelding wel.
+
+Vervolg #126 (Marco 10:35, log 1033: netspanning onderbroken, melding kwam, maar traag): in log 1033 kostte elk commando zonder terugmelding 3,6 s (10:33:23 -> 10:33:27), omdat de extra wachttijden
+van #93/#123 (1,5-2 s, tong laten uitzwaaien) ook doorliepen terwijl er niets beweegt, plus 1,5 s wachten op de terugmelding. Nu: eerst 1,0 s op de terugmelding wachten, en blijft die uit dan vervalt de
+extra wachttijd. Zonder eerdere terugmelding in de sessie is het alarm na 4 commando's (was 6): ongeveer 4 x 1,4 s i.p.v. 6 x 3,6 s. Test aangepast. Nog niet getest op de baan; het WPF-project is niet gecompileerd.

@@ -1209,7 +1209,7 @@ public static class Tests
     static void WisselBevestigingTest()
     {
         var w = new EchoWaakhond();
-        Eis(!w.Noteer(false) && !w.Noteer(false) && !w.Noteer(false) && !w.Noteer(false) && !w.Noteer(false) && w.Noteer(false), "echo (#126): zonder ooit een terugmelding gaat het alarm na 6 commando's af");
+        Eis(!w.Noteer(false) && !w.Noteer(false) && !w.Noteer(false) && w.Noteer(false), "echo (#126): zonder ooit een terugmelding gaat het alarm na 4 commando's af");
         var w2 = new EchoWaakhond(); w2.Noteer(true);
         Eis(!w2.Noteer(false) && !w2.Noteer(false) && w2.Noteer(false), "echo (#126): na eerdere terugmeldingen gaat het alarm al na 3 commando's af");
         var w3 = new EchoWaakhond(); w3.Noteer(true); w3.Noteer(false); w3.Noteer(false); w3.Noteer(true);

@@ -339,15 +339,18 @@ public partial class BaanVerkenner
         // BUG #93 (log 15:20:28): wissel 5 werd omgezet terwijl de loc op melder 14 stond (de wissel ligt vlak erachter) en de loc reed 0,6 s later weg;
         // 3,6 s later kortsluiting, en dezelfde rit zonder nieuw commando lukte wel. Ligt de wissel achter een melder waarop de loc nu staat, dan
         // krijgt de tong extra tijd voordat de loc weer wegrijdt.
+        // BUG #126: eerst op de terugmelding wachten. Meldt Dinamo niets terug, dan beweegt er niets en zijn de extra wachttijden hieronder zinloos (kostte 3,6 s per commando).
+        bool? terugmelding = await WachtOpBevestiging(bevestigingenVoor);
         var bezetNu = _monitor.Bezet;
-        if (bezetNu.Count > 0 && _kaart.Wissels.Any(w => w.Adres == adres && w.Waarnemingen.Any(o => bezetNu.Contains(o.NaMelder))))
+        if (terugmelding == false) { /* geen extra wachttijd: de tong beweegt niet */ }
+        else if (bezetNu.Count > 0 && _kaart.Wissels.Any(w => w.Adres == adres && w.Waarnemingen.Any(o => bezetNu.Contains(o.NaMelder))))
             await Wacht(TimeSpan.FromMilliseconds(ExtraWisselWachtMs));
         // BUG #123 (log 14-10 08:52:55 en 08:53:15): wissel 14 staat in de kaart bij melder 8, maar twee keer kwam er kortsluiting 2 s na het omzetten
         // van 14 terwijl de loc op melder 13 stond en 0,5-1,5 s later wegreed. De kaart kent niet altijd welke wissel bij welke melder ligt; staat de loc
         // ergens op een melder, dan krijgt de tong daarom altijd een korte extra wachttijd, ook als de kaart de wissel niet bij die melder noemt.
         else if (bezetNu.Count > 0)
             await Wacht(TimeSpan.FromMilliseconds(ExtraWisselWachtOnbekendMs));
-        await ControleerWisselBevestiging(adres, afbuigend, bevestigingenVoor);
+        if (terugmelding is bool tm) await VerwerkBevestiging(adres, afbuigend, tm);
     }
 
     /// <summary>BUG #126: bewaakt of Dinamo de wissel-commando's terugmeldt (zie <see cref="EchoWaakhond"/>).</summary>
@@ -357,11 +360,16 @@ public partial class BaanVerkenner
     /// hele sessie) terwijl de interface keepalives bleef sturen. De wissels bewogen niet meer, de verkenner dacht van wel en 'ontdekte' daardoor wissels die er niet
     /// bij horen en kortsluitingen. Een wissel-commando dat Dinamo uitvoert, wordt in een statusbericht teruggemeld; blijft dat meerdere commando's achter elkaar weg,
     /// dan stopt de verkenner en vraagt de gebruiker Dinamo te controleren.</summary>
-    private async Task ControleerWisselBevestiging(int adres, bool afbuigend, long bevestigingenVoor)
+    private async Task<bool?> WachtOpBevestiging(long bevestigingenVoor)
+    {
+        if (_hw is not IWisselBevestiging bron) return null;
+        for (int i = 0; i < 10 && bron.AantalWisselBevestigingen <= bevestigingenVoor; i++) await Wacht(TimeSpan.FromMilliseconds(100));
+        return bron.AantalWisselBevestigingen > bevestigingenVoor;
+    }
+
+    private async Task VerwerkBevestiging(int adres, bool afbuigend, bool bevestigd)
     {
         if (_hw is not IWisselBevestiging bron) return;
-        for (int i = 0; i < 15 && bron.AantalWisselBevestigingen <= bevestigingenVoor; i++) await Wacht(TimeSpan.FromMilliseconds(100));
-        bool bevestigd = bron.AantalWisselBevestigingen > bevestigingenVoor;
         if (bevestigd) { _echo.Noteer(true); return; }
         _log.Rijden($"Wissel {adres}: geen terugmelding van Dinamo op het commando ({_echo.Reeks + 1} achter elkaar zonder).");
         if (!_echo.Noteer(false)) return;
@@ -389,7 +397,7 @@ public partial class BaanVerkenner
             _laatsteWisselCommando = (kv.Key, kv.Value, _klok.Nu, _monitor.Bezet.OrderBy(x => x).ToList());
             await Wacht(TimeSpan.FromMilliseconds(Math.Max(100, _ins.WisselPauzeMs)));
             for (int i = 0; i < 40 && !_hw.KlaarVoorVolgendeWisselCommando; i++) await Wacht(DinamoCyclus);
-            for (int i = 0; i < 15 && bron.AantalWisselBevestigingen <= voor; i++) await Wacht(TimeSpan.FromMilliseconds(100));
+            for (int i = 0; i < 10 && bron.AantalWisselBevestigingen <= voor; i++) await Wacht(TimeSpan.FromMilliseconds(100));
             _echo.Noteer(bron.AantalWisselBevestigingen > voor);
         }
         if (_echo.Reeks >= EchoWaakhond.Drempel(_echo.OoitBevestigd))
@@ -1831,14 +1839,14 @@ public partial class BaanVerkenner
     }
 }
 
-/// <summary>BUG #126: telt achter elkaar verstuurde wissel-commando's zonder terugmelding van Dinamo. Na 3 (eerder wel terugmeldingen gezien) of 6 (nog nooit)
+/// <summary>BUG #126: telt achter elkaar verstuurde wissel-commando's zonder terugmelding van Dinamo. Na 3 (eerder wel terugmeldingen gezien) of 4 (nog nooit)
 /// is het alarm. Een terugmelding zet de teller terug. Na "Nee" van de gebruiker (de wissels gaan wel om) blijft het stil.</summary>
 internal sealed class EchoWaakhond
 {
     public int Reeks { get; private set; }
     public bool OoitBevestigd { get; private set; }
     public bool Negeren { get; set; }
-    public static int Drempel(bool ooitBevestigd) => ooitBevestigd ? 3 : 6;
+    public static int Drempel(bool ooitBevestigd) => ooitBevestigd ? 3 : 4;
 
     /// <returns>true als het alarm nu af moet gaan.</returns>
     public bool Noteer(bool bevestigd)
