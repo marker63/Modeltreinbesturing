@@ -1416,6 +1416,44 @@ public static class Tests
 
     // BUG #135-#137 (Marco 14-10 14:12, log 14:07-14:11): kruiswissel-bewaking zonder vaste referentie, met het bewijs uit de EIGEN kaart
     // BUG #140: loc stond alleen op melder 30 (blok 7) en moest naar melder 20 (blok 6): het doelblok kreeg geen rijcommando en hij bleef staan
+    // BUG #141: aanhoudende kortsluiting bij stilstaande loc op de proefwissel -> die gaat terug naar rechtdoor
+    static void StatischeKortsluitingTest()
+    {
+        Console.WriteLine("Test: kortsluiting die terugkomt bij een stilstaande loc (BUG #141, log 14-10 15:30-15:32)");
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        (BaanVerkenner V, Baanverkenner.Kern.Simulatie.SimulatieBaan.Wissel W, VerkenLog Log) Maak(int proefAdres, bool afbuigendNu)
+        {
+            var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = false, LocAdres = 5408 };
+            var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+            var s5 = sim.NieuweSectie(5, 100, 3); var w = sim.NieuweWissel(proefAdres, true, 3); var s13 = sim.NieuweSectie(13, 100, 3);
+            sim.Verbind(s5, B, s13, A);
+            var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 14, DinamoBlokken = "3" };
+            sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+            var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+            var log = new VerkenLog(klok);
+            var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true));
+            v.Kruis = KruisKennis.Parse("10+13");
+            typeof(BaanVerkenner).GetField("_ritDoel", bf)!.SetValue(v, new RitDoel { ProefAdres = proefAdres });
+            ((Dictionary<int, bool>)typeof(BaanVerkenner).GetField("_wisselStand", bf)!.GetValue(v)!)[proefAdres] = afbuigendNu;
+            typeof(BaanVerkenner).GetField("_statischeKortsluiting", bf)!.SetValue(v, true);
+            return (v, w, log);
+        }
+        bool Los(BaanVerkenner v) => ((Task<bool>)typeof(BaanVerkenner).GetMethod("LosMakenProefWissel", bf)!.Invoke(v, null)!).GetAwaiter().GetResult();
+
+        var (v1, w1, log1) = Maak(2, true);
+        Eis(Los(v1), "statisch (#141): proefwissel 2 afbuigend + terugkerende kortsluiting -> wordt losgemaakt");
+        Eis(log1.Regels.Any(r => r.Tekst.Contains("zit klem op wissel 2")), "statisch (#141): het log legt uit waarom wissel 2 terug naar rechtdoor gaat");
+        Eis(!(bool)typeof(BaanVerkenner).GetField("_statischeKortsluiting", bf)!.GetValue(v1)!, "statisch (#141): de vlag is daarna gewist (geen herhaling)");
+
+        var (v2, _, _) = Maak(2, false);
+        Eis(!Los(v2), "statisch (#141): staat de proefwissel al rechtdoor, dan gebeurt er niets");
+        var (v3, _, _) = Maak(10, true);
+        Eis(!Los(v3), "statisch (#141): een kruismotor (10) wordt nooit onder de loc omgezet");
+        var (v4, _, _) = Maak(2, true);
+        typeof(BaanVerkenner).GetField("_statischeKortsluiting", bf)!.SetValue(v4, false);
+        Eis(!Los(v4), "statisch (#141): zonder terugkerende kortsluiting (vlag uit) gebeurt er niets");
+    }
+
     static void NastellenAnderBlokTest()
     {
         Console.WriteLine("Test: neerzetten op een melder in een ander Dinamo-blok (BUG #140, log 14-10 15:01)");
@@ -1919,6 +1957,7 @@ public static class Tests
         KruisZonderReferentieTest();
         WisselTerugmeldingTest();
         NastellenAnderBlokTest();
+        StatischeKortsluitingTest();
         TweedeMelderTest();
         VerkeerdeWisselVraagTest();
         WisselstraatImportTest();

@@ -101,6 +101,10 @@ public partial class BaanVerkenner
     /// <summary>BUG #132: door de gebruiker aangewezen oplossing die op het kortsluitpunt van de lopende kortsluiting wacht (wordt in RegistreerKortsluitpunt toegepast).</summary>
     private (int Melder, Richting Richting, int Adres, bool Afbuigend, DateTime Tijd)? _wachtendeHandOplossing;
 
+    /// <summary>BUG #141: de kortsluiting kwam terug terwijl de loc stilstond (geen rijcommando actief): de loc zit klem op de punten van een wissel
+    /// en Dinamo zet de stroom steeds even terug en sluit hem weer af. Alleen het omzetten van die wissel (of de loc met de hand verplaatsen) helpt.</summary>
+    private volatile bool _statischeKortsluiting;
+
     private void HardwareMeldtBlokAlarm(int blok, bool kortsluiting)
     {
         lock (_alarmSlot)
@@ -108,6 +112,9 @@ public partial class BaanVerkenner
             if (kortsluiting) _alarmBlokken.Add(blok);
             else _alarmBlokken.Remove(blok);
         }
+        if (kortsluiting && _voedingBlokken.Count == 0 && _laatsteKortsluitingOm != DateTime.MinValue
+            && (_klok.Nu - _laatsteKortsluitingOm).TotalSeconds > 4 && (_klok.Nu - _laatsteKortsluitingOm).TotalMinutes < 5)
+            _statischeKortsluiting = true;
         if (kortsluiting && _klok.Nu >= _negeerKortsluitingTot) _kortsluitingGemeld = true;
     }
 
@@ -1689,11 +1696,28 @@ public partial class BaanVerkenner
 
     /// <summary>Probeert de loc na een kortsluiting zelf terug te laten rijden naar de
     /// laatste melder. Lukt dat niet, dan wordt de gebruiker gevraagd hem terug te zetten.</summary>
+    /// <summary>BUG #141 (log 14-10 15:30-15:32): de kortsluiting na wissel 2 afbuigend kwam steeds terug terwijl de loc stilstond (Dinamo zette de
+    /// stroom elke ~20 s terug en sloot hem weer af, 4 keer in 95 s) en het terugrijden/neerzetten had geen enkele kans. Het hielp pas toen wissel 2 terug naar
+    /// rechtdoor ging (kortsluiting 1 s later weg). Komt de kortsluiting terug bij een stilstaande loc en is de wissel die de rit zelf proefde (afbuigend) de
+    /// verdachte, dan gaat die meteen terug naar rechtdoor. Kruismotoren blijven buiten schot (#96). De partnerzoektocht zet hem zo nodig weer afbuigend.</summary>
+    private async Task<bool> LosMakenProefWissel()
+    {
+        if (!_statischeKortsluiting) return false;
+        if (_ritDoel?.ProefAdres is not int pa || Kruis.IsMotor(pa) || !_wisselStand.TryGetValue(pa, out var afb) || !afb) return false;
+        _statischeKortsluiting = false;
+        _log.Waarschuwing($"De kortsluiting komt steeds terug terwijl de loc stilstaat: hij zit klem op wissel {pa} (afbuigend). Die wissel gaat nu terug naar rechtdoor om de loc vrij te maken; anders blijft Dinamo de stroom steeds even terugzetten en weer afsluiten.");
+        await ZetWissel(pa, false, forceer: true);
+        await Wacht(TimeSpan.FromSeconds(2));
+        _kortsluitingGemeld = false;
+        return true;
+    }
+
     private async Task HerstelNaKortsluiting(int melder, Richting richtingVanRit)
     {
         var terug = richtingVanRit.Om();
         for (int poging = 1; poging <= 2; poging++)
         {
+            await LosMakenProefWissel();
             await Wacht(TimeSpan.FromSeconds(1));
             _kortsluitingGemeld = false;
             _negeerKortsluitingTot = _klok.Nu + TimeSpan.FromSeconds(12);

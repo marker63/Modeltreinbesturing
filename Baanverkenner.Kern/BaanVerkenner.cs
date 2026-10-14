@@ -1022,6 +1022,11 @@ public partial class BaanVerkenner
                 _log.Waarschuwing($"Partnerzoektocht voor adres {a} afgebroken: de loc staat niet netjes op melder {x} (bezet: {Lijst(bezetNu.OrderBy(m => m).ToList())}). Verder proberen heeft pas zin als de loc weer goed staat.");
                 return null;
             }
+            if (_wisselStand.TryGetValue(a, out var aStand) && !aStand)
+            {
+                _log.Info($"Wissel {a} stond tijdens het herstel weer op rechtdoor (BUG #141); hij gaat voor de partnerproef terug naar afbuigend.");
+                await ZetWissel(a, true);
+            }
             _bezig = $"opdracht #{o.Id}: adres {a} afbuigend laten staan, partner {b} proberen";
             MeldVoortgang();
             var cAb = cA.Met(b);
