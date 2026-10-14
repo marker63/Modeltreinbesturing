@@ -258,6 +258,14 @@ public static class DinamoLogVertaler
                 CombineerToelichting(kortsluiting ? $"KORTSLUITING in blok {alarmBlok}" : $"geen kortsluiting meer in blok {alarmBlok}", faultTekst), ruw);
         }
 
+        if (data.Length == 2 && (data[0] & 0x70) == 0x10)
+        {
+            // BUG #139: Dinamo meldt een uitgevoerd wissel-/seincommando terug met dezelfde twee databytes als het commando.
+            return new VertaaldeRegel(tijdstip, richting, "Terugmelding wissel/sein", "", "", "", "",
+                WisselTerugmeldingTekst(data[0], data[1], out string standTekst), standTekst, "", "",
+                CombineerToelichting("Dinamo bevestigt dat dit wisselcommando is uitgevoerd.", faultTekst), ruw);
+        }
+
         if (data.Length == 2 && (data[0] & 0x60) == 0x40)
         {
             // Switch-event: (10CSSSS)(sssssss)
@@ -269,6 +277,14 @@ public static class DinamoLogVertaler
 
         return new VertaaldeRegel(tijdstip, richting, "Onbekend/niet gedecodeerd", "", "", "", "", "", "", "", "",
             CombineerToelichting($"Inkomend datagram met data, maar geen herkend patroon ({toggleInfo}).", faultTekst), ruw);
+    }
+
+    /// <summary>BUG #139: leest een terugmelding (zelfde opbouw als het wisselcommando: 0001 0 C AA, aaaaaaa).</summary>
+    public static string WisselTerugmeldingTekst(byte d1, byte d2, out string stand)
+    {
+        int adres = (((d1 & 0x03) << 7) | d2) + 1;
+        stand = (d1 & 0x04) != 0 ? "afbuigend" : "rechtdoor";
+        return adres.ToString(CultureInfo.InvariantCulture);
     }
 
     private static string FunctieBits(int ffff, int laagsteNummer)

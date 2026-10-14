@@ -114,6 +114,7 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
     private readonly List<(long Ticks, int Adres, bool Afbuigend)> _recenteWisselCommandos = new();
     private readonly Dictionary<int, int> _uitvalNaAdres = new();
     private readonly Dictionary<int, int> _commandosPerAdres = new();
+    private readonly Dictionary<int, (long Ticks, string Stand)> _laatsteTerugmeldingen = new();
     private int _uitvalTeller;
     private int _schrijfFouten;
     private static double SecondenSinds(long ticks) => (double)(System.Diagnostics.Stopwatch.GetTimestamp() - ticks) / System.Diagnostics.Stopwatch.Frequency;
@@ -155,6 +156,10 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
                 sb.Append("Uitval na commando per wisseladres (deze sessie, uitvallen/commando's): " +
                     string.Join(", ", _uitvalNaAdres.OrderByDescending(k => k.Value).Take(6).Select(k => $"wissel {k.Key}: {k.Value}/{_commandosPerAdres.GetValueOrDefault(k.Key)}")) + ". ");
         }
+        lock (_laatsteTerugmeldingen)
+            if (_laatsteTerugmeldingen.Count > 0)
+                sb.Append("Laatste terugmeldingen van Dinamo: " + string.Join(", ", _laatsteTerugmeldingen.OrderByDescending(k => k.Value.Ticks).Take(4)
+                    .Select(k => $"wissel {k.Key} {k.Value.Stand} {SecondenSinds(k.Value.Ticks):0.0} s geleden")) + ". ");
         lock (_vergrendeling)
             sb.Append($"Wachtrijen: urgent {_teVersturenUrgent.Count}, wissel/sein {_teVersturenPrioriteit.Count}, overig {_teVersturen.Count}. ");
         try
@@ -1053,7 +1058,16 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
 
                 bool ditIsKeepalive = aantalDataBytes == 0;
                 NoteerOntvangst();
-                HardwareCommunicatieLog.Log("In", $"[Dinamo] {Convert.ToHexString(_ontvangstBuffer.GetRange(i, berichtLengte).ToArray())}", keepalive: ditIsKeepalive);
+                // BUG #139: een terugmelding van een wissel/sein krijgt meteen leesbare tekst in het log (adres + stand) en wordt onthouden.
+                string terugTekst = "";
+                if (aantalDataBytes >= 2 && (_ontvangstBuffer[i + 1] & 0x70) == 0x10)
+                {
+                    byte t1 = (byte)(_ontvangstBuffer[i + 1] & 0x7F), t2 = (byte)(_ontvangstBuffer[i + 2] & 0x7F);
+                    string tAdres = DinamoLogVertaler.WisselTerugmeldingTekst(t1, t2, out string tStand);
+                    terugTekst = $"  <- terugmelding: wissel {tAdres} {tStand}";
+                    lock (_laatsteTerugmeldingen) _laatsteTerugmeldingen[int.Parse(tAdres)] = (System.Diagnostics.Stopwatch.GetTimestamp(), tStand);
+                }
+                HardwareCommunicatieLog.Log("In", $"[Dinamo] {Convert.ToHexString(_ontvangstBuffer.GetRange(i, berichtLengte).ToArray())}{terugTekst}", keepalive: ditIsKeepalive);
 
                 framesDezeKeer++;
                 if ((_ontvangstBuffer[i] & 0x20) != 0) dinamoMeldtFout = true; // Dinamo's eigen F-bit

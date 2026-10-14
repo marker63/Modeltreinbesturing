@@ -1415,6 +1415,15 @@ public static class Tests
 
 
     // BUG #135-#137 (Marco 14-10 14:12, log 14:07-14:11): kruiswissel-bewaking zonder vaste referentie, met het bewijs uit de EIGEN kaart
+    static void WisselTerugmeldingTest()
+    {
+        Console.WriteLine("Test: terugmelding van een wissel wordt leesbaar gelogd (BUG #139), voorbeeld uit hardwarelog 14-10 14:11");
+        // echte regels: 4A 90 80 (wissel 1 rechtdoor), 0A 90 81 (wissel 2), 0A 94 89 (wissel 10 afbuigend)
+        Eis(Modeltreinbesturing.Hardware.DinamoLogVertaler.WisselTerugmeldingTekst(0x10, 0x00, out string s1) == "1" && s1 == "rechtdoor", "terugmelding (#139): 90 80 = wissel 1 rechtdoor");
+        Eis(Modeltreinbesturing.Hardware.DinamoLogVertaler.WisselTerugmeldingTekst(0x10, 0x01, out string s2) == "2" && s2 == "rechtdoor", "terugmelding (#139): 90 81 = wissel 2 rechtdoor");
+        Eis(Modeltreinbesturing.Hardware.DinamoLogVertaler.WisselTerugmeldingTekst(0x14, 0x09, out string s3) == "10" && s3 == "afbuigend", "terugmelding (#139): 94 89 = wissel 10 afbuigend");
+    }
+
     static void KruisZonderReferentieTest()
     {
         Console.WriteLine("Test: kruiswissel zonder vaste referentie (BUG #135-#137), echte kaart van 14-10 14:11");
@@ -1866,6 +1875,7 @@ public static class Tests
         WisselBevestigingTest();
         HoortestEnKruisTest();
         KruisZonderReferentieTest();
+        WisselTerugmeldingTest();
         TweedeMelderTest();
         VerkeerdeWisselVraagTest();
         WisselstraatImportTest();
