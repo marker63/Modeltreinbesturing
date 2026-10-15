@@ -2135,3 +2135,8 @@ Gevonden:
 - Wissel 11 stond onder "adressen zonder gevonden effect" terwijl hij waarnemingen heeft.
 Oplossing: wissels die de route zelf eist en kruismotoren op een route over de kruiswissel worden bij de aankomst niet meer vastgehouden; ontbrekende Via wordt bij laden en afronden afgeleid uit de doorgangen (wissel 2: 16 → 5, wissel 14: 17 → 8, wissel 10: 14 → 24); wissels met waarnemingen tellen mee als "effect gevonden".
 Test in CompileCheck (kaart 12:42). Nog niet getest op de baan.
+
+## #161 - Controle (15-10 13:48, zonder versie 160) reed alleen de basisronde; schijnverschil bij adressen
+Oorzaak: de controle begint zonder overgangen en plande alleen "start, vooruit" en "start, achteruit". De zijtakken (melder 129, 10, 9, 1, 12, 11, 4 en 14 → 129, 24 → 8, 8 → 24, 5 → 12) werden nooit bereikt, omdat ze alleen via een afbuigende stand te bereiken zijn en de controle geen adrestest doet. Het verslag meldde daardoor 18 overgangen 'niet gereden' en 9 wissels 'niet opnieuw vastgesteld'. Daarnaast telde 'adressen zonder effect: nu 1-14' als verschil, terwijl de controle geen adrestest doet.
+Oplossing: na de basisrondes plant de controle elk traject uit de bestaande kaart (zelfde startmelder, richting, wisselstand), met een route over de basis of over een ander traject dat langs de startmelder loopt (`PlanControleTrajecten`, `ControleRoute`). Trajecten die op een bekend kortsluitpunt zonder bekende oplossing eindigen worden niet gereden. De vergelijking van 'adressen zonder effect' is vervallen.
+Test in CompileCheck (simulatie: alle overgangen opnieuw gereden; kaart 12:42: route naar 129 via 21 met motor 10 afbuigend). Nog niet getest op de baan.

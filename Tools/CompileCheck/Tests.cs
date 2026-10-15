@@ -483,6 +483,7 @@ public static class Tests
         Eis(na.AlsJson() == vk.AlsJson(), "controle: de bestaande kaart is ongewijzigd (alleen het verslag is toegevoegd)");
         var vs = k.ControleVerslagen[0];
         Console.WriteLine("  (controle: " + vs.Samenvatting + (vs.Regels.Count > 0 ? " | " + string.Join(" | ", vs.Regels) : "") + ")");
+        Eis(status.ControleKaart.Overgangen.Count == k.Overgangen.Count, "controle (#161): de controle reed alle overgangen van de kaart (nu " + status.ControleKaart.Overgangen.Count + " van " + k.Overgangen.Count + ")");
         Eis(!vs.Verschillen, "controle: dezelfde baan geeft geen verschillen");
         Eis(Rapport.AlsTekst(k).Contains("CONTROLES VAN DE BAAN") && Rapport.AlsHtml(k).Contains("Controles van de baan"), "controle: rapport toont het verslag");
         var ct = Rapport.ControleAlsTekst(vs); var ch = Rapport.ControleAlsHtml(vs);
@@ -2081,6 +2082,11 @@ public static class Tests
         Eis(Rapport.AlsTekst(k160).Contains("ingang 16 → 5"), "ingang (#160): het rapport noemt 'ingang 16 → 5' voor wissel 2");
         var e160 = new Etappe { Van = 21, Naar = 129, Richting = Richting.Achteruit, Pad = new List<int> { 21, 24, 129 }, Configuratie = Configuratie.Basis.Met(5).Met(6).Met(10) };
         var c160 = BaanVerkenner.AankomstZonderKortsluitWissels(k160, e160, e160.Configuratie, out var u160);
+        // BUG #161: elke traject van de voltooide kaart (behalve die op een bekend kortsluitpunt eindigen) heeft een route vanaf de startmelder
+        var t129 = k160.Trajecten.First(t => t.Start == 129 && t.Richting == Richting.Achteruit);
+        var r129 = BaanVerkenner.ControleRoute(k160, t129, k160.Trajecten, new HashSet<Traject>());
+        Eis(r129 is not null && r129[0].Van == k160.StartMelder && r129[^1].Naar == 129 && r129[^1].Configuratie.Bevat(10), "controle (#161): route naar melder 129 loopt vanaf de startmelder en neemt het traject met motor 10 afbuigend (nu " + (r129 is null ? "geen" : string.Join(" ; ", r129.Select(e => $"{e.Van}->{e.Naar} {e.Configuratie}"))) + ")");
+        Eis(k160.Trajecten.Where(t => t.Einde != RitEinde.BekendKortsluitpunt).All(t => BaanVerkenner.ControleRoute(k160, t, k160.Trajecten, new HashSet<Traject>()) is not null), "controle (#161): alle trajecten (zonder bekend kortsluitpunt) zijn te bereiken");
         Eis(c160.Bevat(10) && !c160.Bevat(5) && !c160.Bevat(6), "aankomst (#160): bij 21 -> 24 -> 129 blijft kruismotor 10 afbuigend; 5 en 6 wachten tot de loc op melder 129 staat (nu " + c160 + ")");
         Eis(!v.Any(x => x.VanBlok == x.NaarBlok), "wisselstraat: geen voorstel binnen een blok");
         Eis(!v.Any(x => x.VanMelder == 20 && x.NaarMelder == 27), "wisselstraat: 20 -> 27 (zelfde blok) heeft geen voorstel");

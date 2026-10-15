@@ -60,10 +60,8 @@ public static class ControleVergelijking
         bevestigd += oudS.Intersect(nieuwS).Count();
 
         // ---- Adressen zonder effect ----
-        var oudA = oud.AdressenZonderEffect.ToHashSet();
-        var nieuwA = nieuw.AdressenZonderEffect.ToHashSet();
-        if (!oudA.SetEquals(nieuwA))
-            regels.Add($"Adressen zonder gevonden effect: nu {(nieuwA.Count == 0 ? "geen" : string.Join(", ", nieuwA.OrderBy(x => x)))}; in de kaart {(oudA.Count == 0 ? "geen" : string.Join(", ", oudA.OrderBy(x => x)))}.");
+        // BUG #161: de controle doet geen adrestest (de wissels zijn al bekend), dus 'nu zonder effect' was altijd alle adressen: een schijnverschil. Alleen
+        // een adres dat de kaart wel als wissel kent maar dat tijdens de controle ontbreekt is al gemeld bij de wissels.
 
         bool verschillen = regels.Any(r => r.StartsWith("NIEUW") || r.StartsWith("WISSEL") || r.Contains("niet gereden") || r.Contains("niet teruggezien"));
         string sam = verschillen

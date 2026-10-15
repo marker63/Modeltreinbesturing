@@ -311,6 +311,7 @@ public partial class BaanVerkenner
                     _status.AfgerondeOpdrachten++;
                     BewaarNu();
                 }
+                if (_status.Controle && PlanControleTrajecten()) continue;   // BUG #161
                 if (!await LosKortsluitpuntenOp()) break;
             }
 
@@ -615,6 +616,56 @@ public partial class BaanVerkenner
             }
         }
         return null;
+    }
+
+    /// <summary>BUG #161 (Marco 15-10 13:51: de controle reed alleen de twee basisrondes; 18 overgangen met melder 129, 4, 11, 12, 1, 9, 10 waren 'niet gereden'):
+    /// de controle begint zonder overgangen en plande daarom alleen "start, vooruit" en "start, achteruit". Nu plant ze daarna ook elk traject uit de bestaande kaart
+    /// (zelfde startmelder, richting en wisselstand), met een route over de basis of over een ander traject dat langs de startmelder loopt. Trajecten die op een
+    /// bekend kortsluitpunt zonder bekende oplossing eindigen worden niet gereden. Geeft true als er iets nieuws gepland is.</summary>
+    private bool PlanControleTrajecten()
+    {
+        var oud = _status.Kaart;
+        bool nieuw = false;
+        foreach (var t in oud.Trajecten)
+        {
+            if (t.Reeks.Count < 2 || t.Einde == RitEinde.BekendKortsluitpunt) continue;
+            if (t.Einde == RitEinde.Kortsluiting && !oud.BekendeKortsluitOplossingen.Any(s => s.NaMelder == t.Reeks[^1] && s.Richting == t.Richting)) continue;
+            var o = new Opdracht { Configuratie = t.Configuratie, Start = t.Start, Richting = t.Richting, Reden = "controle: traject uit de kaart" };
+            if (_status.GeplandeOpdrachten.Contains(o.Sleutel)) continue;
+            var route = ControleRoute(oud, t, oud.Trajecten, new HashSet<Traject>());
+            if (route is null) { _status.GeplandeOpdrachten.Add(o.Sleutel); _log.Info($"Controle: traject vanaf melder {t.Start} {t.Richting.Tekst()} ({t.Configuratie}) kan niet bereikt worden over de bekende wegen; overgeslagen."); continue; }
+            o.Route = route;
+            Plan(o);
+            nieuw = true;
+        }
+        return nieuw;
+    }
+
+    internal static List<Etappe>? ControleRoute(Baankaart oud, Traject t, List<Traject> alle, HashSet<Traject> bezocht)
+    {
+        if (!bezocht.Add(t)) return null;
+        var weg = ZelfTerugWeg(oud, oud.StartMelder, t.Start);
+        if (weg is not null) return StappenNaarEtappes(weg);
+        foreach (var a in alle.Where(a => !ReferenceEquals(a, t) && a.Einde != RitEinde.BekendKortsluitpunt && a.Reeks.Contains(t.Start)))
+        {
+            int i = a.Reeks.IndexOf(t.Start);
+            var tot = ControleRoute(oud, a, alle, bezocht);
+            if (tot is null) continue;
+            if (i > 0) tot.Add(new Etappe { Configuratie = a.Configuratie, Richting = a.Richting, Van = a.Start, Naar = t.Start, Pad = a.Reeks.Take(i + 1).ToList() });
+            return tot;
+        }
+        return null;
+    }
+
+    internal static List<Etappe> StappenNaarEtappes(List<(int Van, int Naar, Richting Richting)> stappen)
+    {
+        var res = new List<Etappe>();
+        foreach (var s in stappen)
+        {
+            if (res.Count > 0 && res[^1].Richting == s.Richting && res[^1].Pad[^1] == s.Van) { res[^1].Pad.Add(s.Naar); res[^1].Naar = s.Naar; }
+            else res.Add(new Etappe { Configuratie = Configuratie.Basis, Richting = s.Richting, Van = s.Van, Naar = s.Naar, Pad = new List<int> { s.Van, s.Naar } });
+        }
+        return res;
     }
 
     private static List<Etappe> RouteMet(List<Etappe> basis, Configuratie c, Richting r, List<int> pad)
