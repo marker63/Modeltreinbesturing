@@ -19,3 +19,9 @@ Een uitval is: Dinamo meldt wissel-commando's niet meer terug (terugmelding `4A 
 - Nieuw: er stond dit keer GEEN regel 'Diagnose uitval (BUG #138)' in het hardwarelog. De diagnose gaat alleen af bij 'Dinamo antwoordt niet', niet bij 'wisselcommando's zonder terugmelding'. Aangepast in BUG #154.
 
 Nieuwe uitvallen worden hier onderaan de tabel toegevoegd (nieuwste bovenaan).
+
+## 15-10 09:03:47 (log 0919, versie van vóór #155/#156)
+- Eerste verloren terugmelding: wissel 9 afbuigend, 09:03:47.134, direct na de laatste echo (wissel 8 rechtdoor, ≈09:03:46.8). Derde keer dat de uitval bij het eerste commando naar wissel 9 begint (15-10 07:55, 14-10 meerdere keren, nu weer).
+- Daarna bleef alles zonder terugmelding (55+ commando's achter elkaar tot 09:15). Marco antwoordde om 09:05 "de wissels gaan wel om"; de controle stond daarna uit.
+- Wissel 9 voerde zijn commando wél uit (09:03:48 en 09:06:02 verdween de kortsluiting meteen), maar wissel 5 afbuigend (09:13:49: loc reed 14 → 24 i.p.v. 129) en wissel 2 rechtdoor (09:13:47: kortsluiting 16 → 5 om 09:15:21) werden NIET uitgevoerd. Uitval = soms alleen de terugmelding weg, soms ook het commando.
+- Gevolg: kortsluitpunt #3 (oplossing "wissel 2 afbuigend") en onverwachte terugweg #4 uit deze sessie zijn artefacten van de uitval en niet betrouwbaar.
