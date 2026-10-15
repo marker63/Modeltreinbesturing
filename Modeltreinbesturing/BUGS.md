@@ -2078,3 +2078,13 @@ na het nastellen nog een derde van de bekende tijd tot de volgende melder door i
 melder een wissel kent (waarneming "kortsluiting bij omzetten" of "loste kortsluiting op" met die melder). Onbekende tijd of geen bekende wissel: niets. Nog niet getest op de baan.
 Ook nog niet in de simulator uitgeoefend (de Miniworld-run komt niet in dit geval); regressietests blijven groen. Open: de plaats van de wissel (ingang of uitgang van de melder) is
 uit de kaart niet zeker af te leiden; Marco's voorbeeld (melder 5) is de enige reden om aan te nemen dat het de ingang is.
+
+## BUG #153 – nastellen kroop met voorkennis de verkeerde kant op (simulatie tweede run, start melder 30)
+Stond de loc op het doel én op een buurmelder (30 + 20) dan kroop hij in de laatste rijrichting, dus verder de buurmelder in (50 s, daarna nog twee pogingen), en gaf hij op
+("De loc kon niet netjes op melder 30 gezet worden"). `RichtingNaarDoel` kijkt nu ook in het leerprofiel (voorkennis) en `Nastellen` kruipt bij precies twee bezette melders
+weg van de buur als de richting bekend is. Het is alleen een hint (staat de loc anders om dan in de vorige verkenning, dan kost een verkeerde gok één poging zoals eerder).
+Gemeten: tweede run met voorkennis start nu en rijdt 32 minuten (voorheen stopte hij na 3 minuten). Nog niet getest op de baan.
+Bevinding (niet opgelost): de tweede run met voorkennis krijgt nog dezelfde twee kortsluitingen (wissel 2 bij melder 5, kruiswissel 24). Het leerprofiel bewaart alleen
+overgangen (tijden), blokhints en `KortsluitOplossingen`; de eerste run leverde daarvan maar 1 oplossing op (5 -> 12 achteruit: wissel 1). De kortsluitpunten zelf (welke ingang
+met welke wissel kortsluit) en de doorgangen per ingang worden niet in het leerprofiel bewaard. Voorstel: die ook bewaren, per ingang (Via -> Na, richting, wissel), en bij voorkennis
+vooraf toepassen.

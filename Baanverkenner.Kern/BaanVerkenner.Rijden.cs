@@ -717,6 +717,14 @@ public partial class BaanVerkenner
             if (o is not null) return o.Richting;
             var t = _kaart.Overgangen.FirstOrDefault(x => x.Van == doel && x.Naar == m);
             if (t is not null) return t.Richting.Om();
+            // BUG #153: ook het leerprofiel (voorkennis) kent de richting; alleen een hint (staat de loc anders om, dan kost een verkeerde gok één poging).
+            if (Voorkennis is { } lp)
+            {
+                var pm = lp.Overgangen.FirstOrDefault(x => x.Aantal > 0 && x.Van == m && x.Naar == doel);
+                if (pm is not null) return pm.Richting;
+                var pt = lp.Overgangen.FirstOrDefault(x => x.Aantal > 0 && x.Van == doel && x.Naar == m);
+                if (pt is not null) return pt.Richting.Om();
+            }
         }
         return null;
     }
@@ -776,6 +784,9 @@ public partial class BaanVerkenner
         // BUG #58: staat de loc alleen op een melder waarvan de kaart al weet in welke richting het doel ligt
         // (gemeten overgang), dan kruipt hij daarheen i.p.v. te gokken.
         if (!bezet.Contains(doel)) r = RichtingNaarDoel(bezet, doel) ?? laatsteRichting.Om();
+        // BUG #153: staat de loc op het doel en op een buurmelder waarvan de richting bekend is (kaart of voorkennis), dan weg van die buur kruipen
+        // (simulatie met voorkennis: de loc kroop 50 s de verkeerde kant op, naar melder 20 i.p.v. terug van 30).
+        else if (bezet.Count == 2 && RichtingNaarDoel(bezet, doel) is Richting naarDoel) r = naarDoel;
         else if (voor is int v && bezet.Contains(v)) r = laatsteRichting.Om();
         else if (achter is int a && bezet.Contains(a)) r = laatsteRichting;
         else r = laatsteRichting;
