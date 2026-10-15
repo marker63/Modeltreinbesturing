@@ -644,6 +644,39 @@ public static class Tests
         Eis(res3.IsLeeg, "wisselstraat-import: zonder BlokRelatie komt er geen wisselstraat");
     }
 
+    // BUG #163: bestaande wisselstraten corrigeren met wat de kaart bewezen heeft
+    static void WisselstraatCorrectieTest()
+    {
+        var bb = new BlokBeheerder();
+        Blok MaakBlok(int nr, int melder) { var b = new Blok { Nummer = nr }; b.Bezetmeldpunten.Add(new Bezetmeldpunt { MeldernNummer = melder, Rol = BezetmeldpuntRol.Voorblok }); bb.Blokken.Add(b); return b; }
+        var b4 = MaakBlok(4, 16); var b3 = MaakBlok(3, 5); var b5 = MaakBlok(5, 24); var b6 = MaakBlok(6, 21);
+        bb.LegRelatieVast(b4, b3); bb.LegRelatieVast(b3, b5); bb.LegRelatieVast(b5, b6);
+        var w2 = new Wissel { Adres = 2 }; var w7 = new Wissel { Adres = 7 };
+        var kw = new Kruiswissel { Adres = 13, Adres2 = 10, IsEngels = true };
+        var k = new Baankaart();
+        k.Wisselstraatvoorstellen.Add(new WisselstraatVoorstel { VanMelder = 16, NaarMelder = 5, Richting = Richting.Vooruit, AantalKeer = 4, Eisen = { new WisselEis { Adres = 2, Afbuigend = false, Bron = EisBron.Kortsluiting }, new WisselEis { Adres = 7, Afbuigend = true, Bron = EisBron.Splitsing } } });
+        // splitsing alleen: wijzigt niets, alleen melding; kruismotor: nooit wijzigen
+        k.Wisselstraatvoorstellen.Add(new WisselstraatVoorstel { VanMelder = 5, NaarMelder = 24, Richting = Richting.Vooruit, AantalKeer = 3, Eisen = { new WisselEis { Adres = 7, Afbuigend = true, Bron = EisBron.Splitsing } } });
+        k.Wisselstraatvoorstellen.Add(new WisselstraatVoorstel { VanMelder = 24, NaarMelder = 21, Richting = Richting.Vooruit, AantalKeer = 3, Eisen = { new WisselEis { Adres = 10, Afbuigend = false, Bron = EisBron.Kortsluiting } } });
+        var s43 = new Wisselstraat { Van = b4, Naar = b3, Wissels = { new WisselInWisselstraat { Wissel = w2, GewensteStand = WisselStand.Afbuigend } } };
+        var s35 = new Wisselstraat { Van = b3, Naar = b5, Wissels = { new WisselInWisselstraat { Wissel = w7, GewensteStand = WisselStand.Rechtdoor } } };
+        var s56 = new Wisselstraat { Van = b5, Naar = b6, Kruiswisselstanden = { new KruiswisselInWisselstraat { Kruiswissel = kw, StandAdres = WisselStand.Afbuigend, StandAdres2 = WisselStand.Afbuigend } } };
+        var cor = new WisselstraatCorrectie();
+        var res = cor.Bereken(k, bb, new[] { w2, w7 }, new[] { kw }, new[] { s43, s35, s56 });
+        Eis(res.Wijzigingen.Count == 2, $"correctie (#163): 2 wijzigingen (nu {res.Wijzigingen.Count})");
+        cor.Pas(res);
+        Eis(s43.Wissels.First(w => w.Wissel == w2).GewensteStand == WisselStand.Rechtdoor, "correctie (#163): wissel 2 van 4 -> 3 is rechtdoor gezet (kortsluiting bewezen)");
+        Eis(s43.Wissels.Any(w => w.Wissel == w7 && w.GewensteStand == WisselStand.Afbuigend), "correctie (#163): ontbrekende wissel 7 is toegevoegd");
+        Eis(s35.Wissels[0].GewensteStand == WisselStand.Rechtdoor, "correctie (#163): splitsing alleen wijzigt een bestaande stand niet");
+        Eis(res.Meldingen.Any(m => m.Omschrijving.Contains("NIET gewijzigd") && m.Omschrijving.Contains("3 → 5")), "correctie (#163): splitsing-verschil wordt gemeld");
+        Eis(s56.Kruiswisselstanden[0].StandAdres2 == WisselStand.Afbuigend && s56.Kruiswisselstanden[0].StandAdres == WisselStand.Afbuigend, "correctie (#163): kruismotoren blijven onaangeroerd");
+        Eis(res.Meldingen.Any(m => m.Omschrijving.Contains("kruismotor 10")), "correctie (#163): kruismotor-verschil wordt gemeld");
+        cor.Herstel(res);
+        Eis(s43.Wissels.Count == 1 && s43.Wissels[0].GewensteStand == WisselStand.Afbuigend, "correctie (#163): ongedaan maken herstelt de oude situatie");
+        var leeg = cor.Bereken(new Baankaart(), bb, new[] { w2 }, new[] { kw }, new[] { s43 });
+        Eis(leeg.Wijzigingen.Count == 0 && leeg.Meldingen.Count == 0, "correctie (#163): lege kaart wijzigt niets");
+    }
+
     // BUG #80: een wissel waar de loc op staat wordt niet omgezet (ontsporing)
     static void WisselOnderLocTest()
     {
@@ -2333,6 +2366,7 @@ public static class Tests
         TweedeMelderTest();
         VerkeerdeWisselVraagTest();
         WisselstraatImportTest();
+        WisselstraatCorrectieTest();
         WisselOnderLocTest();
         DinamoStilteTest();
         AlarmVoorStapTest();

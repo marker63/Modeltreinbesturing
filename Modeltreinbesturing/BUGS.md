@@ -2153,3 +2153,11 @@ Oplossing:
 - `StaartWisselToegestaan`: een staartwissel gaat niet afbuigend als een kruismotor afbuigend staat en de kaart die wissel voor die richting als verboden ingang kent.
 Nieuwe bevindingen uit het verslag van 16:19 (niet als fout): wissel 2 na melder 5 achteruit: rechtdoor 16, afbuigend 12; overgangen 1 → 9, 9 → 10, 12 → 1 vooruit; wissel 1 'niet rijden 1 → 12 achteruit afbuigend'. De kaart wordt hierdoor niet gewijzigd.
 Test in CompileCheck (kaart 12:42). Nog niet getest op de baan.
+
+## #163 - Hele Modeltreinbesturing optimaliseren met de kennis uit de kaart (15-10 16:22, Marco; gekozen: automatisch overnemen)
+Nieuw: `WisselstraatCorrectie` (Modeltreinbesturing). Na het openen van een baankaart en het importeren van nieuwe wisselstraten worden de BESTAANDE wisselstraten naast de kaart gelegd:
+- Wissel in een wisselstraat in de stand die de kaart als kortsluiting bewezen heeft (bijv. 16 → 5 met wissel 2 afbuigend) wordt omgezet.
+- Een wissel die de kaart voor die rit eist maar in de wisselstraat ontbreekt, wordt toegevoegd.
+Veiligheid: alleen eisen die voor alle voorstellen van het blokpaar gelden; "aangenomen" eisen nooit; een verschil dat alleen uit een splitsing komt wordt gemeld, niet gewijzigd; kruiswissel-motoren (13/10) worden nooit aangeraakt (alleen gemeld); geen wisselstraten toegevoegd of verwijderd. Na afloop dialoog met alle meldingen en de vraag "behouden?" (Nee = alles ongedaan).
+Wiring: `MainWindow.WisselstratenCorrigeren` na `WisselstratenImporteren`. Het WPF-deel kon hier niet gecompileerd worden (alleen de klasse zelf is getest in CompileCheck).
+Nog niet getest op de baan.

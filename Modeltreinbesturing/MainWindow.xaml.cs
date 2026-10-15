@@ -1710,6 +1710,25 @@ public partial class MainWindow : Window
         if (teZetten.Count > 0) slot.Add($"{teZetten.Count} wissel(s) (adres {string.Join(", ", teZetten)}) onderaan het baanontwerp gezet; sleep ze naar de goede plek en leg de wisselstanden zelf vast.");
         if (slot.Count > 0) MessageBox.Show(this, string.Join("\n\n", slot) + "\n\nNIET getest op de baan.", "Baankaart importeren", MessageBoxButton.OK, MessageBoxImage.Information);
         WisselstratenImporteren(kaart);
+        WisselstratenCorrigeren(kaart);
+    }
+
+    /// <summary>BUG #163: bestaande wisselstraten naast de kaart leggen. Alleen bewezen kortsluitstanden worden omgezet en ontbrekende
+    /// verplichte wissels toegevoegd; kruiswissel-motoren blijven onaangeroerd. Na afloop kan alles ongedaan gemaakt worden.</summary>
+    private void WisselstratenCorrigeren(Baanverkenner.Kern.Baankaart kaart)
+    {
+        var correctie = new WisselstraatCorrectie();
+        var res = correctie.Bereken(kaart, _beheerder, _baanBeheerder.Symbolen.OfType<Wissel>().ToList(),
+            _baanBeheerder.Symbolen.OfType<Kruiswissel>().ToList(), _wisselstraatBeheerder.Wisselstraten);
+        if (res.Wijzigingen.Count == 0 && res.Meldingen.Count == 0) return;
+        correctie.Pas(res);
+        new BaanControleDialog("Wisselstraten gecorrigeerd met de kaart",
+            $"{res.Wijzigingen.Count} wijziging(en) in bestaande wisselstraten toegepast. Hierna kun je ze behouden of ongedaan maken.", res.Meldingen) { Owner = this }.ShowDialog();
+        if (res.Wijzigingen.Count == 0) return;
+        var antw = MessageBox.Show(this, $"{res.Wijzigingen.Count} wijziging(en) behouden?\n\nAlleen standen die de verkenning als kortsluiting bewezen heeft zijn omgezet of ontbrekende verplichte wissels toegevoegd; kruiswissel-motoren zijn niet aangeraakt. NIET getest op de baan. (Nee = alles ongedaan maken.)",
+            "Wisselstraten corrigeren", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes);
+        if (antw != MessageBoxResult.Yes) correctie.Herstel(res);
+        Redraw();
     }
 
     /// <summary>BUG #78 (B): wisselstraten uit de voorstellen van de verkenning. Eerst een voorbeeld; pas na "Ja" worden ze toegevoegd
