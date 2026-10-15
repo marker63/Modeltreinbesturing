@@ -2102,3 +2102,8 @@ Marco: de loc reed van 16 naar 5 en kreeg kortsluiting; genoteerd moet worden "1
 Oorzaak: de waarneming KortsluitingBijOmzetten kende alleen NaMelder (5) en het vervolg bij rechtdoor (13), niet de melder waar de loc vandaan kwam.
 Oplossing: `WisselWaarneming.Via` (ingang, 16) wordt gevuld uit de gereden reeks; toelichting en rapport (tekst/html) noemen nu "ingang 16 → 5 (vooruit): niet rijden als afbuigend";
 wisselstraat 16 → 5 vooruit eist nu "wissel 2 rechtdoor (anders kortsluiting)" (was "geen wissel nodig"). Test in CompileCheck (kaart 08:24). Nog niet getest op de baan.
+
+## #156 - Rapport toonde maar een paar basisritten; Marco wil iedere rit met blokken, melders en wisselstanden (15-10 08:57)
+Het rapport ("Gereden trajecten") bevatte alleen de gekozen basisritten. Nu bewaart de verkenner iedere gereden rit (verkenning en navigatie) in de baankaart (`Ritten`)
+en toont het rapport (tekst en html) een lijst "Alle ritten": nummer, tijd (einde rit), soort, start en richting, afbuigende wissels, per blok de melders in volgorde
+(bijv. `3: 5, 13, 14 → 4: 8, 15, 16`) en hoe de rit eindigde (lus, doodlopend, KORTSLUITING). Blok "?" = blok van de melder nog onbekend. Test in CompileCheck. Nog niet getest op de baan.

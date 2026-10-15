@@ -207,6 +207,20 @@ public class Traject
     public RitEinde Einde { get; set; }
 }
 
+/// <summary>BUG #156: elke gereden rit (verkenning én navigatie), voor het rapport "Alle ritten" met blokken, melders en wisselstanden.</summary>
+public class GeredenRit
+{
+    public int Nr { get; set; }
+    public DateTime Tijd { get; set; }
+    public bool Navigatie { get; set; }
+    public int Start { get; set; }
+    public Richting Richting { get; set; }
+    /// <summary>Adressen die tijdens de rit afbuigend stonden.</summary>
+    public List<int> Afbuigend { get; set; } = new();
+    public List<int> Reeks { get; set; } = new();
+    public RitEinde Einde { get; set; }
+}
+
 public class Etappe
 {
     public Configuratie Configuratie { get; set; } = Configuratie.Basis;
@@ -406,6 +420,7 @@ public class Baankaart
     /// <summary>BUG #78: voorstel voor wisselstraten per gereden overgang (zie <see cref="WisselstraatVoorstel"/>). Oudere kaarten: leeg.</summary>
     public List<WisselstraatVoorstel> Wisselstraatvoorstellen { get; set; } = new();
     public List<string> Waarschuwingen { get; set; } = new();
+    public List<GeredenRit> Ritten { get; set; } = new();
     /// <summary>BUG #104: uitkomsten van 'Voltooide baan nogmaals checken'. De kaart zelf blijft bij een controle ongewijzigd; dit zijn alleen de verslagen.</summary>
     public List<ControleVerslag> ControleVerslagen { get; set; } = new();
 

@@ -62,6 +62,31 @@ public static class Rapport
         return res.Distinct().ToList();
     }
 
+    /// <summary>BUG #156: de melders van een rit gegroepeerd per blok: "3: 5, 13, 14 → 4: 8, 15, 16".</summary>
+    public static string BlokMelderTekst(Baankaart k, List<int> reeks)
+    {
+        var delen = new List<string>();
+        string? huidig = null; var lijst = new List<int>();
+        void Sluit() { if (huidig is not null) delen.Add($"{huidig}: {string.Join(", ", lijst)}"); lijst = new List<int>(); }
+        foreach (var m in reeks)
+        {
+            string b = k.Melders.FirstOrDefault(x => x.Nummer == m)?.DinamoBlok is int d ? d.ToString() : "?";
+            if (b != huidig) { Sluit(); huidig = b; }
+            lijst.Add(m);
+        }
+        Sluit();
+        return string.Join(" → ", delen);
+    }
+
+    public static string RitEindeTekst(RitEinde e) => e switch
+    {
+        RitEinde.Doodlopend => "doodlopend", RitEinde.Lus => "lus", RitEinde.Kortsluiting => "KORTSLUITING",
+        RitEinde.BekendKortsluitpunt => "bekend kortsluitpunt", RitEinde.Maximum => "veiligheidsgrens", _ => e.ToString()
+    };
+
+    public static string RitRegel(Baankaart k, GeredenRit t)
+        => $"#{t.Nr} {t.Tijd:HH:mm:ss} {(t.Navigatie ? "navigatie" : "verkenning")} vanaf {t.Start} {t.Richting.Tekst()} | wissels afbuigend: {(t.Afbuigend.Count == 0 ? "geen" : string.Join(", ", t.Afbuigend))} | {BlokMelderTekst(k, t.Reeks)} | einde: {RitEindeTekst(t.Einde)}";
+
     public static string TrajectTekst(Baankaart k, Traject t)
     {
         var sb = new StringBuilder();
@@ -178,6 +203,14 @@ ul{margin:6px 0 0 18px;padding:0}
         sb.Append("<p class=\"uitleg\">Elke basisrit van een opdracht, met de wissels die daarbij gepasseerd worden.</p>");
         foreach (var t in k.Trajecten)
             sb.Append($"<div class=\"traject\">{E(TrajectTekst(k, t))}<small>vanaf melder {t.Start}, {t.Richting.Tekst()}, {E(t.Configuratie)}</small></div>");
+
+        // Alle ritten (BUG #156)
+        if (k.Ritten.Count > 0)
+        {
+            sb.Append("<h2>Alle ritten</h2><p class=\"uitleg\">Iedere gereden rit (verkenning en navigatie): per blok de melders in volgorde, met de wissels die afbuigend stonden.</p>");
+            foreach (var t in k.Ritten)
+                sb.Append($"<div class=\"traject\">{E(RitRegel(k, t))}</div>");
+        }
 
         // Melders
         sb.Append("<h2>Melders</h2>");
@@ -314,6 +347,12 @@ ul{margin:6px 0 0 18px;padding:0}
             sb.AppendLine($"  Adres {r.Adres,-4} {r.Ligging}\n             rechtdoor: {r.Rechtdoor}   afbuigend: {r.Afbuigend}");
         if (k.Wissels.Count == 0) sb.AppendLine("  (geen)");
 
+        if (k.Ritten.Count > 0)
+        {
+            Kop("ALLE RITTEN (per blok: melders in volgorde)");
+            foreach (var t in k.Ritten) sb.AppendLine("  " + RitRegel(k, t));
+            sb.AppendLine();
+        }
         Kop("GEREDEN TRAJECTEN");
         foreach (var t in k.Trajecten)
             sb.AppendLine($"  [{t.Richting.Tekst()}, {t.Configuratie}]\n     {TrajectTekst(k, t)}");

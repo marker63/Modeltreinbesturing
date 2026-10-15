@@ -23,6 +23,13 @@ public static class Tests
         var o144 = eerste.V.Kaart.Overgangen.FirstOrDefault(o => o.Van == 144 && o.Naar == 136 && o.AantalMetingen > 0);
         Eis(o144 is not null && Math.Abs((terug.Verwacht(144, 136, Richting.Achteruit, 12) ?? 0) - o144.GemiddeldeSeconden) < 0.01, "leerprofiel: verwachte tijd bij dezelfde snelheid klopt met de meting");
         Eis(Math.Abs((terug.Verwacht(144, 136, Richting.Achteruit, 6) ?? 0) - 2 * o144!.GemiddeldeSeconden) < 0.01, "leerprofiel: bij halve snelheid is de verwachte tijd dubbel");
+        // BUG #156: iedere rit staat in het rapport, per blok met melders en wisselstanden
+        var k156 = eerste.V.Kaart;
+        Eis(k156.Ritten.Count >= k156.Trajecten.Count && k156.Ritten.Count > 0, "alle ritten (#156): elke gereden rit is bewaard (" + k156.Ritten.Count + " ritten, " + k156.Trajecten.Count + " basisritten)");
+        var t156 = Rapport.AlsTekst(k156);
+        Eis(t156.Contains("ALLE RITTEN") && t156.Contains("wissels afbuigend:") && Rapport.AlsHtml(k156).Contains("Alle ritten"), "alle ritten (#156): tekst- en htmlrapport tonen ze");
+        Eis(Baankaart.VanJson(k156.AlsJson())!.Ritten.Count == k156.Ritten.Count, "alle ritten (#156): blijven bewaard na opslaan en laden");
+        Console.WriteLine("  voorbeeld: " + Rapport.RitRegel(k156, k156.Ritten[0]));
         var dubbel = LeerProfiel.VanJson(profiel.AlsJson())!; dubbel.Leer(eerste.V.Kaart, eerste.V.Kaart.RefSnelheid);
         Eis(dubbel.AantalMetingen == profiel.AantalMetingen, "leerprofiel: dezelfde kaart twee keer aanbieden telt niet dubbel");
         var tweede = PendelScenario(new Dictionary<(int, int, bool), int>(), "leren: tweede run met profiel", true, profiel: terug);

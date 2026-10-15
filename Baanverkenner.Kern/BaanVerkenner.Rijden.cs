@@ -1095,6 +1095,12 @@ public partial class BaanVerkenner
         _ritMinDt = double.MaxValue; _ritMaxDt = 0;
         var uitkomst = await RitUitvoeren(start, r, doel);
         MarkeerTijdelijkeKortsluiting(start, r, doel.Configuratie, uitkomst);
+        _kaart.Ritten.Add(new GeredenRit
+        {
+            Nr = _kaart.Ritten.Count + 1, Tijd = DateTime.Now, Navigatie = doel.IsNavigatie, Start = start, Richting = r,
+            Afbuigend = _wisselStand.Where(kv => kv.Value).Select(kv => kv.Key).OrderBy(a => a).ToList(),
+            Reeks = uitkomst.Reeks.ToList(), Einde = uitkomst.Einde
+        });
         // BUG #74: waar kwam de loc vandaan? (Na een kortsluiting/herstel is dat niet meer te weten.)
         if (uitkomst.Einde == RitEinde.Kortsluiting) _ingang = null;
         else if (uitkomst.Reeks.Count >= 2) _ingang = (uitkomst.Reeks[^2], uitkomst.Reeks[^1], r);
