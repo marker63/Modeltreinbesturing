@@ -1830,6 +1830,12 @@ public partial class BaanVerkenner
     /// <summary>BUG #107: zet de wissels uit <see cref="StaartWissels"/> goed voordat de loc erop afrijdt. Overgeslagen worden: het adres dat de
     /// rit zelf test, de twee kruiswisselmotoren (daar geldt de kruiswissel-referentie), adressen buiten het geteste bereik en een wissel die de
     /// rit zelf bewust afbuigend heeft gezet. Geeft de werkelijke stand terug.</summary>
+    /// <summary>BUG #162 (log 14:40:41): achteruit via melder 21 zette de verkenner wissel 9 afbuigend "voor de loc er is" (voor 24 -> 14), maar de lopende
+    /// rit had motor 10 afbuigend: de loc reed 24 -> 129 en wissel 9 afbuigend geeft op die ingang kortsluiting. Een staartwissel die afbuigend moet,
+    /// wordt niet gezet als een kruismotor afbuigend staat en de kaart die wissel voor die rijrichting als verboden ingang kent.</summary>
+    internal static bool StaartWisselToegestaan(Baankaart kaart, int adres, bool afb, Richting r, Configuratie cfg, KruisKennis kruis)
+        => !(afb && kruis.Motoren.Any(cfg.Bevat) && kaart.VerbodenIngangen().Any(v => v.Adres == adres && v.R == r));
+
     private async Task<Configuratie> ZetStaartWissels(int melder, Richting r, Configuratie cfg, RitDoel doel)
     {
         foreach (var (adres, afb) in StaartWissels(_kaart, melder, r, a => _wisselStand.TryGetValue(a, out var st) ? st : cfg.Bevat(a)))
@@ -1838,6 +1844,11 @@ public partial class BaanVerkenner
             if (Kruis.IsMotor(adres)) continue;
             if (!_ins.WisselAdressen().Contains(adres)) continue;
             if (doel.Configuratie.Bevat(adres) && !afb) continue;
+            if (!StaartWisselToegestaan(_kaart, adres, afb, r, cfg, Kruis))
+            {
+                _log.Info($"Melder {melder}: wissel {adres} blijft rechtdoor: met een kruismotor afbuigend gaat de loc een andere kant op en wissel {adres} afbuigend geeft daar kortsluiting (bekende ingang).");
+                continue;
+            }
             if (_wisselStand.TryGetValue(adres, out var nu) && nu == afb) { cfg = cfg.MetStand(adres, afb); continue; }
             _log.Info($"Melder {melder}: de loc rijdt {r.Tekst()} van achteren op wissel {adres} af (de kaart kent die splitsing); wissel {adres} gaat nu naar {(afb ? "afbuigend" : "rechtdoor")} voordat de loc er is.");
             await ZetWissel(adres, afb);

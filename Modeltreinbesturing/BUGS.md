@@ -2140,3 +2140,16 @@ Test in CompileCheck (kaart 12:42). Nog niet getest op de baan.
 Oorzaak: de controle begint zonder overgangen en plande alleen "start, vooruit" en "start, achteruit". De zijtakken (melder 129, 10, 9, 1, 12, 11, 4 en 14 → 129, 24 → 8, 8 → 24, 5 → 12) werden nooit bereikt, omdat ze alleen via een afbuigende stand te bereiken zijn en de controle geen adrestest doet. Het verslag meldde daardoor 18 overgangen 'niet gereden' en 9 wissels 'niet opnieuw vastgesteld'. Daarnaast telde 'adressen zonder effect: nu 1-14' als verschil, terwijl de controle geen adrestest doet.
 Oplossing: na de basisrondes plant de controle elk traject uit de bestaande kaart (zelfde startmelder, richting, wisselstand), met een route over de basis of over een ander traject dat langs de startmelder loopt (`PlanControleTrajecten`, `ControleRoute`). Trajecten die op een bekend kortsluitpunt zonder bekende oplossing eindigen worden niet gereden. De vergelijking van 'adressen zonder effect' is vervallen.
 Test in CompileCheck (simulatie: alle overgangen opnieuw gereden; kaart 12:42: route naar 129 via 21 met motor 10 afbuigend). Nog niet getest op de baan.
+
+## #162 - Controle duurde uren en liep steeds vast op wissel 9 en de kruiswissel (15-10 13:58-16:17, Marco 16:19)
+Analyse van log 13:58-16:17 (2356 regels): ruim tien keer moest de loc worden teruggezet (wissel 9 'verkeerd', 2 en 1 'klem', kruiswissel 24/129).
+Oorzaken:
+1. `VoorControle` nam `BekendeKortsluitOplossingen` over, maar die lijst is leeg (de oplossingen staan in de opgeloste kortsluitpunten). De controle begon dus zonder enige kennis en vond alle kortsluitingen opnieuw, inclusief 'wissel 2 afbuigend zonder wissel 1' en 'wissel 9 afbuigend bij 24 → 129'.
+2. De controle testte per opdracht alle 14 adressen opnieuw (elke test een hele ronde, met wissels in vreemde standen) en probeerde kortsluitpunten uit: dat is een nieuwe verkenning, geen controle. Met #161 (meer trajecten) werd het uren.
+3. Log 14:40:41: bij de adrestest met motor 10 afbuigend zette `ZetStaartWissels` wissel 9 afbuigend "voor de loc er is" (goed voor 24 → 14), maar de loc reed met motor 10 afbuigend 24 → 129, de verboden ingang voor wissel 9 afbuigend: kortsluiting in blok 9, loc op de kruiswissel.
+Oplossing:
+- De controle start met `AlleKortsluitOplossingen()` van de kaart.
+- In de controle: geen adrestest meer en geen kortsluitpunten uitproberen; de rit wordt gereden, vergeleken en gemeld.
+- `StaartWisselToegestaan`: een staartwissel gaat niet afbuigend als een kruismotor afbuigend staat en de kaart die wissel voor die richting als verboden ingang kent.
+Nieuwe bevindingen uit het verslag van 16:19 (niet als fout): wissel 2 na melder 5 achteruit: rechtdoor 16, afbuigend 12; overgangen 1 → 9, 9 → 10, 12 → 1 vooruit; wissel 1 'niet rijden 1 → 12 achteruit afbuigend'. De kaart wordt hierdoor niet gewijzigd.
+Test in CompileCheck (kaart 12:42). Nog niet getest op de baan.

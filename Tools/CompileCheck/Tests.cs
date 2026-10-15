@@ -2087,6 +2087,13 @@ public static class Tests
         var r129 = BaanVerkenner.ControleRoute(k160, t129, k160.Trajecten, new HashSet<Traject>());
         Eis(r129 is not null && r129[0].Van == k160.StartMelder && r129[^1].Naar == 129 && r129[^1].Configuratie.Bevat(10), "controle (#161): route naar melder 129 loopt vanaf de startmelder en neemt het traject met motor 10 afbuigend (nu " + (r129 is null ? "geen" : string.Join(" ; ", r129.Select(e => $"{e.Van}->{e.Naar} {e.Configuratie}"))) + ")");
         Eis(k160.Trajecten.Where(t => t.Einde != RitEinde.BekendKortsluitpunt).All(t => BaanVerkenner.ControleRoute(k160, t, k160.Trajecten, new HashSet<Traject>()) is not null), "controle (#161): alle trajecten (zonder bekend kortsluitpunt) zijn te bereiken");
+        // BUG #162: de controle begint met de oplossingen van de kaart; staartwissel 9 niet afbuigend als motor 10 afbuigend staat
+        var st162 = new VerkenStatus { Instellingen = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 14 }, Kaart = Laad("baankaart_2026-10-15_1242.json") };
+        st162.VoorControle(DateTime.Now);
+        Eis(st162.ControleKaart!.BekendeKortsluitOplossingen.Any(x => x.NaMelder == 12 && x.Adres == 1 && x.Afbuigend), "controle (#162): de controlekaart begint met de oplossingen van de kaart (wissel 1 afbuigend na melder 12) (nu " + st162.ControleKaart.BekendeKortsluitOplossingen.Count + " oplossingen)");
+        var kr = KruisKennis.Referentie();
+        Eis(!BaanVerkenner.StaartWisselToegestaan(k160, 9, true, Richting.Achteruit, Configuratie.Basis.Met(10), kr) && BaanVerkenner.StaartWisselToegestaan(k160, 9, true, Richting.Achteruit, Configuratie.Basis, kr),
+            "staartwissel (#162): wissel 9 niet afbuigend bij motor 10 afbuigend (achteruit, ingang 24 -> 129), wel zonder motor 10");
         Eis(c160.Bevat(10) && !c160.Bevat(5) && !c160.Bevat(6), "aankomst (#160): bij 21 -> 24 -> 129 blijft kruismotor 10 afbuigend; 5 en 6 wachten tot de loc op melder 129 staat (nu " + c160 + ")");
         Eis(!v.Any(x => x.VanBlok == x.NaarBlok), "wisselstraat: geen voorstel binnen een blok");
         Eis(!v.Any(x => x.VanMelder == 20 && x.NaarMelder == 27), "wisselstraat: 20 -> 27 (zelfde blok) heeft geen voorstel");

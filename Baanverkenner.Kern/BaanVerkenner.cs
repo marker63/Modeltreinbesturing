@@ -70,7 +70,8 @@ public class VerkenStatus
             StartMelder = o.StartMelder, WisselAdresVan = o.WisselAdresVan, WisselAdresTot = o.WisselAdresTot,
             EerdereStartMelders = o.EerdereStartMelders.ToList(),
             Melders = o.Melders.Select(m => new MelderInfo { Nummer = m.Nummer, DinamoBlok = m.DinamoBlok }).ToList(),
-            Wissels = Kloon(o.Wissels), Doorgangen = Kloon(o.Doorgangen), BekendeKortsluitOplossingen = Kloon(o.BekendeKortsluitOplossingen),
+            Wissels = Kloon(o.Wissels), Doorgangen = Kloon(o.Doorgangen), BekendeKortsluitOplossingen = Kloon(o.AlleKortsluitOplossingen()),   // BUG #162: ook de oplossingen uit de opgeloste kortsluitpunten (die lijst was leeg: de controle begon zonder kennis)
+            
             KruisMotoren = o.KruisMotoren, KruisMidden = o.KruisMidden.ToList(), KruisReferentie = o.KruisReferentie
         };
         ControleKaart = k;
@@ -312,6 +313,7 @@ public partial class BaanVerkenner
                     BewaarNu();
                 }
                 if (_status.Controle && PlanControleTrajecten()) continue;   // BUG #161
+                if (_status.Controle) break;   // BUG #162: een kortsluiting in de controle wordt gemeld, niet urenlang opnieuw uitgeprobeerd
                 if (!await LosKortsluitpuntenOp()) break;
             }
 
@@ -902,6 +904,14 @@ public partial class BaanVerkenner
                 _log.Vondst($"Adres {bron}, andere kant: na melder {o.Start} ({o.Richting.Tekst()}) afbuigend → melder {basis.Reeks[1]}.");
             }
 
+            // BUG #162 (Marco 15-10 16:19: "de controle heeft uren geduurd, wat niet echt nodig is"): een controle rijdt de trajecten van de kaart en vergelijkt;
+            // alle adressen opnieuw testen (veertien extra rondes per opdracht, met wissels in vreemde standen) is geen controle maar een nieuwe verkenning.
+            if (_status.Controle)
+            {
+                _log.Info("Controle: de rit is gereden en wordt vergeleken met de kaart; de adressen worden niet opnieuw getest.");
+                await TerugNaarHuis(o.Route);
+                return;
+            }
             // ---- Iets nieuws om te testen? ----
             var overgangen = Overgangen(basis.Reeks, o.Richting);
             var nieuw = overgangen.Where(s => !_status.GetesteOvergangen.Contains(s)).ToList();
