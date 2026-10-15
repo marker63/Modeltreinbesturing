@@ -2126,3 +2126,12 @@ Oplossing:
 - Nieuw: `Baankaart.VerbodenIngangen()` leidt voor oudere waarnemingen zonder Via de ingang af uit de doorgangen; `MetVerbodenIngangen` zet zulke wissels op een pad weer rechtdoor; proeven met een verboden ingang worden overgeslagen; `HerstelStrijdigeOplossingen` trekt een oplossing in die zelf de verboden ingang afbuigend neemt (met waarschuwing).
 - `ControleerGeenAlarmVoorStap` kreeg een overload met startmelder/richting (testen blijven werken).
 Test: CompileCheck (kaart van 12:20 als testdata). Nog niet getest op de baan.
+
+## #160 - Verkenning 15-10 12:42 (voltooid): kruismotor 10 bij aankomst op melder 129 vastgehouden; ingang ontbrak in rapport
+Analyse van de voltooide verkenning (log 12:32-12:41, hardwarelog 12:42): geen Dinamo-uitval meer in deze sessie, 16 → 5 is niet meer met wissel 2 afbuigend gereden (#159 werkt: kortsluitpunt #3 werd bij het hervatten ingetrokken), kortsluitpunt #9 (kruismotor 10) werd verklaard en niet meer opnieuw geprobeerd.
+Gevonden:
+- Opdracht #12 (12:33): `AankomstZonderKortsluitWissels` hield bij de aankomst op melder 129 ook wissel 10 rechtdoor vast (kortsluitpunt #8 had 6+10 afbuigend). Maar 24 → 129 heeft motor 10 afbuigend nodig: de loc reed 24 → 14, valse melding "wissel niet goed", opdracht overgeslagen. Hardwarelog bevestigt: wissel 10 kreeg in die sessie geen enkel commando.
+- Rapport toonde bij wissel 2 en 14 nog "na melder 5/8" zonder ingang, omdat oudere waarnemingen geen Via hadden.
+- Wissel 11 stond onder "adressen zonder gevonden effect" terwijl hij waarnemingen heeft.
+Oplossing: wissels die de route zelf eist en kruismotoren op een route over de kruiswissel worden bij de aankomst niet meer vastgehouden; ontbrekende Via wordt bij laden en afronden afgeleid uit de doorgangen (wissel 2: 16 → 5, wissel 14: 17 → 8, wissel 10: 14 → 24); wissels met waarnemingen tellen mee als "effect gevonden".
+Test in CompileCheck (kaart 12:42). Nog niet getest op de baan.

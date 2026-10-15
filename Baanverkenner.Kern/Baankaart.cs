@@ -548,19 +548,38 @@ public class Baankaart
     /// (Via -> Na in richting R) waarbij <c>Adres</c> afbuigend kortsluiting geeft. Bron: waarnemingen KortsluitingBijOmzetten met bekende ingang (Via); bij
     /// oudere kaarten zonder Via wordt de ingang afgeleid uit de doorgangen: de ingang waarvandaan het vervolg altijd met deze wissel rechtdoor
     /// gereden is, terwijl een andere ingang naar hetzelfde vervolg hem juist afbuigend vraagt.</summary>
+    private int? AfgeleideVia(int adres, WisselWaarneming ob)
+    {
+        if (ob.VolgendeBijRechtdoor is not int q) return null;
+        var rd = Doorgangen.Where(d => d.Melder == ob.NaMelder && d.Richting == ob.Richting && d.Volgende == q && d.AantalKeer >= 3).ToList();
+        var zonder = rd.Where(d => d.Configuraties.All(c => !Configuratie.VanSleutel(c).Bevat(adres))).ToList();
+        var met = rd.Where(d => d.Configuraties.Any(c => Configuratie.VanSleutel(c).Bevat(adres))).ToList();
+        return zonder.Count == 1 && met.Count >= 1 ? zonder[0].Via : null;
+    }
+
+    /// <summary>BUG #160: oudere waarnemingen KortsluitingBijOmzetten zonder ingang krijgen die alsnog (afgeleid uit de doorgangen), zodat het rapport
+    /// 'ingang 16 → 5' toont en elke latere berekening dezelfde ingang kent.</summary>
+    public int VulOntbrekendeVia()
+    {
+        int n = 0;
+        foreach (var w in Wissels)
+            foreach (var ob in w.Waarnemingen.Where(x => x.Soort == WaarnemingSoort.KortsluitingBijOmzetten && x.Via is null))
+                if (AfgeleideVia(w.Adres, ob) is int v)
+                {
+                    ob.Via = v; n++;
+                    ob.Toelichting = $"Niet rijden van melder {v} naar {ob.NaMelder} ({ob.Richting.Tekst()}) als wissel {w.Adres} afbuigend staat: kortsluiting (ingang afgeleid uit de doorgangen). " + ob.Toelichting;
+                }
+        return n;
+    }
+
     public List<(int Via, int Na, Richting R, int Adres)> VerbodenIngangen()
     {
         var res = new List<(int, int, Richting, int)>();
         foreach (var w in Wissels)
             foreach (var ob in w.Waarnemingen.Where(x => x.Soort == WaarnemingSoort.KortsluitingBijOmzetten))
             {
-                if (ob.Via is int via) { if (!res.Contains((via, ob.NaMelder, ob.Richting, w.Adres))) res.Add((via, ob.NaMelder, ob.Richting, w.Adres)); continue; }
-                if (ob.VolgendeBijRechtdoor is not int q) continue;
-                var rd = Doorgangen.Where(d => d.Melder == ob.NaMelder && d.Richting == ob.Richting && d.Volgende == q && d.AantalKeer >= 3).ToList();
-                var zonder = rd.Where(d => d.Configuraties.All(c => !Configuratie.VanSleutel(c).Bevat(w.Adres))).ToList();
-                var met = rd.Where(d => d.Configuraties.Any(c => Configuratie.VanSleutel(c).Bevat(w.Adres))).ToList();
-                if (zonder.Count == 1 && met.Count >= 1 && !res.Contains((zonder[0].Via, ob.NaMelder, ob.Richting, w.Adres)))
-                    res.Add((zonder[0].Via, ob.NaMelder, ob.Richting, w.Adres));
+                int? via = ob.Via ?? AfgeleideVia(w.Adres, ob);
+                if (via is int v && !res.Contains((v, ob.NaMelder, ob.Richting, w.Adres))) res.Add((v, ob.NaMelder, ob.Richting, w.Adres));
             }
         return res;
     }
@@ -787,5 +806,10 @@ public class Baankaart
     };
 
     public string AlsJson() => JsonSerializer.Serialize(this, JsonOpties);
-    public static Baankaart? VanJson(string json) => JsonSerializer.Deserialize<Baankaart>(json, JsonOpties);
+    public static Baankaart? VanJson(string json)
+    {
+        var k = JsonSerializer.Deserialize<Baankaart>(json, JsonOpties);
+        k?.VulOntbrekendeVia();   // BUG #160
+        return k;
+    }
 }

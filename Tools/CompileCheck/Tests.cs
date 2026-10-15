@@ -2074,6 +2074,14 @@ public static class Tests
             k159.HerstelStrijdigeOplossingen();
             Eis(!k159.Kortsluitpunten.Any(x => x.Opgelost && x.OpgelostMetAfbuigend == true && x.OpgelostDoorAdres == 2 && x.NaMelder == 5), "ingang (#159): " + naam + " heeft geen opgelost kortsluitpunt meer met 'wissel 2 afbuigend' na melder 5");
         }
+        // BUG #160: voltooide kaart van 12:42 - ingangen afgeleid, kruismotor 10 blijft staan bij de aankomst op melder 129
+        var k160 = Laad("baankaart_2026-10-15_1242.json");
+        int? ViaVan(int adres, int na) => k160.Wissel(adres).Waarnemingen.FirstOrDefault(x => x.Soort == WaarnemingSoort.KortsluitingBijOmzetten && x.NaMelder == na)?.Via;
+        Eis(ViaVan(2, 5) == 16 && ViaVan(14, 8) == 17, "ingang (#160): na het laden is de ingang afgeleid: wissel 2 -> 16 naar 5, wissel 14 -> 17 naar 8 (nu " + ViaVan(2, 5) + " en " + ViaVan(14, 8) + ")");
+        Eis(Rapport.AlsTekst(k160).Contains("ingang 16 → 5"), "ingang (#160): het rapport noemt 'ingang 16 → 5' voor wissel 2");
+        var e160 = new Etappe { Van = 21, Naar = 129, Richting = Richting.Achteruit, Pad = new List<int> { 21, 24, 129 }, Configuratie = Configuratie.Basis.Met(5).Met(6).Met(10) };
+        var c160 = BaanVerkenner.AankomstZonderKortsluitWissels(k160, e160, e160.Configuratie, out var u160);
+        Eis(c160.Bevat(10) && !c160.Bevat(5) && !c160.Bevat(6), "aankomst (#160): bij 21 -> 24 -> 129 blijft kruismotor 10 afbuigend; 5 en 6 wachten tot de loc op melder 129 staat (nu " + c160 + ")");
         Eis(!v.Any(x => x.VanBlok == x.NaarBlok), "wisselstraat: geen voorstel binnen een blok");
         Eis(!v.Any(x => x.VanMelder == 20 && x.NaarMelder == 27), "wisselstraat: 20 -> 27 (zelfde blok) heeft geen voorstel");
         var alt = v.Where(x => x.VanMelder == 13 && x.NaarMelder == 24 && x.Richting == Richting.Vooruit).ToList();

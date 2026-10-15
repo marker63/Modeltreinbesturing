@@ -1968,9 +1968,15 @@ public partial class BaanVerkenner
     /// wissel(s) W afbuigend stonden (kortsluitpunt met die route), dan blijven W (en de wissel die daar als oplossing bij hoort) tijdens die aankomst rechtdoor.
     /// Ze worden pas gezet als de loc op de startmelder staat, zoals de partnerrit deed die wissel 1+2 wel goed reed (5 -> 13). Zo botst #122 (wissels bij de
     /// startmelder vooraf zetten) niet meer met een bekende kortsluiting bij het aanrijden vanaf melder 16.</summary>
-    internal static Configuratie AankomstZonderKortsluitWissels(Baankaart kaart, Etappe e, Configuratie cfg, out string? uitleg)
+    internal static Configuratie AankomstZonderKortsluitWissels(Baankaart kaart, Etappe e, Configuratie cfg, out string? uitleg, KruisKennis? kruis = null)
     {
         uitleg = null;
+        // BUG #160 (log 12:33, opdracht #12): wissel 10 (kruismotor) werd tijdens de aankomst op melder 129 vastgehouden, terwijl 24 -> 129 hem afbuigend
+        // nodig heeft: de loc reed 24 -> 14, er kwam een onterechte 'verkeerde wissel'-melding en de opdracht werd overgeslagen. Wissels die de route zelf
+        // afbuigend eist (en kruismotoren op een route over de kruiswissel) blijven dus gewoon staan.
+        kruis ??= KruisKennis.Referentie();
+        var nodig = kaart.MetWisselEisen(e.Pad, e.Richting, Configuratie.Basis, out _);
+        bool overKruis = e.Pad.Any(kruis.Middens.Contains);
         var wissels = new SortedSet<int>();
         foreach (var k in kaart.Kortsluitpunten.Where(k => k.Soort == KortsluitpuntSoort.Kortsluiting && k.Configuratie.Afbuigend.Length > 0 && k.Route.Count > 0
                                                            && k.Route[^1].Naar == e.Naar && k.Route[^1].Richting == e.Richting && k.NaMelder == e.Naar
@@ -1979,7 +1985,7 @@ public partial class BaanVerkenner
             foreach (var a in k.Configuratie.Afbuigend) wissels.Add(a);
             if (k.Opgelost && k.OpgelostMetAfbuigend == true && k.OpgelostDoorAdres is int oa) wissels.Add(oa);
         }
-        var weg = wissels.Where(cfg.Bevat).ToList();
+        var weg = wissels.Where(a => cfg.Bevat(a) && !nodig.Bevat(a) && !(overKruis && kruis.IsMotor(a))).ToList();
         if (weg.Count == 0) return cfg;
         foreach (var a in weg) cfg = cfg.MetStand(a, false);
         uitleg = $"Aankomst op melder {e.Naar}: wissel {string.Join(" en ", weg)} blijft nog rechtdoor (de aankomst met die wissel afbuigend gaf eerder kortsluiting); ze worden gezet zodra de loc op melder {e.Naar} staat.";
@@ -2168,6 +2174,8 @@ public partial class BaanVerkenner
     {
         var gevonden = _status.Geidentificeerd.ToHashSet();
         foreach (var k in _kaart.Kortsluitpunten.Where(k => k.OpgelostDoorAdres is not null)) gevonden.Add(k.OpgelostDoorAdres!.Value);
+        foreach (var w in _kaart.Wissels.Where(w => w.Waarnemingen.Count > 0)) gevonden.Add(w.Adres);   // BUG #160: wissel 11 stond in de lijst 'zonder effect' terwijl hij waarnemingen had
+        _kaart.VulOntbrekendeVia();   // BUG #160
         _kaart.AdressenZonderEffect = _ins.WisselAdressen().Where(a => !gevonden.Contains(a)).ToList();
         _kaart.VoorgesteldeBlokken = BlokVoorstel.Bereken(_kaart);
         _kaart.Wisselstraatvoorstellen = WisselstraatVoorstel.Bereken(_kaart);
