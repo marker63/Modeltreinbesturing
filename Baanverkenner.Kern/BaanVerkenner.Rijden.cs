@@ -400,6 +400,7 @@ public partial class BaanVerkenner
             : $"Dinamo heeft in deze sessie nog geen enkel wissel-commando teruggemeld ({_echo.Reeks} commando's). Waarschijnlijk worden de wissels niet omgezet.";
         _log.Waarschuwing("DINAMO VOERT WISSELCOMMANDO'S NIET UIT: " + tekst);
         _kaart.Waarschuwingen.Add(tekst);
+        try { bron.LogWisselUitval($"laatste commando: wissel {adres} {(afbuigend ? "afbuigend" : "rechtdoor")}"); } catch { /* diagnose mag de verkenning niet storen */ }
         if (VraagJaNee is null) throw new OperationCanceledException(tekst);
         var antwoord = await VraagJaNee("Dinamo voert wissels niet uit",
             tekst + "\n\nWat u op de baan hoort en ziet is leidend: gaan er wissels om? Zet Dinamo en de baanspanning uit en weer aan (of controleer de kabel).\n\nJa = Dinamo is hersteld, alle wissels opnieuw sturen en doorgaan\nNee = de wissels gaan wel om, doorgaan zonder deze controle\n(venster sluiten = verkenning stoppen)");

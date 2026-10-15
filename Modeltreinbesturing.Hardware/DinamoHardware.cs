@@ -174,6 +174,18 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
     }
 
     /// <inheritdoc/>
+    public void LogWisselUitval(string reden)
+    {
+        try
+        {
+            long laatste;
+            lock (_laatsteTerugmeldingen) laatste = _laatsteTerugmeldingen.Count > 0 ? _laatsteTerugmeldingen.Values.Max(v => v.Ticks) : System.Diagnostics.Stopwatch.GetTimestamp();
+            HardwareCommunicatieLog.Log("Info", $"[Dinamo] Wisselcommando's zonder terugmelding ({reden}). Diagnose uitval (BUG #138/#154): " + UitvalDiagnose(laatste));
+        }
+        catch { /* diagnose mag nooit storen */ }
+    }
+
+    /// <inheritdoc/>
     public long AantalWisselBevestigingen => Interlocked.Read(ref _wisselBevestigingen);
 
     public double? SecondenSindsLaatsteOntvangst

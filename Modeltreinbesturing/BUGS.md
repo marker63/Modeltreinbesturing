@@ -2088,3 +2088,11 @@ Bevinding (niet opgelost): de tweede run met voorkennis krijgt nog dezelfde twee
 overgangen (tijden), blokhints en `KortsluitOplossingen`; de eerste run leverde daarvan maar 1 oplossing op (5 -> 12 achteruit: wissel 1). De kortsluitpunten zelf (welke ingang
 met welke wissel kortsluit) en de doorgangen per ingang worden niet in het leerprofiel bewaard. Voorstel: die ook bewaren, per ingang (Via -> Na, richting, wissel), en bij voorkennis
 vooraf toepassen.
+
+## BUG #154 – Dinamo-uitval 15-10 07:55 en uitvallijst (Marco 07:59)
+Log 15-10 07:25-07:57: de verkenning werkte tot 07:55:15 normaal (264 terugmeldingen); vanaf het eerste commando naar wissel 9 (07:55:16.330, afbuigend) kwam er geen terugmelding meer, ook niet bij wissel 9
+rechtdoor en wissel 10. Melders, snelheid en stop bleven werken. De hoortest (07:57:29) bevestigde het: wissel 1 ging niet om. Dit is dezelfde uitval als in #126 en het onderzoek na #134
+(8 van de 12 uitvalmomenten op 14-10 begonnen bij wissel 9 of 10). De uitvallen staan nu met tijdstip in `Modeltreinbesturing/DINAMO_UITVAL.md`.
+Bevinding: de uitvaldiagnose (#138) staat niet in het hardwarelog bij deze uitval; hij gaat alleen af bij 'Dinamo antwoordt niet'. Opgelost: bij 'DINAMO VOERT WISSELCOMMANDO'S NIET UIT' schrijft de hardware nu dezelfde diagnose in het hardwarelog (`IWisselBevestiging.LogWisselUitval`, standaard niets voor simulator en stubs). Hypothese (niet bewezen): wissel 1 t/m 8 en 9 t/m 14
+hangen aan een verschillende print of adresblok; het eerste commando naar de tweede print legt de wisseluitgang vast. Nog niet getest op de baan.
+Kaart 15-10: voor de uitval is niets onbetrouwbaars gevonden (wissel 2 en 5 gevonden voor 07:50); de rest van de kaart tot en met wissel 8 klopt dus, wissel 9 en hoger zijn niet getest.

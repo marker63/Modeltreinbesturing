@@ -23,4 +23,8 @@ public interface IWisselBevestiging
 {
     /// <summary>Aantal terugmeldingen van wissel-commando's sinds het verbinden.</summary>
     long AantalWisselBevestigingen { get; }
+
+    /// <summary>BUG #154: de verkenner constateert dat wisselcommando's niet meer worden teruggemeld; de hardware schrijft dan dezelfde
+    /// uitvaldiagnose in het hardwarelog als bij 'Dinamo antwoordt niet' (#138). Standaard doet dit niets (simulator, stubs).</summary>
+    void LogWisselUitval(string reden) { }
 }
