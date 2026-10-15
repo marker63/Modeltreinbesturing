@@ -1501,7 +1501,9 @@ public static class Tests
     {
         public long AantalWisselBevestigingen { get; private set; }
         public bool Levend = true;
-        public override void ZetWissel(int adres, bool afbuigend) { base.ZetWissel(adres, afbuigend); if (Levend) AantalWisselBevestigingen++; }
+        public int OpLevenNa = int.MaxValue;
+        int _stil;
+        public override void ZetWissel(int adres, bool afbuigend) { base.ZetWissel(adres, afbuigend); if (!Levend && ++_stil >= OpLevenNa) Levend = true; if (Levend) AantalWisselBevestigingen++; }
     }
 
     // BUG #126: Dinamo meldt elk uitgevoerd wissel-commando terug; blijft dat weg, dan stopt de verkenner met een melding
@@ -1514,7 +1516,10 @@ public static class Tests
         var w3 = new EchoWaakhond(); w3.Noteer(true); w3.Noteer(false); w3.Noteer(false); w3.Noteer(true);
         Eis(w3.Reeks == 0 && !w3.Noteer(false), "echo (#126): een terugmelding zet de teller terug");
         var w4 = new EchoWaakhond { Negeren = true }; w4.Noteer(true);
-        Eis(!w4.Noteer(false) && !w4.Noteer(false) && !w4.Noteer(false) && !w4.Noteer(false), "echo (#126): na 'Nee' van de gebruiker blijft het stil");
+        Eis(!w4.Noteer(false) && !w4.Noteer(false) && !w4.Noteer(false) && !w4.Noteer(false), "echo (#126): na 'Nee' van de gebruiker blijft het eerst stil");
+        var w5 = new EchoWaakhond { Negeren = true }; w5.Noteer(true);
+        bool alarm12 = false; for (int i = 1; i <= 12; i++) { if (w5.Noteer(false)) { alarm12 = i == 12; break; } }
+        Eis(alarm12, "echo (#157): na 'Nee' gaat het alarm pas weer af bij 12 commando's zonder terugmelding");
 
         var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
         BaanVerkenner Maak(EchoHw hw, VerkenLog log, Func<string, string, Task<bool?>>? vraag)
@@ -1553,6 +1558,22 @@ public static class Tests
         var v4 = Maak(hw4, log4, (_, _) => { ja++; hw4.Levend = true; return Task.FromResult<bool?>(true); });
         Zet(v4, 1, true); hw4.Levend = false; Zet(v4, 2, true); Zet(v4, 3, true); Zet(v4, 4, true);
         Eis(ja == 2 && log4.Regels.Any(r => r.Tekst.Contains("Dinamo hersteld volgens de gebruiker")) && log4.Regels.Any(r => r.Tekst.Contains("Hoortest geslaagd")), "echo (#126/#131): 'Ja' -> hoortest (tweede vraag), dan opnieuw sturen en doorgaan (vragen " + ja + ")");
+
+        // BUG #157: Dinamo komt tijdens het omschakelen van een willekeurige wissel vanzelf weer tot leven -> geen vraag, bevindingen sinds de uitval weg
+        var hw5 = new EchoHw(); var log5 = new VerkenLog(new VirtueleKlok()); int vragen5 = 0;
+        var v5 = Maak(hw5, log5, (_, _) => { vragen5++; return Task.FromResult<bool?>(true); });
+        Zet(v5, 1, true); hw5.Levend = false; hw5.OpLevenNa = 10;
+        Zet(v5, 2, true);
+        v5.Kaart.Kortsluitpunten.Add(new Kortsluitpunt { Id = 99, NaMelder = 7, Richting = Richting.Vooruit });   // 'bevinding' tijdens de uitval
+        Zet(v5, 3, true); Zet(v5, 4, true);
+        Eis(vragen5 == 0 && log5.Regels.Any(r => r.Tekst.Contains("vanzelf hersteld")), "uitval (#157): Dinamo komt tijdens het omschakelen weer tot leven -> geen vraag aan de gebruiker (vragen " + vragen5 + ")");
+        Eis(!v5.Kaart.Kortsluitpunten.Any(x => x.Id == 99) && v5.Kaart.Waarschuwingen.Any(w => w.Contains("uit de kaart gehaald")), "uitval (#157): bevindingen sinds de eerste ontbrekende terugmelding zijn uit de kaart gehaald");
+
+        // BUG #157: 'Nee' (wissels gaan wel om) -> rit krijgt de markering onbetrouwbaar en niets gaat naar het leerprofiel
+        var hw6 = new EchoHw(); var log6 = new VerkenLog(new VirtueleKlok());
+        var v6 = Maak(hw6, log6, (_, _) => Task.FromResult<bool?>(false));
+        Zet(v6, 1, true); hw6.Levend = false; Zet(v6, 2, true); Zet(v6, 3, true); Zet(v6, 4, true);
+        Eis(typeof(BaanVerkenner).GetField("_onbetrouwbaar", bf)!.GetValue(v6) is true && v6.Kaart.Waarschuwingen.Any(w => w.Contains("ONBETROUWBAAR")), "uitval (#157): na 'Nee' staat alles daarna als onbetrouwbaar gemarkeerd");
     }
 
 

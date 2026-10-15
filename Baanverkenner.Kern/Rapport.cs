@@ -85,7 +85,7 @@ public static class Rapport
     };
 
     public static string RitRegel(Baankaart k, GeredenRit t)
-        => $"#{t.Nr} {t.Tijd:HH:mm:ss} {(t.Navigatie ? "navigatie" : "verkenning")} vanaf {t.Start} {t.Richting.Tekst()} | wissels afbuigend: {(t.Afbuigend.Count == 0 ? "geen" : string.Join(", ", t.Afbuigend))} | {BlokMelderTekst(k, t.Reeks)} | einde: {RitEindeTekst(t.Einde)}";
+        => $"#{t.Nr} {t.Tijd:HH:mm:ss} {(t.Onbetrouwbaar ? "⚠ ONBETROUWBAAR (Dinamo-uitval) " : "")}{(t.Navigatie ? "navigatie" : "verkenning")} vanaf {t.Start} {t.Richting.Tekst()} | wissels afbuigend: {(t.Afbuigend.Count == 0 ? "geen" : string.Join(", ", t.Afbuigend))} | {BlokMelderTekst(k, t.Reeks)} | einde: {RitEindeTekst(t.Einde)}";
 
     public static string TrajectTekst(Baankaart k, Traject t)
     {

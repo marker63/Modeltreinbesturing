@@ -2107,3 +2107,12 @@ wisselstraat 16 → 5 vooruit eist nu "wissel 2 rechtdoor (anders kortsluiting)"
 Het rapport ("Gereden trajecten") bevatte alleen de gekozen basisritten. Nu bewaart de verkenner iedere gereden rit (verkenning en navigatie) in de baankaart (`Ritten`)
 en toont het rapport (tekst en html) een lijst "Alle ritten": nummer, tijd (einde rit), soort, start en richting, afbuigende wissels, per blok de melders in volgorde
 (bijv. `3: 5, 13, 14 → 4: 8, 15, 16`) en hoe de rit eindigde (lus, doodlopend, KORTSLUITING). Blok "?" = blok van de melder nog onbekend. Test in CompileCheck. Nog niet getest op de baan.
+
+## #157 - Na uitval van Dinamo toch conclusies getrokken uit onbetrouwbare ritten (15-10 09:03-09:19, Marco 09:28/09:29)
+Na het alarm "Dinamo voert wissels niet uit" koos de gebruiker "Nee" (wissel 9 ging wel om); daardoor stond de controle de rest van de sessie uit. Wissel 5 en 2 werden daarna niet uitgevoerd
+(zie DINAMO_UITVAL.md), waaruit een valse oplossing van kortsluitpunt #3 en een valse 'onverwachte terugweg' #4 ontstonden.
+Oplossing:
+- Bij het alarm gaat de loc eerst stil en wordt een willekeurige veilige wissel steeds heen en weer omgeschakeld (max 2 min). Komt Dinamo weer terugmelden, dan gaat de verkenner zonder vraag verder.
+- De kaart van vóór de eerste ontbrekende terugmelding wordt bewaard; bij herstel ("Ja"), stoppen of de 2-minutentest zonder succes gaan alle bevindingen sinds die eerste ontbrekende terugmelding weer uit de kaart.
+- "Nee" zet de controle niet meer uit: alles daarna staat als ONBETROUWBAAR in de lijst "Alle ritten" en de waarschuwingen, wordt niet in het leerprofiel bewaard, en bij 12 commando's achter elkaar zonder terugmelding stopt de verkenning.
+Tests in CompileCheck (3 nieuwe + 1 aangepast). Nog niet getest op de baan.

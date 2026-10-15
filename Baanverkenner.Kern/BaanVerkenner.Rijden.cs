@@ -375,6 +375,68 @@ public partial class BaanVerkenner
         if (terugmelding is bool tm) await VerwerkBevestiging(adres, afbuigend, tm);
     }
 
+    /// <summary>BUG #157: JSON van de kaart vóór de eerste ontbrekende terugmelding (null zolang de terugmeldingen binnenkomen).</summary>
+    private string? _kaartVoorUitval;
+    /// <summary>BUG #157: de gebruiker koos "Nee" bij de uitvalmelding: alles daarna is onbetrouwbaar.</summary>
+    private bool _onbetrouwbaar;
+
+    /// <summary>BUG #157 (Marco 15-10 09:28): na de uitval van Dinamo leidde de blinde verkenning (wissel 5 en 2 werden niet uitgevoerd) tot een valse
+    /// kortsluiting-oplossing en een valse 'onverwachte terugweg'. Bevindingen sinds de eerste ontbrekende terugmelding worden uit de kaart gehaald.</summary>
+    private void TerugNaarVoorUitval(string reden)
+    {
+        _onbetrouwbaar = false;
+        if (_kaartVoorUitval is null) return;
+        try
+        {
+            var oud = Baankaart.VanJson(_kaartVoorUitval);
+            _kaartVoorUitval = null;
+            if (oud is null) return;
+            var waarsch = _kaart.Waarschuwingen.ToList();
+            foreach (var p in typeof(Baankaart).GetProperties().Where(p => p.CanRead && p.CanWrite))
+                p.SetValue(_kaart, p.GetValue(oud));
+            _kaart.Waarschuwingen = waarsch;
+            var tekst = $"Dinamo-uitval ({reden}): alle bevindingen sinds de eerste ontbrekende terugmelding zijn uit de kaart gehaald omdat ze niet betrouwbaar zijn.";
+            _kaart.Waarschuwingen.Add(tekst);
+            _log.Waarschuwing(tekst);
+        }
+        catch (Exception ex) { _log.Waarschuwing($"Kaart terugzetten na Dinamo-uitval mislukte: {ex.Message}"); }
+    }
+
+    /// <summary>BUG #157 (Marco 15-10 09:29): na het alarm eerst de loc stilzetten en dan een willekeurige (veilige) wissel blijven omschakelen tot Dinamo weer
+    /// terugmeldt (2 terugmeldingen) of tot de tijd om is. Geeft true als Dinamo weer tot leven kwam.</summary>
+    private async Task<bool> WachtOpLevenstekenDinamo(IWisselBevestiging bron)
+    {
+        try { _hw.Noodstop(); StopZonderWachten(); } catch { /* stilzetten is best effort */ }
+        var rnd = new Random();
+        long begin = bron.AantalWisselBevestigingen;
+        var start = _klok.Nu;
+        _log.Info("Dinamo reageert niet op wissel-commando's: de loc staat stil en een willekeurige wissel wordt steeds omgeschakeld om te zien of Dinamo weer tot leven komt (maximaal 2 minuten).");
+        while (_klok.Nu - start < TimeSpan.FromSeconds(120))
+        {
+            var onder = WisselsOnderLoc();
+            var kand = _ins.WisselAdressen().Where(a => !Kruis.IsMotor(a) && !onder.ContainsKey(a)).ToList();
+            if (kand.Count == 0) return false;
+            int adres = kand[rnd.Next(kand.Count)];
+            bool stand = _wisselStand.TryGetValue(adres, out var h) && h;
+            foreach (var wens in new[] { !stand, stand })
+            {
+                _hw.ZetWissel(adres, wens);
+                await Wacht(TimeSpan.FromMilliseconds(Math.Max(100, _ins.WisselPauzeMs)));
+                for (int i = 0; i < 40 && !_hw.KlaarVoorVolgendeWisselCommando; i++) await Wacht(DinamoCyclus);
+                await Wacht(TimeSpan.FromMilliseconds(1000));
+            }
+            _wisselStand[adres] = stand;
+            if (bron.AantalWisselBevestigingen - begin >= 2)
+            {
+                _log.Info($"Dinamo meldt wissel-commando's weer terug (na {(_klok.Nu - start).TotalSeconds:0} s, wissel {adres}). Dinamo is vanzelf hersteld.");
+                _echo.Herstel();
+                return true;
+            }
+        }
+        _log.Waarschuwing("Dinamo kwam binnen 2 minuten niet tot leven (geen terugmeldingen op het omschakelen).");
+        return false;
+    }
+
     /// <summary>BUG #126: bewaakt of Dinamo de wissel-commando's terugmeldt (zie <see cref="EchoWaakhond"/>).</summary>
     private readonly EchoWaakhond _echo = new();
 
@@ -392,7 +454,9 @@ public partial class BaanVerkenner
     private async Task VerwerkBevestiging(int adres, bool afbuigend, bool bevestigd)
     {
         if (_hw is not IWisselBevestiging bron) return;
-        if (bevestigd) { _echo.Noteer(true); return; }
+        if (bevestigd) { _echo.Noteer(true); _kaartVoorUitval = null; return; }
+        // BUG #157: de kaart zoals die was vóór de eerste ontbrekende terugmelding, om bij een uitval alle latere (onbetrouwbare) bevindingen weg te kunnen halen.
+        if (_echo.Reeks == 0) _kaartVoorUitval ??= _kaart.AlsJson();
         _log.Rijden($"Wissel {adres}: geen terugmelding van Dinamo op het commando ({_echo.Reeks + 1} achter elkaar zonder).");
         if (!_echo.Noteer(false)) return;
         var tekst = _echo.OoitBevestigd
@@ -401,17 +465,29 @@ public partial class BaanVerkenner
         _log.Waarschuwing("DINAMO VOERT WISSELCOMMANDO'S NIET UIT: " + tekst);
         _kaart.Waarschuwingen.Add(tekst);
         try { bron.LogWisselUitval($"laatste commando: wissel {adres} {(afbuigend ? "afbuigend" : "rechtdoor")}"); } catch { /* diagnose mag de verkenning niet storen */ }
-        if (VraagJaNee is null) throw new OperationCanceledException(tekst);
-        var antwoord = await VraagJaNee("Dinamo voert wissels niet uit",
-            tekst + "\n\nWat u op de baan hoort en ziet is leidend: gaan er wissels om? Zet Dinamo en de baanspanning uit en weer aan (of controleer de kabel).\n\nJa = Dinamo is hersteld, alle wissels opnieuw sturen en doorgaan\nNee = de wissels gaan wel om, doorgaan zonder deze controle\n(venster sluiten = verkenning stoppen)");
-        if (antwoord is null) throw new OperationCanceledException("Gebruiker stopte: Dinamo voert wissel-commando's niet uit.");
+        if (VraagJaNee is null) { TerugNaarVoorUitval("zonder gebruiker om te vragen"); throw new OperationCanceledException(tekst); }
+        // BUG #157 (Marco 15-10 09:29): eerst de loc stilzetten en een willekeurige wissel blijven omschakelen: komt Dinamo vanzelf weer tot leven,
+        // dan hoeft de gebruiker niets te doen.
+        bool vanzelfHersteld = await WachtOpLevenstekenDinamo(bron);
+        bool? antwoord = vanzelfHersteld ? true : await VraagJaNee("Dinamo voert wissels niet uit",
+            tekst + "\n\nWat u op de baan hoort en ziet is leidend: gaan er wissels om? Zet Dinamo en de baanspanning uit en weer aan (of controleer de kabel).\n\nJa = Dinamo is hersteld, alle wissels opnieuw sturen en doorgaan (bevindingen sinds de uitval worden weggehaald)\nNee = de wissels gaan wel om: doorgaan, maar alles vanaf nu staat in het rapport als ONBETROUWBAAR en de verkenning stopt bij 12 commando's achter elkaar zonder terugmelding\n(venster sluiten = verkenning stoppen, bevindingen sinds de uitval worden weggehaald)");
+        if (antwoord is null) { TerugNaarVoorUitval("verkenning gestopt"); throw new OperationCanceledException("Gebruiker stopte: Dinamo voert wissel-commando's niet uit."); }
         if (antwoord == false)
         {
+            if (_echo.Negeren)
+            {
+                TerugNaarVoorUitval("12 commando's zonder terugmelding");
+                throw new OperationCanceledException("Dinamo meldt 12 wissel-commando's achter elkaar niet terug: verkenning gestopt. Zet Dinamo uit en aan en hervat.");
+            }
             _echo.Negeren = true;
-            _log.Info("Gebruiker: de wissels gaan wel om. De controle op terugmeldingen van Dinamo staat voor de rest van deze sessie uit.");
+            _onbetrouwbaar = true;
+            var wees = $"Vanaf {_klok.Nu:HH:mm:ss} meldt Dinamo wissel-commando's niet terug; de gebruiker zegt dat de wissels wel omgaan. Alles wat vanaf nu gevonden wordt is ONBETROUWBAAR (sommige commando's worden niet uitgevoerd) en wordt niet in het leerprofiel bewaard.";
+            _log.Waarschuwing(wees);
+            _kaart.Waarschuwingen.Add(wees);
             return;
         }
-        await HoortestNaHerstel();
+        TerugNaarVoorUitval(vanzelfHersteld ? "Dinamo reageerde vanzelf weer" : "Dinamo hersteld");
+        if (!vanzelfHersteld) await HoortestNaHerstel();
         _echo.Herstel();
         _log.Info("Dinamo hersteld volgens de gebruiker: alle wissels worden opnieuw gestuurd. Bevindingen sinds de eerste ontbrekende terugmelding zijn niet betrouwbaar.");
         foreach (var kv in _wisselStand.ToList())
@@ -1099,7 +1175,7 @@ public partial class BaanVerkenner
         {
             Nr = _kaart.Ritten.Count + 1, Tijd = DateTime.Now, Navigatie = doel.IsNavigatie, Start = start, Richting = r,
             Afbuigend = _wisselStand.Where(kv => kv.Value).Select(kv => kv.Key).OrderBy(a => a).ToList(),
-            Reeks = uitkomst.Reeks.ToList(), Einde = uitkomst.Einde
+            Reeks = uitkomst.Reeks.ToList(), Einde = uitkomst.Einde, Onbetrouwbaar = _onbetrouwbaar || _echo.Reeks > 0
         });
         // BUG #74: waar kwam de loc vandaan? (Na een kortsluiting/herstel is dat niet meer te weten.)
         if (uitkomst.Einde == RitEinde.Kortsluiting) _ingang = null;
@@ -1108,7 +1184,7 @@ public partial class BaanVerkenner
         PasSnelheidAutomatischAan();
         try
         {
-            if (Leerprofiel is { } lp) { lp.Leer(_kaart, RefSnelheid); ProfielBijgewerkt?.Invoke(lp); }
+            if (Leerprofiel is { } lp && !_onbetrouwbaar && _echo.Reeks == 0) { lp.Leer(_kaart, RefSnelheid); ProfielBijgewerkt?.Invoke(lp); }
         }
         catch (Exception ex) { _log.Waarschuwing($"Leerprofiel bewaren mislukte: {ex.Message}"); }
         return uitkomst;
@@ -2220,7 +2296,7 @@ internal sealed class EchoWaakhond
     {
         if (bevestigd) { Reeks = 0; OoitBevestigd = true; return false; }
         Reeks++;
-        return !Negeren && Reeks >= Drempel(OoitBevestigd);
+        return Negeren ? Reeks >= 12 : Reeks >= Drempel(OoitBevestigd);
     }
 
     /// <summary>Na herstel door de gebruiker: de reeks begint opnieuw; een tweede uitval wordt na 3 commando's weer gemeld.</summary>

@@ -219,6 +219,8 @@ public class GeredenRit
     public List<int> Afbuigend { get; set; } = new();
     public List<int> Reeks { get; set; } = new();
     public RitEinde Einde { get; set; }
+    /// <summary>BUG #157: gereden terwijl Dinamo wissel-commando's niet terugmeldde; de uitkomst is niet betrouwbaar.</summary>
+    public bool Onbetrouwbaar { get; set; }
 }
 
 public class Etappe
