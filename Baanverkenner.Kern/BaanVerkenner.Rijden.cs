@@ -728,6 +728,45 @@ public partial class BaanVerkenner
     /// verder, en bij doorschieten terug.</summary>
     private async Task Nastellen(int doel, Richting laatsteRichting, int? achter = null, int? voor = null)
     {
+        await NastellenKern(doel, laatsteRichting, achter, voor);
+        await VrijVanIngangsWissel(doel, laatsteRichting);
+    }
+
+    /// <summary>BUG #152 (Marco 07:48: "rijd van de verst verwijderde sectie naar het volgende blok, anders sta je soms al in de wissel; komt bij melder 5 van
+    /// blok 3 al voor"): nastellen stopt zodra alleen de doelmelder bezet is, dus met de neus net op de melder en de rest van de loc nog in het
+    /// wisselgebied aan de ingang. Weet de kaart dat bij deze melder een wissel ligt (kortsluiting of oplossing direct na deze melder), dan kruipt de loc daarna nog een stuk
+    /// door in de rijrichting (een derde van de bekende tijd tot de volgende melder), zodat hij op de verste sectie van de melder staat en vrij van de wissel.
+    /// Onbekende tijd of niet-bekende wissel: niets doen. Nog niet getest op de baan.</summary>
+    private async Task VrijVanIngangsWissel(int doel, Richting r)
+    {
+        bool wisselBij = _kaart.Wissels.Any(w => w.Waarnemingen.Any(o => o.NaMelder == doel
+            && (o.Soort == WaarnemingSoort.KortsluitingBijOmzetten || o.Soort == WaarnemingSoort.LostKortsluitingOp)));
+        if (!wisselBij) return;
+        _monitor.Bijwerken();
+        if (!(_monitor.Bezet.Count == 1 && _monitor.Bezet.Contains(doel))) return;
+        var uit = _kaart.Overgangen.Where(x => x.Van == doel && x.Richting == r && x.AantalMetingen > 0).ToList();
+        if (uit.Count == 0) return;
+        double sec = uit.Min(x => x.GemiddeldeSeconden) * RefSnelheid / Math.Max(1, _ins.Verkensnelheid)
+                     * Math.Max(1, _ins.Verkensnelheid) / Math.Max(1, _ins.Kruipsnelheid);
+        double duur = Math.Min(30, sec / 3);
+        if (duur < 1) return;
+        _log.Rijden($"Melder {doel} heeft een wissel in het gebied: de loc kruipt nog {duur:0.0} s door {r.Tekst()} naar de verste sectie van de melder, zodat hij niet in de wissel blijft staan (niet getest op de baan).");
+        await StuurSnelheid(r, _ins.Kruipsnelheid, null);
+        var eind = _klok.Nu + TimeSpan.FromSeconds(duur);
+        while (_klok.Nu < eind)
+        {
+            await Wacht(Poll);
+            _monitor.Bijwerken();
+            if (_monitor.Bezet.Any(m => m != doel)) break; // volgende melder gehaald: niet verder
+        }
+        await StopLoc();
+        _monitor.Bijwerken();
+        if (!_monitor.IsBezet(doel) || _monitor.Bezet.Count > 1)
+            await NastellenKern(doel, r.Om(), null, null);
+    }
+
+    private async Task NastellenKern(int doel, Richting laatsteRichting, int? achter = null, int? voor = null)
+    {
         await Wacht(TimeSpan.FromMilliseconds(500));
         _monitor.Bijwerken();
         var bezet = _monitor.Bezet;

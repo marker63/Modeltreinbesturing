@@ -2071,3 +2071,10 @@ Open: voorkennis-run meten (0 kortsluitingen als doel), kortsluitoplossingen per
 Stand simulatie vanaf melder 17: 6 kortsluitingen (was 2 + vastzitten), melders 4, 5, 8, 11-17, 20, 21, 24-30, 129 gevonden; de rit is NIET voltooid: na de kortsluiting bij de kruiswissel
 (24 vooruit) moet de gebruiker de loc terugzetten, en de simulator kan de loc daarna niet neerzetten. De run met voorkennis (`MINI_VOORKENNIS=1`) kon niet gemeten worden:
 de simulator zet de loc niet op de startmelder (placement-artefact). Nog niet getest op de baan.
+
+## BUG #152 – loc blijft na het nastellen in het wisselgebied staan (Marco 07:48: "rijd van de verst verwijderde sectie naar het volgende blok, anders sta je soms al in de wissel; komt bij melder 5 van blok 3 al voor")
+`Nastellen` stopte zodra alleen de doelmelder bezet was: de neus net op de melder, de rest van de loc nog in het wisselgebied aan de ingang (melder 5: wissel 1+2). Nu kruipt de loc
+na het nastellen nog een derde van de bekende tijd tot de volgende melder door in de rijrichting (maximaal 30 s, stopt zodra een volgende melder bezet raakt), alleen als de kaart bij die
+melder een wissel kent (waarneming "kortsluiting bij omzetten" of "loste kortsluiting op" met die melder). Onbekende tijd of geen bekende wissel: niets. Nog niet getest op de baan.
+Ook nog niet in de simulator uitgeoefend (de Miniworld-run komt niet in dit geval); regressietests blijven groen. Open: de plaats van de wissel (ingang of uitgang van de melder) is
+uit de kaart niet zeker af te leiden; Marco's voorbeeld (melder 5) is de enige reden om aan te nemen dat het de ingang is.
