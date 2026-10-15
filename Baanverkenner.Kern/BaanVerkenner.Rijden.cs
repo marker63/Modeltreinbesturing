@@ -1015,10 +1015,16 @@ public partial class BaanVerkenner
     /// alarmvlaggetje werd bij de ritstart gewist en een alarm komt maar één keer binnen, dus de kortsluiting werd niet meer gezien.
     /// Nu: staat er een blokalarm, dan korte tijd wachten of het vanzelf verdwijnt; zo niet, dan geen wissels omzetten en niet rijden
     /// maar een navigatiefout (loc controleren/terugzetten, mogelijk staat een wissel verkeerd).</summary>
-    private async Task ControleerGeenAlarmVoorStap(string stap)
+    private Task ControleerGeenAlarmVoorStap(string stap) => ControleerGeenAlarmVoorStapMet(stap, null, null);
+
+    private async Task ControleerGeenAlarmVoorStapMet(string stap, int? startMelder, Richting? stapRichting)
     {
         _alarmStand.Clear();
         if (HuidigeAlarmBlokken().Count == 0) return;
+        // BUG #158 (Marco 15-10 12:21, kruiswissel 24): deze kortsluiting hoort bij de melder waar de loc nu staat en de richting van de stap. Zonder dit
+        // bleef de context van een oudere kortsluiting (129 vooruit) staan en kwam de correctie van de gebruiker bij het verkeerde kortsluitpunt terecht.
+        if (startMelder is int sm && stapRichting is Richting sr)
+            _laatsteKortsluitContext = (sm, sr, new Configuratie(_wisselStand.Where(w => w.Value).Select(w => w.Key).ToArray()));
         _laatsteKortsluitingOm = _klok.Nu;   // BUG #117: ook deze kortsluiting telt voor 'kort geleden een kortsluiting' (blokproef overslaan)
         _log.Waarschuwing($"Dinamo meldt kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())} voordat de volgende stap begint ({stap}). Even wachten of dat vanzelf verdwijnt.");
         for (int i = 0; i < AlarmWachtPogingen && HuidigeAlarmBlokken().Count > 0; i++)
@@ -1244,7 +1250,7 @@ public partial class BaanVerkenner
         // Bij Dinamo met een (nog) onbekend blok gaat StuurSnelheid vanzelf naar alle
         // blokken; de sectie wordt gekoppeld zodra de loc er helemaal in staat.
 
-        await ControleerGeenAlarmVoorStap($"rit {r.Tekst()} vanaf melder {start}");
+        await ControleerGeenAlarmVoorStapMet($"rit {r.Tekst()} vanaf melder {start}", start, r);
         cfgNu = MetAlarmStand(cfgNu);
 
         int snelheid = _ins.Verkensnelheid;

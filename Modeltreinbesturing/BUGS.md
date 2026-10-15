@@ -2116,3 +2116,13 @@ Oplossing:
 - De kaart van vóór de eerste ontbrekende terugmelding wordt bewaard; bij herstel ("Ja"), stoppen of de 2-minutentest zonder succes gaan alle bevindingen sinds die eerste ontbrekende terugmelding weer uit de kaart.
 - "Nee" zet de controle niet meer uit: alles daarna staat als ONBETROUWBAAR in de lijst "Alle ritten" en de waarschuwingen, wordt niet in het leerprofiel bewaard, en bij 12 commando's achter elkaar zonder terugmelding stopt de verkenning.
 Tests in CompileCheck (3 nieuwe + 1 aangepast). Nog niet getest op de baan.
+
+## #158/#159 - Kruiswissel-lus (motor 10 steeds verkeerd) en weer 16 → 5 met wissel 2 afbuigend (15-10 12:21/12:24)
+Oorzaak:
+- Kortsluitpunt na melder 24 werd steeds opnieuw "opgelost" en weer teruggedraaid: een handmatige correctie ("wissel 10 verkeerd") werd aan de verkeerde context gekoppeld, een rechtdoor-oplossing voor motor 10 werd afgewezen en NavigatieFouten werden niet geteld, dus de lus eindigde nooit.
+- Kortsluitpunt #3 ("na melder 5 vooruit opgelost door wissel 2 afbuigend", ontstaan tijdens een Dinamo-uitval) is het omgekeerde van wat bekend was: 16 → 5 met wissel 2 afbuigend IS de kortsluiting (#155). Oudere waarnemingen hadden geen Via (ingang), dus het werd niet tegengehouden.
+Oplossing:
+- Een rechtdoor-stand van kruismotor 10/13 telt als verklaring van het kortsluitpunt; handmatige correcties worden via de laatste context aan het juiste punt gekoppeld; 3 navigatiefouten op één punt = opgegeven (geen oneindige lus).
+- Nieuw: `Baankaart.VerbodenIngangen()` leidt voor oudere waarnemingen zonder Via de ingang af uit de doorgangen; `MetVerbodenIngangen` zet zulke wissels op een pad weer rechtdoor; proeven met een verboden ingang worden overgeslagen; `HerstelStrijdigeOplossingen` trekt een oplossing in die zelf de verboden ingang afbuigend neemt (met waarschuwing).
+- `ControleerGeenAlarmVoorStap` kreeg een overload met startmelder/richting (testen blijven werken).
+Test: CompileCheck (kaart van 12:20 als testdata). Nog niet getest op de baan.

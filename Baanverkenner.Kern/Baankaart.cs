@@ -544,6 +544,77 @@ public class Baankaart
         return res.Distinct().ToList();
     }
 
+    /// <summary>BUG #159 (Marco 15-10 12:24: "van 16 naar 5 met wissel 2 afbuigend, daar wist je al heel lang van dat je dat niet mocht rijden"): ingangen
+    /// (Via -> Na in richting R) waarbij <c>Adres</c> afbuigend kortsluiting geeft. Bron: waarnemingen KortsluitingBijOmzetten met bekende ingang (Via); bij
+    /// oudere kaarten zonder Via wordt de ingang afgeleid uit de doorgangen: de ingang waarvandaan het vervolg altijd met deze wissel rechtdoor
+    /// gereden is, terwijl een andere ingang naar hetzelfde vervolg hem juist afbuigend vraagt.</summary>
+    public List<(int Via, int Na, Richting R, int Adres)> VerbodenIngangen()
+    {
+        var res = new List<(int, int, Richting, int)>();
+        foreach (var w in Wissels)
+            foreach (var ob in w.Waarnemingen.Where(x => x.Soort == WaarnemingSoort.KortsluitingBijOmzetten))
+            {
+                if (ob.Via is int via) { if (!res.Contains((via, ob.NaMelder, ob.Richting, w.Adres))) res.Add((via, ob.NaMelder, ob.Richting, w.Adres)); continue; }
+                if (ob.VolgendeBijRechtdoor is not int q) continue;
+                var rd = Doorgangen.Where(d => d.Melder == ob.NaMelder && d.Richting == ob.Richting && d.Volgende == q && d.AantalKeer >= 3).ToList();
+                var zonder = rd.Where(d => d.Configuraties.All(c => !Configuratie.VanSleutel(c).Bevat(w.Adres))).ToList();
+                var met = rd.Where(d => d.Configuraties.Any(c => Configuratie.VanSleutel(c).Bevat(w.Adres))).ToList();
+                if (zonder.Count == 1 && met.Count >= 1 && !res.Contains((zonder[0].Via, ob.NaMelder, ob.Richting, w.Adres)))
+                    res.Add((zonder[0].Via, ob.NaMelder, ob.Richting, w.Adres));
+            }
+        return res;
+    }
+
+    /// <summary>BUG #159: raakt deze route een ingang waarbij <paramref name="adres"/> afbuigend kortsluiting geeft?</summary>
+    public bool IngangVerboden(IEnumerable<Etappe> route, int adres)
+    {
+        var verboden = VerbodenIngangen().Where(v => v.Adres == adres).ToList();
+        if (verboden.Count == 0) return false;
+        foreach (var e in route)
+            for (int i = 0; i + 1 < e.Pad.Count; i++)
+                if (verboden.Any(v => v.Via == e.Pad[i] && v.Na == e.Pad[i + 1] && v.R == e.Richting)) return true;
+        return false;
+    }
+
+    /// <summary>BUG #159: zet wissels die op dit pad een verboden ingang afbuigend zouden nemen weer rechtdoor, tenzij een andere stap van het pad die
+    /// wissel afbuigend eist.</summary>
+    public Configuratie MetVerbodenIngangen(List<int> pad, Richting r, Configuratie c, out List<string> wijzigingen)
+    {
+        wijzigingen = new List<string>();
+        var verboden = VerbodenIngangen();
+        if (verboden.Count == 0) return c;
+        var eisAfb = new HashSet<int>();
+        for (int i = 0; i + 1 < pad.Count; i++)
+            foreach (var (a, afb) in WisselEisenVoorStap(pad[i], pad[i + 1], r)) if (afb) eisAfb.Add(a);
+        for (int i = 0; i + 1 < pad.Count; i++)
+            foreach (var v in verboden.Where(v => v.Via == pad[i] && v.Na == pad[i + 1] && v.R == r))
+                if (c.Bevat(v.Adres) && !eisAfb.Contains(v.Adres))
+                {
+                    c = c.Zonder(v.Adres);
+                    wijzigingen.Add($"{v.Adres} rechtdoor (rijden van {v.Via} naar {v.Na} met wissel {v.Adres} afbuigend geeft kortsluiting)");
+                }
+        return c;
+    }
+
+    /// <summary>BUG #159: een 'oplossing' die zelf de verboden ingang afbuigend neemt (kortsluitpunt #3 van 15-10: na melder 5 vooruit 'opgelost door wissel 2
+    /// afbuigend', terwijl 16 -> 5 met wissel 2 afbuigend juist de kortsluiting is) is onjuist: ze ontstond tijdens een Dinamo-uitval. Zo'n oplossing wordt
+    /// ingetrokken.</summary>
+    public List<string> HerstelStrijdigeOplossingen()
+    {
+        var res = new List<string>();
+        var verboden = VerbodenIngangen();
+        foreach (var kp in Kortsluitpunten.Where(k => k.Opgelost && k.OpgelostMetAfbuigend == true && k.OpgelostDoorAdres is int).ToList())
+        {
+            int a = kp.OpgelostDoorAdres!.Value;
+            var pad = kp.Route.Count > 0 ? kp.Route[^1].Pad : new List<int>();
+            int via = pad.Count >= 2 && pad[^1] == kp.NaMelder ? pad[^2] : -1;
+            if (!verboden.Any(v => v.Adres == a && v.Na == kp.NaMelder && v.R == kp.Richting && (via < 0 || v.Via == via))) continue;
+            kp.Opgelost = false; kp.OpgelostDoorAdres = null; kp.OpgelostMetAfbuigend = null; kp.Opgegeven = true;
+            res.Add($"Kortsluitpunt #{kp.Id} (na melder {kp.NaMelder}, {kp.Richting.Tekst()}): de oplossing 'wissel {a} afbuigend' is ingetrokken, want rijden naar melder {kp.NaMelder} met wissel {a} afbuigend geeft juist kortsluiting.");
+        }
+        return res;
+    }
+
     private static bool IngangInPad(List<int> pad, int via, int na)
     {
         for (int i = 0; i + 1 < pad.Count; i++) if (pad[i] == via && pad[i + 1] == na) return true;

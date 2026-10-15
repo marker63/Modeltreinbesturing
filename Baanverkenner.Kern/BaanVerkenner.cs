@@ -381,6 +381,7 @@ public partial class BaanVerkenner
             }
         }
         BewaarKruis();
+        foreach (var t in _kaart.HerstelStrijdigeOplossingen()) { _log.Waarschuwing("Kaart hersteld (BUG #159): " + t); _kaart.Waarschuwingen.Add(t); }
         foreach (var t in _kaart.HerstelOnmogelijkeKruisOplossingen(Kruis)) { _log.Waarschuwing("Kaart hersteld (BUG #137): " + t); _kaart.Waarschuwingen.Add(t); }
         _log.Info(Kruis.Motoren.Count == 0
             ? "Engelse wissels: geen opgegeven; er worden geen kruiswissel-regels toegepast."
@@ -1331,6 +1332,20 @@ public partial class BaanVerkenner
     /// <summary>BUG #132/#136: legt een door de gebruiker aangewezen oplossing vast bij het kortsluitpunt.</summary>
     private bool KoppelHandOplossing(Kortsluitpunt kp, int adres, bool afbuigend)
     {
+        // BUG #158: de gebruiker zette een kruismotor die in de geteste stand AFBUIGEND stond terug op rechtdoor en de kortsluiting was weg. Dan is niet
+        // een extra wissel de oplossing, maar die motor zelf: in die stand rijdt de loc hier nooit goed. Het punt is daarmee verklaard; niet verder zoeken
+        // met andere wisseladressen (dat gaf een eindeloze reeks proeven, telkens met dezelfde verkeerde motor).
+        if (!afbuigend && Kruis.IsMotor(adres) && kp.Configuratie.Bevat(adres) && !kp.Opgelost)
+        {
+            kp.Opgegeven = true;
+            if (!kp.GeprobeerdeAdressen.Contains(adres)) kp.GeprobeerdeAdressen.Add(adres);
+            string uitleg = $"Kortsluitpunt #{kp.Id} (na melder {kp.NaMelder}, {kp.Richting.Tekst()}, {kp.Configuratie}) is verklaard door motor {adres}: afbuigend geeft hier kortsluiting, rechtdoor niet (volgens de gebruiker). Er wordt niet meer naar andere wissels gezocht; de verkenner rijdt hier voortaan met motor {adres} rechtdoor.";
+            _kaart.Waarschuwingen.Add(uitleg);
+            _log.Vondst(uitleg);
+            _handmatigeOplossingGemeld = true;
+            BewaarNu();
+            return true;
+        }
         if (!_kaart.RegistreerHandmatigeOplossing(kp, adres, afbuigend, Kruis)) return false;
         _log.Vondst($"Kortsluitpunt #{kp.Id} (na melder {kp.NaMelder}, {kp.Richting.Tekst()}, {kp.Configuratie}) is volgens de gebruiker opgelost door wissel {adres} op {(afbuigend ? "afbuigend" : "rechtdoor")}. Dit wordt voortaan in deze verkenning meteen toegepast; in een volgende verkenning alleen als u bij de voorkennis-vraag 'Ja' antwoordt.");
         _handmatigeOplossingGemeld = true; // BUG #102
@@ -1660,6 +1675,24 @@ public partial class BaanVerkenner
             _bezig = $"kortsluitpunt #{k.Id} na melder {k.NaMelder}";
             MeldVoortgang();
 
+            // BUG #158: op de kruiswissel is een kruismotor die in de geteste stand afbuigend staat en daar al eerder kortsluiting gaf (waarneming
+            // KortsluitingBijOmzetten bij dezelfde melder en richting) de verklaring; geen partner-wissels proberen.
+            if (Kruis.Middens.Contains(k.NaMelder))
+            {
+                int motor = k.Configuratie.Afbuigend.FirstOrDefault(a => Kruis.IsMotor(a) && _kaart.Wissels.Any(w => w.Adres == a
+                    && w.Waarnemingen.Any(x => x.Soort == WaarnemingSoort.KortsluitingBijOmzetten && x.NaMelder == k.NaMelder && x.Richting == k.Richting)));
+                if (motor != 0)
+                {
+                    k.Opgegeven = true;
+                    string uitleg = $"Kortsluitpunt #{k.Id} (na melder {k.NaMelder}, {k.Richting.Tekst()}, {k.Configuratie}) is al verklaard: motor {motor} afbuigend geeft op de kruiswissel bij deze melder en richting kortsluiting. Niet verder zoeken.";
+                    _kaart.Waarschuwingen.Add(uitleg);
+                    _log.Vondst(uitleg);
+                    BewaarNu();
+                    continue;
+                }
+            }
+            int navigatieFouten = 0;
+
             // Kandidaten: bekende wissels waarvan (andersom gereden) een tak naar deze melder leidt.
             var kandidaten = new List<(int Adres, bool Afbuigend)>();
             foreach (var w in _kaart.Wissels)
@@ -1701,6 +1734,13 @@ public partial class BaanVerkenner
             foreach (var (adres, afb) in kandidaten)
             {
                 if (k.AantalKortsluitingen >= _ins.MaxKortsluitingenPerPlek) break;
+                // BUG #159: geen proef waarvan de route een verboden ingang met dit adres afbuigend neemt.
+                if (afb && _kaart.IngangVerboden(k.Route, adres))
+                {
+                    k.GeprobeerdeAdressen.Add(adres);
+                    _log.Info($"Kortsluitpunt #{k.Id}: adres {adres} op afbuigend wordt niet geprobeerd; de route daarheen neemt een ingang waarvan bekend is dat dat kortsluiting geeft.");
+                    continue;
+                }
                 k.GeprobeerdeAdressen.Add(adres);
                 var c = k.Configuratie.MetStand(adres, afb);
                 _log.Stap($"Kortsluitpunt #{k.Id}: proberen met adres {adres} op {(afb ? "afbuigend" : "rechtdoor")}" + (partnerSet.Contains(adres) ? $" (naast {k.Configuratie}, overloopwissel?)." : "."));
@@ -1763,9 +1803,21 @@ public partial class BaanVerkenner
                 catch (NavigatieFout nf)
                 {
                     _log.Waarschuwing($"Kortsluitpunt #{k.Id}: {nf.Message}");
+                    // BUG #158: een proef die stukloopt op een blijvende kortsluiting (loc stilstaand) telde nergens mee: het kortsluitpunt kwam nooit aan
+                    // zijn maximum en de verkenner bleef eindeloos nieuwe adressen proberen (12:00-12:20: elke 2 minuten opnieuw, motor 10 steeds afbuigend).
+                    navigatieFouten++;
+                    if (nf.Kortsluiting) k.AantalKortsluitingen++;
                     await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);
                     if (!await ProbeerZelfTerugNaarStart(k.Route, nf))
                         await VraagLocTerugTeZetten(_kaart.StartMelder, $"{nf.Message}\n\nDe verkenner gaat terug naar de startmelder.");
+                    if (navigatieFouten >= 3)
+                    {
+                        k.Opgegeven = true;
+                        string w3 = $"Kortsluitpunt #{k.Id} (na melder {k.NaMelder}, {k.Richting.Tekst()}) opgegeven: {navigatieFouten} proeven achter elkaar liepen vast op een navigatiefout of blijvende kortsluiting.";
+                        _kaart.Waarschuwingen.Add(w3);
+                        _log.Waarschuwing(w3);
+                        break;
+                    }
                 }
             }
             if (!k.Opgelost && k.AantalKortsluitingen >= _ins.MaxKortsluitingenPerPlek)
@@ -1808,6 +1860,10 @@ public partial class BaanVerkenner
         var metOplossing = _kaart.MetBekendeKortsluitOplossingen(pad, r, nieuw, out var wijz2);
         if (wijz2.Count > 0)
             _log.Info($"Wisselstand voor het pad {string.Join("-", pad)} ({r.Tekst()}) aangepast om een bekende kortsluiting te vermijden: {string.Join("; ", wijz2)}. Nieuwe stand: {metOplossing}.");
+        // BUG #159: een verboden ingang (bijv. 16 -> 5 met wissel 2 afbuigend) wordt nooit gereden, ook niet via een geleerde oplossing.
+        metOplossing = _kaart.MetVerbodenIngangen(pad, r, metOplossing, out var wijz4);
+        if (wijz4.Count > 0)
+            _log.Info($"Wisselstand voor het pad {string.Join("-", pad)} ({r.Tekst()}) aangepast om een bekende kortsluiting te vermijden: {string.Join("; ", wijz4)}. Nieuwe stand: {metOplossing}.");
         // BUG #85: de vaste kruiswissel-referentie (motor 13 en 10 bij een rit door melder 24) gaat voor alles wat uit kortsluitingen is afgeleid.
         var wijz3 = new List<string>();
         var metKruis = Kruis.MetReferentie ? KruiswisselReferentie.PasToe(pad, metOplossing, out wijz3) : metOplossing;

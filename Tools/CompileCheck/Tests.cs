@@ -2066,6 +2066,14 @@ public static class Tests
         var v155 = WisselstraatVoorstel.Bereken(k155).FirstOrDefault(x => x.VanMelder == 16 && x.NaarMelder == 5 && x.Richting == Richting.Vooruit);
         Eis(v155 is not null && v155.Eisen.Any(e => e.Adres == 2 && !e.Afbuigend && e.Bron == EisBron.Kortsluiting), "ingang (#155): wisselstraat 16 -> 5 vooruit vraagt wissel 2 rechtdoor (anders kortsluiting)");
         Eis(Rapport.AlsTekst(k155).Contains("ingang 16 → 5"), "ingang (#155): het rapport noemt 'ingang 16 → 5' en niet alleen 'kortsluiting tussen 5 en 13'");
+        // BUG #159: oudere waarnemingen zonder Via + kaart van 12:20: 16 -> 5 met wissel 2 afbuigend blijft verboden, ook als de oplossing 'wissel 2 afbuigend' erin staat
+        foreach (var naam in new[] { "baankaart_2026-10-15_1220.json" })
+        {
+            var k159 = Laad(naam);
+            Eis(k159.VerbodenIngangen().Any(x => x.Via == 16 && x.Na == 5 && x.Adres == 2), "ingang (#159): " + naam + " kent 16 -> 5 met wissel 2 afbuigend als verboden (nu " + string.Join(", ", k159.VerbodenIngangen().Select(x => $"{x.Via}>{x.Na}/W{x.Adres}")) + ")");
+            k159.HerstelStrijdigeOplossingen();
+            Eis(!k159.Kortsluitpunten.Any(x => x.Opgelost && x.OpgelostMetAfbuigend == true && x.OpgelostDoorAdres == 2 && x.NaMelder == 5), "ingang (#159): " + naam + " heeft geen opgelost kortsluitpunt meer met 'wissel 2 afbuigend' na melder 5");
+        }
         Eis(!v.Any(x => x.VanBlok == x.NaarBlok), "wisselstraat: geen voorstel binnen een blok");
         Eis(!v.Any(x => x.VanMelder == 20 && x.NaarMelder == 27), "wisselstraat: 20 -> 27 (zelfde blok) heeft geen voorstel");
         var alt = v.Where(x => x.VanMelder == 13 && x.NaarMelder == 24 && x.Richting == Richting.Vooruit).ToList();
