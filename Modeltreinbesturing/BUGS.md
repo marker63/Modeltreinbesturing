@@ -2096,3 +2096,9 @@ rechtdoor en wissel 10. Melders, snelheid en stop bleven werken. De hoortest (07
 Bevinding: de uitvaldiagnose (#138) staat niet in het hardwarelog bij deze uitval; hij gaat alleen af bij 'Dinamo antwoordt niet'. Opgelost: bij 'DINAMO VOERT WISSELCOMMANDO'S NIET UIT' schrijft de hardware nu dezelfde diagnose in het hardwarelog (`IWisselBevestiging.LogWisselUitval`, standaard niets voor simulator en stubs). Hypothese (niet bewezen): wissel 1 t/m 8 en 9 t/m 14
 hangen aan een verschillende print of adresblok; het eerste commando naar de tweede print legt de wisseluitgang vast. Nog niet getest op de baan.
 Kaart 15-10: voor de uitval is niets onbetrouwbaars gevonden (wissel 2 en 5 gevonden voor 07:50); de rest van de kaart tot en met wissel 8 klopt dus, wissel 9 en hoger zijn niet getest.
+
+## #155 - Kortsluiting bij wissel 2 genoteerd als "tussen 5 en 13" i.p.v. als ingang 16 → 5 (15-10 08:24)
+Marco: de loc reed van 16 naar 5 en kreeg kortsluiting; genoteerd moet worden "16 → 5 niet rijden als wissel 2 afbuigend staat".
+Oorzaak: de waarneming KortsluitingBijOmzetten kende alleen NaMelder (5) en het vervolg bij rechtdoor (13), niet de melder waar de loc vandaan kwam.
+Oplossing: `WisselWaarneming.Via` (ingang, 16) wordt gevuld uit de gereden reeks; toelichting en rapport (tekst/html) noemen nu "ingang 16 → 5 (vooruit): niet rijden als afbuigend";
+wisselstraat 16 → 5 vooruit eist nu "wissel 2 rechtdoor (anders kortsluiting)" (was "geen wissel nodig"). Test in CompileCheck (kaart 08:24). Nog niet getest op de baan.

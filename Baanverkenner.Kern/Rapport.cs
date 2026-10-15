@@ -24,7 +24,7 @@ public static class Rapport
                 string ligging = obs.Soort switch
                 {
                     WaarnemingSoort.Splitsing => $"na melder {obs.NaMelder} ({obs.Richting.Tekst()}), puntzijde",
-                    WaarnemingSoort.KortsluitingBijOmzetten => $"na melder {obs.NaMelder} ({obs.Richting.Tekst()}), van achteren bereden",
+                    WaarnemingSoort.KortsluitingBijOmzetten => obs.Via is int via ? $"ingang {via} → {obs.NaMelder} ({obs.Richting.Tekst()}), van achteren bereden: niet rijden als afbuigend" : $"na melder {obs.NaMelder} ({obs.Richting.Tekst()}), van achteren bereden",
                     _ => $"na melder {obs.NaMelder} ({obs.Richting.Tekst()}), van achteren bereden"
                 };
                 string recht = obs.VolgendeBijRechtdoor is int r ? $"melder {r}" : (obs.Soort == WaarnemingSoort.LostKortsluitingOp ? "–" : "doodlopend / onbekend");

@@ -68,7 +68,8 @@ public class WisselstraatVoorstel
             }
             foreach (var w in k.Wissels)
                 foreach (var ob in w.Waarnemingen.Where(x => x.Soort == WaarnemingSoort.KortsluitingBijOmzetten))
-                    if (ob.NaMelder == o.Van && ob.Richting == o.Richting && ob.VolgendeBijRechtdoor == o.Naar && ob.VolgendeBijAfbuigend is null
+                    if (((ob.NaMelder == o.Van && ob.VolgendeBijRechtdoor == o.Naar) || (ob.Via == o.Van && ob.NaMelder == o.Naar))
+                        && ob.Richting == o.Richting && ob.VolgendeBijAfbuigend is null
                         && !basis.Any(e => e.Adres == w.Adres))
                         basis.Add(new WisselEis { Adres = w.Adres, Afbuigend = false, Bron = EisBron.Kortsluiting });
 

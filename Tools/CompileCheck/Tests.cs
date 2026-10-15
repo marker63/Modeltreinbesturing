@@ -2032,6 +2032,12 @@ public static class Tests
         Eis(t.Count == 1 && t[0].Eisen.Count == 1 && t[0].Eisen[0].Adres == 5 && t[0].Eisen[0].Afbuigend, "wisselstraat: 129 -> 14 achteruit: alleen wissel 5 afbuigend (de gereden stand met 10 erbij is overbodig, en van achteren telt de splitsing) (nu " + string.Join(" | ", t.Select(x => x.EisenTekst)) + ")");
         var e1 = Zoek(24, 21, Richting.Vooruit);
         Eis(e1 is not null && e1.Eisen.Any(e => e.Adres == 10 && !e.Afbuigend), "wisselstraat: 24 -> 21 vooruit vraagt wissel 10 rechtdoor");
+        // BUG #155: kaart van 15-10 08:24 - 16 -> 5 vooruit met wissel 2 afbuigend geeft kortsluiting (ingang), niet 'tussen 5 en 13'
+        var k155 = Laad("baankaart_2026-10-15_0824.json");
+        foreach (var ob in k155.Wissel(2).Waarnemingen.Where(x => x.Soort == WaarnemingSoort.KortsluitingBijOmzetten && x.Via is null)) ob.Via = 16;
+        var v155 = WisselstraatVoorstel.Bereken(k155).FirstOrDefault(x => x.VanMelder == 16 && x.NaarMelder == 5 && x.Richting == Richting.Vooruit);
+        Eis(v155 is not null && v155.Eisen.Any(e => e.Adres == 2 && !e.Afbuigend && e.Bron == EisBron.Kortsluiting), "ingang (#155): wisselstraat 16 -> 5 vooruit vraagt wissel 2 rechtdoor (anders kortsluiting)");
+        Eis(Rapport.AlsTekst(k155).Contains("ingang 16 → 5"), "ingang (#155): het rapport noemt 'ingang 16 → 5' en niet alleen 'kortsluiting tussen 5 en 13'");
         Eis(!v.Any(x => x.VanBlok == x.NaarBlok), "wisselstraat: geen voorstel binnen een blok");
         Eis(!v.Any(x => x.VanMelder == 20 && x.NaarMelder == 27), "wisselstraat: 20 -> 27 (zelfde blok) heeft geen voorstel");
         var alt = v.Where(x => x.VanMelder == 13 && x.NaarMelder == 24 && x.Richting == Richting.Vooruit).ToList();

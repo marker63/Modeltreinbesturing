@@ -124,6 +124,8 @@ public class WisselWaarneming
 {
     public WaarnemingSoort Soort { get; set; }
     public int NaMelder { get; set; }
+    /// <summary>BUG #155: bij KortsluitingBijOmzetten de melder waar de loc vandaan kwam (de ingang): Via → NaMelder (richting) geeft kortsluiting als dit adres afbuigend staat.</summary>
+    public int? Via { get; set; }
     public Richting Richting { get; set; }
     /// <summary>Volgende melder met dit adres op RECHTDOOR (null = onbekend/niet bereikt).</summary>
     public int? VolgendeBijRechtdoor { get; set; }

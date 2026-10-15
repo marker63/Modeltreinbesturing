@@ -1491,13 +1491,15 @@ public partial class BaanVerkenner
             {
                 Soort = WaarnemingSoort.KortsluitingBijOmzetten,
                 NaMelder = x,
+                Via = t.Count >= 2 ? t[^2] : null,
                 Richting = o.Richting,
                 VolgendeBijRechtdoor = q,
                 VolgendeBijAfbuigend = null,
                 Configuratie = c.ToString(),
                 Toelichting = q is null
-                    ? $"Op afbuigend: kortsluiting direct na melder {x}."
-                    : $"Op afbuigend: kortsluiting tussen melder {x} en {q}. Deze wissel wordt hier waarschijnlijk van achteren (samenvoegend) bereden."
+                    ? (t.Count >= 2 ? $"Niet rijden van melder {t[^2]} naar {x} ({o.Richting.Tekst()}) als wissel {a} afbuigend staat: kortsluiting." : $"Op afbuigend: kortsluiting direct na melder {x}.")
+                    : (t.Count >= 2 ? $"Niet rijden van melder {t[^2]} naar {x} ({o.Richting.Tekst()}) als wissel {a} afbuigend staat: kortsluiting (wissel wordt van achteren bereden; rechtdoor gaat het verder naar {q})."
+                        : $"Op afbuigend: kortsluiting tussen melder {x} en {q}. Deze wissel wordt hier waarschijnlijk van achteren (samenvoegend) bereden.")
             });
             if (q is int qq)
             {
