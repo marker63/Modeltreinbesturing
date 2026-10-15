@@ -84,6 +84,8 @@ public class Overgang
 public class KortsluitOplossing
 {
     public int NaMelder { get; set; }
+    /// <summary>BUG #150: de melder waar de loc vandaan kwam (de ingang); 0 = onbekend. Met Via geldt de oplossing voor die ingang bij elke wisselstand.</summary>
+    public int Via { get; set; }
     public Richting Richting { get; set; }
     public string Stand { get; set; } = "";
     public int Start { get; set; }
@@ -91,6 +93,7 @@ public class KortsluitOplossing
     public bool Afbuigend { get; set; }
     public string Bron { get; set; } = "";
     public string Sleutel => $"{NaMelder}|{Richting}|{Stand}|{Start}|{Adres}|{Afbuigend}";
+    public string IngangSleutel => $"{Via}>{NaMelder}|{Richting}|{Adres}|{Afbuigend}";
 }
 
 public class Doorgang
@@ -261,7 +264,7 @@ public class Baankaart
     public List<int> KruisMidden { get; set; } = new();
     public bool KruisReferentie { get; set; }
 
-    private class OplossingItem { public Configuratie K = Configuratie.Basis; public int NaMelder; public int Start; public int Adres; public bool Afbuigend; public string Label = ""; }
+    private class OplossingItem { public Configuratie K = Configuratie.Basis; public int Via; public int NaMelder; public int Start; public int Adres; public bool Afbuigend; public string Label = ""; }
 
     private List<OplossingItem> Oplossingen(Richting r)
     {
@@ -269,7 +272,7 @@ public class Baankaart
         foreach (var k in Kortsluitpunten.Where(k => k.Opgelost && k.OpgelostDoorAdres is not null && k.OpgelostMetAfbuigend is not null && k.Richting == r && k.Configuratie.Afbuigend.Length > 0))
             res.Add(new OplossingItem
             {
-                K = k.Configuratie, NaMelder = k.NaMelder, Adres = k.OpgelostDoorAdres!.Value, Afbuigend = k.OpgelostMetAfbuigend!.Value,
+                K = k.Configuratie, NaMelder = k.NaMelder, Via = k.Route.Count > 0 && k.Route[^1].Pad.Count > 1 && k.Route[^1].Pad[^1] == k.NaMelder ? k.Route[^1].Pad[^2] : 0, Adres = k.OpgelostDoorAdres!.Value, Afbuigend = k.OpgelostMetAfbuigend!.Value,
                 Start = k.Route.Count > 0 && k.Route[^1].Pad.Count > 0 && k.Route[^1].Pad[^1] == k.NaMelder ? k.Route[^1].Pad[0] : 0,
                 Label = $"kortsluitpunt #{k.Id}"
             });
@@ -277,7 +280,7 @@ public class Baankaart
         {
             var cfg = Configuratie.VanSleutel(o.Stand);
             if (cfg.Afbuigend.Length == 0) continue;
-            res.Add(new OplossingItem { K = cfg, NaMelder = o.NaMelder, Adres = o.Adres, Afbuigend = o.Afbuigend, Start = o.Start, Label = "een eerder gevonden oplossing" });
+            res.Add(new OplossingItem { K = cfg, Via = o.Via, NaMelder = o.NaMelder, Adres = o.Adres, Afbuigend = o.Afbuigend, Start = o.Start, Label = "een eerder gevonden oplossing" });
         }
         return res;
     }
@@ -310,7 +313,7 @@ public class Baankaart
         var res = new List<KortsluitOplossing>();
         foreach (var r in new[] { Richting.Vooruit, Richting.Achteruit })
             foreach (var o in Oplossingen(r))
-                res.Add(new KortsluitOplossing { NaMelder = o.NaMelder, Richting = r, Stand = o.K.Sleutel, Start = o.Start, Adres = o.Adres, Afbuigend = o.Afbuigend, Bron = o.Label });
+                res.Add(new KortsluitOplossing { NaMelder = o.NaMelder, Via = o.Via, Richting = r, Stand = o.K.Sleutel, Start = o.Start, Adres = o.Adres, Afbuigend = o.Afbuigend, Bron = o.Label });
         // BUG #124: oplossingen waarbij de oplossende wissel zelf in de geteste stand zit, komen niet in het leerprofiel (ze ontstonden uit wissels die onder de loc omgezet werden).
         return res.Where(x => !Configuratie.VanSleutel(x.Stand).Bevat(x.Adres)).GroupBy(x => x.Sleutel).Select(g => g.First()).ToList();
     }
@@ -522,6 +525,12 @@ public class Baankaart
         return res.Distinct().ToList();
     }
 
+    private static bool IngangInPad(List<int> pad, int via, int na)
+    {
+        for (int i = 0; i + 1 < pad.Count; i++) if (pad[i] == via && pad[i + 1] == na) return true;
+        return false;
+    }
+
     /// <summary>BUG #83 (Marco 11:21: "de kortsluitingen op dezelfde plekken keren steeds terug, terwijl de oplossing al bekend is"): een opgelost
     /// kortsluitpunt zegt: rijdend in richting R voorbij melder M gaf de stand K kortsluiting, en het extra schakelen van wissel A gaf
     /// geen kortsluiting meer. Dat werd alleen bij het oplossen zelf gebruikt; de routes naar een kortsluitpunt en de terugwegen
@@ -548,8 +557,12 @@ public class Baankaart
         for (int ronde = 0; ronde < 5; ronde++)
         {
             bool veranderd = false;
-            foreach (var k in Oplossingen(r).Where(k => pad.Contains(k.NaMelder)))            {
-                if (!k.K.Afbuigend.All(c.Bevat)) continue;
+            foreach (var k in Oplossingen(r).Where(k => pad.Contains(k.NaMelder))
+                .Concat(Oplossingen(r.Om()).Where(k => k.Via > 0 && k.Afbuigend && IngangInPad(pad, k.NaMelder, k.Via))))            {
+                // BUG #150: een oplossing met bekende ingang (Via -> NaMelder) geldt voor die ingang bij elke wisselstand, niet alleen bij de
+                // stand waarin de kortsluiting toevallig gevonden werd (een samenvoegende wissel staat voor één ingang goed).
+                bool ingangGeldt = k.Via > 0 && k.Afbuigend && (IngangInPad(pad, k.Via, k.NaMelder) || IngangInPad(pad, k.NaMelder, k.Via)); // ook omgekeerd: dezelfde wissel op hetzelfde stuk spoor
+                if (!ingangGeldt && !k.K.Afbuigend.All(c.Bevat)) continue;
                 int a = k.Adres; bool s = k.Afbuigend;
                 if (botsend.Contains(a)) continue;
                 if (gezet.TryGetValue(a, out var eerder) && eerder != s)

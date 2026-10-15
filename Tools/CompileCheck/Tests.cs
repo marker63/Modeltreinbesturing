@@ -2131,6 +2131,20 @@ public static class Tests
         }
     }
 
+
+    // BUG #150: tweede run met voorkennis (leerprofiel van de eerste run); doel: minder kortsluitingen dan de eerste.
+    static void MiniworldVoorkennisTest()
+    {
+        if (Environment.GetEnvironmentVariable("MINI_VOORKENNIS") != "1") return;
+        Console.WriteLine("Test: tweede run op de Miniworld-baan met voorkennis (BUG #150)");
+        var r1 = MiniworldRit(17, 1.0);
+        var lp = new LeerProfiel(); lp.Leer(r1.V.Kaart, 12); lp.LeerBlokHints(r1.V.Kaart);
+        Console.WriteLine($"  run 1: {r1.Einde}, {r1.Seconden / 60:0} min, {r1.Kortsluitingen} kortsluiting(en), {lp.KortsluitOplossingen.Count} oplossingen ({string.Join("; ", lp.KortsluitOplossingen.Select(o => $"{o.Via}>{o.NaMelder} {o.Richting} wissel {o.Adres}"))})");
+        var r2 = MiniworldRit(30, 1.0, v => v.Leerprofiel = lp);
+        Console.WriteLine($"  run 2: {r2.Einde}, {r2.Seconden / 60:0} min, {r2.Kortsluitingen} kortsluiting(en), melders {r2.V.Kaart.Melders.Count}, voltooid {r2.V.Kaart.Voltooid}");
+        foreach (var l in r2.Log.Regels.Where(x => x.Tekst.Contains("KORTSLUITING/ONTSPORING vermoed")).Take(10)) Console.WriteLine("    " + l.Tekst.Substring(0, Math.Min(200, l.Tekst.Length)));
+    }
+
     // Hulpmiddel (BUG #150): alle kaarten in testdata samenvoegen tot één lijst bewezen kortsluitoplossingen.
     static void ZaadAllesTest()
     {
@@ -2268,6 +2282,7 @@ public static class Tests
         ZaadAllesTest();
         if (Environment.GetEnvironmentVariable("MINI_DEBUG") == "1") MiniworldFoutzoek();
         MiniworldRitTest();
+        MiniworldVoorkennisTest();
         HerstelBlijftStaanTest();
         KortsluitOplossingTest();
         KoploperReferentieTest();

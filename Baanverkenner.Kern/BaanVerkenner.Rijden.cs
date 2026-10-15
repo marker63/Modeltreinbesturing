@@ -108,6 +108,8 @@ public partial class BaanVerkenner
     /// <summary>BUG #141: de kortsluiting kwam terug terwijl de loc stilstond (geen rijcommando actief): de loc zit klem op de punten van een wissel
     /// en Dinamo zet de stroom steeds even terug en sluit hem weer af. Alleen het omzetten van die wissel (of de loc met de hand verplaatsen) helpt.</summary>
     private volatile bool _statischeKortsluiting;
+    private readonly HashSet<int> _kruisTerugzettenGevraagd = new();
+    private bool _alarmWegProbeerd;
 
     private void HardwareMeldtBlokAlarm(int blok, bool kortsluiting)
     {
@@ -1249,7 +1251,7 @@ public partial class BaanVerkenner
                 tijdVorigeMelder = w.Tijd;
                 laatsteWijziging = _klok.Nu;
                 onderbroken = false;
-                _log.Rijden($"  melder {m} bezet{(dt is double s ? $" (na {s:0.0} s)" : "")}");
+                _log.Rijden($"  melder {m}{(BlokVan(m) is int bl ? $" (blok {bl})" : "")} bezet{(dt is double s ? $" (na {s:0.0} s)" : "")}");
                 BewaarNu(); // BUG #54: baankaart/rapport meteen bijwerken (stond tot de opdracht klaar was op de oude stand)
 
                 // BUG #34 (gebruikerswaarneming: "je ziet de loc op bezet melder 5 en 16 en je
@@ -1822,10 +1824,30 @@ public partial class BaanVerkenner
     {
         // BUG #150: blijft het alarm ook na de stop aan (Dinamo meldt niet opnieuw), dan telt dat ook als vastzittende loc.
         if (!_statischeKortsluiting && HuidigeAlarmBlokken().Count == 0) return false;
-        if (_ritDoel?.ProefAdres is not int pa || Kruis.IsMotor(pa) || !_wisselStand.TryGetValue(pa, out var afb) || !afb) return false;
-        _statischeKortsluiting = false;
-        _log.Waarschuwing($"De kortsluiting komt steeds terug terwijl de loc stilstaat: hij zit klem op wissel {pa} (afbuigend). Die wissel gaat nu terug naar rechtdoor om de loc vrij te maken; anders blijft Dinamo de stroom steeds even terugzetten en weer afsluiten.");
-        await ZetWissel(pa, false, forceer: true);
+        // Verdacht: de proefwissel van de rit, of (zonder proef) de afbuigende wissels van de rijstand van deze rit.
+        var kandidaten = _ritDoel?.ProefAdres is int p0 ? new List<int> { p0 }
+            : (_ritDoel?.Configuratie.Afbuigend.ToList() ?? new List<int>());
+        kandidaten = kandidaten.Where(a => _wisselStand.TryGetValue(a, out var afb) && afb).ToList();
+        if (kandidaten.Count == 0) return false;
+        bool iets = false;
+        foreach (var pa in kandidaten)
+        {
+            // BUG #150: een kruismotor mag nooit zomaar onder de loc om (#96), maar de verkenner zette hem zojuist zelf als proef en de loc zit klem
+            // (log 14:38: terugzetten haalde de kortsluiting weg). Daarom eenmalig vragen; zonder vraagvenster of bij Nee gebeurt er niets.
+            if (Kruis.IsMotor(pa))
+            {
+                if (VraagJaNee is null || _kruisTerugzettenGevraagd.Contains(pa)) continue;
+                _kruisTerugzettenGevraagd.Add(pa);
+                var toe = await VraagJaNee("Kruismotor terugzetten onder de loc?",
+                    $"De loc zit klem op de kruiswissel en de kortsluiting komt steeds terug. De verkenner zette motor {pa} zelf als proef op afbuigend.\n\nJa = motor {pa} gaat nu terug naar rechtdoor (de loc staat erop).\nNee = er verandert niets; zet de loc zelf terug.");
+                if (toe != true) continue;
+            }
+            _statischeKortsluiting = false;
+            _log.Waarschuwing($"De kortsluiting komt steeds terug terwijl de loc stilstaat: hij zit klem op wissel {pa} (afbuigend). Die wissel gaat nu terug naar rechtdoor om de loc vrij te maken; anders blijft Dinamo de stroom steeds even terugzetten en weer afsluiten.");
+            await ZetWissel(pa, false, forceer: true);
+            iets = true;
+        }
+        if (!iets) return false;
         await Wacht(TimeSpan.FromSeconds(2));
         _kortsluitingGemeld = false;
         return true;
@@ -1838,6 +1860,17 @@ public partial class BaanVerkenner
         {
             await LosMakenProefWissel();
             await Wacht(TimeSpan.FromSeconds(1));
+            // BUG #150: staat de loc stil en blijft het alarm, dan zit hij klem op een wissel (meestal de samenvoegende partner van de proefwissel,
+            // bv. wissel 1 bij wissel 2): eerst wissels proberen (de ene na de andere, bij de loc alleen met toestemming), niet blind terugrijden.
+            if (!_alarmWegProbeerd && HuidigeAlarmBlokken().Count > 0)
+            {
+                _alarmWegProbeerd = true;
+                try { if (await ProbeerAlarmWegTeKrijgen("herstel na kortsluiting")) { _kortsluitingGemeld = false; } }
+                finally { _alarmWegProbeerd = false; }
+                // BUG #150: haalde geen enkele wissel het alarm weg, dan is blind achteruitrijden zinloos (de loc staat klem en rijdt nergens heen of
+                // schuift met alarm verder); meteen de gebruiker vragen in plaats van nog een poging die de loc alleen verder laat zakken.
+                if (HuidigeAlarmBlokken().Count > 0) break;
+            }
             _kortsluitingGemeld = false;
             // BUG #144b (Marco 16:54, log 16:51): de loc stond na de kortsluiting op melder 5 en met zijn achterkant nog op melder 16 (de loc is langer dan
             // een melder). 'Alleen op melder 5' kan door terugrijden nooit bereikt worden: de loc reed 16 en 5 voorbij naar melder 15, bleef midden op het
@@ -1849,6 +1882,13 @@ public partial class BaanVerkenner
                 && nuBezet.All(m => m == melder || _laatsteKortsluitMelders.Contains(m)))
             {
                 _log.Info($"Loc staat nog op melder {melder} en deels op melder {string.Join(" en ", nuBezet.Where(m => m != melder).OrderBy(m => m))} (de loc is langer dan één melder) en het alarm is weg: hij blijft staan waar hij staat.");
+                return;
+            }
+            // BUG #150: staat de loc al precies op de melder (alleen die bezet) en is het alarm weg, dan blijft hij staan; terugrijden zou hem
+            // voorbij de melder laten rijden (simulatie: na de kortsluiting bij melder 12 reed de loc door naar 13 en moest worden teruggezet).
+            if (nuBezet.Count == 1 && nuBezet.Contains(melder) && HuidigeAlarmBlokken().Count == 0)
+            {
+                _log.Info($"Loc staat al op melder {melder} en het alarm is weg: hij blijft staan.");
                 return;
             }
             _negeerKortsluitingTot = _klok.Nu + TimeSpan.FromSeconds(12);

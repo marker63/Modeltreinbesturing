@@ -2058,3 +2058,16 @@ Stand: de eerste kortsluiting is nu hersteld zonder dat de gebruiker ingrijpt (s
 aankomst op een onbekende samenvoegende wissel en de kruiswissel is een kortsluiting inherent aan beginnen zonder voorkennis; na de kruiswissel-kortsluiting blijft de loc vastzitten
 (motor 13 mag niet onder de loc worden omgezet, #96) en moet de gebruiker de loc terugzetten. Nog niet getest op de baan.
 Open: voorkennis-run meten (0 kortsluitingen als doel), kortsluitoplossingen per ingang i.p.v. per volledige stand, misleidende hint in `Kortsluiting()`, wissel 10 weergave.
+
+## BUG #151 – blokken zichtbaar in het log en kortsluitoplossingen per ingang (Marco 07:27: "we gaan steeds meer vanuit blokken denken als we ze weten")
+1. Het log noemt bij elke bezette melder nu het Dinamo-blok ("melder 5 (blok 3) bezet"), zodra het blok bekend is.
+2. `KortsluitOplossing` heeft nu `Via` (de melder waar de loc vandaan kwam). Een oplossing met bekende ingang (bijv. 5 -> 12 achteruit: wissel 1 afbuigend) wordt in
+   `MetBekendeKortsluitOplossingen` voor die ingang bij elke wisselstand toegepast en ook omgekeerd (12 -> 5, dezelfde wissel op hetzelfde spoor), niet alleen bij de
+   volledige stand waarin hij gevonden werd. Het leerprofiel bewaart `Via` mee. Nog niet getest op de baan; nog geen eigen regressietest voor de omgekeerde toepassing.
+3. Herstel na kortsluiting (`HerstelNaKortsluiting`): bij blijvend alarm gaan de afbuigende wissels van de rit terug (niet alleen de proefwissel); daarna worden de overige wissels
+   één voor één geprobeerd (`ProbeerAlarmWegTeKrijgen`); staat de loc al precies op de melder dan blijft hij staan; haalt niets het alarm weg dan wordt direct de gebruiker gevraagd,
+   niet blind teruggereden. Een kruismotor onder de loc terugzetten kan alleen na eenmalige toestemming (Ja/Nee-vraag; #96 blijft: nooit zonder vraag).
+4. Simulator: het verbindingsstuk van overloop 1+2 hoort bij melder 5 (zonder melder viel de loc stil, een simulatie-artefact).
+Stand simulatie vanaf melder 17: 6 kortsluitingen (was 2 + vastzitten), melders 4, 5, 8, 11-17, 20, 21, 24-30, 129 gevonden; de rit is NIET voltooid: na de kortsluiting bij de kruiswissel
+(24 vooruit) moet de gebruiker de loc terugzetten, en de simulator kan de loc daarna niet neerzetten. De run met voorkennis (`MINI_VOORKENNIS=1`) kon niet gemeten worden:
+de simulator zet de loc niet op de startmelder (placement-artefact). Nog niet getest op de baan.

@@ -34,7 +34,7 @@ public static class MiniworldBaan
         var s5 = b.NieuweSectie(5, 120, 3);
         var s129 = b.NieuweSectie(129, 65, 9); var s10 = b.NieuweSectie(10, 60, 9);
         var s4 = b.NieuweSectie(4, 30, 2); var s11 = b.NieuweSectie(11, 245, 2); var s12 = b.NieuweSectie(12, 120, 2);
-        var verbinding = b.NieuweSectie(0, 25, 3);   // verbindingsstuk van de overloop (geen melder)
+        var verbinding = b.NieuweSectie(5, 25, 3);   // verbindingsstuk van de overloop: ligt in het gebied van melder 5 (geen losse melder, anders valt de loc zonder voeding stil)
 
         var k = b.NieuweKruis(13, 10, melder: 24, blok: 8, lengte: 50);
         var w5 = b.NieuweWissel(5, true, 3); var w6 = b.NieuweWissel(6, true, 9); var w9 = b.NieuweWissel(9, true, 9);
