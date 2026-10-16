@@ -105,6 +105,8 @@ public partial class BaanVerkenner
     private DateTime _laatsteKortsluitingOm = DateTime.MinValue;
     /// <summary>BUG #132: melder en richting van de laatste kortsluiting in een rit (het kortsluitpunt zelf wordt pas na de rit geregistreerd).</summary>
     private (int Melder, Richting Richting, Configuratie Stand)? _laatsteKortsluitContext;
+    /// <summary>BUG #167b: de melders van de rit die in de laatste kortsluiting eindigde (voor de eerste stap: welke wissels worden van achteren bereden).</summary>
+    private List<int> _laatsteKortsluitReeks = new();
     /// <summary>BUG #132: door de gebruiker aangewezen oplossing die op het kortsluitpunt van de lopende kortsluiting wacht (wordt in RegistreerKortsluitpunt toegepast).</summary>
     private (int Melder, Richting Richting, int Adres, bool Afbuigend, DateTime Tijd)? _wachtendeHandOplossing;
 
@@ -1111,13 +1113,25 @@ public partial class BaanVerkenner
     {
         var bezet = _monitor.Bezet.ToHashSet();
         // BUG #109 (Marco 12:03: "wissel 9 werd geschakeld terwijl de loc er bovenop stond"): wissels die bij een bezette melder liggen (de kaart
-        // noemt die melder bij die wissel) worden nooit geprobeerd: de loc staat er met een deel op of tegen de tong aan.
+        // noemt die melder bij die wissel) worden nooit zonder toestemming geprobeerd: de loc staat er met een deel op of tegen de tong aan.
         var bijLoc = WisselsBijBezet(_kaart, bezet);
-        var alle = _ins.WisselAdressen().Where(a => !Kruis.IsMotor(a) && !bijLoc.Contains(a)).ToList();
-        var volgorde = alle;
-        if (bijLoc.Count > 0) _log.Info($"Niet geprobeerd: wissel {string.Join(", ", bijLoc.OrderBy(a => a))} (ligt bij een bezette melder, de loc staat er mogelijk op).");
+        var alle = _ins.WisselAdressen().Where(a => !Kruis.IsMotor(a)).ToList();
+
+        // BUG #169 (Marco 16-10 18:35): een wissel die van de SAMENGEVOEGDE kant (puntzijde) bereden wordt, kan een kortsluiting niet met zijn stand
+        // veroorzaken en omzetten helpt dus niet; een wissel die vanaf een van de GESPLITSTE takken richting de samenvoeging bereden wordt, kan dat
+        // wel (verkeerde stand = open gereden) en omzetten heft de kortsluiting dan op. Eerste stap: precies die wissels, niet alles blind proberen.
+        var ctx = _laatsteKortsluitContext;
+        var (achter, kop) = ctx is { } c0 && _monitor.Bezet.Contains(c0.Melder) ? WisselRollen(_kaart, c0.Melder, c0.Richting, _laatsteKortsluitReeks) : (new List<int>(), new HashSet<int>());
+        achter = achter.Where(a => alle.Contains(a)).ToList();
+        var kopAdressen = kop.Where(a => !achter.Contains(a) && alle.Contains(a)).ToHashSet();
+        if (achter.Count > 0 || kopAdressen.Count > 0)
+            _log.Info($"Eerste stap bij de kortsluiting: wissel {(achter.Count > 0 ? string.Join(", ", achter) : "-")} wordt van een tak richting de samenvoeging bereden (omzetten kan de kortsluiting opheffen)" +
+                      (kopAdressen.Count > 0 ? $"; wissel {string.Join(", ", kopAdressen.OrderBy(a => a))} wordt van de samengevoegde kant bereden en wordt niet omgezet (dat helpt daar niet)." : "."));
+
+        if (bijLoc.Count > 0) _log.Info($"Niet zonder toestemming geprobeerd: wissel {string.Join(", ", bijLoc.OrderBy(a => a))} (ligt bij een bezette melder, de loc staat er mogelijk op).");
         _log.Waarschuwing($"Kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())} blijft terwijl de loc stilstaat ({stap}). De verkenner probeert zelf wissels om te zetten, behalve die bij een bezette melder ({string.Join(" en ", bezet.OrderBy(m => m))}).");
-        foreach (var a in volgorde)
+
+        async Task<bool> Probeer(int a, string toelichting)
         {
             bool oud = _wisselStand.TryGetValue(a, out var nu) && nu;
             await ZetWissel(a, !oud, forceer: true);
@@ -1125,19 +1139,44 @@ public partial class BaanVerkenner
             while (HuidigeAlarmBlokken().Count > 0 && _klok.Nu < eind) await Wacht(TimeSpan.FromMilliseconds(300));
             if (HuidigeAlarmBlokken().Count == 0)
             {
-                _log.Vondst($"De kortsluiting ging weg nadat wissel {a} naar {(oud ? "rechtdoor" : "afbuigend")} is geschakeld ({stap}). De wissel blijft zo staan.");
+                _log.Vondst($"De kortsluiting ging weg nadat wissel {a}{toelichting} naar {(oud ? "rechtdoor" : "afbuigend")} is geschakeld ({stap}). De wissel blijft zo staan.");
                 _kortsluitingGemeld = false;
                 _alarmStand[a] = !oud;
                 RegistreerAlarmOplossing(a, !oud, bezet);
                 return true;
             }
             await ZetWissel(a, oud, forceer: true);
+            return false;
         }
+
+        // stap 1: de wissels die van achteren bereden worden en niet bij de loc liggen
+        foreach (var a in achter.Where(a => !bijLoc.Contains(a)))
+            if (await Probeer(a, " (van een tak richting de samenvoeging bereden)")) return true;
+
+        // stap 2: de wissels die van achteren bereden worden en bij de loc liggen, plus de kruismotoren als de loc op de kruiswissel staat: met toestemming
+        var verdachtEerst = achter.Where(bijLoc.Contains).ToList();
+        if (Kruis.OpKruis(bezet))
+            foreach (var m in KruisMotorenVolgorde(bezet)) if (!verdachtEerst.Contains(m)) verdachtEerst.Add(m);
+        var gevraagd = new HashSet<int>();
+        if (verdachtEerst.Count > 0 && VraagJaNee is not null)
+        {
+            string lijst = string.Join(" en ", verdachtEerst);
+            var mag = await VraagJaNee("Wissel bij de loc proberen?",
+                $"De loc staat bij melder {string.Join(" en ", bezet.OrderBy(x => x))} en rijdt van een tak richting de samenvoeging; daar kan een verkeerde wisselstand kortsluiting geven en omzetten helpt dan. " +
+                $"Wissel {lijst} ligt daar. De verkenner probeert die één voor één om te zetten (de loc staat stil; kleine kans dat hij daarbij ontspoort).\n\nJa = proberen.\nNee = u zet hem zelf goed.");
+            foreach (var a in verdachtEerst) gevraagd.Add(a);
+            if (mag == true)
+                foreach (var a in verdachtEerst)
+                    if (await Probeer(a, " (ligt bij de loc, met toestemming van de gebruiker)")) return true;
+        }
+
+        // stap 3: de overige wissels, behalve die van de samengevoegde kant (omzetten helpt daar niet) en die bij de loc
+        foreach (var a in alle.Where(a => !bijLoc.Contains(a) && !achter.Contains(a) && !kopAdressen.Contains(a)))
+            if (await Probeer(a, "")) return true;
+
         // BUG #147 (Marco 18:41: "nu weer wissel 14"; ook wissel 2 bij melder 5 om 17:27): de wissel die de kortsluiting veroorzaakt ligt bijna altijd bij de
-        // melder waar de loc staat en werd dus nooit geprobeerd; de gebruiker moest hem elke keer zelf aanwijzen. Omzetten met de loc erop kan ontsporen
-        // (#109), dus nooit zonder toestemming: de verkenner vraagt één keer of hij die wissels toch mag proberen (de loc staat stil), met de meest
-        // verdachte eerst (de wissels waarvan de kaart al weet dat afbuigend kortsluiting geeft bij deze melder).
-        var verdacht = bijLoc.Where(a => !Kruis.IsMotor(a) && _ins.WisselAdressen().Contains(a))
+        // melder waar de loc staat en werd dus nooit geprobeerd. Nooit zonder toestemming (#109): één keer vragen, de meest verdachte eerst.
+        var verdacht = bijLoc.Where(a => !Kruis.IsMotor(a) && _ins.WisselAdressen().Contains(a) && !gevraagd.Contains(a) && !kopAdressen.Contains(a))
             .OrderByDescending(a => _kaart.Wissel(a).Waarnemingen.Any(o => o.Soort == WaarnemingSoort.KortsluitingBijOmzetten && bezet.Contains(o.NaMelder)))
             .ThenBy(a => a).ToList();
         if (verdacht.Count > 0 && VraagJaNee is not null)
@@ -1147,27 +1186,50 @@ public partial class BaanVerkenner
                 $"Geen enkele andere wissel haalt de kortsluiting weg. Waarschijnlijk staat wissel {lijst} verkeerd: die ligt bij melder {string.Join(" en ", bezet.OrderBy(x => x))}, waar de loc nu staat.\n\n" +
                 $"Ja = de verkenner probeert wissel {lijst} één voor één om te zetten (de loc staat stil; kleine kans dat hij daarbij ontspoort).\nNee = u zet hem zelf goed.");
             if (mag == true)
-            {
                 foreach (var a in verdacht)
-                {
-                    bool oud = _wisselStand.TryGetValue(a, out var nu) && nu;
-                    await ZetWissel(a, !oud, forceer: true);
-                    var eind = _klok.Nu + TimeSpan.FromSeconds(2.5);
-                    while (HuidigeAlarmBlokken().Count > 0 && _klok.Nu < eind) await Wacht(TimeSpan.FromMilliseconds(300));
-                    if (HuidigeAlarmBlokken().Count == 0)
-                    {
-                        _log.Vondst($"De kortsluiting ging weg nadat wissel {a} (ligt bij de loc, met toestemming van de gebruiker) naar {(oud ? "rechtdoor" : "afbuigend")} is geschakeld ({stap}). De wissel blijft zo staan.");
-                        _kortsluitingGemeld = false;
-                        _alarmStand[a] = !oud;
-                        RegistreerAlarmOplossing(a, !oud, bezet);
-                        return true;
-                    }
-                    await ZetWissel(a, oud, forceer: true);
-                }
-            }
+                    if (await Probeer(a, " (ligt bij de loc, met toestemming van de gebruiker)")) return true;
         }
         _log.Waarschuwing("Geen enkele wissel haalde de kortsluiting weg.");
         return false;
+    }
+
+    /// <summary>BUG #169: de kruismotoren in de volgorde waarin ze verdacht zijn voor een loc die op de kruiswissel staat: eerst de motor waarvan de huidige stand
+    /// bij de ingang waarlangs de loc binnenkwam nooit gezien is (de kaart weet dan dat die combinatie niet werkt), daarna de rest.</summary>
+    private List<int> KruisMotorenVolgorde(IEnumerable<int> bezet)
+    {
+        var motoren = Kruis.Motoren.OrderBy(m => m).ToList();
+        int? midden = Kruis.Middens.FirstOrDefault(bezet.Contains) is int mm && mm != 0 ? mm : null;
+        int via = _laatsteKortsluitReeks.Count >= 2 && midden is int md && _laatsteKortsluitReeks[^1] == md ? _laatsteKortsluitReeks[^2] : 0;
+        if (midden is not int mid || via == 0) return motoren;
+        var gezien = KruisBewijs.GezienBijIngang(_kaart, Kruis, mid, via);
+        if (gezien.Count == 0) return motoren;
+        bool Verdacht(int m) { bool nu = _wisselStand.TryGetValue(m, out var st) && st; return !gezien.Any(g => g.Bevat(m) == nu); }
+        return motoren.OrderByDescending(Verdacht).ThenBy(m => m).ToList();
+    }
+
+    /// <summary>BUG #169 (Marco 16-10 18:35): welke wissels worden door een loc die op <paramref name="x"/> staat en in richting <paramref name="r"/> verder wil van
+    /// een TAK richting de samenvoeging bereden (<c>Achter</c>: de stand kan kortsluiting geven, omzetten kan helpen) en welke van de SAMENGEVOEGDE kant
+    /// (<c>Kop</c>: omzetten helpt niet)? Uit de splitsingen van de kaart (puntzijde na melder N in richting D: rechtdoor naar R, afbuigend naar A):
+    /// staat de loc op R of A en rijdt hij tegen D in, dan gaat hij van achteren op die wissel af; staat hij op N en rijdt hij in D, dan van voren.
+    /// Ook de laatste stap van <paramref name="reeks"/> telt mee (de loc kan de wissel net voorbij zijn gereden). Wat zowel van achteren als van voren
+    /// voorkomt, geldt als van achteren.</summary>
+    internal static (List<int> Achter, HashSet<int> Kop) WisselRollen(Baankaart kaart, int x, Richting r, IReadOnlyList<int>? reeks)
+    {
+        var achter = new List<int>(); var kop = new HashSet<int>();
+        foreach (var w in kaart.Wissels)
+            foreach (var o in w.Waarnemingen.Where(q => q.Soort == WaarnemingSoort.Splitsing))
+            {
+                if (o.VolgendeBijRechtdoor is int rd && o.VolgendeBijAfbuigend is int af && rd == af) continue;
+                if (r == o.Richting.Om() && (o.VolgendeBijRechtdoor == x || o.VolgendeBijAfbuigend == x)) { if (!achter.Contains(w.Adres)) achter.Add(w.Adres); }
+                else if (r == o.Richting && o.NaMelder == x) kop.Add(w.Adres);
+            }
+        if (reeks is { Count: >= 2 })
+            foreach (var e in kaart.WisselEisenVoorStapDetail(reeks[^2], reeks[^1], r))
+            {
+                if (e.Achter) { if (!achter.Contains(e.Adres)) achter.Add(e.Adres); }
+                else kop.Add(e.Adres);
+            }
+        return (achter, kop);
     }
 
     /// <summary>BUG #144 (Marco 16:29, log 16:23-16:26): wissel 9 afbuigend haalde de kortsluiting na melder 129 (rit 4 -> 129) weg, maar dat werd alleen
@@ -2024,6 +2086,9 @@ public partial class BaanVerkenner
         var bijLoc = WisselsBijBezet(_kaart, bezet);
         var nodig = doel.Configuratie.Afbuigend.ToHashSet();
         var kandidaten = _ins.WisselAdressen().Where(a => !Kruis.IsMotor(a) && !bijLoc.Contains(a) && !nodig.Contains(a)).ToList();
+        // BUG #169: wissels die van de samengevoegde kant bereden worden helpen niet (overslaan); wissels die van een tak richting de samenvoeging bereden worden gaan voorop.
+        var (achterKlem, kopKlem) = WisselRollen(_kaart, start, r, null);
+        kandidaten = kandidaten.Where(a => !kopKlem.Contains(a) || achterKlem.Contains(a)).OrderByDescending(a => achterKlem.Contains(a)).ThenBy(a => a).ToList();
         if (kandidaten.Count == 0) return false;
         _klemProbeActief = true;
         try
@@ -2084,6 +2149,7 @@ public partial class BaanVerkenner
         _hw.Noodstop();
         _laatsteKortsluitingOm = _klok.Nu;
         _laatsteKortsluitContext = (x, res.Richting, new Configuratie(_wisselStand.Where(w => w.Value).Select(w => w.Key).ToArray()));
+        _laatsteKortsluitReeks = res.Reeks.ToList();
         string alarmTekst = _laatsteKortsluitBlokken.Count > 0
             ? $" Dinamo meldt kortsluiting in blok {string.Join(" en ", _laatsteKortsluitBlokken)}."
             : "";

@@ -1333,6 +1333,26 @@ public static class Tests
         Eis(q2.Select(x => x.Id).SequenceEqual(new[] { 6, 7, 5 }), "herpoging: zonder oplossing achteraan");
     }
 
+    // BUG #169: wissels van een tak richting de samenvoeging eerst, wissels van de samengevoegde kant nooit proberen
+    static void WisselRollenTest()
+    {
+        Console.WriteLine("Test: wisselrollen bij een kortsluiting (BUG #169)");
+        var k = new Baankaart();
+        // wissel 14: puntzijde na melder 8 (richting vooruit): rechtdoor -> 24, afbuigend -> 17
+        k.Wissel(14).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.Splitsing, NaMelder = 8, Richting = Richting.Vooruit, VolgendeBijRechtdoor = 24, VolgendeBijAfbuigend = 17 });
+        // wissel 5: puntzijde na melder 14 (vooruit): rechtdoor -> 24, afbuigend -> 129
+        k.Wissel(5).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.Splitsing, NaMelder = 14, Richting = Richting.Vooruit, VolgendeBijRechtdoor = 24, VolgendeBijAfbuigend = 129 });
+        // loc staat op 24 en rijdt achteruit (richting van 24 naar 8/14): van een tak (24) naar de samenvoeging van wissel 14 en wissel 5
+        var (achter, kop) = BaanVerkenner.WisselRollen(k, 24, Richting.Achteruit, null);
+        Eis(achter.Contains(14) && achter.Contains(5) && kop.Count == 0, "loc op 24 achteruit: 14 en 5 worden van achteren bereden (nu " + string.Join(",", achter) + ")");
+        // loc op 8 rijdt vooruit: wissel 14 van de samengevoegde kant
+        var (a2, k2) = BaanVerkenner.WisselRollen(k, 8, Richting.Vooruit, null);
+        Eis(a2.Count == 0 && k2.Contains(14), "loc op 8 vooruit: wissel 14 wordt van de samengevoegde kant bereden, niet omzetten");
+        // laatste stap 17 -> 8 achteruit: door wissel 14 van achteren (afbuigend), geen kop
+        var (a3, k3) = BaanVerkenner.WisselRollen(k, 8, Richting.Achteruit, new[] { 17, 8 });
+        Eis(a3.Contains(14) && !k3.Contains(14), "laatste stap 17 -> 8 achteruit: 14 van achteren");
+    }
+
     // BUG #166: de basisrit door de kruiswissel bewijst de motorstand; de proeven rijden daarmee (geen reset van motor 13)
     static void KruisStandBasisTest()
     {
@@ -2490,6 +2510,7 @@ public static class Tests
         RouteVerkortTest();
         KruisPlusTest();
         KruisStandBasisTest();
+        WisselRollenTest();
         KruisAankomstTest();
         OrientatieTekstTest();
         WisselEisenTest();

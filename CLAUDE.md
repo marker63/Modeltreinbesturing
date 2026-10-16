@@ -13,6 +13,7 @@ niet) en `Modeltreinbesturing/BLOKKENSCHEMA.md`.
 - Nieuw blok op de baan toevoegen = in dezelfde ronde ook seinen en dienst bijwerken.
 - Wisselstanden/kruiswissel-standen en rijrichtingen die Marco heeft vastgesteld nooit overschrijven
   of "spiegelen"; bij twijfel vragen. Eerder vastgestelde gegevens altijd opzoeken en meenemen.
+- Wissel van de samengevoegde kant (puntzijde) bereden: omzetten lost een kortsluiting NIET op. Wissel vanaf een gesplitste tak richting de samenvoeging bereden: omzetten kan de kortsluiting juist opheffen. Bij een kortsluiting daarom eerst die wissels omzetten (BUG #169).
 - Rijrichting (vooruit/achteruit) per overgang A -> B staat in `BlokRelatie.RijrichtingVooruit` (BUG #49).
 - Hardware: Dinamo op COM10, 19200, odd parity. Sessielogs staan automatisch in
   `%AppData%\Modeltreinbesturing\Logs`.
