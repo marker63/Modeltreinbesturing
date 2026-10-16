@@ -1333,6 +1333,25 @@ public static class Tests
         Eis(q2.Select(x => x.Id).SequenceEqual(new[] { 6, 7, 5 }), "herpoging: zonder oplossing achteraan");
     }
 
+    // BUG #166: de basisrit door de kruiswissel bewijst de motorstand; de proeven rijden daarmee (geen reset van motor 13)
+    static void KruisStandBasisTest()
+    {
+        Console.WriteLine("Test: kruismotor-stand van de basisrit blijft de rijstand (BUG #166)");
+        var kr = new KruisKennis(); kr.Motoren.Add(10); kr.Motoren.Add(13); kr.Middens.Add(24);
+        var reeks = new[] { 15, 8, 24, 14, 13, 5, 16, 15 };
+        var rijstand = new Configuratie(new[] { 14 });
+        bool? Stand(int a) => a == 13 ? true : a == 10 ? false : (bool?)null;
+        var c = BaanVerkenner.KruisStandUitBasis(rijstand, reeks, kr, Stand, new HashSet<int>(), out var uitleg);
+        Eis(c.Bevat(13) && c.Bevat(14) && !c.Bevat(10), "basis door 24: motor 13 afbuigend blijft (nu " + c + ")");
+        Eis(uitleg is not null && uitleg.Contains("motor 13 afbuigend"), "uitleg noemt motor 13");
+        var c2 = BaanVerkenner.KruisStandUitBasis(rijstand, new[] { 15, 8, 24 }, kr, Stand, new HashSet<int>(), out var u2);
+        Eis(!c2.Bevat(13) && u2 is null, "rit eindigt op 24 (geen uitgang): rijstand ongewijzigd");
+        var c3 = BaanVerkenner.KruisStandUitBasis(rijstand, new[] { 15, 8, 4 }, kr, Stand, new HashSet<int>(), out _);
+        Eis(!c3.Bevat(13), "rit buiten de kruiswissel: ongewijzigd");
+        var c4 = BaanVerkenner.KruisStandUitBasis(rijstand, reeks, kr, Stand, new HashSet<int> { 13 }, out _);
+        Eis(!c4.Bevat(13), "motor die de opdracht zelf vastlegt blijft zoals de opdracht wil");
+    }
+
     // BUG #165: het plusteken met alle bezetmelders in volgorde staat ook zonder referentie in het rapport
     static void KruisPlusTest()
     {
@@ -2466,6 +2485,7 @@ public static class Tests
         HerpogingVolgordeTest();
         RouteVerkortTest();
         KruisPlusTest();
+        KruisStandBasisTest();
         KruisAankomstTest();
         OrientatieTekstTest();
         WisselEisenTest();

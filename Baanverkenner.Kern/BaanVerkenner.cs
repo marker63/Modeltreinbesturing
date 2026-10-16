@@ -932,6 +932,19 @@ public partial class BaanVerkenner
             var basis = await Basisrit(o);
             if (basis is null) { await TerugNaarHuis(o.Route); return; }
 
+            // BUG #166 (Marco 16-10 18:04: "je zit in een loop", wissel 13 zes keer als verkeerd gemeld): de basisrit 15 -> 8 -> 24 -> 14 reed goed met motor 13 afbuigend,
+            // maar de rijstand van de opdracht (berekend VOOR de basisrit, pad nog maar tot melder 24) had 13 rechtdoor. HerstelRijstand zette 13 daarom voor
+            // elke proef terug ("stond afbuigend en moet rechtdoor staan"); elke proefrit gaf kortsluiting na melder 24 en die werd aan het proefadres
+            // (wissel 1, 3, 4, 7, 8) toegeschreven: valse vondsten en een volgende opdracht met dezelfde fout. Een basisrit die door de kruiswissel is gereden
+            // heeft bewezen welke stand van de kruismotoren werkt: die stand wordt de rijstand voor alle proeven.
+            var rijstandBasis = KruisStandUitBasis(rijstand, basis.Reeks, Kruis, ad => _wisselStand.TryGetValue(ad, out var stnu) ? stnu : null,
+                Kruis.Motoren.Where(m => o.Configuratie.Bevat(m) || o.BronAdres == m).ToHashSet(), out var basisUitleg);
+            if (basisUitleg is not null)
+            {
+                _log.Info($"Opdracht #{o.Id}: {basisUitleg} Rijstand voor de proeven: {rijstandBasis}.");
+                rijstand = rijstandBasis;
+            }
+
             if (o.BronAdres is int bron && basis.Reeks.Count >= 2
                 && !_kaart.Wissel(bron).Waarnemingen.Any(w => w.Soort == WaarnemingSoort.Splitsing && w.NaMelder == o.Start && w.Richting == o.Richting))
             {
@@ -1143,6 +1156,27 @@ public partial class BaanVerkenner
                 _kaart.Waarschuwingen.Add($"Opdracht vanaf melder {o.Start} {o.Richting.Tekst()} ({o.Configuratie}) is overgeslagen: {nf.Message}");
             }
         }
+    }
+
+    /// <summary>BUG #166: reed de basisrit door de kruiswissel heen (een melder van <paramref name="kruis"/>.Middens met een voorgaande én een volgende melder), dan is
+    /// de stand van de kruismotoren tijdens die rit bewezen. Die stand (<paramref name="stand"/>: true = afbuigend, null = onbekend) vervangt die van
+    /// <paramref name="rijstand"/>, behalve voor motoren die de opdracht zelf vastlegt (<paramref name="vast"/>). Geen kruiswissel in de rit: ongewijzigd.</summary>
+    internal static Configuratie KruisStandUitBasis(Configuratie rijstand, IReadOnlyList<int> reeks, KruisKennis kruis, Func<int, bool?> stand, ISet<int> vast, out string? uitleg)
+    {
+        uitleg = null;
+        int i = -1;
+        for (int k = 1; k + 1 < reeks.Count; k++) if (kruis.Middens.Contains(reeks[k])) { i = k; break; }
+        if (i < 0) return rijstand;
+        var c = rijstand; var wijz = new List<string>();
+        foreach (var m in kruis.Motoren.OrderBy(x => x))
+        {
+            if (vast.Contains(m)) continue;
+            if (stand(m) is not bool st || st == rijstand.Bevat(m)) continue;
+            c = c.MetStand(m, st); wijz.Add($"motor {m} {(st ? "afbuigend" : "rechtdoor")}");
+        }
+        if (wijz.Count > 0)
+            uitleg = $"de basisrit reed goed door de kruiswissel ({reeks[i - 1]} - {reeks[i]} - {reeks[i + 1]}) met {string.Join(", ", wijz)}; die stand blijft de rijstand.";
+        return c;
     }
 
     /// <summary>BUG #121: maakt de werkelijke wisselstand gelijk aan <paramref name="rijstand"/> (behalve het adres dat de proef zelf omzet). Wissels die bij een nu

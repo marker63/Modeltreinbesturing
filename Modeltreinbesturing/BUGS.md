@@ -2190,3 +2190,9 @@ Oplossing:
 - `KruisPlus`: het plusteken (benen met alle bezetmelders in volgorde, Dinamo-blok, motorstanden per rit door melder 24) staat weer in het tekst- en html-rapport, ook zonder referentie, alleen met wat deze verkenning zelf vond.
 Open: wissel 14 voor 24 <-> 8 wordt zonder referentie nog steeds pas na de eerste kortsluiting geleerd; de valse bevindingen van deze run (wissel 1, 3) moeten bij een nieuwe run niet meer voorkomen. Dinamo-uitval na herhaalde kortsluitingen (17:29) staat nog niet in DINAMO_UITVAL.md.
 Test: CompileCheck (ALLES OK, KruisPlusTest met de kaart van 17:50). Nog niet getest op de baan.
+
+## #166 – Proeven resetten motor 13 en geven valse kortsluitingen (16-10, 18:04: "je zit in een loop")
+- Log 17:45-18:02: wissel 13 is zes keer als verkeerd gemeld (17:45, 17:49, 17:54, 17:57, 17:59, 18:02). Elke keer eerst "Rijstand hersteld voor de proef: wissel 13 stond afbuigend en moet rechtdoor staan", daarna kortsluiting na melder 24 (15 -> 8 -> 24), toegeschreven aan het proefadres (wissel 1, 3, 4, 7, 8).
+- Oorzaak: de rijstand van een opdracht wordt berekend VOOR de basisrit; het voorspelde pad stopt dan op melder 24, dus motor 13 bleef rechtdoor. De basisrit reed wel goed door 24 naar 14 (13 afbuigend, via vooraf zetten of handmatige oplossing), maar `HerstelRijstand` zette 13 voor elke proef terug naar de rijstand. Mijn eerdere fixes (#164, #165) keken alleen naar de basisrit/registratie en hebben dit niet gezien.
+- Fix: `KruisStandUitBasis` - reed de basisrit door de kruiswissel (melder met voorganger én opvolger), dan wordt de werkelijke stand van de kruismotoren de rijstand voor alle proeven (behalve motoren die de opdracht zelf vastlegt). Test `KruisStandBasisTest`.
+- Nog niet getest op de baan. Een kaart met eerdere valse vondsten (1/3/4/7/8 "8 -> 24 achteruit = kortsluiting") herstelt zich niet; opnieuw beginnen vanaf nul.
