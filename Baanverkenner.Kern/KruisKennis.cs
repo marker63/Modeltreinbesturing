@@ -123,14 +123,25 @@ public static class KruisBewijs
 
     /// <summary>De kruiswissels waar de loc vanaf <paramref name="melder"/> volgens de kaart binnen één of twee stappen in rijdt, met de ingang (het been
     /// waarvandaan hij erin gaat). Twee stappen vooruit, zodat de motoren gezet zijn voordat de loc het laatste been inrijdt.</summary>
-    public static List<(int Midden, int Ingang)> Ingangen(Baankaart kaart, KruisKennis kruis, int melder, Richting r, Configuratie cfg)
+    public static List<(int Midden, int Ingang)> Ingangen(Baankaart kaart, KruisKennis kruis, int melder, Richting r, Configuratie cfg, bool ruim = false)
     {
         var res = new List<(int, int)>();
         if (kruis.Middens.Count == 0 || kruis.Middens.Contains(melder)) return res;
-        foreach (var y in VolgendeBijStand(kaart, kruis, melder, r, cfg))
+        // BUG #171 (log 16-10 19:41: rit 129 -> 24 met wissel 1 en 5 afbuigend; de kaart kende 129 -> 24 alleen met andere wisselstanden, dus 'geen
+        // vervolg bekend' en motor 10 werd niet vooraf gezet: kortsluiting). Ruim: kent de kaart bij deze stand geen vervolg, dan telt elk vervolg
+        // dat ooit vanaf deze melder in deze richting gezien is.
+        IEnumerable<int> Volgende(int van)
+        {
+            var strikt = VolgendeBijStand(kaart, kruis, van, r, cfg);
+            if (strikt.Count > 0 || !ruim) return strikt;
+            return kaart.Overgangen.Where(o => o.Van == van && o.Richting == r && o.AantalKeer > 0).Select(o => o.Naar)
+                .Concat(kaart.Overgangen.Where(o => o.Naar == van && o.Richting == r.Om() && o.AantalKeer > 0).Select(o => o.Van))
+                .Distinct().OrderBy(x => x).ToList();
+        }
+        foreach (var y in Volgende(melder))
         {
             if (kruis.Middens.Contains(y)) { if (!res.Contains((y, melder))) res.Add((y, melder)); continue; }
-            foreach (var z in VolgendeBijStand(kaart, kruis, y, r, cfg))
+            foreach (var z in Volgende(y))
                 if (kruis.Middens.Contains(z) && !res.Contains((z, y))) res.Add((z, y));
         }
         return res;

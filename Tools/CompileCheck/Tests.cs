@@ -1371,6 +1371,22 @@ public static class Tests
         Eis(!achter2.Contains(1) && !achter2.Contains(7), "zeven wissels met dezelfde valse ingang 8 -> 24 tellen niet als verdachten (nu " + string.Join(",", achter2) + ")");
     }
 
+    // BUG #171: kent de kaart bij de huidige wisselstand geen vervolg, dan bepaalt het bekende vervolg toch de kruismotoren
+    static void KruisRuimTest()
+    {
+        Console.WriteLine("Test: kruisingang ook bij onbekende wisselstand (BUG #171)");
+        var k = Laad("baankaart_2026-10-16_1955.json");
+        var kr = new KruisKennis(); kr.Motoren.Add(10); kr.Motoren.Add(13); kr.Middens.Add(24);
+        var cfg = new Configuratie(new[] { 1, 3 });
+        var strikt = KruisBewijs.Ingangen(k, kr, 129, Richting.Vooruit, cfg);
+        var ruim = KruisBewijs.Ingangen(k, kr, 129, Richting.Vooruit, cfg, ruim: true);
+        Eis(strikt.Count == 0, "zonder ruim: onbekende stand geeft geen ingang (nu " + strikt.Count + ")");
+        Eis(ruim.Contains((24, 129)), "met ruim: 129 -> 24 is een kruisingang");
+        var gezien = KruisBewijs.GezienBijIngang(k, kr, 24, 129);
+        var stand = KruisBewijs.KiesStand(gezien, cfg, new[] { 10, 13 }, new HashSet<int>());
+        Eis(stand is not null && stand.Bevat(10) && !stand.Bevat(13), "bewijs: ingang 129 vraagt motor 10 afbuigend, 13 rechtdoor (nu " + stand + ")");
+    }
+
     // BUG #166: de basisrit door de kruiswissel bewijst de motorstand; de proeven rijden daarmee (geen reset van motor 13)
     static void KruisStandBasisTest()
     {
@@ -2530,6 +2546,7 @@ public static class Tests
         KruisStandBasisTest();
         WisselRollenTest();
         VerbodenPadTest();
+        KruisRuimTest();
         KruisAankomstTest();
         OrientatieTekstTest();
         WisselEisenTest();

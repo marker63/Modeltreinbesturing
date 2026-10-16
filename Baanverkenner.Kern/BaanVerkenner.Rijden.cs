@@ -2011,6 +2011,7 @@ public partial class BaanVerkenner
     {
         if (Kruis.Middens.Count == 0 || Kruis.Motoren.Count == 0 || Kruis.OpKruis(_monitor.Bezet)) return cfg;
         var ingangen = KruisBewijs.Ingangen(_kaart, Kruis, melder, r, cfg);
+        if (ingangen.Count == 0) ingangen = KruisBewijs.Ingangen(_kaart, Kruis, melder, r, cfg, ruim: true);   // BUG #171
         if (ingangen.Count == 0) return cfg;
         var motoren = Kruis.Motoren.OrderBy(x => x).ToList();
         var vast = motoren.Where(m => doel.Configuratie.Bevat(m) || doel.ProefAdres == m).ToHashSet();

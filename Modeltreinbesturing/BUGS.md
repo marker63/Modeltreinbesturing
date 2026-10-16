@@ -2219,3 +2219,10 @@ Test: CompileCheck (ALLES OK, KruisPlusTest met de kaart van 17:50). Nog niet ge
 - Fix 1: `RijStand` gebruikt het hele bekende pad (`VoorspeldPad` met 30 stappen) en zet wissels die daarop een verboden ingang afbuigend zouden nemen rechtdoor (niet het geteste adres, niet de kruismotoren).
 - Fix 2: `WisselRollen` (#169) zet een wissel waarvan de kaart al weet dat afbuigend op precies deze ingang kortsluiting geeft vooraan bij de verdachten, zodat de eerste stap bij de kortsluiting meteen die wissel is (niet pas na ~100 s). Wijzen drie of meer wissels naar dezelfde ingang (de valse waarnemingen 8 -> 24 van wissel 1, 3, 4, 7, 8, 11, 12), dan telt dat niet als verdachte.
 - Test `VerbodenPadTest` met de kaart van 19:24. Nog niet getest op de baan.
+
+## BUG #171 (16-10, 19:35-19:55, na "200 versies, rondjes")
+- Log 19:41:44-54: kortsluitpunt-proef "adres 1 afbuigend": rit 129 -> 24 met wissel 1 en 5 afbuigend. Motor 10 werd niet vooraf op afbuigend gezet (kortsluiting in blok 8 en 9, Marco moest wissel 10 zelf omzetten), en de proef werd toch als "opgelost" vastgelegd (valse LostKortsluitingOp, valse overgang 129 -> 24 met '1,5').
+- Oorzaak 1: `KruisBewijs.Ingangen` zocht het vervolg van 129 alleen bij precies deze wisselstand. Kende de kaart bij {1,5} geen vervolg, dan was er "geen ingang", dus geen kruisbewijs, terwijl 129 -> 24 -> 21 vijf keer met motor 10 afbuigend gereden was. Fix: `ZetKruisVooraf` probeert, als er geen ingang is, `Ingangen(..., ruim: true)` (elk ooit gezien vervolg vanaf die melder in die richting).
+- Oorzaak 2: de proef keek alleen of de rit zelf met `Kortsluiting` eindigde; Dinamo meldde de kortsluiting 6 ms na aankomst op 24. Fix: na de proef 1,5 s wachten; is er alarm, dan telt de proef als kortsluiting (geen "opgelost").
+- Test `KruisRuimTest` met de kaart van 19:55. Nog niet getest op de baan.
+- Open (niet opgelost, eerlijk): de opdracht rijdt de hele ronde tot het bekende kortsluitpunt bij melder 8 meerdere keren (basisrit + eigen rit, ~2,5 min per keer); wissel 14 (8 achteruit: rechtdoor 17 / afbuigend 24, in de opgeschoonde kaart van 10-10 wel bekend) wordt in deze "vanaf nul"-run nog niet geleerd.

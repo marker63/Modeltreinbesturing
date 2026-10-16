@@ -1909,6 +1909,17 @@ public partial class BaanVerkenner
                     // BUG #72 (log 16:48): de uitkomst van de proef wordt EERST vastgelegd, daarna pas gaat de loc terug. Mislukte de weg terug
                     // (NavigatieFout), dan ging het gelukte resultaat (adres 13 afbuigend -> melder 14) verloren en telde het kortsluitpunt als opgegeven.
                     bool proefKortsluiting = rit.Einde == RitEinde.Kortsluiting;
+                    // BUG #171 (log 19:41:51): de loc kwam op melder 24 en Dinamo meldde 6 ms later kortsluiting in blok 8 en 9; de proef gold als 'opgelost'
+                    // (valse LostKortsluitingOp). Een proef is pas opgelost als er na aankomst even geen alarm is.
+                    if (!proefKortsluiting && rit.Reeks.Count >= 2)
+                    {
+                        await Wacht(TimeSpan.FromMilliseconds(1500));
+                        if (HuidigeAlarmBlokken().Count > 0 || _kortsluitingGemeld)
+                        {
+                            _log.Waarschuwing($"Kortsluitpunt #{k.Id}: de loc kwam op melder {rit.Reeks[^1]}, maar Dinamo meldt kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())}. Dat telt niet als opgelost.");
+                            proefKortsluiting = true;
+                        }
+                    }
                     bool proefOpgelost = !proefKortsluiting && rit.Reeks.Count >= 2;
                     if (proefKortsluiting)
                     {
