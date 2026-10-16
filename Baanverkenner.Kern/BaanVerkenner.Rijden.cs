@@ -1223,6 +1223,13 @@ public partial class BaanVerkenner
                 if (r == o.Richting.Om() && (o.VolgendeBijRechtdoor == x || o.VolgendeBijAfbuigend == x)) { if (!achter.Contains(w.Adres)) achter.Add(w.Adres); }
                 else if (r == o.Richting && o.NaMelder == x) kop.Add(w.Adres);
             }
+        // BUG #170: een wissel waarvan de kaart al weet dat afbuigend op precies deze ingang kortsluiting geeft (loc staat op de melder na de ingang, zelfde
+        // rijrichting) is de eerste verdachte. Wijzen drie of meer wissels naar dezelfde ingang, dan is dat een gedeelde oorzaak (bv. een kruismotor) of ruis
+        // en zegt het niets over een enkele wissel.
+        var bekend = kaart.VerbodenIngangen().Where(v => v.Na == x && v.R == r).ToList();
+        if (bekend.Select(v => v.Adres).Distinct().Count() <= 2)
+            foreach (var v in bekend)
+                if (!achter.Contains(v.Adres)) achter.Insert(0, v.Adres);
         if (reeks is { Count: >= 2 })
             foreach (var e in kaart.WisselEisenVoorStapDetail(reeks[^2], reeks[^1], r))
             {

@@ -740,10 +740,10 @@ public partial class BaanVerkenner
         return c;
     }
 
-    internal static List<int> VoorspeldPad(Baankaart k, int start, Richting r, Configuratie c, bool metReferentie = true)
+    internal static List<int> VoorspeldPad(Baankaart k, int start, Richting r, Configuratie c, bool metReferentie = true, int maxStappen = 8)
     {
         var pad = new List<int> { start };
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < maxStappen; i++)
         {
             int cur = pad[^1];
             var kand = k.BekendeVolgende(cur, r, c);
@@ -807,6 +807,24 @@ public partial class BaanVerkenner
             var vast = Kruis.Motoren.Where(m => o.Configuratie.Bevat(m) || o.BronAdres == m).ToHashSet();
             var cEigen = KruisBewijs.PasEigenBewijsToe(_kaart, Kruis, pad, c, vast, out var eigenUitleg);
             if (eigenUitleg.Count > 0) { _log.Info($"Opdracht #{o.Id}: {string.Join("; ", eigenUitleg)} (eigen kaart). Rijstand: {cEigen}."); c = cEigen; }
+        }
+        // BUG #170 (Marco 16-10 19:26: "je blijft 10 keer hangen op wissel 14"): een opdracht "andere tak van adres N, vanaf melder 14 andersom" erft de
+        // wissels van de ontdekkingsrit (wissel 14 afbuigend, nodig voor 15 -> 8 -> 24). De rit vanaf 14 vooruit (14 - 24 - 21 - ... - 17 - 8) heeft die
+        // wissel niet nodig, maar kwam met wissel 14 afbuigend aan op melder 8 vanaf 17: een BEKENDE kortsluiting (verboden ingang). Het voorspelde pad was
+        // te kort (9 melders) om dat te zien. Nu telt het hele bekende pad (tot een lus) en gaan wissels die op dat pad een verboden ingang afbuigend zouden
+        // nemen weer rechtdoor, behalve het geteste adres en kruismotoren.
+        var padLang = VoorspeldPad(_kaart, o.Start, o.Richting, c, Kruis.MetReferentie, 30);
+        if (padLang.Count >= 2)
+        {
+            var cV = _kaart.MetVerbodenIngangen(padLang, o.Richting, c, out var verbWijz);
+            foreach (var m in Kruis.Motoren) cV = cV.MetStand(m, c.Bevat(m));
+            if (o.BronAdres is int bronV) cV = cV.MetStand(bronV, c.Bevat(bronV));
+            if (!cV.Equals(c))
+            {
+                _log.Info($"Opdracht #{o.Id}: het bekende pad {string.Join(" - ", padLang)} neemt een bekende kortsluitingsingang; " +
+                          $"wissels die daar afbuigend kortsluiting geven gaan rechtdoor ({string.Join("; ", verbWijz)}). Rijstand: {cV}.");
+                c = cV;
+            }
         }
         // BUG #146: een bewezen overloop-paar (wissel 2 met 1) geldt in beide richtingen.
         c = _kaart.MetOverloopPartners(c, o.BronAdres, Kruis, out var partnerWijz);

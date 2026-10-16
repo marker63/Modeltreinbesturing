@@ -1353,6 +1353,24 @@ public static class Tests
         Eis(a3.Contains(14) && !k3.Contains(14), "laatste stap 17 -> 8 achteruit: 14 van achteren");
     }
 
+    // BUG #170: het volledige bekende pad bepaalt of een geerfde wissel (14 afbuigend) een bekende kortsluitingsingang neemt; de eerste verdachte staat vooraan
+    static void VerbodenPadTest()
+    {
+        Console.WriteLine("Test: bekend pad met verboden ingang, wissel 14 (BUG #170)");
+        var k = Laad("baankaart_2026-10-16_1924.json");
+        var c = new Configuratie(new[] { 7, 14 });
+        var pad = BaanVerkenner.VoorspeldPad(k, 14, Richting.Vooruit, c, false, 30);
+        Eis(pad.Contains(17) && pad[^1] == 8 || pad.Contains(8), "pad vanaf 14 vooruit loopt tot melder 8 (nu " + string.Join("-", pad) + ")");
+        var cV = k.MetVerbodenIngangen(pad, Richting.Vooruit, c, out var w);
+        Eis(!cV.Bevat(14) && cV.Bevat(7), "wissel 14 gaat rechtdoor (verboden ingang 17 -> 8), wissel 7 blijft (nu " + cV + ")");
+        var kort = BaanVerkenner.VoorspeldPad(k, 14, Richting.Vooruit, c, false, 8);
+        Eis(!kort.Contains(8), "het oude korte pad (8 stappen) miste dat (nu " + string.Join("-", kort) + ")");
+        var (achter, _) = BaanVerkenner.WisselRollen(k, 8, Richting.Vooruit, new[] { 25, 17, 8 });
+        Eis(achter.Count > 0 && achter[0] == 14, "loc op 8 vooruit na kortsluiting: wissel 14 is de eerste verdachte (nu " + string.Join(",", achter) + ")");
+        var (achter2, _) = BaanVerkenner.WisselRollen(k, 24, Richting.Achteruit, new[] { 8, 24 });
+        Eis(!achter2.Contains(1) && !achter2.Contains(7), "zeven wissels met dezelfde valse ingang 8 -> 24 tellen niet als verdachten (nu " + string.Join(",", achter2) + ")");
+    }
+
     // BUG #166: de basisrit door de kruiswissel bewijst de motorstand; de proeven rijden daarmee (geen reset van motor 13)
     static void KruisStandBasisTest()
     {
@@ -2511,6 +2529,7 @@ public static class Tests
         KruisPlusTest();
         KruisStandBasisTest();
         WisselRollenTest();
+        VerbodenPadTest();
         KruisAankomstTest();
         OrientatieTekstTest();
         WisselEisenTest();
