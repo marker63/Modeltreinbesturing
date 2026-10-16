@@ -580,6 +580,17 @@ public partial class BaanVerkenner
 
     /// <param name="spaarOnderLoc">BUG #80: sla wissels over die onder de loc liggen (alleen gebruiken als er géén rit volgt, bijv. na een
     /// mislukte terugweg waarbij de gebruiker de loc met de hand heeft neergezet). Ze worden pas omgezet als de loc weg is.</param>
+    /// <summary>BUG #165 (log 16-10 17:43: kaart kende '8 -> 24 -> 14' ook met motor 13 rechtdoor, terwijl de loc daar stond te hangen): de configuratie waarmee een
+    /// rit gelegd is, kan afwijken van wat de wissels echt doen als een motor niet omgezet kon worden (loc op de kruiswissel) of een wissel onder de loc bleef.
+    /// Voor wat de kaart onthoudt geldt de laatst gestuurde stand per adres; een onbekende stand blijft zoals gewenst.</summary>
+    internal Configuratie WerkelijkeStand(Configuratie c)
+    {
+        var uit = c;
+        foreach (var (a, st) in _wisselStand)
+            if (c.Bevat(a) != st) uit = uit.MetStand(a, st);
+        return uit;
+    }
+
     private async Task ZetConfiguratie(Configuratie c, bool spaarOnderLoc = false)
     {
         var onder = spaarOnderLoc ? WisselsOnderLoc() : new Dictionary<int, int>();
@@ -1433,12 +1444,14 @@ public partial class BaanVerkenner
                     _ritMaxDt = Math.Max(_ritMaxDt, gemeten);
                 }
                 double? dtOpgeslagen = dt is double d1 && !doelInzicht ? d1 * _ins.Verkensnelheid / RefSnelheid : null;
-                _kaart.RegistreerOvergang(res.Reeks[^1], m, r, cfgNu, dtOpgeslagen);
+                // BUG #165: vastleggen met de stand waarin de wissels WERKELIJK stonden (ZetConfiguratie slaat een motor over die onder de loc ligt).
+                var cfgWerkelijk = WerkelijkeStand(cfgNu);
+                _kaart.RegistreerOvergang(res.Reeks[^1], m, r, cfgWerkelijk, dtOpgeslagen);
                 // BUG #74: ingangskant onthouden. Binnen de rit is het de melder daarvoor; bij de eerste stap van de rit de ingang van
                 // de vorige rit, mits de loc daar nog in dezelfde richting rijdt en niet met de hand verplaatst is.
                 int? ingangVia = res.Reeks.Count >= 2 ? res.Reeks[^2]
                     : _ingang is { } ing0 && ing0.Melder == res.Reeks[0] && ing0.Richting == r ? ing0.Via : null;
-                if (ingangVia is int iv && iv != m) _kaart.RegistreerDoorgang(iv, res.Reeks[^1], m, r, cfgNu);
+                if (ingangVia is int iv && iv != m) _kaart.RegistreerDoorgang(iv, res.Reeks[^1], m, r, cfgWerkelijk);
                 bool herhaling = res.Reeks.Contains(m);
                 res.Reeks.Add(m);
                 tijdVorigeMelder = w.Tijd;

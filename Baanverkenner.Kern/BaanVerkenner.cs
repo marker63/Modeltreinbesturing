@@ -801,6 +801,13 @@ public partial class BaanVerkenner
         string? kruisUitleg = null;
         if (Kruis.MetReferentie) c = KruisIngangStand(pad, c, o.BronAdres, out kruisUitleg);
         if (kruisUitleg is not null) _log.Info($"Opdracht #{o.Id}: {kruisUitleg} Rijstand: {c}.");
+        // BUG #165: zonder referentie telt het eigen bewijs van de kaart voor de kruiswissel in het voorspelde pad (ingang, midden en uitgang).
+        if (!Kruis.MetReferentie && pad.Count >= 3)
+        {
+            var vast = Kruis.Motoren.Where(m => o.Configuratie.Bevat(m) || o.BronAdres == m).ToHashSet();
+            var cEigen = KruisBewijs.PasEigenBewijsToe(_kaart, Kruis, pad, c, vast, out var eigenUitleg);
+            if (eigenUitleg.Count > 0) { _log.Info($"Opdracht #{o.Id}: {string.Join("; ", eigenUitleg)} (eigen kaart). Rijstand: {cEigen}."); c = cEigen; }
+        }
         // BUG #146: een bewezen overloop-paar (wissel 2 met 1) geldt in beide richtingen.
         c = _kaart.MetOverloopPartners(c, o.BronAdres, Kruis, out var partnerWijz);
         if (partnerWijz.Count > 0) _log.Info($"Opdracht #{o.Id}: {string.Join("; ", partnerWijz)}. Rijstand: {c}.");

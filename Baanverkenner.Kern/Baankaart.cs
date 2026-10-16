@@ -104,6 +104,8 @@ public class Doorgang
     public Richting Richting { get; set; }
     public int AantalKeer { get; set; }
     public List<string> Configuraties { get; set; } = new();
+    /// <summary>BUG #165: hoe vaak elke configuratie bij deze doorgang gezien is (ruis van 1 keer valt zo weg tegen de gewone standen). Oude kaarten hebben dit niet.</summary>
+    public Dictionary<string, int> Tellers { get; set; } = new();
 }
 
 public enum WaarnemingSoort
@@ -476,6 +478,7 @@ public class Baankaart
             }
             d.AantalKeer++;
             if (!d.Configuraties.Contains(c.Sleutel)) d.Configuraties.Add(c.Sleutel);
+            d.Tellers[c.Sleutel] = d.Tellers.GetValueOrDefault(c.Sleutel) + 1;
         }
     }
 

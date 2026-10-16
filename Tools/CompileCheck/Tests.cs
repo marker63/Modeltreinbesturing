@@ -1333,6 +1333,39 @@ public static class Tests
         Eis(q2.Select(x => x.Id).SequenceEqual(new[] { 6, 7, 5 }), "herpoging: zonder oplossing achteraan");
     }
 
+    // BUG #165: het plusteken met alle bezetmelders in volgorde staat ook zonder referentie in het rapport
+    static void KruisPlusTest()
+    {
+        Console.WriteLine("Test: plusteken uit de eigen verkenning in het rapport (BUG #165)");
+        var k = Laad("baankaart_2026-10-16_1750.json");
+        var p = KruisPlus.Maak(k);
+        Eis(p is not null && p.Value.Midden == 24, "plus: midden is melder 24");
+        var benen = p!.Value.Benen;
+        Eis(benen.Count == 4, "plus: vier benen (nu " + benen.Count + ")");
+        string B(string plek) => string.Join("-", benen.First(b => b.Plek == plek).Melders);
+        Eis(B("west").StartsWith("14-13-5") && B("oost").StartsWith("8-15-16") && B("zuid").StartsWith("21-29-30") && B("noord").StartsWith("129"),
+            "plus: benen in volgorde van het midden naar buiten (west " + B("west") + ", oost " + B("oost") + ", zuid " + B("zuid") + ", noord " + B("noord") + ")");
+        var tekst = Rapport.AlsTekst(k); var html = Rapport.AlsHtml(k);
+        Eis(tekst.Contains("Plusteken van melder 24") && tekst.Contains("14 <-> 21"), "plus: staat in het tekstrapport");
+        Eis(html.Contains("Plusteken van melder 24") && html.Contains("<svg"), "plus: staat in het html-rapport");
+        Console.WriteLine(KruisPlus.AlsTekst(k));
+        // ruis van één keer (motor 13 rechtdoor naast vijf keer afbuigend) mag de pre-set van motor 13 niet blokkeren
+        var kk = new KruisKennis(); kk.Motoren.Add(13); kk.Motoren.Add(10); kk.Middens.Add(24);
+        var kr = new Baankaart();
+        kr.Doorgangen.Add(new Doorgang { Via = 8, Melder = 24, Volgende = 14, Richting = Richting.Achteruit, AantalKeer = 6,
+            Configuraties = new List<string> { "13", "13,14", "", "14" }, Tellers = new Dictionary<string, int> { ["13"] = 2, ["13,14"] = 3, [""] = 1, ["14"] = 0 } });
+        var gez = KruisBewijs.GezienBijIngang(kr, kk, 24, 8);
+        Eis(gez.Count == 1 && gez[0].Bevat(13), "plus (#165): ruis van 1x met motor 13 rechtdoor telt niet mee tegen 5x afbuigend (nu " + string.Join(" | ", gez.Select(g => g.ToString())) + ")");
+        var stand = KruisBewijs.KiesStand(gez, Configuratie.Basis, new[] { 10, 13 }, new HashSet<int>());
+        Eis(stand is not null && stand.Bevat(13), "plus (#165): motor 13 gaat dan vooraf afbuigend voor de ingang vanaf 8");
+        var c165 = KruisBewijs.PasEigenBewijsToe(kr, kk, new List<int> { 15, 8, 24, 14 }, new Configuratie(new[] { 14 }), new HashSet<int>(), out var uitleg165);
+        Eis(c165.Bevat(13) && c165.Bevat(14) && uitleg165.Count == 1, "plus (#165): de rijstand van 15 -> 8 -> 24 -> 14 krijgt motor 13 afbuigend uit het eigen bewijs (nu " + c165 + ")");
+        var c165b = KruisBewijs.PasEigenBewijsToe(kr, kk, new List<int> { 15, 8, 24, 14 }, new Configuratie(new[] { 14 }), new HashSet<int> { 13 }, out _);
+        Eis(!c165b.Bevat(13), "plus (#165): een motor die de opdracht zelf vastlegt blijft zoals de opdracht wil");
+        var c165c = KruisBewijs.PasEigenBewijsToe(kr, kk, new List<int> { 15, 8, 17 }, new Configuratie(new[] { 14 }), new HashSet<int>(), out _);
+        Eis(c165c.Equals(new Configuratie(new[] { 14 })), "plus (#165): een pad zonder kruiswissel verandert niets");
+    }
+
     // BUG #103 (log 08:06): route naar 129 liep een hele ronde extra; en zelf terugrijden i.p.v. de gebruiker te vragen
     static void RouteVerkortTest()
     {
@@ -2432,6 +2465,7 @@ public static class Tests
         KruisKennisTest();
         HerpogingVolgordeTest();
         RouteVerkortTest();
+        KruisPlusTest();
         KruisAankomstTest();
         OrientatieTekstTest();
         WisselEisenTest();

@@ -60,16 +60,26 @@ public static class KruisBewijs
     /// <summary>De configuratie zonder de kruismotoren (voor het vergelijken van de rest van de wisselstand).</summary>
     public static Configuratie ZonderMotoren(Configuratie c, IEnumerable<int> motoren) => new(c.Afbuigend.Except(motoren).ToArray());
 
-    /// <summary>Alle standen van de kruismotoren waarmee de loc eerder via <paramref name="via"/> de kruiswissel <paramref name="midden"/> in- en doorreed.</summary>
-    public static List<Configuratie> GezienBijIngang(Baankaart kaart, KruisKennis kruis, int midden, int via)
+    /// <summary>Alle standen van de kruismotoren waarmee de loc eerder via <paramref name="via"/> de kruiswissel <paramref name="midden"/> in- en doorreed.
+    /// BUG #165 (log 16-10 17:41: de kaart kende 14 -> 24 -> 8 ook met motor 13 rechtdoor, één keer, naast vele keren afbuigend; daardoor zette de verkenner motor 13 niet
+    /// vooraf en bleef de loc op de kruiswissel hangen): een kruisstand telt alleen mee als hij minstens half zo vaak gezien is als de meest geziene kruisstand van die
+    /// doorgang (tellers per configuratie, opgeteld per kruisstand). Zonder tellers (oude kaart) telt alles.</summary>
+    public static List<Configuratie> GezienBijIngang(Baankaart kaart, KruisKennis kruis, int midden, int via, int? volgende = null)
     {
         var res = new List<Configuratie>();
-        foreach (var d in kaart.Doorgangen.Where(d => d.Melder == midden && d.Via == via))
+        foreach (var d in kaart.Doorgangen.Where(d => d.Melder == midden && d.Via == via && (volgende is null || d.Volgende == volgende)))
+        {
+            var tel = new Dictionary<string, (Configuratie P, int N)>();
             foreach (var s in d.Configuraties)
             {
                 var p = Project(Configuratie.VanSleutel(s), kruis.Motoren);
-                if (!res.Any(x => x.Equals(p))) res.Add(p);
+                int n = d.Tellers.Count == 0 ? 1 : d.Tellers.GetValueOrDefault(s, 1);
+                tel[p.Sleutel] = tel.TryGetValue(p.Sleutel, out var o) ? (p, o.N + n) : (p, n);
             }
+            int max = tel.Count == 0 ? 0 : tel.Values.Max(t => t.N);
+            foreach (var (p, n) in tel.Values)
+                if ((d.Tellers.Count == 0 || n * 2 >= max) && !res.Any(x => x.Equals(p))) res.Add(p);
+        }
         return res;
     }
 
@@ -124,6 +134,30 @@ public static class KruisBewijs
                 if (kruis.Middens.Contains(z) && !res.Contains((z, y))) res.Add((z, y));
         }
         return res;
+    }
+
+    /// <summary>BUG #165 (log 16-10 17:47-17:50): de adrestest reed 15 -> 8 -> 24 -> 14 met motor 13 rechtdoor (de opdracht kende alleen wissel 14) en gaf elke keer kortsluiting
+    /// op de kruiswissel; die kortsluitingen werden daarna aan wissel 1 en 3 toegeschreven (valse bevindingen). Zonder referentie gebruikt de rijstand nu het eigen bewijs van
+    /// de kaart: voor elke doorgang X -> midden -> Y in het voorspelde pad de kruisstand waarmee die eerder gereden is. Motoren die de opdracht zelf vastlegt blijven staan.</summary>
+    public static Configuratie PasEigenBewijsToe(Baankaart kaart, KruisKennis kruis, List<int> pad, Configuratie c, ISet<int> vast, out List<string> uitleg)
+    {
+        uitleg = new List<string>();
+        if (kruis.Middens.Count == 0 || kruis.Motoren.Count == 0) return c;
+        var motoren = kruis.Motoren.OrderBy(x => x).ToList();
+        var gezet = new HashSet<int>();
+        for (int i = 1; i + 1 < pad.Count; i++)
+        {
+            if (!kruis.Middens.Contains(pad[i])) continue;
+            var gezien = GezienBijIngang(kaart, kruis, pad[i], pad[i - 1], pad[i + 1]);
+            if (KiesStand(gezien, c, motoren, vast) is not { } stand) continue;
+            foreach (var m in motoren)
+            {
+                if (vast.Contains(m) || gezet.Contains(m) || c.Bevat(m) == stand.Bevat(m)) continue;
+                c = c.MetStand(m, stand.Bevat(m)); gezet.Add(m);
+                uitleg.Add($"{pad[i - 1]} -> {pad[i]} -> {pad[i + 1]} is eerder alleen gereden met motor {m} {(stand.Bevat(m) ? "afbuigend" : "rechtdoor")}");
+            }
+        }
+        return c;
     }
 
     public static string StandTekst(IEnumerable<int> motoren, Configuratie c) =>

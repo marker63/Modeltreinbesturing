@@ -2176,3 +2176,17 @@ Oplossing:
 Test: CompileCheck (alles OK) + Miniworld-simulatie met meldvertraging 0.25-0.6 s: vanaf 0.40 s lost de verkenner het zelf op en vraagt Marco niets (0 vragen); bij 0.25-0.30 s komt de loc vrij, maar de terugrit 12 -> 5 geeft in de simulatie nog kortsluiting in blok 3 en dan vraagt de verkenner nog 3x om de loc terug te zetten (open, zie hieronder).
 Open: de simulatie van de terugrit vanaf 12 is een hypothese van de baan; echte gedrag onbekend. Drie Dinamo-uitvallen van 15-10 (14:48, 14:55, 15:27) nog niet in DINAMO_UITVAL.md.
 Nog niet getest op de baan.
+
+## #165 - Kruiswissel (melder 24) en wissel 14 gaven steeds nieuwe kortsluitingen en valse bevindingen (16-10 17:23-17:50, Marco: "Dat kruiswissel en wissel 14 blijven toch moeilijk"; wil plusteken in rapport en meerdere melders/volgorde bijhouden)
+Oorzaken (log 17:27-17:50):
+1. De kaart legde de wisselstand vast die de rit WILDE, niet die de wissels HADDEN: ZetConfiguratie slaat motor 13/10 over als de loc op de kruiswissel staat. Zo kreeg doorgang 14 -> 24 -> 8 ook de standen 'alle rechtdoor' en '14' en 8 -> 24 -> 14 idem.
+2. Eén keer ruis blokkeerde het voor-zetten van motor 13: `KiesStand` doet niets als de gewenste stand 'ook ergens gezien' is. Gevolg: 15 -> 8 -> 24 -> 14 reed met motor 13 rechtdoor (hangen 17:43, kortsluiting 17:47 en 17:50).
+3. De adrestest-rijstand (`RijStand`) gebruikte zonder referentie het eigen bewijs van de kaart niet voor de kruiswissel (alleen `KruisIngangStand`, referentie). Elke proefrit zette motor 13 weer rechtdoor ('Rijstand hersteld voor de proef') en de kortsluiting werd toegeschreven aan wissel 1 en 3. Wissel 1 'niet rijden 8 -> 24 als afbuigend' in het rapport is dus een VALSE bevinding (motor 13 stond fout).
+4. Wissel 14 afbuigend voor 24 <-> 8 was bekend (KRUISWISSEL.md) maar in een run vanaf nul niet; de eerste 24 -> 8 gaf kortsluiting (17:27) en kostte 9 minuten plus een Dinamo-uitval.
+Oplossing:
+- `WerkelijkeStand`: Overgangen en Doorgangen worden met de werkelijke wisselstand vastgelegd.
+- `Doorgang.Tellers` (per configuratie) en `KruisBewijs.GezienBijIngang`: een kruisstand telt alleen mee als hij minstens half zo vaak gezien is als de meest geziene van die doorgang (en per uitgang mogelijk: `volgende`).
+- `KruisBewijs.PasEigenBewijsToe` in `RijStand`: voor elke doorgang ingang -> midden -> uitgang van het voorspelde pad (twee melders vóór en na het midden) krijgen de kruismotoren de stand uit het eigen bewijs; motoren die de opdracht zelf vastlegt blijven staan.
+- `KruisPlus`: het plusteken (benen met alle bezetmelders in volgorde, Dinamo-blok, motorstanden per rit door melder 24) staat weer in het tekst- en html-rapport, ook zonder referentie, alleen met wat deze verkenning zelf vond.
+Open: wissel 14 voor 24 <-> 8 wordt zonder referentie nog steeds pas na de eerste kortsluiting geleerd; de valse bevindingen van deze run (wissel 1, 3) moeten bij een nieuwe run niet meer voorkomen. Dinamo-uitval na herhaalde kortsluitingen (17:29) staat nog niet in DINAMO_UITVAL.md.
+Test: CompileCheck (ALLES OK, KruisPlusTest met de kaart van 17:50). Nog niet getest op de baan.

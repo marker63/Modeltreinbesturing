@@ -81,3 +81,9 @@ De standen in de Modeltreinbesturing-wisselstraten (tabel hierboven, "veldgetest
 
 ## Controle in Modeltreinbesturing (BUG #91, 11-10-2026)
 "Controleer mijn baan" vergelijkt de kruisstanden van de wisselstraten met de referentie hierboven en meldt verschillen (Info). Het past NIETS aan. Afwijkend op testbaan-v24: 7 -> 3, 4 -> 3 en 3 -> 4; de door Claude gespiegelde 3 -> 7 (0,0) komt wel overeen met de referentie. Wacht op bevestiging van Marco welke bron klopt.
+
+## Marco 16-10-2026 17:55 + log 17:27-17:50 (BUG #165) - NIET veldgetest door Claude
+- 24 -> 8 (vooruit) en 8 -> 24 (achteruit) vragen motor 13 afbuigend EN wissel 14 afbuigend (melder 24 zit aan de afbuigende poot van wissel 14; Marco 10-10 17:12). Met alleen motor 13 afbuigend volgt kortsluiting in blok 4 (17:27:40); met wissel 14 erbij lukt het (17:36-17:37, lus 24-8-15-16-5-13-14-24).
+- 15 -> 8 -> 24 -> 14 (achteruit, wissel 14 afbuigend) vraagt vóór het inrijden van 24 motor 13 afbuigend; met motor 13 rechtdoor blijft de loc op 24 hangen (17:43) of geeft kortsluiting (17:47, 17:50).
+- Hypothese (past bij alle bewezen standen, NIET bewezen): Engelse wissel = dubbele wissel; motor 13 kiest de oostkant (rechtdoor = 21, afbuigend = 8), motor 10 de westkant (rechtdoor = 14, afbuigend = 129). Dan geldt 14<->21 = (10 r, 13 r), 14<->8 = (10 r, 13 a), 129<->21 = (10 a, 13 r) en zou 129<->8 = (10 a, 13 a) zijn. Alleen de eerste drie zijn gereden.
+- De kaart legde standen vast die de wissels niet hadden (ZetConfiguratie slaat een motor over als de loc op de kruiswissel staat). Dat is gerepareerd (`WerkelijkeStand`); oudere kaarten kunnen nog zulke ruis bevatten.
