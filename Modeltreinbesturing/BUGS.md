@@ -2161,3 +2161,18 @@ Nieuw: `WisselstraatCorrectie` (Modeltreinbesturing). Na het openen van een baan
 Veiligheid: alleen eisen die voor alle voorstellen van het blokpaar gelden; "aangenomen" eisen nooit; een verschil dat alleen uit een splitsing komt wordt gemeld, niet gewijzigd; kruiswissel-motoren (13/10) worden nooit aangeraakt (alleen gemeld); geen wisselstraten toegevoegd of verwijderd. Na afloop dialoog met alle meldingen en de vraag "behouden?" (Nee = alles ongedaan).
 Wiring: `MainWindow.WisselstratenCorrigeren` na `WisselstratenImporteren`. Het WPF-deel kon hier niet gecompileerd worden (alleen de klasse zelf is getest in CompileCheck).
 Nog niet getest op de baan.
+
+## #164 - Loc klem bij wissel 1/2 (melder 12) werd niet zelf opgelost (16-10 09:00-09:13, Marco: "Je kon de situatie rond wissel 2 en 1 niet zelf oplossen?")
+Oorzaken (log 09:00-09:13):
+1. Het blokalarm van Dinamo viel in het negeervenster van de stop bij een NIEUWE melder (`_negeerKortsluitingTot`) en werd weggegooid; de rit zag daardoor "geen kortsluiting" en de loc bleef kortgesloten staan.
+2. Racetoestand bij ritstart: `_kortsluitingGemeld` werd op false gezet terwijl het alarm al actief was.
+3. Een zinloze blokproef (9 minuten) met een onbekend blok terwijl de kortsluiting nog stond.
+4. Er was geen manier om een klem te herkennen als het alarm alleen onder rijstroom bestaat (Dinamo meldt het niet als er niet gereden wordt).
+Oplossing:
+- `_genegeerdeAlarmen`: alarmen in het negeervenster worden onthouden; na de rit alsnog als kortsluiting behandeld (`Kortsluiting(..., alarmBlokken)`).
+- `RitUitvoeren`/`BlokZoekenBijStart`: alarmlijst (`HuidigeAlarmBlokken()`) telt mee bij start en in de lus; geen blokproef bij actief alarm.
+- `ProbeerKlemWegTeKrijgen` + `VrijheidsProef`: zit de loc klem aan het begin van een navigatierit, dan zet de verkenner zelf wissels in de buurt om (nooit kruismotoren, nooit wissels onder een bezette melder, wat de rit nodig heeft blijft staan), elk met een korte proefrit; wat werkt wordt als kortsluitoplossing vastgelegd.
+- Terugweg: `ZelfTerugWegAlleStanden` (ook overgangen met afbuigende wissels en omgekeerde overgangen) en een voorstap van de onverwachte melder (bijv. 12) terug naar de laatste goede melder met de stand die de loc vrij maakte (`NavigatieFout.RitRichting/RitConfiguratie`).
+Test: CompileCheck (alles OK) + Miniworld-simulatie met meldvertraging 0.25-0.6 s: vanaf 0.40 s lost de verkenner het zelf op en vraagt Marco niets (0 vragen); bij 0.25-0.30 s komt de loc vrij, maar de terugrit 12 -> 5 geeft in de simulatie nog kortsluiting in blok 3 en dan vraagt de verkenner nog 3x om de loc terug te zetten (open, zie hieronder).
+Open: de simulatie van de terugrit vanaf 12 is een hypothese van de baan; echte gedrag onbekend. Drie Dinamo-uitvallen van 15-10 (14:48, 14:55, 15:27) nog niet in DINAMO_UITVAL.md.
+Nog niet getest op de baan.

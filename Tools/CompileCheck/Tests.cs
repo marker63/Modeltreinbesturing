@@ -1351,6 +1351,14 @@ public static class Tests
         Eis(BaanVerkenner.ZelfTerugIndex(kort, 13, 13) == -1, "zelf terug: loc al op de startmelder");
         Eis(BaanVerkenner.ZelfTerugIndex(kort, 129, 13) == 1, "zelf terug: loc op 129 -> terug via etappe 1 en 0");
         Eis(BaanVerkenner.ZelfTerugIndex(kort, 21, 13) is null, "zelf terug: melder 21 ligt niet op de route -> de gebruiker vragen");
+        // BUG #164: de loc staat op een melder die alleen als eindpunt van een rit bekend is (12 achter wissel 1 en 2): de weg terug is de omgekeerde overgang
+        var k164 = new Baankaart();
+        k164.Overgangen.Add(new Overgang { Van = 5, Naar = 12, Richting = Richting.Achteruit, AantalKeer = 1, GezienBijConfiguraties = new List<string> { "2" } });
+        k164.Overgangen.Add(new Overgang { Van = 5, Naar = 13, Richting = Richting.Vooruit, AantalKeer = 2, GezienBijConfiguraties = new List<string> { "" } });
+        Eis(BaanVerkenner.ZelfTerugWeg(k164, 12, 13) is null, "zelf terug (#164): zonder afbuigende standen is er vanaf 12 geen weg");
+        var w164 = BaanVerkenner.ZelfTerugWegAlleStanden(k164, 12, 13);
+        Eis(w164 is { Count: 2 } && w164[0].Van == 12 && w164[0].Naar == 5 && w164[0].Richting == Richting.Vooruit && w164[0].Cfg.Bevat(2) && w164[1].Naar == 13 && w164[1].Cfg.Afbuigend.Length == 0,
+            "zelf terug (#164): 12 -> 5 (omgekeerde overgang, wissel 2 afbuigend) -> 13 (nu " + (w164 is null ? "geen weg" : string.Join(" | ", w164.Select(x => $"{x.Van}>{x.Naar} {x.Richting} {x.Cfg}"))) + ")");
     }
 
     static void StopVoorTerugzettenTest()
@@ -2186,9 +2194,10 @@ public static class Tests
 
     // De geslaagde, volledige rit van 10-10 11:38 (blokken 10, 11, 12): referentie voor importer en leerprofiel
     /// <summary>BUG #150: een volledige verkenning vanaf nul op de nagebouwde Miniworld-baan (zie MiniworldBaan). Geeft het aantal kortsluitingen terug.</summary>
-    static (BaanVerkenner V, VerkenLog Log, int Kortsluitingen, double Seconden, string Einde) MiniworldRit(int startMelder, double maxUren = 6, Action<BaanVerkenner>? voorbereiding = null, bool omzettenOnderLoc = true)
+    static (BaanVerkenner V, VerkenLog Log, int Kortsluitingen, double Seconden, string Einde) MiniworldRit(int startMelder, double maxUren = 6, Action<BaanVerkenner>? voorbereiding = null, bool omzettenOnderLoc = true, Action<Baanverkenner.Kern.Simulatie.SimulatieBaan>? simAanpassing = null)
     {
         var sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(omzettenOnderLoc, startMelder);
+        simAanpassing?.Invoke(sim);
         var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 14, DinamoBlokken = "1-12", KruisMotoren = "10+13", HoogsteMelder = 150 };
         sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
         var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
@@ -2205,6 +2214,26 @@ public static class Tests
         if (Environment.GetEnvironmentVariable("MINI_LOG") == "1") Console.WriteLine(log.AlsTekst());
         int kort = log.Regels.Count(r => r.Tekst.Contains("KORTSLUITING/ONTSPORING vermoed"));
         return (v, log, kort, (klok.Nu - t0).TotalSeconds, einde);
+    }
+
+    // BUG #164: de kortsluitmelding van Dinamo komt vlak NA het begin van de stop (log 16-10 09:00:35: 1 ms na het eerste stopcommando) en werd als gevolg van de eigen stop genegeerd.
+    static void MiniworldAlarmVertragingTest()
+    {
+        var lijst = Environment.GetEnvironmentVariable("MINI_VERTRAGING");
+        if (string.IsNullOrEmpty(lijst)) return;
+        Console.WriteLine("Test: verkenning op de Miniworld-baan met verschillende meldvertragingen van het blokalarm (BUG #164)");
+        foreach (var vt in lijst.Split(',').Select(x => double.Parse(x, System.Globalization.CultureInfo.InvariantCulture)))
+        {
+            var r = MiniworldRit(int.Parse(Environment.GetEnvironmentVariable("MINI_START") ?? "17"), 1.5, simAanpassing: sim => { sim.KortsluitMeldVertraging = vt; sim.AlarmAlleenBijRijstroom = Environment.GetEnvironmentVariable("MINI_ALLEENRIJSTROOM") == "1"; });
+            int stop = r.Log.Regels.Count(x => x.Tekst.Contains("tijdens de stop een kortsluitmelding"));
+            int vermoed = r.Log.Regels.Count(x => x.Tekst.Contains("KORTSLUITING/ONTSPORING vermoed"));
+            int blokproef = r.Log.Regels.Count(x => x.Tekst.Contains("Blokproef: blok"));
+            int vragen = r.Log.Regels.Count(x => x.Tekst.Contains("Gebruiker") || x.Tekst.Contains("terugzetten van de loc"));
+            bool klas12 = r.Log.Regels.Any(x => x.Tekst.Contains("vermoed na melder 12"));
+            bool proef12 = r.Log.Regels.Any(x => x.Tekst.Contains("Blokproef voor melder 12"));
+            int zelf = r.Log.Regels.Count(x => x.Tekst.Contains("De kortsluiting ging weg nadat wissel"));
+            Console.WriteLine($"  [12: geclassificeerd {klas12}, blokproef {proef12}, zelf opgelost {zelf}x] vertraging {vt:0.00} s: {r.Einde}, {r.Seconden / 60:0} min, vermoed {vermoed}, stop-met-alarm {stop}, blokproef-regels {blokproef}, vragen {vragen}, melders {r.V.Kaart.Melders.Count}, voltooid {r.V.Kaart.Voltooid}");
+        }
     }
 
     static void MiniworldFoutzoek()
@@ -2379,6 +2408,7 @@ public static class Tests
         ZaadAllesTest();
         if (Environment.GetEnvironmentVariable("MINI_DEBUG") == "1") MiniworldFoutzoek();
         MiniworldRitTest();
+        MiniworldAlarmVertragingTest();
         MiniworldVoorkennisTest();
         HerstelBlijftStaanTest();
         KortsluitOplossingTest();

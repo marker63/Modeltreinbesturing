@@ -620,6 +620,43 @@ public partial class BaanVerkenner
         return null;
     }
 
+    /// <summary>BUG #164: zoals <see cref="ZelfTerugWeg"/>, maar valt terug op overgangen die bij een andere wisselstand gezien zijn als er geen weg met alle
+    /// wissels rechtdoor is (de loc kwam bij een kortsluiting-oplossing op een onverwachte melder, bijv. 12 achter wissel 1 en 2). Per stap de bekende
+    /// configuratie met de minste afbuigende wissels. Null als er ook zo geen weg is.</summary>
+    internal static List<(int Van, int Naar, Richting Richting, Configuratie Cfg)>? ZelfTerugWegAlleStanden(Baankaart kaart, int van, int naar)
+    {
+        if (van == naar) return new();
+        var vorige = new Dictionary<int, (int Van, Richting R, Configuratie C)>();
+        var rij = new Queue<int>(); rij.Enqueue(van);
+        var gezien = new HashSet<int> { van };
+        while (rij.Count > 0)
+        {
+            int m = rij.Dequeue();
+            // Eerst de overgangen die in deze richting gereden zijn, daarna de omgekeerde van overgangen die naar m toe liepen (de loc rijdt dan dezelfde
+            // route de andere kant op; zo komt de loc terug van een melder die alleen als eindpunt van een rit bekend is, zoals 12 achter wissel 1 en 2).
+            var opties = kaart.Overgangen.Where(o => o.Van == m && o.GezienBijConfiguraties.Count > 0).OrderBy(o => o.Naar)
+                .Select(o => (Naar: o.Naar, R: o.Richting, O: o))
+                .Concat(kaart.Overgangen.Where(o => o.Naar == m && o.GezienBijConfiguraties.Count > 0).OrderBy(o => o.Van)
+                    .Select(o => (Naar: o.Van, R: o.Richting.Om(), O: o)));
+            foreach (var (nxt, rch, o) in opties)
+            {
+                if (!gezien.Add(nxt)) continue;
+                var c = o.GezienBijConfiguraties.Select(Configuratie.VanSleutel).OrderBy(x => x.Afbuigend.Length).ThenBy(x => x.Sleutel, StringComparer.Ordinal).First();
+                vorige[nxt] = (m, rch, c);
+                if (nxt == naar)
+                {
+                    var weg = new List<(int, int, Richting, Configuratie)>();
+                    int cur = naar;
+                    while (cur != van) { var (v, r, cc) = vorige[cur]; weg.Add((v, cur, r, cc)); cur = v; }
+                    weg.Reverse();
+                    return weg;
+                }
+                rij.Enqueue(nxt);
+            }
+        }
+        return null;
+    }
+
     /// <summary>BUG #161 (Marco 15-10 13:51: de controle reed alleen de twee basisrondes; 18 overgangen met melder 129, 4, 11, 12, 1, 9, 10 waren 'niet gereden'):
     /// de controle begint zonder overgangen en plande daarom alleen "start, vooruit" en "start, achteruit". Nu plant ze daarna ook elk traject uit de bestaande kaart
     /// (zelfde startmelder, richting en wisselstand), met een route over de basis of over een ander traject dat langs de startmelder loopt. Trajecten die op een

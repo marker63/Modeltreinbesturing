@@ -249,6 +249,11 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
     private void AlarmAan(params int[] blokken) { if (!MeldBlokAlarm) return; foreach (var b in blokken) if (_alarmBlokken.Add(b)) BlokAlarmGewijzigd?.Invoke(b, true); }
     /// <summary>Echte Dinamo: de kortsluiting wordt een fractie van een seconde NA het ontstaan gemeld (eerst zie je de melder bezet worden).</summary>
     public double KortsluitMeldVertraging { get; set; } = 0.8;
+    /// <summary>BUG #164 (hardwarelog 16-10 09:00-09:01): Dinamo meldt de kortsluiting van een vastzittende loc alleen zolang er een rijcommando naar de blokken
+    /// staat; zodra de loc gestopt is verdwijnt het alarm (0,8 s na de stop) en bij het volgende rijcommando komt het meteen terug. De kortsluiting zelf blijft
+    /// bestaan (de loc staat klem tot de wissel goed staat). Standaard uit.</summary>
+    public bool AlarmAlleenBijRijstroom { get; set; }
+    private DateTime? _stilSinds;
     private DateTime? _meldKortOp;
     private int _meldKortBlok;
     private void MeldKortsluitingStraks(int blok, DateTime nu)
@@ -391,6 +396,20 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
             _meldKortOp = null;
             if (_kortsluiting) { AlarmAan(_meldKortBlok); if (MeldtKortsluiting) KortsluitingStatusGewijzigd?.Invoke(true); }
         }
+        if (AlarmAlleenBijRijstroom && _kortsluiting && DinamoGedrag)
+        {
+            if (_decoderStap == 0)
+            {
+                _stilSinds ??= nu;
+                if (_alarmBlokken.Count > 0 && _meldKortOp is null && (nu - _stilSinds.Value).TotalSeconds >= 0.8) AlarmUit();
+            }
+            else
+            {
+                _stilSinds = null;
+                if (_alarmBlokken.Count == 0 && _meldKortOp is null) MeldKortsluitingStraks(_meldKortBlok, nu);
+            }
+        }
+        else _stilSinds = null;
         if (_kortMeldTijd is DateTime km && nu >= km) { _kortMeldTijd = null; KortsluitingStatusGewijzigd?.Invoke(true); }
         Beweeg(nu, dt);
         if (FlikkerMelder > 0 && _geflikkerd < FlikkerKeer && nu >= _flikkerVolgende && nu >= _flikkerTot)

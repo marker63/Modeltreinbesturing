@@ -53,6 +53,9 @@ public class NavigatieFout : Exception
     public bool LocAndersom { get; init; }
     /// <summary>BUG #145: de fout is een blijvende kortsluiting terwijl de loc stilstaat.</summary>
     public bool Kortsluiting { get; init; }
+    /// <summary>BUG #164: richting en wisselstand van de rit waarop de afwijking optrad; daarmee kan de loc dezelfde weg terug (andere richting).</summary>
+    public Richting? RitRichting { get; init; }
+    public Configuratie? RitConfiguratie { get; init; }
 }
 
 public partial class BaanVerkenner
@@ -111,12 +114,19 @@ public partial class BaanVerkenner
     private readonly HashSet<int> _kruisTerugzettenGevraagd = new();
     private bool _alarmWegProbeerd;
 
+    /// <summary>BUG #164 (hardwarelog 16-10 09:00:35): Dinamo meldde de kortsluiting op melder 12 één milliseconde NADAT de verkenner begon te stoppen. Alles wat binnen het
+    /// negeervenster van een eigen stop binnenkomt gold als gevolg van die stop en werd weggegooid; het alarm was na de stop vanzelf weg, dus de kortsluiting werd nooit
+    /// vastgelegd en de verkenner draaide daarna minuten blokproeven met een loc die klem zat. Per-blokalarmen zijn geen gevolg van onze stop (in een uur logboek
+    /// kwam er bij 17 melders geen enkele bij een gewone stop): ze worden nu onthouden en na de rit alsnog als kortsluiting behandeld.</summary>
+    private readonly List<(int Blok, DateTime Tijd)> _genegeerdeAlarmen = new();
+
     private void HardwareMeldtBlokAlarm(int blok, bool kortsluiting)
     {
         lock (_alarmSlot)
         {
             if (kortsluiting) _alarmBlokken.Add(blok);
             else _alarmBlokken.Remove(blok);
+            if (kortsluiting && _klok.Nu < _negeerKortsluitingTot) _genegeerdeAlarmen.Add((blok, _klok.Nu));
         }
         if (kortsluiting && _voedingBlokken.Count == 0 && _laatsteKortsluitingOm != DateTime.MinValue
             && (_klok.Nu - _laatsteKortsluitingOm).TotalSeconds > 4 && (_klok.Nu - _laatsteKortsluitingOm).TotalMinutes < 5)
@@ -653,6 +663,15 @@ public partial class BaanVerkenner
                     await Wacht(Poll);
                     // BUG #55: alleen wijzigingen NA het commando tellen (een nasleep van de vorige rit gaf een verkeerde koppeling, 144 -> blok 10)
                     if (_monitor.Bijwerken().Any(x => x.Tijd >= t0)) { gewijzigd = true; break; }
+                    // BUG #164 (hardwarelog 16-10 09:01-09:10): met een loc in een kortsluiting is er in het blok geen rijstroom; elk van de 18 proeven (9 minuten) kon dus
+                    // alleen mislukken. Dat zegt niets over de blokkoppeling.
+                    if (HuidigeAlarmBlokken().Count > 0 && _klok.Nu >= _negeerKortsluitingTot)
+                    {
+                        _log.Waarschuwing($"Dinamo meldt kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())}: zonder rijstroom kan geen enkel blok de loc laten rijden. De blokproef voor melder {melder} stopt; het ligt niet aan de blokkoppeling.");
+                        await StuurNaarBlok(blok, r, 0);
+                        await VolledigeStop();
+                        return false;
+                    }
                 }
                 if (gewijzigd)
                 {
@@ -1175,7 +1194,20 @@ public partial class BaanVerkenner
     private async Task<RitResultaat> Rit(int start, Richting r, RitDoel doel)
     {
         _ritMinDt = double.MaxValue; _ritMaxDt = 0;
+        lock (_alarmSlot) _genegeerdeAlarmen.Clear();
         var uitkomst = await RitUitvoeren(start, r, doel);
+        // BUG #164: een blokalarm dat binnenkwam terwijl de verkenner aan het stoppen was (en daarom genegeerd werd) is een echte kortsluiting als de rit eindigt
+        // op een nieuwe plek of een onverwachte afwijking. Zo ontstaat hetzelfde kortsluitpunt als wanneer de melding een fractie eerder was gekomen.
+        if (!doel.IsNavigatie && uitkomst.Einde is RitEinde.AfwijkingGevonden or RitEinde.Doodlopend)
+        {
+            List<int> genegeerd;
+            lock (_alarmSlot) genegeerd = _genegeerdeAlarmen.Select(g => g.Blok).Distinct().OrderBy(b => b).ToList();
+            if (genegeerd.Count > 0)
+            {
+                _log.Waarschuwing($"Dinamo meldde kortsluiting in blok {string.Join(" en ", genegeerd)} op het moment dat de verkenner na melder {uitkomst.Reeks[^1]} stopte. Dat is geen gevolg van de eigen stop maar een echte kortsluiting: de rit telt als kortsluiting na melder {uitkomst.Reeks[^1]} (BUG #164).");
+                uitkomst = await Kortsluiting(uitkomst, "Dinamo meldde kortsluiting tijdens het stoppen", genegeerd);
+            }
+        }
         MarkeerTijdelijkeKortsluiting(start, r, doel.Configuratie, uitkomst);
         _kaart.Ritten.Add(new GeredenRit
         {
@@ -1271,7 +1303,10 @@ public partial class BaanVerkenner
         bool wachttijdVerlengd = false;   // BUG #55: eenmalige bevestigingsronde voordat "doodlopend" geconcludeerd wordt
         bool vervolgHerhaald = false;     // BUG #64: bij een bekend vervolg eenmalig het rijcommando herhalen
         DateTime? heelInNieuweSectieSinds = null;
-        _kortsluitingGemeld = false;
+        // BUG #164 (hardwarelog 16-10 09:00:44): het rijcommando naar alle blokken duurt ~1,8 s en het alarm kwam al tijdens het versturen binnen; hier werd de vlag
+        // daarna gewist en een alarm komt maar één keer binnen. De rit zag niets meer, wachtte 30 s en draaide daarna een blokproef met een loc die klem zat.
+        // Een alarm dat nog loopt blijft dus gelden.
+        _kortsluitingGemeld = HuidigeAlarmBlokken().Count > 0;
 
         while (true)
         {
@@ -1290,8 +1325,25 @@ public partial class BaanVerkenner
             var bezet = _monitor.Bezet;
 
             // ---- Kortsluiting? ----
-            if (_kortsluitingGemeld && _klok.Nu >= _negeerKortsluitingTot)
+            if ((_kortsluitingGemeld || HuidigeAlarmBlokken().Count > 0) && _klok.Nu >= _negeerKortsluitingTot)
+            {
+                // BUG #164: een navigatierit die direct bij de start in een kortsluiting loopt: de loc zit klem op een wissel (bijv. wissel 1 bij wissel 2). Eerst zelf
+                // wissels proberen (met een proefrit per wissel) voordat de rit als mislukt geldt en de gebruiker de loc moet terugzetten.
+                if (doel.IsNavigatie && res.Reeks.Count == 1 && !_klemProbeActief && _hw is IBlokAlarmBron)
+                {
+                    _log.Waarschuwing($"De loc kan niet weg van melder {start} ({r.Tekst()}): Dinamo meldt direct kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())}. De loc zit waarschijnlijk klem op een wissel.");
+                    await VolledigeStop();
+                    if (await ProbeerKlemWegTeKrijgen(start, r, doel, $"rit {r.Tekst()} vanaf melder {start}"))
+                    {
+                        _kortsluitingGemeld = false;
+                        await StuurSnelheid(r, snelheid);
+                        laatsteWijziging = _klok.Nu;
+                        onderbroken = true;
+                        continue;
+                    }
+                }
                 return await Kortsluiting(res, "de centrale meldt een kortsluiting/fout");
+            }
             if (bezet.Count == 0)
             {
                 leegSinds ??= _klok.Nu;
@@ -1349,7 +1401,9 @@ public partial class BaanVerkenner
                         // (dan kwam die nooit als "nieuw" binnen): neem de verste melder van
                         // het verwachte pad die op dit moment nog bezet is.
                         LaatsteGoed = bezet.Where(x => x != m && pad.Contains(x)).OrderByDescending(x => pad.LastIndexOf(x)).Cast<int?>().FirstOrDefault() ?? res.Reeks[^1],
-                        Onverwacht = m
+                        Onverwacht = m,
+                        RitRichting = r,
+                        RitConfiguratie = doel.Configuratie
                     };
                 }
 
@@ -1671,11 +1725,20 @@ public partial class BaanVerkenner
                     // de blokkoppeling maar staat de loc waarschijnlijk op een open gereden of verkeerd staande wissel (log 15:14:
                     // 2 x 9 minuten blokproef met de loc vast op de kruiswissel, blok 8 bleef kortsluiting melden). Niet 18 blokken
                     // x 30 s proberen maar direct de gebruiker vragen de loc terug te zetten.
-                    if (!bevestigd && bekendBlok is not null && (_klok.Nu - _laatsteKortsluitingOm < TimeSpan.FromMinutes(10) || HuidigeAlarmBlokken().Count > 0))
+                    // BUG #164: ook bij een nog onbekend blok (nieuwe melder) is een blokproef zinloos als de kortsluiting bij déze melder hoort (log 09:01: 9 minuten blokproef
+                    // voor melder 12 met een loc die klem zat).
+                    bool kortsluitingHierBij = _laatsteKortsluitContext is { } kcx && kcx.Melder == start;
+                    if (!bevestigd && (bekendBlok is not null || kortsluitingHierBij || HuidigeAlarmBlokken().Count > 0)
+                        && (_klok.Nu - _laatsteKortsluitingOm < TimeSpan.FromMinutes(10) || HuidigeAlarmBlokken().Count > 0))
                     {
-                        _log.Waarschuwing($"De loc vertrok niet van melder {start} terwijl het blok ({bekendBlok}) bekend is en er kort geleden een kortsluiting was: waarschijnlijk staat hij op een open gereden of verkeerd staande wissel (bijv. een kruiswissel met maar één van de twee motoren op afbuigend). De volledige blokproef wordt overgeslagen.");
+                        if (!_klemProbeActief && _hw is IBlokAlarmBron && await ProbeerKlemWegTeKrijgen(start, r, doel, $"de loc vertrok niet van melder {start}"))
+                            bevestigd = true;
+                        else
+                        {
+                        _log.Waarschuwing($"De loc vertrok niet van melder {start} (blok {(bekendBlok is null ? "nog onbekend" : bekendBlok.ToString())}) en er is kort geleden een kortsluiting geweest: waarschijnlijk staat hij op een open gereden of verkeerd staande wissel (bijv. een kruiswissel met maar één van de twee motoren op afbuigend). De volledige blokproef wordt overgeslagen.");
                         await VraagLocTerugTeZetten(start, $"De loc rijdt niet weg van melder {start}, kort na een kortsluiting. Staat er een wissel (kruiswissel?) open gereden of in een gemengde stand? Zet de wissels goed en de loc op melder {start}.");
                         bevestigd = true;
+                        }
                     }
                     // BUG #125 (Marco 14-10 09:42: Dinamo reageerde niet meer, wissels schakelden niet, na het uitzetten van de netspanning kwam er geen melding): de
                     // interface bleef keepalives sturen, dus de stiltemelding (#81) ging niet af. De loc vertrok om 09:41:59 niet van melder 13, terwijl hij daar de hele
@@ -1932,10 +1995,77 @@ public partial class BaanVerkenner
         }
     }
 
-    private async Task<RitResultaat> Kortsluiting(RitResultaat res, string reden)
+    private bool _klemProbeActief;
+
+    /// <summary>BUG #164 (Marco 16-10 09:13: "je kon de situatie rond wissel 2 en 1 niet zelf oplossen?"): de loc zit klem op een wissel, maar Dinamo meldt de kortsluiting
+    /// alleen zolang er een rijcommando loopt; bij een stilstaande loc verdwijnt het alarm na 0,8 s. De alarmroutine (#108) kijkt of het alarm na het omzetten van
+    /// een wissel weggaat en ziet dan niets. Hier zit het rijcommando vast aan de proef: wissel omzetten, de loc even laten rijden, en kijken of het alarm
+    /// wegblijft en de loc echt beweegt. Zo ja, dan blijft die wissel staan en wordt hij als oplossing van het kortsluitpunt vastgelegd (zoals #108/#144).
+    /// Nooit kruismotoren, nooit wissels die bij een bezette melder liggen (de loc kan erop staan, #109) en nooit wissels die de rit zelf nodig heeft.
+    /// Alle wissels worden teruggezet als er niets helpt. Nog niet getest op de baan.</summary>
+    private async Task<bool> ProbeerKlemWegTeKrijgen(int start, Richting r, RitDoel doel, string stap)
+    {
+        if (_klemProbeActief || _hw is not IBlokAlarmBron) return false;
+        _monitor.Bijwerken();
+        var bezet = _monitor.Bezet.ToHashSet();
+        var bijLoc = WisselsBijBezet(_kaart, bezet);
+        var nodig = doel.Configuratie.Afbuigend.ToHashSet();
+        var kandidaten = _ins.WisselAdressen().Where(a => !Kruis.IsMotor(a) && !bijLoc.Contains(a) && !nodig.Contains(a)).ToList();
+        if (kandidaten.Count == 0) return false;
+        _klemProbeActief = true;
+        try
+        {
+            _log.Waarschuwing($"De loc zit klem ({stap}). De verkenner probeert zelf wissels om te zetten (met een korte proefrit per wissel), behalve {(bijLoc.Count > 0 ? "wissel " + string.Join(", ", bijLoc.OrderBy(a => a)) + " (ligt bij een bezette melder), " : "")}de kruismotoren en wat deze rit nodig heeft (nog niet getest op de baan).");
+            foreach (var a in kandidaten)
+            {
+                _token.ThrowIfCancellationRequested();
+                bool oud = _wisselStand.TryGetValue(a, out var nu) && nu;
+                await ZetWissel(a, !oud, forceer: true);
+                var vrij = await VrijheidsProef(r);
+                if (vrij)
+                {
+                    _log.Vondst($"De loc reed weer zonder kortsluiting nadat wissel {a} naar {(oud ? "rechtdoor" : "afbuigend")} is geschakeld ({stap}). De wissel blijft zo staan (nog niet getest op de baan).");
+                    _kortsluitingGemeld = false;
+                    _statischeKortsluiting = false;
+                    _alarmStand[a] = !oud;
+                    RegistreerAlarmOplossing(a, !oud, bezet);
+                    return true;
+                }
+                await ZetWissel(a, oud, forceer: true);
+            }
+            _log.Waarschuwing("Geen enkele wissel maakte de loc vrij.");
+            return false;
+        }
+        finally { _klemProbeActief = false; }
+    }
+
+    /// <summary>BUG #164: stuurt de loc kort weg in richting <paramref name="r"/> en meldt true als hij beweegt zonder dat Dinamo kortsluiting meldt. De loc wordt
+    /// daarna altijd gestopt.</summary>
+    private async Task<bool> VrijheidsProef(Richting r)
+    {
+        _monitor.Bijwerken();
+        _kortsluitingGemeld = false;
+        _negeerKortsluitingTot = DateTime.MinValue;
+        var t0 = _klok.Nu;
+        bool alarm = false, bewogen = false;
+        await StuurSnelheidAlleBlokken(r, _ins.Verkensnelheid);
+        var eind = t0 + TimeSpan.FromSeconds(10);
+        while (_klok.Nu < eind)
+        {
+            await Wacht(Poll);
+            if (HuidigeAlarmBlokken().Count > 0) { alarm = true; break; }
+            if (_monitor.Bijwerken().Any(x => x.Tijd >= t0)) { bewogen = true; break; }
+        }
+        await VolledigeStop();
+        _kortsluitingGemeld = false;
+        return bewogen && !alarm && HuidigeAlarmBlokken().Count == 0;
+    }
+
+    private async Task<RitResultaat> Kortsluiting(RitResultaat res, string reden, List<int>? alarmBlokken = null)
     {
         int x = res.Reeks[^1];
         _laatsteKortsluitBlokken = HuidigeAlarmBlokken();
+        if (_laatsteKortsluitBlokken.Count == 0 && alarmBlokken is { Count: > 0 }) _laatsteKortsluitBlokken = alarmBlokken.ToList();
         // BUG #75: welke andere melder is nu ook bezet? Daar staat de loc met een deel al in: wijst naar de betrokken wissel.
         _laatsteKortsluitMelders = _monitor.Bezet.Where(m => m != x).OrderBy(m => m).ToList();
         _hw.Noodstop();
@@ -2184,9 +2314,24 @@ public partial class BaanVerkenner
         {
             // BUG #106 (log 09:06): een opdracht die op de startmelder zelf begint heeft een lege route, dus "ligt niet op de route terug" terwijl
             // de loc op de bekende basis-lus stond. Dan de kortste bekende weg met alle wissels rechtdoor.
-            var weg = ZelfTerugWeg(_kaart, x, _kaart.StartMelder);
-            if (weg is null) { _log.Info($"Melder {x} ligt niet op de route terug en er is geen bekende weg met alle wissels rechtdoor naar melder {_kaart.StartMelder}; de verkenner rijdt niet zelf terug."); return false; }
-            _log.Info($"De kortsluiting is weg en de loc staat op melder {x}: de verkenner rijdt zelf terug naar melder {_kaart.StartMelder} over de bekende basisweg ({Lijst(new[] { x }.Concat(weg.Select(s => s.Naar)).ToList())}) (niet getest op de baan).");
+            // BUG #164: een melder waar de loc net onverwacht terechtkwam (bijv. 12 na een klem-oplossing) staat nog niet als overgang op de kaart.
+            // De loc rijdt dan dezelfde weg terug (andere richting, zelfde wisselstand) naar de laatste melder die klopte en gaat vandaar verder.
+            var voorstap = new List<(int Van, int Naar, Richting Richting, Configuratie Cfg)>();
+            int vanaf = x;
+            if (nf.Onverwacht == x && nf.LaatsteGoed is int lg && lg != x && nf.RitRichting is Richting rr && nf.RitConfiguratie is Configuratie rc)
+            {
+                // Wat de loc daar vrij kreeg (kortsluitoplossing, bijv. wissel 1 afbuigend) moet ook op de terugweg zo staan: dezelfde klem zit er andersom ook.
+                var terugCfg = rc;
+                foreach (var ko in _kaart.AlleKortsluitOplossingen().Where(o => o.NaMelder == lg && o.Richting == rr)) terugCfg = terugCfg.MetStand(ko.Adres, ko.Afbuigend);
+                voorstap.Add((x, lg, rr.Om(), terugCfg)); vanaf = lg;
+            }
+            var basisWeg = ZelfTerugWeg(_kaart, vanaf, _kaart.StartMelder);
+            var restWeg = basisWeg?.Select(w => (w.Van, w.Naar, w.Richting, Cfg: Configuratie.Basis)).ToList()
+                      ?? ZelfTerugWegAlleStanden(_kaart, vanaf, _kaart.StartMelder);
+            var weg = restWeg is null ? null : voorstap.Concat(restWeg).ToList();
+            if (voorstap.Count > 0) basisWeg = null;
+            if (weg is null) { _log.Info($"Melder {x} ligt niet op de route terug en er is geen bekende weg naar melder {_kaart.StartMelder}; de verkenner rijdt niet zelf terug."); return false; }
+            _log.Info($"De kortsluiting is weg en de loc staat op melder {x}: de verkenner rijdt zelf terug naar melder {_kaart.StartMelder} over de bekende {(basisWeg is null ? "weg (met de wisselstanden waarmee die gezien is)" : "basisweg")} ({Lijst(new[] { x }.Concat(weg.Select(s => s.Naar)).ToList())}) (niet getest op de baan).");
             _kortsluitingGemeld = false;
             try
             {
@@ -2194,9 +2339,10 @@ public partial class BaanVerkenner
                 while (k < weg.Count)
                 {
                     var r = weg[k].Richting;
+                    var stapCfg = weg[k].Cfg;
                     var pad = new List<int> { weg[k].Van };
-                    while (k < weg.Count && weg[k].Richting == r) { pad.Add(weg[k].Naar); k++; }
-                    var cfg = MetEisen(pad, r, KiesBijIngang(pad[0], r, pad, Configuratie.Basis));
+                    while (k < weg.Count && weg[k].Richting == r && weg[k].Cfg.Sleutel == stapCfg.Sleutel) { pad.Add(weg[k].Naar); k++; }
+                    var cfg = MetEisen(pad, r, KiesBijIngang(pad[0], r, pad, stapCfg));
                     await ControleerGeenAlarmVoorStap($"terugweg {pad[0]} -> {pad[^1]}");
                     await ZetConfiguratie(cfg);
                     var terug = await Rit(pad[0], r, new RitDoel { Configuratie = cfg, DoelMelder = pad[^1], VerwachtPad = pad });
