@@ -1362,7 +1362,7 @@ public static class Tests
         // BUG #167: per been twee Dinamo-blokken (zuid 7 en 6, west 3 met vervolg 4 of 2)
         var zuid2 = p!.Value.Benen.First(b => b.Plek == "zuid").Melders;
         Eis(zuid2.Select(m => k.Melders.First(x => x.Nummer == m).DinamoBlok).Distinct().Count() == 2, "plus: zuid toont twee blokken (" + string.Join("-", zuid2) + ")");
-        Eis(p.Value.Benen.First(b => b.Plek == "west").Vervolg.Contains("daarna"), "plus: west noemt het vervolg bij de splitsing");
+        Eis(p.Value.Benen.First(b => b.Plek == "west").Takken is { Count: 2 } tk && tk[0][0] == 16 && tk[1][0] == 12, "plus (#168): west splitst na 5 en toont beide takken (16 en 12)");
         var benen = p!.Value.Benen;
         Eis(benen.Count == 4, "plus: vier benen (nu " + benen.Count + ")");
         string B(string plek) => string.Join("-", benen.First(b => b.Plek == plek).Melders);

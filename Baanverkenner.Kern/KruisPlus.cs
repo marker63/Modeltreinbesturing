@@ -7,10 +7,32 @@ namespace Baanverkenner.Kern;
 /// de stand van beide motoren zoals die in de gereden ritten gezien is. Niets uit eerdere verkenningen.</summary>
 public static class KruisPlus
 {
-    public record PlusBeen(string Plek, int[] Melders, string Vervolg = "");
+    public record PlusBeen(string Plek, int[] Melders, string Vervolg = "", List<int[]>? Takken = null);
     public record PlusVerbinding(int A, int B, int Keer, string Stand13, string Stand10);
 
     private const int MaxDiepte = 8;
+
+    /// <summary>Verlengt <paramref name="rij"/> naar buiten zolang het ondubbelzinnig is, buiten het midden blijft, niet in een lus terugkomt en niet meer dan twee
+    /// Dinamo-blokken omvat. Geeft de vervolgmelders terug als het been splitst (meer dan een mogelijkheid), anders een lege lijst.</summary>
+    private static List<int> Verleng(Baankaart k, List<int> rij, int vorige, int nu, int midden, List<int> buren)
+    {
+        while (rij.Count < MaxDiepte)
+        {
+            var volg = k.Doorgangen.Where(d => d.Via == vorige && d.Melder == nu).Select(d => d.Volgende).Distinct().ToList();
+            if (volg.Count == 0)
+                volg = k.Overgangen.Where(o => o.Van == nu && o.Naar != vorige).Select(o => o.Naar)
+                    .Concat(k.Overgangen.Where(o => o.Naar == nu && o.Van != vorige).Select(o => o.Van)).Distinct().ToList();
+            volg = volg.Where(x => x != midden && !rij.Contains(x) && !buren.Contains(x)).ToList();
+            if (volg.Count > 1) return volg;
+            if (volg.Count != 1) return new List<int>();
+            // BUG #167: twee Dinamo-blokken per been; een derde blok hoort niet meer bij dit been
+            var blokken = rij.Select(m => k.Melders.FirstOrDefault(x => x.Nummer == m)?.DinamoBlok).Where(x => x is not null).Select(x => x!.Value).Distinct().ToList();
+            var blNieuw = k.Melders.FirstOrDefault(x => x.Nummer == volg[0])?.DinamoBlok;
+            if (blNieuw is int bn && !blokken.Contains(bn) && blokken.Count >= 2) return new List<int>();
+            rij.Add(volg[0]); vorige = nu; nu = volg[0];
+        }
+        return new List<int>();
+    }
 
     public static (int Midden, int[] Motoren, List<PlusBeen> Benen, List<PlusVerbinding> Verbindingen)? Maak(Baankaart k)
     {
@@ -21,54 +43,44 @@ public static class KruisPlus
         var buren = k.Overgangen.Where(o => o.Van == midden).Select(o => o.Naar)
             .Concat(k.Overgangen.Where(o => o.Naar == midden).Select(o => o.Van))
             .Where(n => n != midden).Distinct().OrderBy(n => n).ToList();
-        var benen = new List<(int Buur, List<int> Melders, string Vervolg)>();
+        var benen = new List<(int Buur, List<int> Melders, string Vervolg, List<int[]> Takken)>();
         foreach (var b in buren)
         {
             var rij = new List<int> { b };
+            var splits = Verleng(k, rij, midden, b, midden, buren);
+            var takken = new List<int[]>();
             string vervolg = "";
-            int vorige = midden, nu = b;
-            while (rij.Count < MaxDiepte)
+            if (splits.Count > 1)
             {
-                // verder naar buiten: via de doorgangen (ingangskant) als die er zijn, anders de enige andere overgang
-                var volg = k.Doorgangen.Where(d => d.Via == vorige && d.Melder == nu).Select(d => d.Volgende).Distinct().ToList();
-                if (volg.Count == 0)
-                    volg = k.Overgangen.Where(o => o.Van == nu && o.Naar != vorige).Select(o => o.Naar)
-                        .Concat(k.Overgangen.Where(o => o.Naar == nu && o.Van != vorige).Select(o => o.Van)).Distinct().ToList();
-                // een been loopt alleen door zolang het ondubbelzinnig is, buiten het midden blijft en niet in een lus terugkomt
-                volg = volg.Where(x => x != midden && !rij.Contains(x) && !buren.Contains(x)).ToList();
-                if (volg.Count > 1)
+                // BUG #168 (Marco 18:24): bij een splitsing na het eerste blok worden beide (alle) takken getekend, daar zitten de problemen
+                int laatste = rij[^1];
+                foreach (var x in splits)
                 {
-                    // splitsing (bv. wissel): het been loopt niet ondubbelzinnig door; de mogelijke vervolgmelders met hun blok staan erbij
-                    vervolg = "daarna " + string.Join(" of ", volg.Select(x => $"{x} (blok {k.Melders.FirstOrDefault(m => m.Nummer == x)?.DinamoBlok?.ToString() ?? "?"})"));
-                    break;
+                    var tak = new List<int>(rij) { x };
+                    Verleng(k, tak, laatste, x, midden, buren);
+                    takken.Add(tak.Skip(rij.Count).ToArray());
                 }
-                if (volg.Count != 1) break;
-                // BUG #167 (Marco 18:18): per been twee Dinamo-blokken laten zien (het blok bij het midden en het volgende), zodat te zien is
-                // welke bezetmelders in welke volgorde bezet raken; een derde blok hoort niet meer bij dit been.
-                var blokken = rij.Select(m => k.Melders.FirstOrDefault(x => x.Nummer == m)?.DinamoBlok).Where(x => x is not null).Select(x => x!.Value).Distinct().ToList();
-                var blNieuw = k.Melders.FirstOrDefault(x => x.Nummer == volg[0])?.DinamoBlok;
-                if (blNieuw is int bn && !blokken.Contains(bn) && blokken.Count >= 2) break;
-                rij.Add(volg[0]); vorige = nu; nu = volg[0];
+                vervolg = "splitst na " + laatste + " in " + takken.Count + " takken";
             }
-            benen.Add((b, rij, vervolg));
+            benen.Add((b, rij, vervolg, takken));
+        }
+        // een melder die in twee benen voorkomt (lus) hoort bij het been waar hij het dichtst bij het midden ligt; het andere been stopt daarvoor
+        for (int i = 0; i < benen.Count; i++)
+        {
+            var (bu, ml, vv, tk) = benen[i];
+            int cut = ml.FindIndex(1, m => benen.Where((_, j) => j != i).Any(x => x.Melders.IndexOf(m) is int q && q >= 0 && q <= ml.IndexOf(m)));
+            if (cut > 0) benen[i] = (bu, ml.Take(cut).ToList(), $"sluit via {ml[cut]} aan op een ander been (lus)", new List<int[]>());
         }
         // zelfde windrichtingen als de referentie waar de buurmelder overeenkomt, de rest vult de vrije plekken
         var plekken = new[] { "noord", "west", "oost", "zuid" };
         var gebruikt = new HashSet<string>();
         var uit = new List<PlusBeen>();
-        // een melder die in twee benen voorkomt (lus) hoort bij het been waar hij het dichtst bij het midden ligt; het andere been stopt daarvoor
-        for (int i = 0; i < benen.Count; i++)
-        {
-            var (bu, ml, vv) = benen[i];
-            int cut = ml.FindIndex(1, m => benen.Where((_, j) => j != i).Any(x => x.Melders.IndexOf(m) is int q && q >= 0 && q <= ml.IndexOf(m)));
-            if (cut > 0) benen[i] = (bu, ml.Take(cut).ToList(), $"sluit via {ml[cut]} aan op een ander been (lus)");
-        }
-        foreach (var (buur, melders, vervolg2) in benen)
+        foreach (var (buur, melders, vervolg2, takken2) in benen)
         {
             var ref1 = KruiswisselReferentie.Benen.FirstOrDefault(r => r.Melders[0] == buur);
             string? plek = ref1 is not null && gebruikt.Add(ref1.Plek) ? ref1.Plek : null;
             if (plek is null) { plek = plekken.FirstOrDefault(p => !gebruikt.Contains(p) && !benen.Any(x => KruiswisselReferentie.Benen.Any(r => r.Plek == p && r.Melders[0] == x.Buur))); if (plek is null) plek = plekken.FirstOrDefault(p => !gebruikt.Contains(p)); if (plek is null) continue; gebruikt.Add(plek); }
-            uit.Add(new PlusBeen(plek, melders.ToArray(), vervolg2));
+            uit.Add(new PlusBeen(plek, melders.ToArray(), vervolg2, takken2));
         }
         var verb = new List<PlusVerbinding>();
         foreach (var g in k.Doorgangen.Where(d => d.Melder == midden).GroupBy(d => (Math.Min(d.Via, d.Volgende), Math.Max(d.Via, d.Volgende))))
@@ -99,7 +111,11 @@ public static class KruisPlus
         var sb = new StringBuilder();
         sb.AppendLine($"  Plusteken van melder {midden} (motor {string.Join(" + ", motoren)}) - alleen wat deze verkenning zelf gevonden heeft; bezetmelders in volgorde van {midden} naar buiten:");
         foreach (var b in benen.OrderBy(b => b.Plek))
+        {
             sb.AppendLine($"    been {b.Plek,-5}: {midden} - {string.Join(" - ", b.Melders)}   ({BlokTekst(k, b.Melders)}){(b.Vervolg == "" ? "" : "  -> " + b.Vervolg)}");
+            for (int t = 0; b.Takken is not null && t < b.Takken.Count; t++)
+                sb.AppendLine($"      been {b.Plek}, tak {(char)('a' + t)}: na {b.Melders[^1]} - {string.Join(" - ", b.Takken[t])}   ({BlokTekst(k, b.Takken[t])})");
+        }
         if (verb.Count == 0) sb.AppendLine("    Nog geen rit door het midden gereden.");
         foreach (var v in verb)
             sb.AppendLine($"    {v.A} <-> {v.B}: motor {(motoren.Length > 0 ? motoren[0] : 0)} {v.Stand13}, motor {(motoren.Length > 1 ? motoren[1] : 0)} {v.Stand10}  ({v.Keer}x gereden)");
@@ -115,19 +131,37 @@ public static class KruisPlus
         var sb = new StringBuilder();
         string E(string s) => System.Net.WebUtility.HtmlEncode(s);
         sb.Append($"<h2>Plusteken van melder {midden} (motor {E(string.Join(" + ", motoren))})</h2><p class=\"uitleg\">Alleen wat deze verkenning zelf gevonden heeft: per been alle bezetmelders in volgorde van het midden naar buiten, met het Dinamo-blok. De richting op het papier is schematisch. <b>Nog niet getest op de baan</b>.</p>");
-        const int B = 760, H = 520, cx = B / 2, cy = H / 2, bw = 54, bh = 28, stap = 64;
+        const int B = 900, H = 880, cx = B / 2, cy = H / 2, bw = 54, bh = 28, stap = 64;
         sb.Append($"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {B} {H}\" width=\"{B}\" height=\"{H}\" font-family=\"Segoe UI, Arial, sans-serif\" style=\"max-width:100%;height:auto;background:#fff\">");
         var richting = new Dictionary<string, (int X, int Y)> { ["noord"] = (0, -1), ["west"] = (-1, 0), ["oost"] = (1, 0), ["zuid"] = (0, 1) };
         foreach (var b in benen)
         {
             var (dx, dy) = richting[b.Plek];
-            int n = b.Melders.Length + 1, sy = stap - 12;
+            int tmax = b.Takken is { Count: > 0 } tt ? tt.Max(x => x.Length) : 0;
+            int n = b.Melders.Length + tmax + 1, sy = dx != 0 ? stap : 44;
             sb.Append($"<line x1=\"{cx}\" y1=\"{cy}\" x2=\"{cx + dx * stap * n}\" y2=\"{cy + dy * sy * n}\" stroke=\"#44506a\" stroke-width=\"3\"/>");
             for (int i = 0; i < b.Melders.Length; i++)
             {
                 int mx = cx + dx * stap * (i + 1), my = cy + dy * sy * (i + 1);
                 sb.Append($"<rect x=\"{mx - bw / 2}\" y=\"{my - bh / 2}\" width=\"{bw}\" height=\"{bh}\" rx=\"5\" fill=\"#eef2ff\" stroke=\"#44506a\"/>");
                 sb.Append($"<text x=\"{mx}\" y=\"{my + 5}\" text-anchor=\"middle\" font-size=\"14\" fill=\"#1c2333\">{b.Melders[i]}</text>");
+            }
+            // splitsing: elke tak apart getekend, zijwaarts naast elkaar
+            for (int t = 0; b.Takken is not null && t < b.Takken.Count; t++)
+            {
+                int off = (int)((t - (b.Takken.Count - 1) / 2.0) * 44) + (b.Takken.Count == 1 ? 44 : 0);
+                int px = dy != 0 ? off : 0, py = dx != 0 ? off : 0;
+                int l = b.Melders.Length;
+                sb.Append($"<line x1=\"{cx + dx * stap * l}\" y1=\"{cy + dy * sy * l}\" x2=\"{cx + dx * stap * (l + 1) + px}\" y2=\"{cy + dy * sy * (l + 1) + py}\" stroke=\"#c77700\" stroke-width=\"2\"/>");
+                sb.Append($"<line x1=\"{cx + dx * stap * (l + 1) + px}\" y1=\"{cy + dy * sy * (l + 1) + py}\" x2=\"{cx + dx * stap * (l + b.Takken[t].Length) + px}\" y2=\"{cy + dy * sy * (l + b.Takken[t].Length) + py}\" stroke=\"#c77700\" stroke-width=\"2\"/>");
+                for (int i = 0; i < b.Takken[t].Length; i++)
+                {
+                    int mx = cx + dx * stap * (l + 1 + i) + px, my = cy + dy * sy * (l + 1 + i) + py;
+                    sb.Append($"<rect x=\"{mx - bw / 2}\" y=\"{my - bh / 2}\" width=\"{bw}\" height=\"{bh}\" rx=\"5\" fill=\"#fff4e0\" stroke=\"#c77700\"/>");
+                    sb.Append($"<text x=\"{mx}\" y=\"{my + 5}\" text-anchor=\"middle\" font-size=\"14\" fill=\"#1c2333\">{b.Takken[t][i]}</text>");
+                }
+                int tx = cx + dx * stap * (l + b.Takken[t].Length) + px + (dx != 0 ? 0 : 36), ty = cy + dy * sy * (l + b.Takken[t].Length) + py + (dx != 0 ? (t % 2 == 0 ? -24 : 34) : 5);
+                sb.Append($"<text x=\"{tx}\" y=\"{ty}\" text-anchor=\"{(dx != 0 ? "middle" : "start")}\" font-size=\"12\" fill=\"#c77700\">tak {(char)('a' + t)}: {E(BlokTekst(k, b.Takken[t]))}</text>");
             }
             int lx = dx != 0 ? cx + dx * stap * b.Melders.Length : cx + 36;
             int ly = dx != 0 ? cy - 24 : cy + dy * sy * b.Melders.Length + 5;

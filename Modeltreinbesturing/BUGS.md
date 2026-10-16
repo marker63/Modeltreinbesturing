@@ -2201,3 +2201,8 @@ Test: CompileCheck (ALLES OK, KruisPlusTest met de kaart van 17:50). Nog niet ge
 - Marco vroeg om per poot van het plusteken twee blokken (met alle bezetmelders in volgorde) te tonen; #165 kapte elke poot af bij de eerste blokwissel.
 - Fix: `KruisPlus.Maak` laat elke poot doorlopen tot twee Dinamo-blokken; bij een splitsing staat "daarna X (blok n) of Y (blok m)", een lus naar een ander been wordt benoemd. Test in `KruisPlusTest`.
 - Nog niet getest op de baan.
+
+## #168 – Plusteken: bij een splitsing beide takken tonen (16-10, 18:24)
+- Marco: ook bij een poot met één blok controleren, en bij een splitsing na het eerste blok beide takken tekenen (daar ontstaan en blijken de problemen).
+- Fix: `KruisPlus.Verleng` (gedeelde logica); splitst een poot (west na 5: 16 of 12), dan worden alle takken met hun blokken doorgevolgd en in tekst en html-tekening (oranje takken naast elkaar) getoond. Poten zonder splitsing blijven zoals ze zijn. Test in `KruisPlusTest`.
+- Nog niet getest op de baan; de html-tekening is alleen gecontroleerd op opbouw (geen visuele controle hier).
