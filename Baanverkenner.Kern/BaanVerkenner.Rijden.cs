@@ -38,6 +38,12 @@ public class RitDoel
 
     /// <summary>BUG #107: het adres dat deze rit zelf test; dat wordt nooit automatisch gezet.</summary>
     public int? ProefAdres { get; set; }
+
+    /// <summary>BUG #172: stap-voor-stap: de rit stopt na zoveel nieuwe melders (nooit op een kruiswissel-melder: dan rijdt hij één melder door, de uitgang).</summary>
+    public int? MaxStappen { get; set; }
+
+    /// <summary>BUG #172: de kruismotoren blijven precies zoals de rit ze kreeg (kruiswissel-proef).</summary>
+    public bool GeenKruisVooraf { get; set; }
 }
 
 /// <summary>De loc kwam niet waar hij verwacht werd (bijv. een wissel die niet omging).</summary>
@@ -1370,7 +1376,7 @@ public partial class BaanVerkenner
             ? $"Rijden {r.Tekst()} van melder {start} naar melder {doel.DoelMelder}."
             : $"Verkenningsrit {r.Tekst()} vanaf melder {start} ({doel.Configuratie}).");
         if (doel.StaartWissels && !doel.IsNavigatie) cfgNu = await ZetStaartWissels(start, r, cfgNu, doel);
-        if (!doel.IsNavigatie) cfgNu = await ZetKruisVooraf(start, r, cfgNu, doel);   // BUG #135
+        if (!doel.IsNavigatie && !doel.GeenKruisVooraf) cfgNu = await ZetKruisVooraf(start, r, cfgNu, doel);   // BUG #135
         await StuurSnelheid(r, snelheid);
 
         var laatsteWijziging = _klok.Nu;
@@ -1604,9 +1610,15 @@ public partial class BaanVerkenner
                     res.Einde = RitEinde.BekendKortsluitpunt;
                     return res;
                 }
+                if (doel.MaxStappen is int maxStappen && res.Reeks.Count - 1 >= maxStappen && !Kruis.Middens.Contains(m))
+                {
+                    await StopLoc();
+                    res.Einde = RitEinde.StapKlaar;
+                    return res;
+                }
                 // BUG #107: de rit gaat door; ligt voor de loc een wissel waar hij van achteren op af rijdt, dan nu goed zetten.
                 if (doel.StaartWissels) cfgNu = await ZetStaartWissels(m, r, cfgNu, doel);
-                if (!doel.IsNavigatie) cfgNu = await ZetKruisVooraf(m, r, cfgNu, doel);   // BUG #135
+                if (!doel.IsNavigatie && !doel.GeenKruisVooraf) cfgNu = await ZetKruisVooraf(m, r, cfgNu, doel);   // BUG #135
             }
 
             // ---- Helemaal in een nieuwe, nog onbekende sectie (Dinamo): blokproef ----
@@ -2383,6 +2395,7 @@ public partial class BaanVerkenner
     /// fout), dan volgt als vanouds de vraag aan de gebruiker.</summary>
     private async Task<bool> ProbeerZelfTerugNaarStart(List<Etappe> route, NavigatieFout nf)
     {
+        if (Stap) return await ProbeerZelfNaarMelder(RouteDoel(route));   // BUG #172
         if (nf.LocAndersom) return false;
         var eind = _klok.Nu + TimeSpan.FromSeconds(10);
         while (HuidigeAlarmBlokken().Count > 0 && _klok.Nu < eind) await Wacht(TimeSpan.FromMilliseconds(300));

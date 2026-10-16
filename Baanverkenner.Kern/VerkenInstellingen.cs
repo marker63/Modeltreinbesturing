@@ -67,6 +67,11 @@ public class VerkenInstellingen
     /// <summary>Een melder telt pas als bezet/vrij als hij zo lang stabiel is (filtert
     /// spookmeldingen/flikkeren).</summary>
     public int OntdenderMs { get; set; } = 300;
+    /// <summary>BUG #172 (Marco 16-10 20:23): werkwijze 'Stap voor stap'. De loc rijdt na een opdracht niet meer terug naar de startmelder maar blijft waar hij is;
+    /// elke basis- en proefrit is één melder lang (twee als daarna de kruiswissel volgt) en de dichtstbijzijnde open plek komt eerst aan de beurt.
+    /// De kruiswissel krijgt een eigen proef met de vier standen van de kruismotoren.</summary>
+    public bool StapVoorStap { get; set; }
+
     /// <summary>Basisrit twee keer rijden en vergelijken ("voor de zekerheid").</summary>
     public bool BasisritHerhalen { get; set; } = true;
     /// <summary>Hoeveel melders er na de eerste afwijkende melder nog doorgereden wordt

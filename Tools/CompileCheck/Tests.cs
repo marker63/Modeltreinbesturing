@@ -2304,11 +2304,12 @@ public static class Tests
 
     // De geslaagde, volledige rit van 10-10 11:38 (blokken 10, 11, 12): referentie voor importer en leerprofiel
     /// <summary>BUG #150: een volledige verkenning vanaf nul op de nagebouwde Miniworld-baan (zie MiniworldBaan). Geeft het aantal kortsluitingen terug.</summary>
-    static (BaanVerkenner V, VerkenLog Log, int Kortsluitingen, double Seconden, string Einde) MiniworldRit(int startMelder, double maxUren = 6, Action<BaanVerkenner>? voorbereiding = null, bool omzettenOnderLoc = true, Action<Baanverkenner.Kern.Simulatie.SimulatieBaan>? simAanpassing = null)
+    static (BaanVerkenner V, VerkenLog Log, int Kortsluitingen, double Seconden, string Einde) MiniworldRit(int startMelder, double maxUren = 6, Action<BaanVerkenner>? voorbereiding = null, bool omzettenOnderLoc = true, Action<Baanverkenner.Kern.Simulatie.SimulatieBaan>? simAanpassing = null, Action<VerkenInstellingen>? insAanpassing = null)
     {
         var sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(omzettenOnderLoc, startMelder);
         simAanpassing?.Invoke(sim);
         var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 14, DinamoBlokken = "1-12", KruisMotoren = "10+13", HoogsteMelder = 150 };
+        insAanpassing?.Invoke(ins);
         sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
         var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
         var log = new VerkenLog(klok);
@@ -2324,6 +2325,21 @@ public static class Tests
         if (Environment.GetEnvironmentVariable("MINI_LOG") == "1") Console.WriteLine(log.AlsTekst());
         int kort = log.Regels.Count(r => r.Tekst.Contains("KORTSLUITING/ONTSPORING vermoed"));
         return (v, log, kort, (klok.Nu - t0).TotalSeconds, einde);
+    }
+
+    // BUG #172: werkwijze 'Stap voor stap' op de nagebouwde Miniworld-baan
+    static void StapVoorStapTest()
+    {
+        Console.WriteLine("Test: stap voor stap op de nagebouwde Miniworld-baan (BUG #172)");
+        foreach (var start in (Environment.GetEnvironmentVariable("STAP_START") ?? "17").Split(',').Select(int.Parse))
+        {
+            var r = MiniworldRit(start, double.Parse(Environment.GetEnvironmentVariable("STAP_UREN") ?? "8", System.Globalization.CultureInfo.InvariantCulture), insAanpassing: i => i.StapVoorStap = true);
+            Console.WriteLine($"  start {start}: {r.Einde}, {r.Seconden / 60:0} min, {r.Kortsluitingen} kortsluiting(en), melders: {string.Join(",", r.V.Kaart.Melders.Select(m => m.Nummer).OrderBy(x => x))}, voltooid: {r.V.Kaart.Voltooid}, wissels: {string.Join(",", r.V.Kaart.Wissels.Where(w => w.Waarnemingen.Count > 0).Select(w => w.Adres))}");
+            Eis(r.V.Kaart.Voltooid, $"stap voor stap (start {start}): de verkenning rondt af");
+            Eis(r.V.Kaart.Melders.Count >= 18, $"stap voor stap (start {start}): de melders zijn gevonden (nu {r.V.Kaart.Melders.Count})");
+            Eis(r.Kortsluitingen <= 5, $"stap voor stap (start {start}): weinig kortsluitingen (nu {r.Kortsluitingen})");
+            Eis(r.V.Kaart.KruisMidden.Contains(24) && !r.V.Kaart.KruisMidden.Contains(129), $"stap voor stap (start {start}): alleen melder 24 is de kruiswissel (nu {string.Join(",", r.V.Kaart.KruisMidden)})");
+        }
     }
 
     // BUG #164: de kortsluitmelding van Dinamo komt vlak NA het begin van de stop (log 16-10 09:00:35: 1 ms na het eerste stopcommando) en werd als gevolg van de eigen stop genegeerd.
@@ -2518,6 +2534,7 @@ public static class Tests
         ZaadAllesTest();
         if (Environment.GetEnvironmentVariable("MINI_DEBUG") == "1") MiniworldFoutzoek();
         MiniworldRitTest();
+        StapVoorStapTest();
         MiniworldAlarmVertragingTest();
         MiniworldVoorkennisTest();
         HerstelBlijftStaanTest();

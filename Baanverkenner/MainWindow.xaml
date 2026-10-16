@@ -156,6 +156,7 @@
                         <TextBox x:Name="ExtraMeldersBox" Grid.Row="9" Grid.Column="1"/>
                         <StackPanel Grid.Row="10" Grid.ColumnSpan="2">
                             <CheckBox x:Name="BasisHerhalenCheck" Margin="0,4" Content="Basisrit twee keer rijden ter controle"/>
+                            <CheckBox x:Name="StapVoorStapCheck" Margin="0,4" Content="Stap voor stap verkennen (loc in het midden van een blok, steeds één melder rijden, wissels één voor één) - nieuw, trager"/>
                             <CheckBox x:Name="AutoSnelheidCheck" Margin="0,4" Content="Verkensnelheid zelf bijstellen (lager bij heel korte secties) - experimenteel"/>
                         </StackPanel>
                         <TextBlock Grid.Row="11" Grid.ColumnSpan="2" Style="{StaticResource Uitleg}"

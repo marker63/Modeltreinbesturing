@@ -29,6 +29,8 @@ public class Opdracht
     /// met een al afbuigend gezette wissel, een anders doodlopende tak alsnog opent, gevonden
     /// worden.</summary>
     public bool TestCombinaties { get; set; }
+    /// <summary>BUG #172: proef van een kruiswissel-ingang (twee melders, precies de gevraagde motorstanden, geen adrestest).</summary>
+    public bool KruisProef { get; set; }
     public string Sleutel => $"{Configuratie.Sleutel}|{Start}|{Richting}";
 }
 
@@ -303,8 +305,8 @@ public partial class BaanVerkenner
                         _status.Wachtrij.Clear();
                         break;
                     }
-                    var o = _status.Wachtrij[0];
-                    _status.Wachtrij.RemoveAt(0);
+                    var o = Stap ? KiesVolgendeOpdracht(_kaart, HuidigePlek(), _status.Wachtrij) : _status.Wachtrij[0];
+                    _status.Wachtrij.Remove(o);
                     _status.Huidig = o;
                     BewaarNu();
                     await VoerOpdrachtUit(o);
@@ -553,6 +555,7 @@ public partial class BaanVerkenner
         o.Id = _status.VolgendeOpdrachtId++;
         o.VolgendAdres = _ins.WisselAdressen().First();
         o.Route = VerkortRoute(o.Route, o.Start);
+        if (Stap && o.Route.Count > 3) o.Route = o.Route.TakeLast(3).ToList();   // BUG #172: de route is hier alleen boekhouding; de loc kiest zelf zijn weg
         _status.GeplandeOpdrachten.Add(o.Sleutel);
         if (vooraan) _status.Wachtrij.Insert(0, o); else _status.Wachtrij.Add(o);
         _log.Info($"Nieuwe opdracht #{o.Id}: vanaf melder {o.Start} {o.Richting.Tekst()} ({o.Configuratie}) - {o.Reden}.");
@@ -903,7 +906,15 @@ public partial class BaanVerkenner
         return pad;
     }
 
+    private int AantalOplossingen() => _kaart.Kortsluitpunten.Count(k => k.Opgelost) + _kaart.BekendeKortsluitOplossingen.Count;
+
     private async Task VoerOpdrachtUit(Opdracht o)
+    {
+        await VoerOpdrachtUitKern(o);
+        if (Stap) NaOpdrachtStap();
+    }
+
+    private async Task VoerOpdrachtUitKern(Opdracht o)
     {
         _handmatigeOplossingGemeld = false;
         o.Route = VerkortRoute(o.Route, o.Start); // ook voor opdrachten uit een eerder opgeslagen voortgang
@@ -912,10 +923,13 @@ public partial class BaanVerkenner
         MeldVoortgang();
         _log.Stap($"Opdracht #{o.Id}: {_bezig} - {o.Reden}.");
 
-        var rijstand = RijStand(o);
+        // BUG #172: een kruiswissel-proef rijdt met precies de gevraagde motorstanden.
+        _stapDoel = o.Start;
+        var rijstand = o.KruisProef ? o.Configuratie : RijStand(o);
         // BUG #145: een opdracht waarvan de aankomst op de startmelder al kortsluiting gaf (en niet bewezen oplosbaar is) wordt niet opnieuw gereden.
         // BUG #149: liever vanaf de bewezen ingang aankomen dan een wissel bij de startmelder onder de staande loc omzetten.
-        var viaIngang = AankomstViaBewezenIngang(_kaart, o, rijstand, Kruis, out var ingangUitleg);
+        string? ingangUitleg = null;
+        var viaIngang = Stap ? null : AankomstViaBewezenIngang(_kaart, o, rijstand, Kruis, out ingangUitleg);   // BUG #172: stap voor stap kiest zelf de kortste weg
         if (ingangUitleg is not null) _log.Info(ingangUitleg);
         if (viaIngang is null && BekendeAankomstKortsluiting(o, rijstand) is { } bekend)
         {
@@ -926,6 +940,7 @@ public partial class BaanVerkenner
         }
         try
         {
+            if (o.KruisProef) { await VoerKruisProefUit(o); return; }
             await NaarStartVan(viaIngang ?? o.Route, rijstand);
             // BUG #96 (Marco 16:01: "weer kortsluiting in het kruiswissel en motor 13 staat verkeerd"): motor 13 of 10 omzetten terwijl de loc op melder 24
             // staat geeft ALTIJD kortsluiting (log 15:40, 15:48, 14:40). Is dat hier nodig en kon het niet vooraf (#95), dan wordt de opdracht
@@ -962,6 +977,8 @@ public partial class BaanVerkenner
                 _log.Info($"Opdracht #{o.Id}: {basisUitleg} Rijstand voor de proeven: {rijstandBasis}.");
                 rijstand = rijstandBasis;
             }
+
+            if (Stap) PlanVervolg(o, basis);   // BUG #172
 
             if (o.BronAdres is int bron && basis.Reeks.Count >= 2
                 && !_kaart.Wissel(bron).Waarnemingen.Any(w => w.Soort == WaarnemingSoort.Splitsing && w.NaMelder == o.Start && w.Richting == o.Richting))
@@ -1001,11 +1018,22 @@ public partial class BaanVerkenner
             // doorgegaan naar de adrestest hieronder, zie de toelichting bij Opdracht.TestCombinaties.
 
             // ---- Alle adressen één voor één ----
+            int oplossingenBekend = AantalOplossingen();
             foreach (var a in _ins.WisselAdressen())
             {
                 if (a < o.VolgendAdres) continue;
+                // BUG #172: werd tijdens deze opdracht een kortsluiting opgelost met een extra wissel (wissel 1 bij wissel 2), dan rijden de volgende proeven daar meteen mee;
+                // anders zette de proef die wissel na elke rit terug terwijl de loc ernaast stond en kwam de kortsluiting steeds terug.
+                if (Stap && AantalOplossingen() != oplossingenBekend)
+                {
+                    oplossingenBekend = AantalOplossingen();
+                    var nieuwStand = RijStand(o);
+                    foreach (var x in nieuwStand.Afbuigend.Where(x => !rijstand.Bevat(x) && !Kruis.IsMotor(x) && x != a)) rijstand = rijstand.Met(x);
+                }
                 o.VolgendAdres = a;
                 if (_status.Geidentificeerd.Contains(a) || o.Configuratie.Bevat(a)) continue;
+                // BUG #172: de kruismotoren hebben alleen effect op de kruiswissel zelf; die krijgt een eigen proef (VoerKruisProefUit) vanaf elke ingang.
+                if (Stap && Kruis.IsMotor(a)) continue;
                 await PauzeMoment();
                 _bezig = $"opdracht #{o.Id}: adres {a} testen";
                 MeldVoortgang();
@@ -1156,7 +1184,7 @@ public partial class BaanVerkenner
             if (nf.Kortsluiting && WeerlegAankomstOplossing(o, rijstand)) o.Pogingen = 2;   // BUG #145: niet nog eens dezelfde rit
             await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);
             if (!await ProbeerZelfTerugNaarStart(o.Route, nf))
-                await VraagLocTerugTeZetten(_kaart.StartMelder, $"{nf.Message}\n\nDe verkenner gaat terug naar de startmelder.");
+                await VraagLocTerugTeZetten(Stap ? RouteDoel(o.Route) : _kaart.StartMelder, $"{nf.Message}\n\n{(Stap ? "De verkenner gaat naar de plek van deze opdracht." : "De verkenner gaat terug naar de startmelder.")}");
             o.Pogingen++;
             if (o.Pogingen < 2)
             {
@@ -1377,7 +1405,7 @@ public partial class BaanVerkenner
     {
         var stops = KortsluitStops(o.Configuratie, o.Richting);
         RitResultaat? eerste = null;
-        int aantal = _ins.BasisritHerhalen ? 2 : 1;
+        int aantal = _ins.BasisritHerhalen && !Stap ? 2 : 1;   // BUG #172: stap voor stap vergelijkt elke proef toch met deze ene korte rit
         var ritten = new List<RitResultaat>();
         for (int i = 0; i < aantal + 1; i++)
         {
@@ -1385,7 +1413,7 @@ public partial class BaanVerkenner
             _bezig = $"opdracht #{o.Id}: basisrit {(i == 0 ? "" : $"(controle {i})")}";
             MeldVoortgang();
             var rijstandBasis = RijStand(o);
-            var rit = await Rit(o.Start, o.Richting, new RitDoel { Configuratie = rijstandBasis, StopBijMelders = stops, StaartWissels = true });
+            var rit = await Rit(o.Start, o.Richting, new RitDoel { Configuratie = rijstandBasis, StopBijMelders = stops, StaartWissels = true, MaxStappen = Stap ? 1 : null });
             _log.Info($"Basisrit: {Lijst(rit.Reeks)} - einde: {EindeTekst(rit.Einde)}.");
             VerwerkEinde(o, rit);
             // BUG #121 (log 18:16:37 en 17:01:58): de terugweg ging uit van de NOMINALE stand van de opdracht (afbuigend: 2) in plaats van de werkelijke
@@ -1410,7 +1438,7 @@ public partial class BaanVerkenner
             // De rit met kortsluiting heeft de loc teruggezet; de volgende basisrit (als die er
             // was) stopte vóór het kortsluitpunt. Voor het vergelijken is de korte versie goed.
             var gekozen = ritten.LastOrDefault(r => r.Reeks.SequenceEqual(eerste.Reeks)) ?? eerste;
-            _kaart.Trajecten.Add(new Traject { Configuratie = o.Configuratie, Start = o.Start, Richting = o.Richting, Reeks = gekozen.Reeks.ToList(), Einde = gekozen.Einde });
+            if (!Stap) _kaart.Trajecten.Add(new Traject { Configuratie = o.Configuratie, Start = o.Start, Richting = o.Richting, Reeks = gekozen.Reeks.ToList(), Einde = gekozen.Einde });   // BUG #172: stap voor stap bouwt de trajecten aan het eind (BouwTrajecten)
             return gekozen;
         }
         return null;
@@ -1903,6 +1931,7 @@ public partial class BaanVerkenner
                 _log.Stap($"Kortsluitpunt #{k.Id}: proberen met adres {adres} op {(afb ? "afbuigend" : "rechtdoor")}" + (partnerSet.Contains(adres) ? $" (naast {k.Configuratie}, overloopwissel?)." : "."));
                 try
                 {
+                    _stapDoel = k.NaMelder;
                     await NaarStartVan(k.Route);
                     await ZetConfiguratie(c);
                     var rit = await Rit(k.NaMelder, k.Richting, new RitDoel { Configuratie = c, Basis = new List<int> { k.NaMelder }, ExtraNaAfwijking = 0 });
@@ -1963,7 +1992,7 @@ public partial class BaanVerkenner
                         _log.Waarschuwing($"Kortsluitpunt #{k.Id}: de uitkomst van de proef met adres {adres} is vastgelegd, maar de weg terug mislukte: {nf.Message}");
                         await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);
                         if (!await ProbeerZelfTerugNaarStart(k.Route, nf))
-                            await VraagLocTerugTeZetten(_kaart.StartMelder, $"{nf.Message}\n\nDe uitkomst van de proef is bewaard. De verkenner gaat terug naar de startmelder.");
+                            await VraagLocTerugTeZetten(Stap ? RouteDoel(k.Route) : _kaart.StartMelder, $"{nf.Message}\n\nDe uitkomst van de proef is bewaard. {(Stap ? "De verkenner gaat naar de plek van deze opdracht." : "De verkenner gaat terug naar de startmelder.")}");
                     }
                     if (proefKortsluiting) continue;
                     if (proefOpgelost) break;
@@ -1977,7 +2006,7 @@ public partial class BaanVerkenner
                     if (nf.Kortsluiting) k.AantalKortsluitingen++;
                     await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);
                     if (!await ProbeerZelfTerugNaarStart(k.Route, nf))
-                        await VraagLocTerugTeZetten(_kaart.StartMelder, $"{nf.Message}\n\nDe verkenner gaat terug naar de startmelder.");
+                        await VraagLocTerugTeZetten(Stap ? RouteDoel(k.Route) : _kaart.StartMelder, $"{nf.Message}\n\n{(Stap ? "De verkenner gaat naar de plek van deze opdracht." : "De verkenner gaat terug naar de startmelder.")}");
                     if (navigatieFouten >= 3)
                     {
                         k.Opgegeven = true;
@@ -2096,6 +2125,12 @@ public partial class BaanVerkenner
 
     private async Task NaarStartVan(List<Etappe> route, Configuratie? doel = null)
     {
+        // BUG #172: stap voor stap: niet via de startmelder, maar over de kortste bekende weg vanaf waar de loc nu staat.
+        if (Stap && !_stapNavigeert)
+        {
+            await NaarPlekMelder(RouteDoel(route), doel);
+            return;
+        }
         for (int i = 0; i < route.Count; i++)
         {
             var e = route[i];
@@ -2206,6 +2241,7 @@ public partial class BaanVerkenner
     /// proef staan voor het EERSTE stuk van de terugweg; pas daarna volgen de standen van de route.</param>
     private async Task TerugNaarHuis(List<Etappe> route, Configuratie? eersteConfiguratie = null)
     {
+        if (Stap) return;   // BUG #172: de loc blijft waar hij is; de volgende opdracht rijdt zelf naar zijn plek
         for (int i = route.Count - 1; i >= 0; i--)
         {
             var e = route[i];
@@ -2344,6 +2380,7 @@ public partial class BaanVerkenner
         foreach (var k in _kaart.Kortsluitpunten.Where(k => k.OpgelostDoorAdres is not null)) gevonden.Add(k.OpgelostDoorAdres!.Value);
         foreach (var w in _kaart.Wissels.Where(w => w.Waarnemingen.Count > 0)) gevonden.Add(w.Adres);   // BUG #160: wissel 11 stond in de lijst 'zonder effect' terwijl hij waarnemingen had
         _kaart.VulOntbrekendeVia();   // BUG #160
+        if (Stap) BouwTrajecten();   // BUG #172
         _kaart.AdressenZonderEffect = _ins.WisselAdressen().Where(a => !gevonden.Contains(a)).ToList();
         _kaart.VoorgesteldeBlokken = BlokVoorstel.Bereken(_kaart);
         _kaart.Wisselstraatvoorstellen = WisselstraatVoorstel.Bereken(_kaart);
@@ -2394,6 +2431,7 @@ public partial class BaanVerkenner
         RitEinde.AfwijkingGevonden => "afwijking gevonden",
         RitEinde.Maximum => "maximaal aantal melders",
         RitEinde.DoelBereikt => "doel bereikt",
+        RitEinde.StapKlaar => "stap gereden",
         _ => e.ToString()
     };
 }

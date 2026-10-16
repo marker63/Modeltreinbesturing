@@ -197,7 +197,8 @@ public enum RitEinde
     GelijkAanBasis,      // proefrit volgde de basisrit tot het einde: niets nieuws
     AfwijkingGevonden,   // proefrit week af van de basisrit en reed nog even door
     Maximum,             // veiligheidsgrens aantal melders
-    DoelBereikt          // (navigatie) doelmelder bereikt
+    DoelBereikt,         // (navigatie) doelmelder bereikt
+    StapKlaar            // BUG #172: stap-voor-stap: de rit is zo lang als gevraagd (MaxStappen) en stopt
 }
 
 public class Traject
