@@ -7,10 +7,10 @@ namespace Baanverkenner.Kern;
 /// de stand van beide motoren zoals die in de gereden ritten gezien is. Niets uit eerdere verkenningen.</summary>
 public static class KruisPlus
 {
-    public record PlusBeen(string Plek, int[] Melders);
+    public record PlusBeen(string Plek, int[] Melders, string Vervolg = "");
     public record PlusVerbinding(int A, int B, int Keer, string Stand13, string Stand10);
 
-    private const int MaxDiepte = 4;
+    private const int MaxDiepte = 8;
 
     public static (int Midden, int[] Motoren, List<PlusBeen> Benen, List<PlusVerbinding> Verbindingen)? Maak(Baankaart k)
     {
@@ -21,10 +21,11 @@ public static class KruisPlus
         var buren = k.Overgangen.Where(o => o.Van == midden).Select(o => o.Naar)
             .Concat(k.Overgangen.Where(o => o.Naar == midden).Select(o => o.Van))
             .Where(n => n != midden).Distinct().OrderBy(n => n).ToList();
-        var benen = new List<(int Buur, List<int> Melders)>();
+        var benen = new List<(int Buur, List<int> Melders, string Vervolg)>();
         foreach (var b in buren)
         {
             var rij = new List<int> { b };
+            string vervolg = "";
             int vorige = midden, nu = b;
             while (rij.Count < MaxDiepte)
             {
@@ -34,24 +35,40 @@ public static class KruisPlus
                     volg = k.Overgangen.Where(o => o.Van == nu && o.Naar != vorige).Select(o => o.Naar)
                         .Concat(k.Overgangen.Where(o => o.Naar == nu && o.Van != vorige).Select(o => o.Van)).Distinct().ToList();
                 // een been loopt alleen door zolang het ondubbelzinnig is, buiten het midden blijft en niet in een lus terugkomt
-                if (volg.Count != 1 || volg[0] == midden || rij.Contains(volg[0]) || buren.Contains(volg[0])) break;
-                // een been eindigt waar het Dinamo-blok verandert (de rest hoort bij een ander blok/been)
-                var bl0 = k.Melders.FirstOrDefault(x => x.Nummer == b)?.DinamoBlok; var bl1 = k.Melders.FirstOrDefault(x => x.Nummer == volg[0])?.DinamoBlok;
-                if (bl0 is not null && bl1 is not null && bl0 != bl1) break;
+                volg = volg.Where(x => x != midden && !rij.Contains(x) && !buren.Contains(x)).ToList();
+                if (volg.Count > 1)
+                {
+                    // splitsing (bv. wissel): het been loopt niet ondubbelzinnig door; de mogelijke vervolgmelders met hun blok staan erbij
+                    vervolg = "daarna " + string.Join(" of ", volg.Select(x => $"{x} (blok {k.Melders.FirstOrDefault(m => m.Nummer == x)?.DinamoBlok?.ToString() ?? "?"})"));
+                    break;
+                }
+                if (volg.Count != 1) break;
+                // BUG #167 (Marco 18:18): per been twee Dinamo-blokken laten zien (het blok bij het midden en het volgende), zodat te zien is
+                // welke bezetmelders in welke volgorde bezet raken; een derde blok hoort niet meer bij dit been.
+                var blokken = rij.Select(m => k.Melders.FirstOrDefault(x => x.Nummer == m)?.DinamoBlok).Where(x => x is not null).Select(x => x!.Value).Distinct().ToList();
+                var blNieuw = k.Melders.FirstOrDefault(x => x.Nummer == volg[0])?.DinamoBlok;
+                if (blNieuw is int bn && !blokken.Contains(bn) && blokken.Count >= 2) break;
                 rij.Add(volg[0]); vorige = nu; nu = volg[0];
             }
-            benen.Add((b, rij));
+            benen.Add((b, rij, vervolg));
         }
         // zelfde windrichtingen als de referentie waar de buurmelder overeenkomt, de rest vult de vrije plekken
         var plekken = new[] { "noord", "west", "oost", "zuid" };
         var gebruikt = new HashSet<string>();
         var uit = new List<PlusBeen>();
-        foreach (var (buur, melders) in benen)
+        // een melder die in twee benen voorkomt (lus) hoort bij het been waar hij het dichtst bij het midden ligt; het andere been stopt daarvoor
+        for (int i = 0; i < benen.Count; i++)
+        {
+            var (bu, ml, vv) = benen[i];
+            int cut = ml.FindIndex(1, m => benen.Where((_, j) => j != i).Any(x => x.Melders.IndexOf(m) is int q && q >= 0 && q <= ml.IndexOf(m)));
+            if (cut > 0) benen[i] = (bu, ml.Take(cut).ToList(), $"sluit via {ml[cut]} aan op een ander been (lus)");
+        }
+        foreach (var (buur, melders, vervolg2) in benen)
         {
             var ref1 = KruiswisselReferentie.Benen.FirstOrDefault(r => r.Melders[0] == buur);
             string? plek = ref1 is not null && gebruikt.Add(ref1.Plek) ? ref1.Plek : null;
             if (plek is null) { plek = plekken.FirstOrDefault(p => !gebruikt.Contains(p) && !benen.Any(x => KruiswisselReferentie.Benen.Any(r => r.Plek == p && r.Melders[0] == x.Buur))); if (plek is null) plek = plekken.FirstOrDefault(p => !gebruikt.Contains(p)); if (plek is null) continue; gebruikt.Add(plek); }
-            uit.Add(new PlusBeen(plek, melders.ToArray()));
+            uit.Add(new PlusBeen(plek, melders.ToArray(), vervolg2));
         }
         var verb = new List<PlusVerbinding>();
         foreach (var g in k.Doorgangen.Where(d => d.Melder == midden).GroupBy(d => (Math.Min(d.Via, d.Volgende), Math.Max(d.Via, d.Volgende))))
@@ -82,7 +99,7 @@ public static class KruisPlus
         var sb = new StringBuilder();
         sb.AppendLine($"  Plusteken van melder {midden} (motor {string.Join(" + ", motoren)}) - alleen wat deze verkenning zelf gevonden heeft; bezetmelders in volgorde van {midden} naar buiten:");
         foreach (var b in benen.OrderBy(b => b.Plek))
-            sb.AppendLine($"    been {b.Plek,-5}: {midden} - {string.Join(" - ", b.Melders)}   ({BlokTekst(k, b.Melders)})");
+            sb.AppendLine($"    been {b.Plek,-5}: {midden} - {string.Join(" - ", b.Melders)}   ({BlokTekst(k, b.Melders)}){(b.Vervolg == "" ? "" : "  -> " + b.Vervolg)}");
         if (verb.Count == 0) sb.AppendLine("    Nog geen rit door het midden gereden.");
         foreach (var v in verb)
             sb.AppendLine($"    {v.A} <-> {v.B}: motor {(motoren.Length > 0 ? motoren[0] : 0)} {v.Stand13}, motor {(motoren.Length > 1 ? motoren[1] : 0)} {v.Stand10}  ({v.Keer}x gereden)");

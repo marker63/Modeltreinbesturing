@@ -2196,3 +2196,8 @@ Test: CompileCheck (ALLES OK, KruisPlusTest met de kaart van 17:50). Nog niet ge
 - Oorzaak: de rijstand van een opdracht wordt berekend VOOR de basisrit; het voorspelde pad stopt dan op melder 24, dus motor 13 bleef rechtdoor. De basisrit reed wel goed door 24 naar 14 (13 afbuigend, via vooraf zetten of handmatige oplossing), maar `HerstelRijstand` zette 13 voor elke proef terug naar de rijstand. Mijn eerdere fixes (#164, #165) keken alleen naar de basisrit/registratie en hebben dit niet gezien.
 - Fix: `KruisStandUitBasis` - reed de basisrit door de kruiswissel (melder met voorganger én opvolger), dan wordt de werkelijke stand van de kruismotoren de rijstand voor alle proeven (behalve motoren die de opdracht zelf vastlegt). Test `KruisStandBasisTest`.
 - Nog niet getest op de baan. Een kaart met eerdere valse vondsten (1/3/4/7/8 "8 -> 24 achteruit = kortsluiting") herstelt zich niet; opnieuw beginnen vanaf nul.
+
+## #167 – Plusteken: twee blokken per poot (16-10, 18:18)
+- Marco vroeg om per poot van het plusteken twee blokken (met alle bezetmelders in volgorde) te tonen; #165 kapte elke poot af bij de eerste blokwissel.
+- Fix: `KruisPlus.Maak` laat elke poot doorlopen tot twee Dinamo-blokken; bij een splitsing staat "daarna X (blok n) of Y (blok m)", een lus naar een ander been wordt benoemd. Test in `KruisPlusTest`.
+- Nog niet getest op de baan.

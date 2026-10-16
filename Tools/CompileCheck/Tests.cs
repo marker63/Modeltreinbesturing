@@ -1359,6 +1359,10 @@ public static class Tests
         var k = Laad("baankaart_2026-10-16_1750.json");
         var p = KruisPlus.Maak(k);
         Eis(p is not null && p.Value.Midden == 24, "plus: midden is melder 24");
+        // BUG #167: per been twee Dinamo-blokken (zuid 7 en 6, west 3 met vervolg 4 of 2)
+        var zuid2 = p!.Value.Benen.First(b => b.Plek == "zuid").Melders;
+        Eis(zuid2.Select(m => k.Melders.First(x => x.Nummer == m).DinamoBlok).Distinct().Count() == 2, "plus: zuid toont twee blokken (" + string.Join("-", zuid2) + ")");
+        Eis(p.Value.Benen.First(b => b.Plek == "west").Vervolg.Contains("daarna"), "plus: west noemt het vervolg bij de splitsing");
         var benen = p!.Value.Benen;
         Eis(benen.Count == 4, "plus: vier benen (nu " + benen.Count + ")");
         string B(string plek) => string.Join("-", benen.First(b => b.Plek == plek).Melders);
