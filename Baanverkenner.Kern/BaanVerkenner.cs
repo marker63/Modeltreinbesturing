@@ -942,6 +942,38 @@ public partial class BaanVerkenner
         return kand.OrderByDescending(x => x.Van == plek).ThenByDescending(x => x.AantalKeer).ThenBy(x => x.Van).First().Van;
     }
 
+    /// <summary>BUG #176: staat de loc na de basisrit op een nieuwe melder zonder Dinamo-blok, dan volgt de blokproef meteen (nu hoeft de loc er niet nog eens heen).
+    /// Alleen als de rijstand alle wissels rechtdoor heeft, er geen bekende wissel bij die melder ligt en de loc er werkelijk staat. Nog niet getest op de baan.</summary>
+    private async Task BlokProefNaRit(Opdracht o, RitResultaat basis, Configuratie rijstand)
+    {
+        if (!BlokVereist) return;
+        int m = basis.Reeks[^1];
+        _monitor.Bijwerken();
+        if (m == _kaart.StartMelder || !ProefMogelijk(m) || Kruis.Middens.Contains(m) || Kruis.OpKruis(_monitor.Bezet)) return;
+        if (rijstand.Afbuigend.Length > 0 || !_monitor.Bezet.Contains(m)) return;   // na de basisrit staat de loc nog met een deel in de melder ervoor: nastellen zet hem helemaal op m
+        if (WisselsBijBezet(_kaart, new[] { m }).Count > 0) return;
+        // pas bij de tweede keer dat de melder bereikt wordt: een melder die voor het eerst gezien wordt kan de (nog niet herkende) kruiswissel zijn, en daar
+        // laat de blokproef de loc in de simulatie in de verkeerde kruismotor-stand achter.
+        if (_kaart.Overgangen.Where(x => x.Naar == m).Sum(x => x.AantalKeer) < 2) return;
+        // een melder naast de kruiswissel: de loc zou bij het neerzetten de kruiswissel in kunnen rijden; die krijgt zijn blokproef los (VoerBlokProefUit)
+        if (Buren(_kaart).TryGetValue(m, out var bm) && bm.Any(Kruis.Middens.Contains)) return;
+        _bezig = $"blokproef voor melder {m}";
+        MeldVoortgang();
+        await Nastellen(m, o.Richting, achter: basis.Reeks[^2]);
+        _proefPogingen[m] = _proefPogingen.GetValueOrDefault(m) + 1;
+        await BlokZoekenBijStart(m);
+        // De blokproef laat de loc een stuk rijden, vooruit of achteruit. Terugzetten op m: staat hij deels op de melder voor m (waar hij vandaan kwam) dan verder in
+        // de rijrichting, staat hij deels op een andere buurmelder dan terug. Zonder dit gokt Nastellen op de rijrichting en schiet de loc in de simulatie door.
+        _monitor.Bijwerken();
+        if (_monitor.Bezet.Count > 0)
+        {
+            int achter = basis.Reeks[^2];
+            int? voor = _monitor.Bezet.Where(x => x != m && x != achter).Select(x => (int?)x).FirstOrDefault();
+            await Nastellen(m, o.Richting, achter: achter, voor: voor);
+        }
+        BewaarNu();
+    }
+
     private async Task VoerOpdrachtUit(Opdracht o)
     {
         await VoerOpdrachtUitKern(o);
@@ -1457,6 +1489,9 @@ public partial class BaanVerkenner
             var rit = await Rit(o.Start, o.Richting, new RitDoel { Configuratie = rijstandBasis, StopBijMelders = stops, StaartWissels = true, MaxStappen = Stap ? (o.Aanloop ? 2 : 1) : null });
             _log.Info($"Basisrit: {Lijst(rit.Reeks)} - einde: {EindeTekst(rit.Einde)}.");
             VerwerkEinde(o, rit);
+            // BUG #176 (Marco 17-10 10:27: "waarom is het blok van deze melders nog niet bekend?"): de blokproef van een nieuwe melder kwam pas na alle ritten, terwijl
+            // de loc er na deze rit al staat. Nu meteen, maar alleen als dat veilig is (alle wissels rechtdoor, geen bekende wissel bij die melder).
+            if (Stap && !o.KruisProef && rit.Einde == RitEinde.StapKlaar && rit.Reeks.Count >= 2) await BlokProefNaRit(o, rit, rijstandBasis);
             // BUG #121 (log 18:16:37 en 17:01:58): de terugweg ging uit van de NOMINALE stand van de opdracht (afbuigend: 2) in plaats van de werkelijke
             // rijstand (afbuigend: 1, 2). Wissel 1 werd rechtdoor gezet terwijl de loc er nog op stond (kortsluiting, ontsporing); een tweede basisrit
             // begon bovendien met de verkeerde stand.

@@ -693,6 +693,8 @@ public partial class BaanVerkenner
     private async Task<bool> BlokZoekenBijStart(int melder)
     {
         _log.Stap($"Blokproef voor melder {melder}: elk Dinamo-blok krijgt om beurten een rijcommando.");
+        _monitor.Bijwerken();
+        var bezetVoorProef = _monitor.Bezet.ToList();   // BUG #176: een melder die erbij komt ligt vóór de loc in de proefrichting
         foreach (var r in new[] { Richting.Vooruit, Richting.Achteruit })
         {
             foreach (var blok in BlokKandidaten(null, melder))
@@ -727,7 +729,11 @@ public partial class BaanVerkenner
                     KoppelBlok(melder, blok);
                     _hw.ZetLocSnelheid(_ins.LocAdres, 0, r == Richting.Vooruit, blok, _ins.LocStappen);
                     await StopLoc();
-                    await Nastellen(melder, r);
+                    // BUG #176: staat de loc nu deels op een melder die er tijdens de proef bij kwam, dan ligt die voor hem: terugkruipen. Zonder dit kroop hij eerst
+                    // verder (op de baan 13/14: vooruit, dan pas terug) en schoot in de simulatie door tot in de volgende melder.
+                    _monitor.Bijwerken();
+                    int? erbij = !Stap ? null : _monitor.Bezet.Where(x => x != melder && !bezetVoorProef.Contains(x)).Select(x => (int?)x).FirstOrDefault();
+                    await Nastellen(melder, r, voor: erbij);
                     return true;
                 }
                 await StuurNaarBlok(blok, r, 0);
