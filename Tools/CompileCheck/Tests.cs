@@ -862,6 +862,56 @@ public static class Tests
         Eis(v.BekendeAankomstKortsluiting(new Opdracht { Id = 5, Start = 2, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis }, Configuratie.Basis) is null, "aankomst: een opdracht zonder die wissel afbuigend blijft gewoon mogelijk");
     }
 
+    // BUG #195: optie 6 'Rondrijden' op de Miniworld-simulatie vanaf een hoofdlus: alle melders, wissels, geen valse wissels, blokken pas aan het eind
+    static void RondritTest()
+    {
+        Console.WriteLine("Test: optie 6 rondrijden (BUG #195)");
+        var r = MiniworldRit(5, 10, insAanpassing: i => { i.Rondrit = true; i.StapVoorStap = true; });   // StapVoorStap staat aan: optie 6 schakelt optie 5 uit
+        var k = r.V.Kaart;
+        var regels = r.Log.Regels.Select(x => x.Tekst).ToList();
+        Eis(!r.V.Status.Instellingen.StapVoorStap, "rondrit: optie 5 is uitgeschakeld");
+        Eis(k.Melders.Count == 21, $"rondrit: alle 21 melders gevonden (nu {k.Melders.Count})");
+        Eis(new[] { 2, 5, 6, 9, 14 }.All(a => k.Wissels.Any(w => w.Adres == a && w.Waarnemingen.Count > 0)), "rondrit: wissels 2, 5, 6, 9 en 14 gevonden");
+        Eis(k.Wissels.All(w => new[] { 1, 2, 5, 6, 9, 10, 13, 14 }.Contains(w.Adres)), "rondrit: geen valse wissels");
+        Eis(k.Wissels.Any(w => w.Adres is 10 or 13 && w.Waarnemingen.Count > 0), "rondrit: de kruismotoren 10 en 13 zijn als gewone wissel gevonden");
+        int eersteProef = regels.FindIndex(x => x.StartsWith("Blokproef voor melder"));
+        int blokFase = regels.FindIndex(x => x.Contains("Nu worden de Dinamo-blokken gezocht"));
+        Eis(blokFase >= 0 && eersteProef > blokFase, $"rondrit: de eerste blokproef (regel {eersteProef}) komt pas na het ontdekken van alle melders (regel {blokFase})");
+        Eis(k.Voltooid && k.Melders.All(m => m.DinamoBlok is not null), "rondrit: voltooid en elke melder heeft een Dinamo-blok");
+        Eis(r.Kortsluitingen <= 10, $"rondrit: beperkt aantal kortsluitingen (nu {r.Kortsluitingen})");
+    }
+
+    // BUG #195: optie 6 'Rondrijden' in de Miniworld-simulatie, per startplek en in gewone en strenge sim
+    static void RondritBench()
+    {
+        var echt = new HashSet<int> { 1, 2, 5, 6, 9, 10, 13, 14 };
+        foreach (var start in (Environment.GetEnvironmentVariable("BENCH_START") ?? "17,5,13,30,129,12,4,10").Split(',').Select(int.Parse))
+        foreach (var streng in new[] { false, true })
+        {
+            Baanverkenner.Kern.Simulatie.SimulatieBaan? sim = null;
+            var r = MiniworldRit(start, 10, insAanpassing: i => { i.Rondrit = true; i.StapVoorStap = Environment.GetEnvironmentVariable("RONDRIT_STAP") == "1"; }, simAanpassing: sa => { sim = sa; sa.BuurwisselHeftKruisKortsluitingOp = streng; });
+            var k = r.V.Kaart;
+            var gevonden = k.Wissels.Where(w => w.Waarnemingen.Count > 0).Select(w => w.Adres).ToList();
+            int blokken = k.Melders.Count(m => m.DinamoBlok is not null);
+            Console.WriteLine($"RONDRIT start {start,3} streng={(streng ? 1 : 0)}: {r.Einde,-12} {(k.Voltooid ? "voltooid" : "NIET-voltooid"),-13} melders {k.Melders.Count,2}/21  met-blok {blokken,2}  wissels [{string.Join(",", gevonden.OrderBy(x => x))}]  valse {gevonden.Count(a => !echt.Contains(a))}  kortsl {r.Kortsluitingen,2}  onder-loc {sim?.OnderLocOmgezet ?? 0,2}  {r.Seconden / 60:0} min");
+            if (Environment.GetEnvironmentVariable("RONDRIT_LOG") == "1") Console.WriteLine(r.Log.AlsTekst());
+        }
+    }
+
+    // BUG #194/#195
+    // BUG #193: het blokkenschema tekent de gevonden wissels als blokjes
+    static void SchemaWisselsTest()
+    {
+        Console.WriteLine("Test: blokkenschema met wissel-blokjes (BUG #193)");
+        var k = Laad("baankaart_2026-10-17_1601.json");
+        var t = SchemaTekening.Maak(k);
+        var svg = t.AlsSvg();
+        var adressen = t.Vakken.SelectMany(v => v.Wissels).Select(w => w.Adres).Distinct().OrderBy(x => x).ToList();
+        Eis(adressen.Contains(2) && adressen.Contains(14), "schema: wissel 2 en 14 staan als blokje in een vak (nu " + string.Join(",", adressen) + ")");
+        Eis(svg.Contains(">W2") && svg.Contains(">W14"), "schema: de SVG bevat de blokjes W2 en W14");
+        Eis(k.Wissels.Count(w => w.Waarnemingen.Count > 0) >= adressen.Count, "schema: niet meer blokjes dan wissels met waarnemingen");
+    }
+
     // BUG #193: kruiswissel herkennen door uitsluiting (log 17-10 16:01: motor 10+13 opgegeven, melder 24 had drie buren)
     static void KruisUitsluitingTest()
     {
@@ -2630,6 +2680,7 @@ public static class Tests
     public static int Main()
     {
         if (Environment.GetEnvironmentVariable("BENCH") == "1") { BenchTest(); return 0; }
+        if (Environment.GetEnvironmentVariable("RONDRIT") == "1") { RondritBench(); return 0; }
         var kaart = Laad("baankaart_voltooid_2026-10-04.json");
 
         // 1. leeg project
@@ -2715,6 +2766,8 @@ public static class Tests
         AankomstEnOverloopTest();
         Aankomst192Test();
         KruisUitsluitingTest();
+        SchemaWisselsTest();
+        RondritTest();
         AlarmWisselBijLocTest();
         KruisRuisVoorafTest();
         AankomstViaIngangTest();

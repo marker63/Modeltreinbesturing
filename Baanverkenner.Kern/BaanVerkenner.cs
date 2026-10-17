@@ -238,6 +238,12 @@ public partial class BaanVerkenner
         if (_hw is IVerbindingsBron stilteBron) stilteBron.StilteGewijzigd += HardwareMeldtStilte;
         try
         {
+            if (_ins.Rondrit)
+            {
+                _ins.StapVoorStap = false;   // BUG #195: optie 6 sluit optie 5 uit
+                _ins.ExtraMeldersNaAfwijking = Math.Max(_ins.ExtraMeldersNaAfwijking, _ins.MaxMeldersPerRit);   // na een andere melder gewoon doorrijden tot lus, kopspoor of kortsluiting
+                _log.Stap("Optie 6 (rondrijden): eerst alle melders en hun vervolgen ontdekken, zonder bloknummers; rijcommando's gaan naar alle blokken. Pas daarna worden de Dinamo-blokken gezocht (nog niet getest op de baan).");
+            }
             ZaaiKennis();
             bool uitbreiden = _status.Uitbreiden && _status.Kaart.StartMelder != 0;
             bool hervat = _status.Kaart.StartMelder != 0 && !uitbreiden;
@@ -334,6 +340,7 @@ public partial class BaanVerkenner
                 if (!await LosKortsluitpuntenOp()) break;
             }
 
+            if (Rondrit && BlokVereist && !_status.Controle) await RondritBlokkenZoeken();
             Afronden();
             if (_status.Controle) RondControleAf();
             _log.Stap(controleRit ? "Controle voltooid." : "Verkenning voltooid.");
@@ -383,6 +390,14 @@ public partial class BaanVerkenner
     /// (melder 24, motor 13/10) telt alleen mee als de gebruiker koos voor gegevens uit eerdere verkenningen.</summary>
     private void InitKruis(bool hervat)
     {
+        if (Rondrit)
+        {
+            // BUG #195: bij 'Rondrijden' is een kruiswissel een gewone wissel; de motoren worden net als elk ander adres geprobeerd en de kruiswissel volgt uit de kortsluitingen en vervolgen.
+            Kruis = new KruisKennis();
+            BewaarKruis();
+            _log.Info("Optie 6 (rondrijden): de kruiswissel wordt behandeld als een gewone wissel; motor " + (string.IsNullOrWhiteSpace(_ins.KruisMotoren) ? "(geen opgegeven)" : _ins.KruisMotoren) + " wordt als gewoon wisseladres geprobeerd.");
+            return;
+        }
         if (hervat && (_kaart.KruisMotoren != "" || _kaart.KruisReferentie))
         {
             Kruis = KruisKennis.Parse(_kaart.KruisMotoren);
@@ -498,7 +513,7 @@ public partial class BaanVerkenner
         else throw new InvalidOperationException($"Er zijn nog steeds meerdere melders bezet ({Lijst(bezet)}).");
 
         _kaart.Melder(_kaart.StartMelder);
-        if (BlokVereist && BlokVan(_kaart.StartMelder) is null)
+        if (BlokVereist && !Rondrit && BlokVan(_kaart.StartMelder) is null)
             if (!await BlokZoekenBijStart(_kaart.StartMelder))
                 throw new InvalidOperationException("Geen Dinamo-blok gevonden voor de startmelder.");
         BewaarNu();
@@ -2515,6 +2530,13 @@ public partial class BaanVerkenner
         // zijn blok niet kent is niet af. Het rapport blijft een tussenstand en noemt de melders, zodat Marco niet denkt dat de baan klaar is.
         var zonderBlok = BlokVereist ? _kaart.Melders.Where(m => m.DinamoBlok is null).Select(m => m.Nummer).OrderBy(x => x).ToList() : new List<int>();
         _kaart.Voltooid = zonderBlok.Count == 0;
+        // BUG #195: bij optie 6 is een verkenning waarin opdrachten zijn overgeslagen en geen enkele wissel is gevonden niet af (de loc kwam er niet doorheen) (simulatie: start op het zijspoor 12 meldde 'voltooid' met 5 van 21 melders).
+        if (Rondrit && !_kaart.Wissels.Any(w => w.Waarnemingen.Count > 0) && _kaart.Waarschuwingen.Any(w => w.Contains("is overgeslagen")))
+        {
+            _kaart.Voltooid = false;
+            var t2 = "De verkenning is gestopt maar nog NIET af: een of meer opdrachten zijn overgeslagen (de loc kwam er niet doorheen), dus niet alles is bereden. Zet de loc op een andere plek van de baan (bij voorkeur op een hoofdlus) en start opnieuw; de kaart blijft bewaard.";
+            if (!_kaart.Waarschuwingen.Contains(t2)) { _kaart.Waarschuwingen.Add(t2); _log.Waarschuwing(t2); }
+        }
         if (zonderBlok.Count > 0)
         {
             var t = $"De verkenning is gestopt maar nog NIET af: van melder {string.Join(", ", zonderBlok)} is het Dinamo-blok niet bepaald, dus dit is een tussenstand. Start opnieuw (de kaart blijft bewaard) of zet de loc op een van die melders.";

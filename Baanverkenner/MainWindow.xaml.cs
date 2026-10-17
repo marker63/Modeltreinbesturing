@@ -153,7 +153,8 @@ public partial class MainWindow : Window
         ExtraMeldersBox.Text = i.ExtraMeldersNaAfwijking.ToString();
         BasisHerhalenCheck.IsChecked = i.BasisritHerhalen;
         AutoSnelheidCheck.IsChecked = i.AutoSnelheid;
-        StapVoorStapCheck.IsChecked = i.StapVoorStap;
+        StapVoorStapCheck.IsChecked = i.StapVoorStap && !i.Rondrit;
+        RondritCheck.IsChecked = i.Rondrit;
         StapAanloopCheck.IsChecked = i.StapAanloop;
         // BUG #178: de oude standaard (1 s) wordt de nieuwe (2 s); een bewuste andere waarde blijft staan
         StapDoorrijBox.Text = (Math.Abs(i.StapDoorrijSeconden - 1.0) < 0.001 ? 2.0 : i.StapDoorrijSeconden).ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -200,7 +201,8 @@ public partial class MainWindow : Window
             ExtraMeldersNaAfwijking = Geheel(ExtraMeldersBox, "Extra melders na afwijking", 0, 10),
             BasisritHerhalen = BasisHerhalenCheck.IsChecked == true,
             AutoSnelheid = AutoSnelheidCheck.IsChecked == true,
-            StapVoorStap = StapVoorStapCheck.IsChecked == true,
+            StapVoorStap = StapVoorStapCheck.IsChecked == true && RondritCheck.IsChecked != true,
+            Rondrit = RondritCheck.IsChecked == true,
             StapAanloop = StapAanloopCheck.IsChecked == true,
             StapDoorrijSeconden = Getal(StapDoorrijBox, "Doorrijden na nieuwe melder", 0, 10)
         };
@@ -349,6 +351,17 @@ public partial class MainWindow : Window
     // =====================================================================
     // Starten / hervatten / pauze / stop / noodstop
     // =====================================================================
+
+    /// <summary>BUG #195: optie 5 (stap voor stap) en optie 6 (rondrijden) sluiten elkaar uit.</summary>
+    private void Rondrit_Checked(object sender, RoutedEventArgs e)
+    {
+        if (StapVoorStapCheck is not null) StapVoorStapCheck.IsChecked = false;
+    }
+
+    private void StapVoorStap_Checked(object sender, RoutedEventArgs e)
+    {
+        if (RondritCheck is not null) RondritCheck.IsChecked = false;
+    }
 
     private async void Start_Click(object sender, RoutedEventArgs e)
     {
@@ -550,6 +563,7 @@ public partial class MainWindow : Window
         vast.BasisritHerhalen = scherm.BasisritHerhalen;
         vast.AutoSnelheid = scherm.AutoSnelheid;
         vast.StapVoorStap = scherm.StapVoorStap;
+        vast.Rondrit = scherm.Rondrit;
         vast.StapAanloop = scherm.StapAanloop;
         vast.StapDoorrijSeconden = scherm.StapDoorrijSeconden;
         if (vast.LocStappen <= 28 && (vast.Verkensnelheid > vast.LocStappen || vast.Kruipsnelheid > vast.LocStappen))

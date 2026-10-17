@@ -91,7 +91,12 @@ public partial class BaanVerkenner
     private const int MaxProefPogingen = 2;
     /// <summary>BUG #142: melders waar de loc na het stoppen altijd ook op een buurmelder staat (loc langer dan de melder).</summary>
     private readonly HashSet<int> _nietIsoleerbaar = new();
-    private bool ProefMogelijk(int melder) => BlokVan(melder) is null && _proefPogingen.GetValueOrDefault(melder) < MaxProefPogingen;
+    private bool ProefMogelijk(int melder) => BlokVan(melder) is null && _proefPogingen.GetValueOrDefault(melder) < MaxProefPogingen && (!Rondrit || _rondritBlokfase);
+
+    /// <summary>BUG #195: optie 6 'Rondrijden'.</summary>
+    private bool Rondrit => _ins.Rondrit;
+    /// <summary>BUG #195: pas als alle melders bekend zijn (tweede fase) mogen blokproeven plaatsvinden.</summary>
+    private bool _rondritBlokfase;
 
     private bool BlokVereist => _hw.LocCommandoVereistBlok;
 
@@ -1742,6 +1747,13 @@ public partial class BaanVerkenner
 
                 if (doel.IsNavigatie)
                 {
+                    // BUG #195 (simulatie optie 6): een navigatie die zijn doel niet haalt (de stand om er te komen ontbrak, bv. wissel 6 bleef rechtdoor door de alarmstand) reed eindeloos
+                    // rondjes over de lus (600 minuten). Meer melders dan de kaart er heeft x 2 = de loc rijdt rondjes: stoppen en de aanroeper laten herstellen.
+                    if (res.Reeks.Count > Math.Max(20, 2 * _kaart.Melders.Count) && m != doel.DoelMelder)
+                    {
+                        await StopLoc();
+                        throw new NavigatieFout($"De loc bereikte melder {doel.DoelMelder} niet na {res.Reeks.Count} melders (hij rijdt rondjes); de rit is gestopt op melder {m}.");
+                    }
                     if (m == doel.DoelMelder && !doelInzicht)
                     {
                         doelInzicht = true;
@@ -1924,7 +1936,7 @@ public partial class BaanVerkenner
                 // overgang telt). Dan is dit geen kopspoor maar blijft de loc hangen (slecht contact, tong, stroomonderbreking):
                 // één keer het rijcommando herhalen en nog een keer wachten voordat er iets uit geconcludeerd wordt.
                 var bekendVervolg = _kaart.BekendeVolgende(res.Reeks[^1], r, cfgNu);
-                bool eersteBlokcontrole = BlokVereist && res.Reeks.Count == 1 && !blokGecontroleerd && !doelInzicht;
+                bool eersteBlokcontrole = BlokVereist && !Rondrit && res.Reeks.Count == 1 && !blokGecontroleerd && !doelInzicht;
                 if (bekendVervolg.Count > 0 && !vervolgHerhaald && !eersteBlokcontrole && !kopBekend)
                 {
                     vervolgHerhaald = true;
@@ -1938,7 +1950,7 @@ public partial class BaanVerkenner
                 // rijdt hem na de melder nog even door): geen Dinamo-storing en geen blokproef, maar gewoon weer een doodlopend einde.
                 bool kopHierBekend = res.Reeks.Count == 1 && _kaart.Kopsporen.Any(k => k.Melder == start && k.Richting == r);
                 if (kopHierBekend) _log.Info($"De loc vertrok niet van melder {start}: dat is een bekend doodlopend einde ({r.Tekst()}); geen blokproef nodig.");
-                if (BlokVereist && res.Reeks.Count == 1 && !blokGecontroleerd && !doelInzicht && !kopHierBekend)
+                if (BlokVereist && !Rondrit && res.Reeks.Count == 1 && !blokGecontroleerd && !doelInzicht && !kopHierBekend)
                 {
                     // De loc is helemaal niet vertrokken: klopt de blokkoppeling van deze
                     // melder wel? Eén keer opnieuw bepalen voordat we iets concluderen.

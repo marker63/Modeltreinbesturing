@@ -117,8 +117,11 @@
 
                 <GroupBox Header="Werkwijze" Margin="0,0,0,10">
                     <StackPanel>
-                        <CheckBox x:Name="StapVoorStapCheck" Margin="0,4" IsChecked="False">
-                            <TextBlock TextWrapping="Wrap" Text="Stap voor stap verkennen: zet de loc midden in een blok; de verkenner rijdt steeds één melder en probeert de wissels één voor één. Trager, maar rustiger (nieuw, nog niet getest op de baan)."/>
+                        <CheckBox x:Name="StapVoorStapCheck" Margin="0,4" IsChecked="False" Checked="StapVoorStap_Checked">
+                            <TextBlock TextWrapping="Wrap" Text="5. Stap voor stap verkennen: zet de loc midden in een blok; de verkenner rijdt steeds één melder en probeert de wissels één voor één. Trager, maar rustiger (nieuw, nog niet getest op de baan)."/>
+                        </CheckBox>
+                        <CheckBox x:Name="RondritCheck" Margin="0,8,0,4" IsChecked="False" Checked="Rondrit_Checked">
+                            <TextBlock TextWrapping="Wrap" Text="6. Rondrijden: zet de loc waar je wilt. De verkenner rijdt vanaf die plek in één richting en geeft het rijcommando aan ALLE blokken; hij noteert alleen de volgorde van de melders (nog geen bloknummers), keert om bij een doodlopend einde en stopt bij een lus. Daarna zet hij steeds één wisselmotor om (de kruiswissel is een gewone wissel) en rijdt opnieuw tot een nieuwe melder, een lus of een kortsluiting. Pas als alle melders met hun vervolgen bekend zijn, worden de Dinamo-blokken gezocht. Sluit optie 5 (stap voor stap) uit. Nieuw, nog niet getest op de baan."/>
                         </CheckBox>
                         <CheckBox x:Name="StapAanloopCheck" Margin="24,4,0,4" IsChecked="True">
                             <TextBlock TextWrapping="Wrap" Text="Bij stap voor stap één melder extra terugrijden: de proefritten beginnen één melder vóór de startmelder (de loc staat dan niet op de wissels bij de startmelder en wissels vóór de startmelder worden ook gemeten). Nieuw, nog niet getest op de baan."/>
