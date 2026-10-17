@@ -155,7 +155,8 @@ public partial class MainWindow : Window
         AutoSnelheidCheck.IsChecked = i.AutoSnelheid;
         StapVoorStapCheck.IsChecked = i.StapVoorStap;
         StapAanloopCheck.IsChecked = i.StapAanloop;
-        StapDoorrijCheck.IsChecked = i.StapDoorrijSeconden > 0;
+        // BUG #178: de oude standaard (1 s) wordt de nieuwe (2 s); een bewuste andere waarde blijft staan
+        StapDoorrijBox.Text = (Math.Abs(i.StapDoorrijSeconden - 1.0) < 0.001 ? 2.0 : i.StapDoorrijSeconden).ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private static int Geheel(TextBox box, string naam, int min, int max)
@@ -201,7 +202,7 @@ public partial class MainWindow : Window
             AutoSnelheid = AutoSnelheidCheck.IsChecked == true,
             StapVoorStap = StapVoorStapCheck.IsChecked == true,
             StapAanloop = StapAanloopCheck.IsChecked == true,
-            StapDoorrijSeconden = StapDoorrijCheck.IsChecked == true ? 1.0 : 0
+            StapDoorrijSeconden = Getal(StapDoorrijBox, "Doorrijden na nieuwe melder", 0, 10)
         };
         if (i.Kruipsnelheid > i.Verkensnelheid)
             throw new FormatException($"De kruipsnelheid ({i.Kruipsnelheid}) is hoger dan de verkensnelheid ({i.Verkensnelheid}). Verhoog ook de verkensnelheid, of kies een lagere kruipsnelheid.");

@@ -2284,3 +2284,10 @@ Test: CompileCheck (ALLES OK, KruisPlusTest met de kaart van 17:50). Nog niet ge
 - Fix: `VerkenLog.Schrijf` vervangt pijlen en het weglatingsteken door gewone tekens ('->', '<-', '<->', '...') voor het logboek (venster en bestand). De wisselregel is nu 'Adres 5: afbuigend (wisselcommando 27 sinds het verbinden)'. Letters als é en ó blijven staan (vooral 'vóór'); in het rapport zijn de pijlen ongewijzigd (het rapport is html/UTF-8).
 - Ook hersteld: in #176 stond in een commentaar in BaanVerkenner.Rijden.cs een verkeerd gecodeerde 'ó' (ongeldig UTF-8, 'vóór'); alle .cs-bestanden zijn nu gecontroleerd en geldig UTF-8.
 - NOG NIET GETEST OP DE BAAN (het logvenster zelf kan hier niet bekeken worden; de tekst is in de test gecontroleerd).
+
+## BUG #178 - Doorrijden na de melder: zeker 2 seconden (Marco 17-10 11:18)
+- Marco: "je rijdt nog niet ver genoeg door na wissel 5; je moet na het zien van de melder nog zeker 2 sec doorrijden voordat je een sluiting kan zien van een wisseltong die je open rijdt."
+- Fix: `StapDoorrijSeconden` (BUG #175) staat nu standaard op 2,0 s (was 1,0). In het scherm is het keuzevakje een invoerveld (seconden, 0 = uit, komma of punt, 0 t/m 10), zodat het te verlengen is zonder nieuwe versie. Een bewaarde oude standaardwaarde van 1 s wordt bij het laden 2 s; elke andere bewuste waarde blijft staan.
+- Test: de bestaande tests zijn groen (volledige Stap-run in de simulatie met doorrijden uit, `AanloopTest` met de nieuwe standaard 2 s). Een kortsluiting bij een wissel naar de samenvoeging toe is in de simulatie niet nagebootst op de tong; het aantal seconden is dus afgesproken op jouw waarneming, niet gemeten.
+- Let op: bij een heel korte sectie kan de loc in 2 s de volgende melder halen; dan stopt hij daar (de rit telt dan twee melders).
+- NOG NIET GETEST OP DE BAAN.

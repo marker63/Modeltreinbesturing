@@ -76,7 +76,7 @@ public class VerkenInstellingen
     public bool StapAanloop { get; set; } = true;
     /// <summary>BUG #175: seconden die de loc bij 'Stap voor stap' na het bereiken van de nieuwe melder nog doorrijdt, zodat hij de wisseltongen in die sectie berijdt
     /// en een kortsluiting bij een wissel naar de samenvoeging toe zichtbaar wordt. 0 = meteen stoppen.</summary>
-    public double StapDoorrijSeconden { get; set; } = 1.0;
+    public double StapDoorrijSeconden { get; set; } = 2.0;   // BUG #178: Marco 17-10 11:18: na het zien van de melder zeker 2 s doorrijden
 
     /// <summary>Basisrit twee keer rijden en vergelijken ("voor de zekerheid").</summary>
     public bool BasisritHerhalen { get; set; } = true;

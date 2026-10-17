@@ -123,9 +123,10 @@
                         <CheckBox x:Name="StapAanloopCheck" Margin="24,4,0,4" IsChecked="True">
                             <TextBlock TextWrapping="Wrap" Text="Bij stap voor stap één melder extra terugrijden: de proefritten beginnen één melder vóór de startmelder (de loc staat dan niet op de wissels bij de startmelder en wissels vóór de startmelder worden ook gemeten). Nieuw, nog niet getest op de baan."/>
                         </CheckBox>
-                        <CheckBox x:Name="StapDoorrijCheck" Margin="24,4,0,4" IsChecked="True">
-                            <TextBlock TextWrapping="Wrap" Text="Bij stap voor stap na de nieuwe melder nog 1 seconde doorrijden, zodat de loc de wisseltongen in die sectie berijdt en een kortsluiting bij een wissel naar de samenvoeging toe zichtbaar wordt. Nieuw, nog niet getest op de baan."/>
-                        </CheckBox>
+                        <StackPanel Orientation="Horizontal" Margin="24,4,0,4">
+                            <TextBlock VerticalAlignment="Center" Text="Bij stap voor stap na de nieuwe melder nog doorrijden (seconden, 0 = uit): "/>
+                            <TextBox x:Name="StapDoorrijBox" Width="50" Text="2" ToolTip="Na het zien van een nieuwe melder rijdt de loc nog zo lang door, zodat hij de wisseltongen in die sectie berijdt en een kortsluiting bij een wissel naar de samenvoeging toe zichtbaar wordt. Zeker 2 seconden. 0 = meteen stoppen. Nog niet getest op de baan."/>
+                        </StackPanel>
                     </StackPanel>
                 </GroupBox>
 
