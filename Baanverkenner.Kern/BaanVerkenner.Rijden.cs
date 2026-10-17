@@ -640,6 +640,10 @@ public partial class BaanVerkenner
     private bool _vrijRijdenBezig;
     /// <summary>BUG #188: wissels waarvan we weten dat ze bij de melder liggen waar de loc nu staat, ook al staat dat nog niet in de kaart (net ontdekt door de proef).</summary>
     private readonly HashSet<int> _bekendBijBezet = new();
+    /// <summary>BUG #194: proefwissels die het herstel (klem-ingreep) terugzette naar rechtdoor; vindt ProbeerAlarmWegTeKrijgen daarna een partner, dan gaan ze terug naar afbuigend (wissel 1 samen met wissel 2).</summary>
+    private readonly List<int> _losgemaakteProefWissels = new();
+    /// <summary>BUG #194: wissels (adres, stand afbuigend) die net een alarm wegnamen, met de melders waar de loc toen stond; ze blijven staan zolang de loc daar nog (deels) staat.</summary>
+    private readonly Dictionary<int, (HashSet<int> Melders, DateTime Tijd)> _klemOplossing = new();
 
     /// <summary>BUG #181 (Marco 17-10 11:46/11:51: "doorrijden totdat de laatste melder alleen actief is"): staat de loc nog op twee melders (de neus op de nieuwe melder, de staart
     /// nog op de vorige) en moet er een wissel om die de kaart bij een van die melders noemt, dan ligt de loc mogelijk op of tegen de tong. Eerst doorrijden tot alleen de laatste
@@ -696,6 +700,17 @@ public partial class BaanVerkenner
             {
                 _log.Waarschuwing($"Motor {a} wordt nu NIET omgezet: de loc staat op de kruiswissel (melder {Kruis.MiddenTekst}) en omzetten geeft kortsluiting.");
                 continue;
+            }
+            // BUG #194: een stand die net een alarm wegnam (wissel 1 bij wissel 2) blijft staan zolang de loc nog op die melders staat; daarna mag hij terug.
+            if (spaarOnderLoc && _klemOplossing.TryGetValue(a, out var ko))
+            {
+                bool nogOp = _monitor.Bezet.Any(ko.Melders.Contains) && (_klok.Nu - ko.Tijd).TotalMinutes < 10;
+                if (!nogOp) _klemOplossing.Remove(a);
+                else if (!wens && _wisselStand.TryGetValue(a, out var ks) && ks)
+                {
+                    _log.Info($"Wissel {a} blijft afbuigend staan: dat haalde zojuist de kortsluiting weg en de loc staat nog op melder {string.Join(" en ", _monitor.Bezet.Where(ko.Melders.Contains).OrderBy(x => x))}.");
+                    continue;
+                }
             }
             await ZetWissel(a, wens);
         }
@@ -1247,6 +1262,31 @@ public partial class BaanVerkenner
                 _kortsluitingGemeld = false;
                 _alarmStand[a] = !oud;
                 RegistreerAlarmOplossing(a, !oud, bezet, alarmBlokkenVoor);
+                // BUG #194 (Marco 17-10 16:48, log 16:01): wissel 1 haalde het alarm weg terwijl wissel 2 door het herstel op rechtdoor stond; de bewezen oplossing is 1 EN 2 afbuigend.
+                // De proefwissel gaat dus terug naar afbuigend (blijft het alarm weg), en de stand blijft staan zolang de loc nog op deze melders staat.
+                if (!oud)
+                {
+                    _klemOplossing[a] = (bezet.ToHashSet(), _klok.Nu);
+                    foreach (var pw in _losgemaakteProefWissels.ToList())
+                    {
+                        if (pw == a || !(_wisselStand.TryGetValue(pw, out var pst) && !pst)) continue;
+                        await ZetWissel(pw, true, forceer: true);
+                        var eind2 = _klok.Nu + TimeSpan.FromSeconds(2.5);
+                        while (_klok.Nu < eind2) await Wacht(TimeSpan.FromMilliseconds(300));
+                        if (HuidigeAlarmBlokken().Count == 0)
+                        {
+                            _log.Vondst($"Wissel {pw} staat weer op afbuigend samen met wissel {a}: het alarm blijft weg. Samen vormen ze de oplossing en ze blijven zo staan tot de loc de melder verlaten heeft (nog niet getest op de baan).");
+                            _klemOplossing[pw] = (bezet.ToHashSet(), _klok.Nu);
+                            _alarmStand[pw] = true;
+                        }
+                        else
+                        {
+                            await ZetWissel(pw, false, forceer: true);
+                            _log.Waarschuwing($"Wissel {pw} samen met wissel {a} afbuigend gaf direct weer alarm: wissel {pw} blijft rechtdoor.");
+                        }
+                    }
+                    _losgemaakteProefWissels.Clear();
+                }
                 return true;
             }
             await ZetWissel(a, oud, forceer: true);
@@ -2406,6 +2446,7 @@ public partial class BaanVerkenner
             _statischeKortsluiting = false;
             _log.Waarschuwing($"De kortsluiting komt steeds terug terwijl de loc stilstaat: hij zit klem op wissel {pa} (afbuigend). Die wissel gaat nu terug naar rechtdoor om de loc vrij te maken; anders blijft Dinamo de stroom steeds even terugzetten en weer afsluiten.");
             await ZetWissel(pa, false, forceer: true);
+            if (!_losgemaakteProefWissels.Contains(pa)) _losgemaakteProefWissels.Add(pa);
             iets = true;
         }
         if (!iets) return false;

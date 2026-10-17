@@ -1342,6 +1342,8 @@ public partial class BaanVerkenner
             bool nu = _wisselStand.TryGetValue(adres, out var st) && st;
             if (nu == wens) continue;
             if (Kruis.IsMotor(adres) && Kruis.OpKruis(_monitor.Bezet)) return false;
+            // BUG #194: een stand die net het alarm wegnam (wissel 1 bij wissel 2) niet terugzetten zolang de loc nog op die melders staat
+            if (!wens && nu && _klemOplossing.TryGetValue(adres, out var ko) && _monitor.Bezet.Any(ko.Melders.Contains) && (_klok.Nu - ko.Tijd).TotalMinutes < 10) continue;
             if (bijBezet.Contains(adres)) continue;   // ligt bij de melder waar de loc staat: niet onder de loc omzetten (de staartwissels regelt de rit zelf, #107)
             teDoen.Add((adres, wens));
         }
