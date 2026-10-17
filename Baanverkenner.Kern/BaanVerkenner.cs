@@ -978,6 +978,13 @@ public partial class BaanVerkenner
         _bezig = $"blokproef voor melder {m}";
         MeldVoortgang();
         await Nastellen(m, o.Richting, achter: basis.Reeks[^2]);
+        // BUG #187: de blokproef start alleen als ALLEEN de nieuwe melder bezet is (de oude melder mag niet meer actief zijn); lukt dat niet, dan geen proef op twee melders
+        _monitor.Bijwerken();
+        if (!(_monitor.Bezet.Count == 1 && _monitor.Bezet.Contains(m)))
+        {
+            _log.Waarschuwing($"Blokproef voor melder {m} uitgesteld: de loc staat niet alleen op melder {m} (bezet: {Lijst(_monitor.Bezet)}).");
+            return;
+        }
         _proefPogingen[m] = _proefPogingen.GetValueOrDefault(m) + 1;
         await BlokZoekenBijStart(m);
         // De blokproef laat de loc een stuk rijden, vooruit of achteruit. Terugzetten op m: staat hij deels op de melder voor m (waar hij vandaan kwam) dan verder in

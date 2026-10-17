@@ -2339,3 +2339,4 @@ Test: CompileCheck (ALLES OK, KruisPlusTest met de kaart van 17:50). Nog niet ge
 Marco: bij een onbekende melder volledig doorrijden tot alleen die melder bezet is en dan direct de blokkentest doen. De code wachtte met de blokproef tot de melder twee keer bereikt was (regel uit #176), waardoor de adrestests van de overgang 13→14 tientallen keren werden herhaald vóór melder 14 een blok had.
 Oplossing: tweede-bezoekregel in `BlokProefNaRit` verwijderd; `Nastellen` zet de loc eerst helemaal op de nieuwe melder, daarna volgt direct `BlokZoekenBijStart`. Test in `StapMatrixTest`. CompileCheck: ALLES OK (start 17 en 5, beide simulatiemodi, start 13 voltooid).
 NOG NIET GETEST OP DE BAAN.
+Aanvulling: de blokproef start alleen als uitsluitend de nieuwe melder bezet is; anders wordt hij uitgesteld met een waarschuwing in het logboek. NOG NIET GETEST OP DE BAAN.
