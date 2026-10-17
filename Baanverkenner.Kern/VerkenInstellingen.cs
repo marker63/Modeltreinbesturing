@@ -71,6 +71,12 @@ public class VerkenInstellingen
     /// elke basis- en proefrit is één melder lang (twee als daarna de kruiswissel volgt) en de dichtstbijzijnde open plek komt eerst aan de beurt.
     /// De kruiswissel krijgt een eigen proef met de vier standen van de kruismotoren.</summary>
     public bool StapVoorStap { get; set; }
+    /// <summary>BUG #175 (Marco 17-10 09:44): bij 'Stap voor stap' beginnen de proefritten één melder vóór de startmelder en rijdt de loc na de proef daar ook naartoe terug,
+    /// zodat hij niet op de wissels bij de startmelder staat terwijl die omgezet worden en de wissels vóór de startmelder ook gemeten worden.</summary>
+    public bool StapAanloop { get; set; } = true;
+    /// <summary>BUG #175: seconden die de loc bij 'Stap voor stap' na het bereiken van de nieuwe melder nog doorrijdt, zodat hij de wisseltongen in die sectie berijdt
+    /// en een kortsluiting bij een wissel naar de samenvoeging toe zichtbaar wordt. 0 = meteen stoppen.</summary>
+    public double StapDoorrijSeconden { get; set; } = 1.0;
 
     /// <summary>Basisrit twee keer rijden en vergelijken ("voor de zekerheid").</summary>
     public bool BasisritHerhalen { get; set; } = true;

@@ -1423,6 +1423,7 @@ public partial class BaanVerkenner
         // Een alarm dat nog loopt blijft dus gelden.
         _kortsluitingGemeld = HuidigeAlarmBlokken().Count > 0;
 
+        DateTime? stapStopTot = null;   // BUG #175: tot wanneer de loc na de laatste melder van een stap-rit nog doorrijdt
         while (true)
         {
             await Wacht(Poll);
@@ -1458,6 +1459,12 @@ public partial class BaanVerkenner
                     }
                 }
                 return await Kortsluiting(res, "de centrale meldt een kortsluiting/fout");
+            }
+            if (stapStopTot is DateTime stopTijd && _klok.Nu >= stopTijd)
+            {
+                await StopLoc();
+                res.Einde = RitEinde.StapKlaar;
+                return res;
             }
             if (bezet.Count == 0)
             {
@@ -1641,6 +1648,13 @@ public partial class BaanVerkenner
                 }
                 if (doel.MaxStappen is int maxStappen && res.Reeks.Count - 1 >= maxStappen && !Kruis.Middens.Contains(m))
                 {
+                    // BUG #175 (Marco 17-10 10:03: "je stopt heel snel in een meldsectie, ruim voor de wisseltongen, daardoor zie je bijna nooit een kortsluiting als je
+                    // een wissel naar de samenvoeging toe berijdt"): de loc rijdt nog even door in de nieuwe sectie voordat hij stopt.
+                    if (_ins.StapDoorrijSeconden > 0 && stapStopTot is null)
+                    {
+                        stapStopTot = _klok.Nu + TimeSpan.FromSeconds(_ins.StapDoorrijSeconden);
+                        continue;
+                    }
                     await StopLoc();
                     res.Einde = RitEinde.StapKlaar;
                     return res;

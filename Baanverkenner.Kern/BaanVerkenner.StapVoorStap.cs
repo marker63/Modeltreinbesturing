@@ -119,15 +119,20 @@ public partial class BaanVerkenner
     {
         if (van == naar) return new();
         var rand = new Dictionary<(int, int), (Richting R, Configuratie C)>();
-        void Voeg(int a, int b, Richting r, Configuratie c)
+        var direct = new HashSet<(int, int)>();
+        // BUG #175: een stap die zelf gereden is gaat voor de omgekeerde van de tegenovergestelde rit: 5 -> 12 lukte met wissel 2, maar 12 -> 5 (van achteren door
+        // de overloop) vraagt wissel 1 en 2; de omgekeerde stand was te klein en de loc bleef op melder 12 staan.
+        void Voeg(int a, int b, Richting r, Configuratie c, bool zelfGereden)
         {
+            if (zelfGereden) { if (direct.Add((a, b))) { rand[(a, b)] = (r, c); return; } }
+            else if (direct.Contains((a, b))) return;
             if (!rand.TryGetValue((a, b), out var oud) || c.Afbuigend.Length < oud.C.Afbuigend.Length) rand[(a, b)] = (r, c);
         }
         foreach (var o in k.Overgangen.Where(o => o.GezienBijConfiguraties.Count > 0))
         {
             var c = o.GezienBijConfiguraties.Select(Configuratie.VanSleutel).OrderBy(x => x.Afbuigend.Length).ThenBy(x => x.Sleutel, StringComparer.Ordinal).First();
-            Voeg(o.Van, o.Naar, o.Richting, c);
-            Voeg(o.Naar, o.Van, o.Richting.Om(), c);
+            Voeg(o.Van, o.Naar, o.Richting, c, true);
+            Voeg(o.Naar, o.Van, o.Richting.Om(), c, false);
         }
         var uit = rand.Keys.GroupBy(x => x.Item1).ToDictionary(g => g.Key, g => g.Select(x => x.Item2).OrderBy(x => x).ToList());
         var vorige = new Dictionary<(int Cur, int Prev), (int Cur, int Prev)>();

@@ -154,6 +154,8 @@ public partial class MainWindow : Window
         BasisHerhalenCheck.IsChecked = i.BasisritHerhalen;
         AutoSnelheidCheck.IsChecked = i.AutoSnelheid;
         StapVoorStapCheck.IsChecked = i.StapVoorStap;
+        StapAanloopCheck.IsChecked = i.StapAanloop;
+        StapDoorrijCheck.IsChecked = i.StapDoorrijSeconden > 0;
     }
 
     private static int Geheel(TextBox box, string naam, int min, int max)
@@ -197,7 +199,9 @@ public partial class MainWindow : Window
             ExtraMeldersNaAfwijking = Geheel(ExtraMeldersBox, "Extra melders na afwijking", 0, 10),
             BasisritHerhalen = BasisHerhalenCheck.IsChecked == true,
             AutoSnelheid = AutoSnelheidCheck.IsChecked == true,
-            StapVoorStap = StapVoorStapCheck.IsChecked == true
+            StapVoorStap = StapVoorStapCheck.IsChecked == true,
+            StapAanloop = StapAanloopCheck.IsChecked == true,
+            StapDoorrijSeconden = StapDoorrijCheck.IsChecked == true ? 1.0 : 0
         };
         if (i.Kruipsnelheid > i.Verkensnelheid)
             throw new FormatException($"De kruipsnelheid ({i.Kruipsnelheid}) is hoger dan de verkensnelheid ({i.Verkensnelheid}). Verhoog ook de verkensnelheid, of kies een lagere kruipsnelheid.");
@@ -545,6 +549,8 @@ public partial class MainWindow : Window
         vast.BasisritHerhalen = scherm.BasisritHerhalen;
         vast.AutoSnelheid = scherm.AutoSnelheid;
         vast.StapVoorStap = scherm.StapVoorStap;
+        vast.StapAanloop = scherm.StapAanloop;
+        vast.StapDoorrijSeconden = scherm.StapDoorrijSeconden;
         if (vast.LocStappen <= 28 && (vast.Verkensnelheid > vast.LocStappen || vast.Kruipsnelheid > vast.LocStappen))
         {
             MessageBox.Show(this, $"De verkenning gebruikt {vast.LocStappen} rijstappen; de snelheden mogen daar niet boven komen.", "Controleer de instellingen", MessageBoxButton.OK, MessageBoxImage.Warning);

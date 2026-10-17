@@ -33,6 +33,9 @@ public class Opdracht
     public bool KruisProef { get; set; }
     /// <summary>BUG #174: alleen het Dinamo-blok van deze melder bepalen (loc erheen, neerzetten, blokproef); geen rit, geen adrestest.</summary>
     public bool BlokProef { get; set; }
+    /// <summary>BUG #175 (Marco 17-10 09:44: "1 extra melder terug"): bij stap voor stap begint de opdracht één melder vóór de eigenlijke startmelder (Start is dan die
+    /// aanloopmelder). De loc staat zo niet op de wissels bij de startmelder, en wissels vóór de startmelder (zoals wissel 14 bij melder 8) worden ook gemeten.</summary>
+    public bool Aanloop { get; set; }
     /// <summary>BUG #173: hoe vaak deze opdracht is afgebroken door een wisselprobleem (Dinamo-uitval, klem) en opnieuw begonnen is.</summary>
     public int UitvalHersteld { get; set; }
     public string Sleutel => $"{Configuratie.Sleutel}|{Start}|{Richting}{(BlokProef ? "|blok" : "")}";
@@ -917,6 +920,28 @@ public partial class BaanVerkenner
 
     private int AantalOplossingen() => _kaart.Kortsluitpunten.Count(k => k.Opgelost) + _kaart.BekendeKortsluitOplossingen.Count;
 
+    /// <summary>BUG #175: de melder vlak vóór <paramref name="o"/>.Start (in de rijrichting van de opdracht), als de loc daar over een eerder gereden stuk met deze wisselstand
+    /// vandaan komt. Geen aanloop bij de kruiswissel zelf.</summary>
+    private int? KiesAanloop(Opdracht o)
+    {
+        if (!_ins.StapAanloop) return null;
+        if (Kruis.Middens.Contains(o.Start) || o.Configuratie.Afbuigend.Length > 0) return null;   // opdrachten met een eigen wisselstand beginnen gewoon op hun startmelder
+        // een ingang van de (bekende) kruiswissel heeft een eigen proef (VoerKruisProefUit); daar de loc een melder verder terug laten beginnen laat hem door de kruiswissel rijden
+        if (_kaart.Overgangen.Any(x => x.AantalKeer > 0 && ((x.Van == o.Start && Kruis.Middens.Contains(x.Naar)) || (x.Naar == o.Start && Kruis.Middens.Contains(x.Van))))) return null;
+        string sl = o.Configuratie.Sleutel;
+        var kand = _kaart.Overgangen.Where(x => x.Naar == o.Start && x.Richting == o.Richting && x.AantalKeer > 0 && x.Van != o.Start
+                                                 && !Kruis.Middens.Contains(x.Van)
+                                                 && (x.GezienBijConfiguraties.Contains(sl) || (o.Configuratie.Afbuigend.Length == 0 && x.GezienBijConfiguraties.Contains(""))))
+            .ToList();
+        // de aanloopmelder zelf moet veilig zijn: ligt daar een wissel (de loc staat er dan op bij het omzetten), dan helpt een aanloop niet
+        kand = kand.Where(x => WisselsBijBezet(_kaart, new[] { x.Van }).Count == 0).ToList();
+        // draagt de rit al een eerder gevonden oplossing (extra afbuigende wissel) mee, dan blijft het bij de gewone start: dat zou de rit over het kortsluitpunt van die oplossing sturen
+        kand = kand.Where(x => { _kaart.MetBekendeOplossingenVoorStart(x.Van, o.Richting, o.Configuratie, out var w); return w.Count == 0; }).ToList();
+        if (kand.Count == 0) return null;
+        var plek = HuidigePlek();
+        return kand.OrderByDescending(x => x.Van == plek).ThenByDescending(x => x.AantalKeer).ThenBy(x => x.Van).First().Van;
+    }
+
     private async Task VoerOpdrachtUit(Opdracht o)
     {
         await VoerOpdrachtUitKern(o);
@@ -926,6 +951,12 @@ public partial class BaanVerkenner
     private async Task VoerOpdrachtUitKern(Opdracht o)
     {
         _handmatigeOplossingGemeld = false;
+        if (Stap && !o.Aanloop && !o.KruisProef && !o.BlokProef && KiesAanloop(o) is int aanloopMelder)
+        {
+            _log.Info($"Opdracht #{o.Id}: de proefritten beginnen één melder eerder, op melder {aanloopMelder} (de loc staat dan niet op de wissels bij melder {o.Start} en wissels vóór melder {o.Start} worden ook gemeten).");
+            o.Start = aanloopMelder;
+            o.Aanloop = true;
+        }
         o.Route = VerkortRoute(o.Route, o.Start); // ook voor opdrachten uit een eerder opgeslagen voortgang
         _fase = $"Opdracht #{o.Id}";
         _bezig = $"vanaf melder {o.Start} {o.Richting.Tekst()} ({o.Configuratie})";
@@ -1423,7 +1454,7 @@ public partial class BaanVerkenner
             _bezig = $"opdracht #{o.Id}: basisrit {(i == 0 ? "" : $"(controle {i})")}";
             MeldVoortgang();
             var rijstandBasis = RijStand(o);
-            var rit = await Rit(o.Start, o.Richting, new RitDoel { Configuratie = rijstandBasis, StopBijMelders = stops, StaartWissels = true, MaxStappen = Stap ? 1 : null });
+            var rit = await Rit(o.Start, o.Richting, new RitDoel { Configuratie = rijstandBasis, StopBijMelders = stops, StaartWissels = true, MaxStappen = Stap ? (o.Aanloop ? 2 : 1) : null });
             _log.Info($"Basisrit: {Lijst(rit.Reeks)} - einde: {EindeTekst(rit.Einde)}.");
             VerwerkEinde(o, rit);
             // BUG #121 (log 18:16:37 en 17:01:58): de terugweg ging uit van de NOMINALE stand van de opdracht (afbuigend: 2) in plaats van de werkelijke

@@ -120,6 +120,12 @@
                         <CheckBox x:Name="StapVoorStapCheck" Margin="0,4" IsChecked="False">
                             <TextBlock TextWrapping="Wrap" Text="Stap voor stap verkennen: zet de loc midden in een blok; de verkenner rijdt steeds één melder en probeert de wissels één voor één. Trager, maar rustiger (nieuw, nog niet getest op de baan)."/>
                         </CheckBox>
+                        <CheckBox x:Name="StapAanloopCheck" Margin="24,4,0,4" IsChecked="True">
+                            <TextBlock TextWrapping="Wrap" Text="Bij stap voor stap één melder extra terugrijden: de proefritten beginnen één melder vóór de startmelder (de loc staat dan niet op de wissels bij de startmelder en wissels vóór de startmelder worden ook gemeten). Nieuw, nog niet getest op de baan."/>
+                        </CheckBox>
+                        <CheckBox x:Name="StapDoorrijCheck" Margin="24,4,0,4" IsChecked="True">
+                            <TextBlock TextWrapping="Wrap" Text="Bij stap voor stap na de nieuwe melder nog 1 seconde doorrijden, zodat de loc de wisseltongen in die sectie berijdt en een kortsluiting bij een wissel naar de samenvoeging toe zichtbaar wordt. Nieuw, nog niet getest op de baan."/>
+                        </CheckBox>
                     </StackPanel>
                 </GroupBox>
 

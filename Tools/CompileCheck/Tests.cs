@@ -2357,8 +2357,11 @@ public static class Tests
         Console.WriteLine("Test: stap voor stap op de nagebouwde Miniworld-baan (BUG #172)");
         foreach (var start in (Environment.GetEnvironmentVariable("STAP_START") ?? "17").Split(',').Select(int.Parse))
         {
-            var r = MiniworldRit(start, double.Parse(Environment.GetEnvironmentVariable("STAP_UREN") ?? "8", System.Globalization.CultureInfo.InvariantCulture), insAanpassing: i => i.StapVoorStap = true);
+            var r = MiniworldRit(start, double.Parse(Environment.GetEnvironmentVariable("STAP_UREN") ?? "8", System.Globalization.CultureInfo.InvariantCulture), insAanpassing: i => { i.StapVoorStap = true; i.StapAanloop = Environment.GetEnvironmentVariable("STAP_AANLOOP") == "1"; i.StapDoorrijSeconden = double.Parse(Environment.GetEnvironmentVariable("STAP_DOORRIJ") ?? "0", System.Globalization.CultureInfo.InvariantCulture); });   // volledige run zonder aanloop: met aanloop loopt de sim vast in het herstel na de kruisproef (zie AanloopTest en BUGS.md #175)
             Console.WriteLine($"  start {start}: {r.Einde}, {r.Seconden / 60:0} min, {r.Kortsluitingen} kortsluiting(en), melders: {string.Join(",", r.V.Kaart.Melders.Select(m => m.Nummer).OrderBy(x => x))}, voltooid: {r.V.Kaart.Voltooid}, wissels: {string.Join(",", r.V.Kaart.Wissels.Where(w => w.Waarnemingen.Count > 0).Select(w => w.Adres))}");
+            if (Environment.GetEnvironmentVariable("MINI_OVERGANGEN") == "1")
+                foreach (var ov in r.V.Kaart.Overgangen.Where(x => new[] { 4, 5, 11, 12 }.Contains(x.Van) && new[] { 4, 5, 11, 12 }.Contains(x.Naar)))
+                    Console.WriteLine($"  OVERGANG {ov.Van}->{ov.Naar} {ov.Richting} x{ov.AantalKeer} configs: {string.Join(" | ", ov.GezienBijConfiguraties)}");
             Eis(r.V.Kaart.Voltooid, $"stap voor stap (start {start}): de verkenning rondt af");
             Eis(r.V.Kaart.Melders.Count >= 18, $"stap voor stap (start {start}): de melders zijn gevonden (nu {r.V.Kaart.Melders.Count})");
             Eis(r.Kortsluitingen <= 5, $"stap voor stap (start {start}): weinig kortsluitingen (nu {r.Kortsluitingen})");
@@ -2369,6 +2372,18 @@ public static class Tests
         }
     }
 
+    // BUG #175 (Marco 17-10 09:44): één melder extra terug: de proefritten beginnen vóór de startmelder. Alleen het eerste uur van de sim, daar zit wat de aanloop moet bewijzen.
+    static void AanloopTest()
+    {
+        Console.WriteLine("Test: stap voor stap met een melder aanloop (BUG #175)");
+        var r = MiniworldRit(17, 0.8, insAanpassing: i => { i.StapVoorStap = true; i.StapAanloop = true; });
+        var tekst = r.Log.AlsTekst();
+        Console.WriteLine($"  eerste {r.Seconden / 60:0} min: {r.Einde}, {r.Kortsluitingen} kortsluiting(en), melders {r.V.Kaart.Melders.Count}");
+        Eis(r.Log.Regels.Any(x => x.Tekst.Contains("proefritten beginnen één melder eerder")), "aanloop: de proefritten beginnen een melder eerder");
+        Eis(r.V.Kaart.Wissels.Any(w => w.Adres == 14 && w.Waarnemingen.Count > 0), "aanloop: wissel 14 (vóór melder 17 -> 8) wordt al in het eerste uur gemeten");
+        Eis(r.Kortsluitingen <= 2, $"aanloop: weinig kortsluitingen in het eerste uur (nu {r.Kortsluitingen})");
+    }
+
     // BUG #173: Dinamo-uitval midden in 'Stap voor stap': alles na het begin van het probleem telt niet, de loc rijdt terug naar een getest stuk en gaat daar verder
     static void StapUitvalTest()
     {
@@ -2376,7 +2391,7 @@ public static class Tests
         foreach (var vanaf in (Environment.GetEnvironmentVariable("UITVAL_VANAF") ?? "60").Split(',').Select(int.Parse))
         {
             Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan? uitval = null;
-            var r = MiniworldRit(int.Parse(Environment.GetEnvironmentVariable("STAP_START") ?? "17"), 10, insAanpassing: i => i.StapVoorStap = true,
+            var r = MiniworldRit(int.Parse(Environment.GetEnvironmentVariable("STAP_START") ?? "17"), 10, insAanpassing: i => { i.StapVoorStap = true; i.StapAanloop = false; i.StapDoorrijSeconden = 0; },
                 simFabriek: () => uitval = new Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan { UitvalVanafCommando = vanaf, UitvalDuur = TimeSpan.FromSeconds(75) });
             if (Environment.GetEnvironmentVariable("MINI_LOG") == "1") Console.WriteLine(r.Log.AlsTekst());
             Console.WriteLine($"  uitval vanaf commando {vanaf}: {r.Einde}, {r.Seconden / 60:0} min, {r.Kortsluitingen} kortsluiting(en), {uitval!.GenegeerdeCommandos} commando's genegeerd, voltooid: {r.V.Kaart.Voltooid}, melders: {r.V.Kaart.Melders.Count}");
@@ -2583,6 +2598,7 @@ public static class Tests
         StapUitvalTest();
         OnbekendeBlokkenTest();
         StapVoorStapTest();
+        AanloopTest();
         MiniworldAlarmVertragingTest();
         MiniworldVoorkennisTest();
         HerstelBlijftStaanTest();
