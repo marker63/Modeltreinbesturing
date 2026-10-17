@@ -43,12 +43,16 @@ public static class BlokVoorstel
         // (dood lopende) aftakking in ligt. Een gevonden wissel mag daarom nooit een splitsing
         // afdwingen tussen twee melders die al een bekend, gelijk Dinamo-blok hebben: de echte
         // bedrading (waarmee Koploper al jaren foutloos rijdt) is dan het sterkere bewijs.
+        // BUG #174 (Marco 17-10: "een blok melder 24 met daarin alle melders na blok 3"): zodra de kaart Dinamo-blokken kent, is een melder zonder blok geen
+        // bewijs dat hij bij een buurmelder hoort; dan wordt er niets samengevoegd.
+        bool metBlokInfo = kaart.Melders.Any(m => m.DinamoBlok is not null);
         bool Samen(int a, int b)
         {
             var blokA = blokVan.GetValueOrDefault(a);
             var blokB = blokVan.GetValueOrDefault(b);
             if (!Equals(blokA, blokB)) return false;
             if (blokA is not null) return true;
+            if (metBlokInfo) return false;
             return !viaWissel.Contains((Math.Min(a, b), Math.Max(a, b)));
         }
 

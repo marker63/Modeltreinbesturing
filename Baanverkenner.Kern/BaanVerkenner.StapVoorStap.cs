@@ -82,7 +82,7 @@ public partial class BaanVerkenner
         {
             var o = wachtrij[i];
             long d = afstand.TryGetValue(o.Start, out var dd) ? dd : 1000;
-            long score = d * 1000 + o.Pogingen * 100000 + i;
+            long score = d * 1000 + o.Pogingen * 100000 + i + (o.BlokProef ? 50_000_000 : 0);   // blokproeven pas als er geen ritten meer zijn
             if (score < besteScore) { beste = o; besteScore = score; }
         }
         return beste;
@@ -357,6 +357,7 @@ public partial class BaanVerkenner
     private void NaOpdrachtStap()
     {
         DetecteerKruis();
+        PlanBlokProeven();   // BUG #174
         PlanKruisProeven();
     }
 
@@ -377,6 +378,16 @@ public partial class BaanVerkenner
             }
     }
 
+    /// <summary>BUG #174: de standen van de kruismotoren die op een proef getest worden: elke motor alleen, en bij een Engelse wissel met twee motoren ook beide tegelijk
+    /// afbuigend (de stand "129 <-> 8" ontbrak: Marco 17-10, "belangrijke standen van wisselmotoren 10 en 13 gemist"). De gewone stand (alles rechtdoor) is de basisrit.</summary>
+    internal List<Configuratie> MotorCombinaties()
+    {
+        var m = Kruis.Motoren.OrderBy(x => x).ToList();
+        var res = m.Select(x => new Configuratie(new[] { x })).ToList();
+        if (m.Count == 2) res.Add(new Configuratie(m.ToArray()));
+        return res;
+    }
+
     /// <summary>Voor elke bekende kruiswissel, elke ingang (buur) en elke stand van één kruismotor die nog niet gereden is: een eigen proef van twee melders
     /// (ingang → kruiswissel → uitgang). Zo komt er per ingang uit wat elke motor doet, zonder motoren onder de loc om te zetten.</summary>
     private void PlanKruisProeven()
@@ -385,7 +396,7 @@ public partial class BaanVerkenner
         var buren = Buren(_kaart);
         var motoren = Kruis.Motoren.OrderBy(x => x).ToList();
         var standen = new List<Configuratie> { Configuratie.Basis };
-        foreach (var m in motoren) standen.Add(new Configuratie(new[] { m }));
+        standen.AddRange(MotorCombinaties());   // BUG #174: ook beide motoren tegelijk afbuigend (129 <-> 8), die ontbrak
         foreach (var k in Kruis.Middens.OrderBy(x => x))
         {
             if (!buren.TryGetValue(k, out var bk)) continue;
@@ -395,9 +406,15 @@ public partial class BaanVerkenner
                         ?? _kaart.Overgangen.Where(o => o.Van == k && o.Naar == ingang).Select(o => (Richting?)o.Richting.Om()).FirstOrDefault();
                 if (r is null) continue;
                 var gezien = KruisBewijs.GezienBijIngang(_kaart, Kruis, k, ingang);
+                // BUG #174: beide motoren tegelijk afbuigend heeft alleen een doorgaand spoor vanaf een ingang die in de andere standen maar één doorgang liet zien
+                // (129 <-> 8). Vanaf een ingang met twee doorgangen (14, 21) geeft die stand alleen een kortsluiting: dan niet proberen. Pas plannen als de enkelvoudige
+                // standen van deze ingang klaar zijn.
+                int enkelvoudigOpen = _status.Wachtrij.Count(w => w.KruisProef && w.Start == ingang && w.Configuratie.Afbuigend.Length <= 1);
+                int doorgangen = gezien.Count(g => g.Afbuigend.Length <= 1);
                 foreach (var s in standen)
                 {
                     if (gezien.Any(g => g.Equals(s))) continue;
+                    if (s.Afbuigend.Length >= 2 && (enkelvoudigOpen > 0 || doorgangen > 1)) continue;
                     Plan(new Opdracht
                     {
                         Configuratie = s,
@@ -409,6 +426,54 @@ public partial class BaanVerkenner
                 }
             }
         }
+    }
+
+    /// <summary>BUG #174 (Marco 17-10: "je had al lang moeten weten bij welke blokken sommige melders horen"): een rit van één melder stopte op de nieuwe melder, vóór de
+    /// blokproef; alleen de startmelders kregen hun blok. Elke melder zonder Dinamo-blok krijgt daarom een eigen kleine opdracht: erheen, neerzetten en de blokproef.
+    /// Dat gebeurt los van de ritten zodat de loc daarbij nooit midden in een rit dieper een (kruiswissel-)sectie in komt. Nog niet getest op de baan.</summary>
+    private void PlanBlokProeven()
+    {
+        if (!BlokVereist) return;
+        foreach (var m in _kaart.Melders.Select(x => x.Nummer).OrderBy(x => x).ToList())
+        {
+            if (m == _kaart.StartMelder || !ProefMogelijk(m) || Kruis.Middens.Contains(m)) continue;
+            // de richting waarmee de loc deze melder inreed (voor het neerzetten): uit een bekende overgang naar deze melder
+            var aankomst = _kaart.Overgangen.Where(o => o.Naar == m && o.AantalKeer > 0).Select(o => (Richting?)o.Richting).FirstOrDefault()
+                           ?? _kaart.Overgangen.Where(o => o.Van == m && o.AantalKeer > 0).Select(o => (Richting?)o.Richting.Om()).FirstOrDefault();
+            if (aankomst is null) continue;
+            Plan(new Opdracht
+            {
+                Configuratie = Configuratie.Basis,
+                Start = m,
+                Richting = aankomst.Value,
+                BlokProef = true,
+                Reden = $"Dinamo-blok van melder {m} bepalen"
+            }, vooraan: false);
+        }
+    }
+
+    private async Task VoerBlokProefUit(Opdracht o)
+    {
+        if (!ProefMogelijk(o.Start)) return;   // intussen al bekend (of te vaak mislukt)
+        // de weg erheen zet geen wissel om die bij de melder ligt waar de loc nu staat (de loc kan er met een deel op staan: kortsluiting)
+        if (HuidigePlek() is int nu && nu != o.Start && StapWeg(_kaart, Kruis, nu, o.Start) is { } weg)
+        {
+            var bij = WisselsBijBezet(_kaart, new[] { nu });
+            if (weg.Take(1).Any(st => st.Cfg.Afbuigend.Any(bij.Contains)))
+            {
+                _log.Info($"Blokproef voor melder {o.Start} nu niet: de weg erheen zet wissel {string.Join(", ", weg[0].Cfg.Afbuigend.Where(bij.Contains))} om terwijl de loc op melder {nu} staat. Later opnieuw vanaf een andere melder.");
+                _proefPogingen[o.Start] = _proefPogingen.GetValueOrDefault(o.Start) + 1;
+                return;
+            }
+        }
+        _bezig = $"blokproef voor melder {o.Start}";
+        MeldVoortgang();
+        await NaarPlekMelder(o.Start, Configuratie.Basis);
+        await ZetConfiguratie(Configuratie.Basis);
+        await Nastellen(o.Start, o.Richting);
+        _proefPogingen[o.Start] = _proefPogingen.GetValueOrDefault(o.Start) + 1;
+        await BlokZoekenBijStart(o.Start);
+        BewaarNu();
     }
 
     /// <summary>De proef van een kruiswissel-ingang: twee melders rijden met precies de gevraagde motorstanden, vastleggen, terug.</summary>

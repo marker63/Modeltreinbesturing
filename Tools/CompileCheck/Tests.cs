@@ -1548,6 +1548,16 @@ public static class Tests
         Eis(blokken.All(b => b.Buren.All(n => blokken.Any(x => x.Nummer == n))), "bloknummers: buren verwijzen naar bestaande blokken");
     }
 
+    // BUG #174: melders zonder bekend Dinamo-blok mogen niet in één verzamelblok ("melder 24") samengevoegd worden zodra de kaart blok-info heeft
+    static void OnbekendeBlokkenTest()
+    {
+        Console.WriteLine("Test: onbekende melders niet samenvoegen (BUG #174, log 17-10 08:51)");
+        var k = Laad("baankaart_2026-10-17_0851.json");
+        var blokken = BlokVoorstel.Bereken(k);
+        var onbekend = blokken.Where(b => b.DinamoBlok is null).ToList();
+        Eis(onbekend.Count > 0 && onbekend.All(b => b.Melders.Count == 1), $"onbekende blokken: elke onbekende melder is een eigen blok (nu {string.Join(" | ", onbekend.Select(b => string.Join("+", b.Melders)))})");
+    }
+
     static void KruiswisselControleTest()
     {
         Console.WriteLine("Test: kruiswisselstanden in wisselstraten naast de referentie (BUG #91)");
@@ -2352,6 +2362,9 @@ public static class Tests
             Eis(r.V.Kaart.Voltooid, $"stap voor stap (start {start}): de verkenning rondt af");
             Eis(r.V.Kaart.Melders.Count >= 18, $"stap voor stap (start {start}): de melders zijn gevonden (nu {r.V.Kaart.Melders.Count})");
             Eis(r.Kortsluitingen <= 5, $"stap voor stap (start {start}): weinig kortsluitingen (nu {r.Kortsluitingen})");
+            var zonderBlok = r.V.Kaart.Melders.Where(m => m.DinamoBlok is null).Select(m => m.Nummer).OrderBy(x => x).ToList();
+            Console.WriteLine($"  melders zonder Dinamo-blok: {(zonderBlok.Count == 0 ? "geen" : string.Join(",", zonderBlok))}");
+            Eis(zonderBlok.Count <= 2, $"stap voor stap (start {start}) BUG #174: (bijna) alle melders kennen hun Dinamo-blok (zonder: {string.Join(",", zonderBlok)})");
             Eis(r.V.Kaart.KruisMidden.Contains(24) && !r.V.Kaart.KruisMidden.Contains(129), $"stap voor stap (start {start}): alleen melder 24 is de kruiswissel (nu {string.Join(",", r.V.Kaart.KruisMidden)})");
         }
     }
@@ -2568,6 +2581,7 @@ public static class Tests
         if (Environment.GetEnvironmentVariable("MINI_DEBUG") == "1") MiniworldFoutzoek();
         MiniworldRitTest();
         StapUitvalTest();
+        OnbekendeBlokkenTest();
         StapVoorStapTest();
         MiniworldAlarmVertragingTest();
         MiniworldVoorkennisTest();

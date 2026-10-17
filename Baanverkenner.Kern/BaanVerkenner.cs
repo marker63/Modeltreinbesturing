@@ -31,9 +31,11 @@ public class Opdracht
     public bool TestCombinaties { get; set; }
     /// <summary>BUG #172: proef van een kruiswissel-ingang (twee melders, precies de gevraagde motorstanden, geen adrestest).</summary>
     public bool KruisProef { get; set; }
+    /// <summary>BUG #174: alleen het Dinamo-blok van deze melder bepalen (loc erheen, neerzetten, blokproef); geen rit, geen adrestest.</summary>
+    public bool BlokProef { get; set; }
     /// <summary>BUG #173: hoe vaak deze opdracht is afgebroken door een wisselprobleem (Dinamo-uitval, klem) en opnieuw begonnen is.</summary>
     public int UitvalHersteld { get; set; }
-    public string Sleutel => $"{Configuratie.Sleutel}|{Start}|{Richting}";
+    public string Sleutel => $"{Configuratie.Sleutel}|{Start}|{Richting}{(BlokProef ? "|blok" : "")}";
 }
 
 /// <summary>Alles wat nodig is om een onderbroken verkenning te hervatten.</summary>
@@ -932,7 +934,7 @@ public partial class BaanVerkenner
 
         // BUG #172: een kruiswissel-proef rijdt met precies de gevraagde motorstanden.
         _stapDoel = o.Start;
-        var rijstand = o.KruisProef ? o.Configuratie : RijStand(o);
+        var rijstand = (o.KruisProef || o.BlokProef) ? o.Configuratie : RijStand(o);
         // BUG #145: een opdracht waarvan de aankomst op de startmelder al kortsluiting gaf (en niet bewezen oplosbaar is) wordt niet opnieuw gereden.
         // BUG #149: liever vanaf de bewezen ingang aankomen dan een wissel bij de startmelder onder de staande loc omzetten.
         string? ingangUitleg = null;
@@ -948,6 +950,7 @@ public partial class BaanVerkenner
         try
         {
             if (o.KruisProef) { await VoerKruisProefUit(o); return; }
+            if (o.BlokProef) { await VoerBlokProefUit(o); return; }   // BUG #174
             await NaarStartVan(viaIngang ?? o.Route, rijstand);
             // BUG #96 (Marco 16:01: "weer kortsluiting in het kruiswissel en motor 13 staat verkeerd"): motor 13 of 10 omzetten terwijl de loc op melder 24
             // staat geeft ALTIJD kortsluiting (log 15:40, 15:48, 14:40). Is dat hier nodig en kon het niet vooraf (#95), dan wordt de opdracht

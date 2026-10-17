@@ -1162,6 +1162,7 @@ public partial class BaanVerkenner
                       (kopAdressen.Count > 0 ? $"; wissel {string.Join(", ", kopAdressen.OrderBy(a => a))} wordt van de samengevoegde kant bereden en wordt niet omgezet (dat helpt daar niet)." : "."));
 
         if (bijLoc.Count > 0) _log.Info($"Niet zonder toestemming geprobeerd: wissel {string.Join(", ", bijLoc.OrderBy(a => a))} (ligt bij een bezette melder, de loc staat er mogelijk op).");
+        var alarmBlokkenVoor = HuidigeAlarmBlokken();   // BUG #174: de oplossing hoort alleen bij een kortsluitpunt met hetzelfde alarmblok
         _log.Waarschuwing($"Kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())} blijft terwijl de loc stilstaat ({stap}). De verkenner probeert zelf wissels om te zetten, behalve die bij een bezette melder ({string.Join(" en ", bezet.OrderBy(m => m))}).");
 
         async Task<bool> Probeer(int a, string toelichting)
@@ -1175,7 +1176,7 @@ public partial class BaanVerkenner
                 _log.Vondst($"De kortsluiting ging weg nadat wissel {a}{toelichting} naar {(oud ? "rechtdoor" : "afbuigend")} is geschakeld ({stap}). De wissel blijft zo staan.");
                 _kortsluitingGemeld = false;
                 _alarmStand[a] = !oud;
-                RegistreerAlarmOplossing(a, !oud, bezet);
+                RegistreerAlarmOplossing(a, !oud, bezet, alarmBlokkenVoor);
                 return true;
             }
             await ZetWissel(a, oud, forceer: true);
@@ -1277,11 +1278,12 @@ public partial class BaanVerkenner
     /// volgende rit 4 -> 129 zou weer met wissel 9 rechtdoor beginnen (opnieuw kortsluiting, opnieuw 50 s wissels proberen). Nu wordt de wissel die het
     /// alarm wegnam als oplossing vastgelegd bij het nieuwste nog niet opgeloste kortsluitpunt waarvan de melder bezet is (de loc staat er nog).
     /// Een wissel die al in de stand van het punt zit, een kruismotor die daar niets kan oplossen of een wissel die op rechtdoor werd gezet telt niet.</summary>
-    private void RegistreerAlarmOplossing(int adres, bool afbuigend, IEnumerable<int> bezet)
+    private void RegistreerAlarmOplossing(int adres, bool afbuigend, IEnumerable<int> bezet, IReadOnlyCollection<int>? alarmBlokken = null)
     {
         var b = bezet.ToHashSet();
         var kp = _kaart.Kortsluitpunten.Where(k => k.Soort == KortsluitpuntSoort.Kortsluiting && !k.Opgelost && !k.Opgegeven
-                                                   && (b.Contains(k.NaMelder) || k.TweedeMelders.Any(b.Contains)))
+                                                   && (b.Contains(k.NaMelder) || k.TweedeMelders.Any(b.Contains))
+                                                   && (alarmBlokken is not { Count: > 0 } || k.AlarmBlokken.Count == 0 || k.AlarmBlokken.Any(alarmBlokken.Contains)))
                                        .OrderByDescending(k => k.Id).FirstOrDefault();
         if (kp is null || !_kaart.RegistreerHandmatigeOplossing(kp, adres, afbuigend, Kruis)) return;
         _log.Vondst($"Kortsluitpunt #{kp.Id} (na melder {kp.NaMelder}, {kp.Richting.Tekst()}, {kp.Configuratie}) is opgelost door wissel {adres} op afbuigend: " +

@@ -1,0 +1,3745 @@
+{
+  "FormaatVersie": 1,
+  "Programma": "Baanverkenner",
+  "Gestart": "2026-10-17T08:03:12.5768282+02:00",
+  "Bijgewerkt": "2026-10-17T08:51:03.2370676+02:00",
+  "Voltooid": false,
+  "Hardware": "VPEB Dinamo",
+  "LocAdres": 5408,
+  "LocStappen": 28,
+  "RefSnelheid": 12,
+  "StartMelder": 13,
+  "EerdereStartMelders": [],
+  "WisselAdresVan": 1,
+  "WisselAdresTot": 14,
+  "Melders": [
+    {
+      "Nummer": 5,
+      "DinamoBlok": null
+    },
+    {
+      "Nummer": 13,
+      "DinamoBlok": 3
+    },
+    {
+      "Nummer": 14,
+      "DinamoBlok": null
+    },
+    {
+      "Nummer": 20,
+      "DinamoBlok": null
+    },
+    {
+      "Nummer": 21,
+      "DinamoBlok": null
+    },
+    {
+      "Nummer": 24,
+      "DinamoBlok": null
+    },
+    {
+      "Nummer": 27,
+      "DinamoBlok": null
+    },
+    {
+      "Nummer": 29,
+      "DinamoBlok": null
+    },
+    {
+      "Nummer": 30,
+      "DinamoBlok": null
+    }
+  ],
+  "Overgangen": [
+    {
+      "Van": 13,
+      "Naar": 14,
+      "Richting": "Vooruit",
+      "AantalKeer": 14,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "11",
+        "12",
+        "14"
+      ]
+    },
+    {
+      "Van": 14,
+      "Naar": 13,
+      "Richting": "Achteruit",
+      "AantalKeer": 13,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        ""
+      ]
+    },
+    {
+      "Van": 13,
+      "Naar": 5,
+      "Richting": "Achteruit",
+      "AantalKeer": 13,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "11",
+        "12",
+        "14"
+      ]
+    },
+    {
+      "Van": 5,
+      "Naar": 13,
+      "Richting": "Vooruit",
+      "AantalKeer": 13,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        ""
+      ]
+    },
+    {
+      "Van": 14,
+      "Naar": 24,
+      "Richting": "Vooruit",
+      "AantalKeer": 24,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "6",
+        "7",
+        "8",
+        "1,11",
+        "12",
+        "14",
+        "5"
+      ]
+    },
+    {
+      "Van": 24,
+      "Naar": 14,
+      "Richting": "Achteruit",
+      "AantalKeer": 23,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        "",
+        "5",
+        "1,5",
+        "2,5",
+        "3,5",
+        "4,5",
+        "5,6",
+        "5,7",
+        "5,8",
+        "5,9",
+        "5,11",
+        "5,12",
+        "5,14"
+      ]
+    },
+    {
+      "Van": 24,
+      "Naar": 21,
+      "Richting": "Vooruit",
+      "AantalKeer": 13,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "6",
+        "7",
+        "8",
+        "9",
+        "11",
+        "12",
+        "14"
+      ]
+    },
+    {
+      "Van": 21,
+      "Naar": 24,
+      "Richting": "Achteruit",
+      "AantalKeer": 12,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        ""
+      ]
+    },
+    {
+      "Van": 21,
+      "Naar": 29,
+      "Richting": "Vooruit",
+      "AantalKeer": 13,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "6",
+        "7",
+        "8",
+        "9",
+        "11",
+        "12",
+        "14"
+      ]
+    },
+    {
+      "Van": 29,
+      "Naar": 21,
+      "Richting": "Achteruit",
+      "AantalKeer": 12,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        ""
+      ]
+    },
+    {
+      "Van": 29,
+      "Naar": 30,
+      "Richting": "Vooruit",
+      "AantalKeer": 13,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "6",
+        "7",
+        "8",
+        "9",
+        "11",
+        "12",
+        "14"
+      ]
+    },
+    {
+      "Van": 30,
+      "Naar": 29,
+      "Richting": "Achteruit",
+      "AantalKeer": 12,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        ""
+      ]
+    },
+    {
+      "Van": 30,
+      "Naar": 20,
+      "Richting": "Vooruit",
+      "AantalKeer": 13,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2",
+        "3",
+        "4",
+        "6",
+        "7",
+        "8",
+        "9",
+        "11",
+        "12",
+        "14"
+      ]
+    },
+    {
+      "Van": 20,
+      "Naar": 30,
+      "Richting": "Achteruit",
+      "AantalKeer": 9,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        ""
+      ]
+    },
+    {
+      "Van": 20,
+      "Naar": 27,
+      "Richting": "Vooruit",
+      "AantalKeer": 3,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        "",
+        "1",
+        "2"
+      ]
+    },
+    {
+      "Van": 27,
+      "Naar": 20,
+      "Richting": "Achteruit",
+      "AantalKeer": 2,
+      "GemiddeldeSeconden": 0,
+      "AantalMetingen": 0,
+      "GezienBijConfiguraties": [
+        ""
+      ]
+    }
+  ],
+  "Wissels": [
+    {
+      "Adres": 5,
+      "Waarnemingen": [
+        {
+          "Soort": "KortsluitingBijOmzetten",
+          "NaMelder": 14,
+          "Via": null,
+          "Richting": "Vooruit",
+          "VolgendeBijRechtdoor": 24,
+          "VolgendeBijAfbuigend": null,
+          "Configuratie": "alle wissels rechtdoor",
+          "Toelichting": "Op afbuigend: kortsluiting tussen melder 14 en 24. Deze wissel wordt hier waarschijnlijk van achteren (samenvoegend) bereden."
+        },
+        {
+          "Soort": "Splitsing",
+          "NaMelder": 24,
+          "Via": null,
+          "Richting": "Achteruit",
+          "VolgendeBijRechtdoor": 14,
+          "VolgendeBijAfbuigend": 14,
+          "Configuratie": "alle wissels rechtdoor",
+          "Toelichting": "Na melder 24 (achteruit): rechtdoor \u2192 melder 14, afbuigend \u2192 melder 14 (puntzijde, gevonden door andersom te rijden)."
+        }
+      ]
+    }
+  ],
+  "Kopsporen": [],
+  "Trajecten": [],
+  "Kortsluitpunten": [],
+  "Doorgangen": [
+    {
+      "Via": 14,
+      "Melder": 13,
+      "Volgende": 5,
+      "Richting": "Achteruit",
+      "AantalKeer": 2,
+      "Configuraties": [
+        ""
+      ],
+      "Tellers": {
+        "": 2
+      }
+    },
+    {
+      "Via": 5,
+      "Melder": 13,
+      "Volgende": 14,
+      "Richting": "Vooruit",
+      "AantalKeer": 2,
+      "Configuraties": [
+        ""
+      ],
+      "Tellers": {
+        "": 2
+      }
+    },
+    {
+      "Via": 13,
+      "Melder": 14,
+      "Volgende": 24,
+      "Richting": "Vooruit",
+      "AantalKeer": 1,
+      "Configuraties": [
+        ""
+      ],
+      "Tellers": {
+        "": 1
+      }
+    },
+    {
+      "Via": 24,
+      "Melder": 14,
+      "Volgende": 13,
+      "Richting": "Achteruit",
+      "AantalKeer": 1,
+      "Configuraties": [
+        ""
+      ],
+      "Tellers": {
+        "": 1
+      }
+    },
+    {
+      "Via": 14,
+      "Melder": 24,
+      "Volgende": 21,
+      "Richting": "Vooruit",
+      "AantalKeer": 3,
+      "Configuraties": [
+        "",
+        "5"
+      ],
+      "Tellers": {
+        "": 2,
+        "5": 1
+      }
+    },
+    {
+      "Via": 21,
+      "Melder": 24,
+      "Volgende": 14,
+      "Richting": "Achteruit",
+      "AantalKeer": 3,
+      "Configuraties": [
+        "",
+        "5"
+      ],
+      "Tellers": {
+        "": 2,
+        "5": 1
+      }
+    },
+    {
+      "Via": 24,
+      "Melder": 21,
+      "Volgende": 29,
+      "Richting": "Vooruit",
+      "AantalKeer": 1,
+      "Configuraties": [
+        ""
+      ],
+      "Tellers": {
+        "": 1
+      }
+    },
+    {
+      "Via": 29,
+      "Melder": 21,
+      "Volgende": 24,
+      "Richting": "Achteruit",
+      "AantalKeer": 1,
+      "Configuraties": [
+        ""
+      ],
+      "Tellers": {
+        "": 1
+      }
+    },
+    {
+      "Via": 21,
+      "Melder": 29,
+      "Volgende": 30,
+      "Richting": "Vooruit",
+      "AantalKeer": 1,
+      "Configuraties": [
+        ""
+      ],
+      "Tellers": {
+        "": 1
+      }
+    },
+    {
+      "Via": 30,
+      "Melder": 29,
+      "Volgende": 21,
+      "Richting": "Achteruit",
+      "AantalKeer": 1,
+      "Configuraties": [
+        ""
+      ],
+      "Tellers": {
+        "": 1
+      }
+    },
+    {
+      "Via": 29,
+      "Melder": 30,
+      "Volgende": 20,
+      "Richting": "Vooruit",
+      "AantalKeer": 1,
+      "Configuraties": [
+        ""
+      ],
+      "Tellers": {
+        "": 1
+      }
+    },
+    {
+      "Via": 20,
+      "Melder": 30,
+      "Volgende": 29,
+      "Richting": "Achteruit",
+      "AantalKeer": 1,
+      "Configuraties": [
+        ""
+      ],
+      "Tellers": {
+        "": 1
+      }
+    },
+    {
+      "Via": 30,
+      "Melder": 20,
+      "Volgende": 27,
+      "Richting": "Vooruit",
+      "AantalKeer": 1,
+      "Configuraties": [
+        ""
+      ],
+      "Tellers": {
+        "": 1
+      }
+    },
+    {
+      "Via": 27,
+      "Melder": 20,
+      "Volgende": 30,
+      "Richting": "Achteruit",
+      "AantalKeer": 1,
+      "Configuraties": [
+        ""
+      ],
+      "Tellers": {
+        "": 1
+      }
+    }
+  ],
+  "BekendeKortsluitOplossingen": [],
+  "KruisMotoren": "10\u002B13",
+  "KruisMidden": [],
+  "KruisReferentie": false,
+  "AdressenZonderEffect": [],
+  "VoorgesteldeBlokken": [
+    {
+      "Nummer": 90000,
+      "Label": "onbekend (melder 5)",
+      "Melders": [
+        5
+      ],
+      "DinamoBlok": null,
+      "Buren": [
+        3
+      ]
+    },
+    {
+      "Nummer": 3,
+      "Label": "3",
+      "Melders": [
+        13
+      ],
+      "DinamoBlok": 3,
+      "Buren": [
+        90000,
+        90002
+      ]
+    },
+    {
+      "Nummer": 90002,
+      "Label": "onbekend (melder 14)",
+      "Melders": [
+        14
+      ],
+      "DinamoBlok": null,
+      "Buren": [
+        3,
+        90003
+      ]
+    },
+    {
+      "Nummer": 90003,
+      "Label": "onbekend (melder 24)",
+      "Melders": [
+        24,
+        21,
+        29,
+        30,
+        20,
+        27
+      ],
+      "DinamoBlok": null,
+      "Buren": [
+        90002
+      ]
+    }
+  ],
+  "Wisselstraatvoorstellen": [
+    {
+      "VanMelder": 5,
+      "NaarMelder": 13,
+      "Richting": "Vooruit",
+      "AantalKeer": 13,
+      "VanBlok": 90000,
+      "NaarBlok": 3,
+      "VanLabel": "onbekend (melder 5)",
+      "NaarLabel": "3",
+      "Eisen": [],
+      "Standen": "",
+      "EisenTekst": "geen wissel nodig",
+      "Sleutel": "5\u003E13:Vooruit|"
+    },
+    {
+      "VanMelder": 13,
+      "NaarMelder": 5,
+      "Richting": "Achteruit",
+      "AantalKeer": 13,
+      "VanBlok": 3,
+      "NaarBlok": 90000,
+      "VanLabel": "3",
+      "NaarLabel": "onbekend (melder 5)",
+      "Eisen": [],
+      "Standen": "",
+      "EisenTekst": "geen wissel nodig",
+      "Sleutel": "13\u003E5:Achteruit|"
+    },
+    {
+      "VanMelder": 13,
+      "NaarMelder": 14,
+      "Richting": "Vooruit",
+      "AantalKeer": 14,
+      "VanBlok": 3,
+      "NaarBlok": 90002,
+      "VanLabel": "3",
+      "NaarLabel": "onbekend (melder 14)",
+      "Eisen": [],
+      "Standen": "",
+      "EisenTekst": "geen wissel nodig",
+      "Sleutel": "13\u003E14:Vooruit|"
+    },
+    {
+      "VanMelder": 14,
+      "NaarMelder": 13,
+      "Richting": "Achteruit",
+      "AantalKeer": 13,
+      "VanBlok": 90002,
+      "NaarBlok": 3,
+      "VanLabel": "onbekend (melder 14)",
+      "NaarLabel": "3",
+      "Eisen": [],
+      "Standen": "",
+      "EisenTekst": "geen wissel nodig",
+      "Sleutel": "14\u003E13:Achteruit|"
+    },
+    {
+      "VanMelder": 14,
+      "NaarMelder": 24,
+      "Richting": "Vooruit",
+      "AantalKeer": 24,
+      "VanBlok": 90002,
+      "NaarBlok": 90003,
+      "VanLabel": "onbekend (melder 14)",
+      "NaarLabel": "onbekend (melder 24)",
+      "Eisen": [
+        {
+          "Adres": 5,
+          "Afbuigend": false,
+          "Bron": "Kortsluiting",
+          "Tekst": "wissel 5 rechtdoor"
+        }
+      ],
+      "Standen": "",
+      "EisenTekst": "wissel 5 rechtdoor (anders kortsluiting)",
+      "Sleutel": "14\u003E24:Vooruit|5R"
+    },
+    {
+      "VanMelder": 24,
+      "NaarMelder": 14,
+      "Richting": "Achteruit",
+      "AantalKeer": 23,
+      "VanBlok": 90003,
+      "NaarBlok": 90002,
+      "VanLabel": "onbekend (melder 24)",
+      "NaarLabel": "onbekend (melder 14)",
+      "Eisen": [],
+      "Standen": "",
+      "EisenTekst": "geen wissel nodig",
+      "Sleutel": "24\u003E14:Achteruit|"
+    }
+  ],
+  "Waarschuwingen": [
+    "Dinamo meldt de laatste 3 wissel-commando\u0027s niet meer terug (laatste: wissel 11 \u2192 afbuigend), terwijl dat eerder in deze sessie wel gebeurde. De wissels worden dan niet meer omgezet.",
+    "Dinamo-uitval (Dinamo reageerde vanzelf weer): alle bevindingen sinds de eerste ontbrekende terugmelding zijn uit de kaart gehaald omdat ze niet betrouwbaar zijn."
+  ],
+  "Ritten": [
+    {
+      "Nr": 1,
+      "Tijd": "2026-10-17T08:04:26.6347009+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        13,
+        14
+      ],
+      "Einde": "StapKlaar",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 2,
+      "Tijd": "2026-10-17T08:04:35.6326692+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        14,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 3,
+      "Tijd": "2026-10-17T08:04:45.2106962+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        1
+      ],
+      "Reeks": [
+        13,
+        14
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 4,
+      "Tijd": "2026-10-17T08:04:51.9823173+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        14,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 5,
+      "Tijd": "2026-10-17T08:05:02.784057+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        2
+      ],
+      "Reeks": [
+        13,
+        14
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 6,
+      "Tijd": "2026-10-17T08:05:09.6035665+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        14,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 7,
+      "Tijd": "2026-10-17T08:05:20.2017626+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        3
+      ],
+      "Reeks": [
+        13,
+        14
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 8,
+      "Tijd": "2026-10-17T08:05:26.9736823+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        14,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 9,
+      "Tijd": "2026-10-17T08:05:37.6116693+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        4
+      ],
+      "Reeks": [
+        13,
+        14
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 10,
+      "Tijd": "2026-10-17T08:05:44.1793176+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        14,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 11,
+      "Tijd": "2026-10-17T08:05:54.8191852+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        5
+      ],
+      "Reeks": [
+        13,
+        14
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 12,
+      "Tijd": "2026-10-17T08:06:01.3824988+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        14,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 13,
+      "Tijd": "2026-10-17T08:06:12.0202346+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        6
+      ],
+      "Reeks": [
+        13,
+        14
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 14,
+      "Tijd": "2026-10-17T08:06:18.5880163+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        14,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 15,
+      "Tijd": "2026-10-17T08:06:29.3764217+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        7
+      ],
+      "Reeks": [
+        13,
+        14
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 16,
+      "Tijd": "2026-10-17T08:06:39.784151+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        14,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 17,
+      "Tijd": "2026-10-17T08:06:51.5939098+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        8
+      ],
+      "Reeks": [
+        13,
+        14
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 18,
+      "Tijd": "2026-10-17T08:06:58.6222976+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        14,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 19,
+      "Tijd": "2026-10-17T08:07:09.4119561+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        9
+      ],
+      "Reeks": [
+        13,
+        14
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 20,
+      "Tijd": "2026-10-17T08:07:16.1807198+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        14,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 21,
+      "Tijd": "2026-10-17T08:07:26.9756692+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        11
+      ],
+      "Reeks": [
+        13,
+        14
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 22,
+      "Tijd": "2026-10-17T08:07:33.7965054+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        14,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 23,
+      "Tijd": "2026-10-17T08:07:44.5773793+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        12
+      ],
+      "Reeks": [
+        13,
+        14
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 24,
+      "Tijd": "2026-10-17T08:07:51.4037696+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        14,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 25,
+      "Tijd": "2026-10-17T08:08:01.9958634+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        14
+      ],
+      "Reeks": [
+        13,
+        14
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 26,
+      "Tijd": "2026-10-17T08:08:08.6208196+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        14,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 27,
+      "Tijd": "2026-10-17T08:08:17.5948445+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        13,
+        5
+      ],
+      "Einde": "StapKlaar",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 28,
+      "Tijd": "2026-10-17T08:08:22.0103812+02:00",
+      "Navigatie": true,
+      "Start": 5,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        5,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 29,
+      "Tijd": "2026-10-17T08:08:32.807851+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        1
+      ],
+      "Reeks": [
+        13,
+        5
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 30,
+      "Tijd": "2026-10-17T08:08:39.3784439+02:00",
+      "Navigatie": true,
+      "Start": 5,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        5,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 31,
+      "Tijd": "2026-10-17T08:08:50.1828808+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        2
+      ],
+      "Reeks": [
+        13,
+        5
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 32,
+      "Tijd": "2026-10-17T08:08:56.8061396+02:00",
+      "Navigatie": true,
+      "Start": 5,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        5,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 33,
+      "Tijd": "2026-10-17T08:09:07.6146176+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        3
+      ],
+      "Reeks": [
+        13,
+        5
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 34,
+      "Tijd": "2026-10-17T08:09:14.1868179+02:00",
+      "Navigatie": true,
+      "Start": 5,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        5,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 35,
+      "Tijd": "2026-10-17T08:09:24.9819389+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        4
+      ],
+      "Reeks": [
+        13,
+        5
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 36,
+      "Tijd": "2026-10-17T08:09:31.6049486+02:00",
+      "Navigatie": true,
+      "Start": 5,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        5,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 37,
+      "Tijd": "2026-10-17T08:09:42.2185594+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        5
+      ],
+      "Reeks": [
+        13,
+        5
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 38,
+      "Tijd": "2026-10-17T08:09:52.6271821+02:00",
+      "Navigatie": true,
+      "Start": 5,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        5,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 39,
+      "Tijd": "2026-10-17T08:10:04.3813977+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        6
+      ],
+      "Reeks": [
+        13,
+        5
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 40,
+      "Tijd": "2026-10-17T08:10:11.0005424+02:00",
+      "Navigatie": true,
+      "Start": 5,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        5,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 41,
+      "Tijd": "2026-10-17T08:10:21.9965628+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        7
+      ],
+      "Reeks": [
+        13,
+        5
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 42,
+      "Tijd": "2026-10-17T08:10:32.4029884+02:00",
+      "Navigatie": true,
+      "Start": 5,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        5,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 43,
+      "Tijd": "2026-10-17T08:10:44.2086634+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        8
+      ],
+      "Reeks": [
+        13,
+        5
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 44,
+      "Tijd": "2026-10-17T08:10:50.7758395+02:00",
+      "Navigatie": true,
+      "Start": 5,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        5,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 45,
+      "Tijd": "2026-10-17T08:11:01.8264039+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        9
+      ],
+      "Reeks": [
+        13,
+        5
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 46,
+      "Tijd": "2026-10-17T08:11:12.2327822+02:00",
+      "Navigatie": true,
+      "Start": 5,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        5,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 47,
+      "Tijd": "2026-10-17T08:11:24.1933242+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        11
+      ],
+      "Reeks": [
+        13,
+        5
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 48,
+      "Tijd": "2026-10-17T08:11:30.8198825+02:00",
+      "Navigatie": true,
+      "Start": 5,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        5,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 49,
+      "Tijd": "2026-10-17T08:11:42.0122496+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        12
+      ],
+      "Reeks": [
+        13,
+        5
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 50,
+      "Tijd": "2026-10-17T08:11:48.7835042+02:00",
+      "Navigatie": true,
+      "Start": 5,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        5,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 51,
+      "Tijd": "2026-10-17T08:11:59.6296069+02:00",
+      "Navigatie": false,
+      "Start": 13,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        14
+      ],
+      "Reeks": [
+        13,
+        5
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 52,
+      "Tijd": "2026-10-17T08:12:10.0481539+02:00",
+      "Navigatie": true,
+      "Start": 5,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        5,
+        13
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 53,
+      "Tijd": "2026-10-17T08:12:20.3602372+02:00",
+      "Navigatie": true,
+      "Start": 13,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        13,
+        14
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 54,
+      "Tijd": "2026-10-17T08:12:32.0131018+02:00",
+      "Navigatie": false,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "StapKlaar",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 55,
+      "Tijd": "2026-10-17T08:12:43.4886355+02:00",
+      "Navigatie": true,
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        24,
+        14
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 56,
+      "Tijd": "2026-10-17T08:12:54.81814+02:00",
+      "Navigatie": false,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        1
+      ],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 57,
+      "Tijd": "2026-10-17T08:13:08.5042157+02:00",
+      "Navigatie": true,
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        24,
+        14
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 58,
+      "Tijd": "2026-10-17T08:13:19.7918055+02:00",
+      "Navigatie": false,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        2
+      ],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 59,
+      "Tijd": "2026-10-17T08:13:33.5311849+02:00",
+      "Navigatie": true,
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        24,
+        14
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 60,
+      "Tijd": "2026-10-17T08:13:45.0156978+02:00",
+      "Navigatie": false,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        3
+      ],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 61,
+      "Tijd": "2026-10-17T08:13:58.7054029+02:00",
+      "Navigatie": true,
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        24,
+        14
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 62,
+      "Tijd": "2026-10-17T08:14:10.1979577+02:00",
+      "Navigatie": false,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        4
+      ],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 63,
+      "Tijd": "2026-10-17T08:14:23.8853055+02:00",
+      "Navigatie": true,
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        24,
+        14
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 64,
+      "Tijd": "2026-10-17T08:14:41.285958+02:00",
+      "Navigatie": false,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        14
+      ],
+      "Einde": "Kortsluiting",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 65,
+      "Tijd": "2026-10-17T08:14:53.3925285+02:00",
+      "Navigatie": false,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        6
+      ],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 66,
+      "Tijd": "2026-10-17T08:15:07.1275292+02:00",
+      "Navigatie": true,
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        24,
+        14
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 67,
+      "Tijd": "2026-10-17T08:15:18.6246942+02:00",
+      "Navigatie": false,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        7
+      ],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 68,
+      "Tijd": "2026-10-17T08:15:32.1069624+02:00",
+      "Navigatie": true,
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        24,
+        14
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 69,
+      "Tijd": "2026-10-17T08:15:43.5912054+02:00",
+      "Navigatie": false,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        8
+      ],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 70,
+      "Tijd": "2026-10-17T08:15:57.3280089+02:00",
+      "Navigatie": true,
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        24,
+        14
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 71,
+      "Tijd": "2026-10-17T08:18:42.3847933+02:00",
+      "Navigatie": false,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        1,
+        11
+      ],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 72,
+      "Tijd": "2026-10-17T08:18:58.3670373+02:00",
+      "Navigatie": true,
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        24,
+        14
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 73,
+      "Tijd": "2026-10-17T08:19:08.5907019+02:00",
+      "Navigatie": false,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        12
+      ],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 74,
+      "Tijd": "2026-10-17T08:19:22.2907214+02:00",
+      "Navigatie": true,
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        24,
+        14
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 75,
+      "Tijd": "2026-10-17T08:19:33.6233158+02:00",
+      "Navigatie": false,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        14
+      ],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 76,
+      "Tijd": "2026-10-17T08:19:47.310078+02:00",
+      "Navigatie": true,
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        24,
+        14
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 77,
+      "Tijd": "2026-10-17T08:19:59.1504425+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 78,
+      "Tijd": "2026-10-17T08:20:09.1933149+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        24,
+        21
+      ],
+      "Einde": "StapKlaar",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 79,
+      "Tijd": "2026-10-17T08:20:20.8819195+02:00",
+      "Navigatie": true,
+      "Start": 21,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        21,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 80,
+      "Tijd": "2026-10-17T08:20:34.0146153+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        1
+      ],
+      "Reeks": [
+        24,
+        21
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 81,
+      "Tijd": "2026-10-17T08:20:47.6987725+02:00",
+      "Navigatie": true,
+      "Start": 21,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        21,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 82,
+      "Tijd": "2026-10-17T08:21:00.8048758+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        2
+      ],
+      "Reeks": [
+        24,
+        21
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 83,
+      "Tijd": "2026-10-17T08:21:14.4904547+02:00",
+      "Navigatie": true,
+      "Start": 21,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        21,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 84,
+      "Tijd": "2026-10-17T08:21:27.5863903+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        3
+      ],
+      "Reeks": [
+        24,
+        21
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 85,
+      "Tijd": "2026-10-17T08:21:41.5320018+02:00",
+      "Navigatie": true,
+      "Start": 21,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        21,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 86,
+      "Tijd": "2026-10-17T08:21:54.5957493+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        4
+      ],
+      "Reeks": [
+        24,
+        21
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 87,
+      "Tijd": "2026-10-17T08:22:08.2878794+02:00",
+      "Navigatie": true,
+      "Start": 21,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        21,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 88,
+      "Tijd": "2026-10-17T08:22:21.3956891+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        6
+      ],
+      "Reeks": [
+        24,
+        21
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 89,
+      "Tijd": "2026-10-17T08:22:35.0871409+02:00",
+      "Navigatie": true,
+      "Start": 21,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        21,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 90,
+      "Tijd": "2026-10-17T08:22:48.1906137+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        7
+      ],
+      "Reeks": [
+        24,
+        21
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 91,
+      "Tijd": "2026-10-17T08:23:02.1030349+02:00",
+      "Navigatie": true,
+      "Start": 21,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        21,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 92,
+      "Tijd": "2026-10-17T08:23:15.4205927+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        8
+      ],
+      "Reeks": [
+        24,
+        21
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 93,
+      "Tijd": "2026-10-17T08:23:29.3023944+02:00",
+      "Navigatie": true,
+      "Start": 21,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        21,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 94,
+      "Tijd": "2026-10-17T08:23:42.6114744+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        9
+      ],
+      "Reeks": [
+        24,
+        21
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 95,
+      "Tijd": "2026-10-17T08:23:56.7286225+02:00",
+      "Navigatie": true,
+      "Start": 21,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        21,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 96,
+      "Tijd": "2026-10-17T08:24:09.8281237+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        11
+      ],
+      "Reeks": [
+        24,
+        21
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 97,
+      "Tijd": "2026-10-17T08:24:23.5405287+02:00",
+      "Navigatie": true,
+      "Start": 21,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        21,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 98,
+      "Tijd": "2026-10-17T08:24:36.5992706+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        12
+      ],
+      "Reeks": [
+        24,
+        21
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 99,
+      "Tijd": "2026-10-17T08:24:50.3293507+02:00",
+      "Navigatie": true,
+      "Start": 21,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        21,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 100,
+      "Tijd": "2026-10-17T08:25:03.4172936+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        14
+      ],
+      "Reeks": [
+        24,
+        21
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 101,
+      "Tijd": "2026-10-17T08:25:17.3312502+02:00",
+      "Navigatie": true,
+      "Start": 21,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        21,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 102,
+      "Tijd": "2026-10-17T08:25:27.8037446+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        5
+      ],
+      "Reeks": [
+        24,
+        14
+      ],
+      "Einde": "StapKlaar",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 103,
+      "Tijd": "2026-10-17T08:25:38.9350811+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        5
+      ],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 104,
+      "Tijd": "2026-10-17T08:25:52.02211+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        1,
+        5
+      ],
+      "Reeks": [
+        24,
+        14
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 105,
+      "Tijd": "2026-10-17T08:26:05.3084148+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        5
+      ],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 106,
+      "Tijd": "2026-10-17T08:26:18.6255974+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        2,
+        5
+      ],
+      "Reeks": [
+        24,
+        14
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 107,
+      "Tijd": "2026-10-17T08:26:32.114402+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        5
+      ],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 108,
+      "Tijd": "2026-10-17T08:26:45.2162638+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        3,
+        5
+      ],
+      "Reeks": [
+        24,
+        14
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 109,
+      "Tijd": "2026-10-17T08:26:58.4935939+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        5
+      ],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 110,
+      "Tijd": "2026-10-17T08:27:11.8106894+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        4,
+        5
+      ],
+      "Reeks": [
+        24,
+        14
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 111,
+      "Tijd": "2026-10-17T08:27:25.3035132+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        5
+      ],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 112,
+      "Tijd": "2026-10-17T08:27:38.4236871+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        5,
+        6
+      ],
+      "Reeks": [
+        24,
+        14
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 113,
+      "Tijd": "2026-10-17T08:27:51.6977518+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        5
+      ],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 114,
+      "Tijd": "2026-10-17T08:28:04.797311+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        5,
+        7
+      ],
+      "Reeks": [
+        24,
+        14
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 115,
+      "Tijd": "2026-10-17T08:28:18.5252751+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        5
+      ],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 116,
+      "Tijd": "2026-10-17T08:28:31.8312223+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        5,
+        8
+      ],
+      "Reeks": [
+        24,
+        14
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 117,
+      "Tijd": "2026-10-17T08:28:44.7055334+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        5
+      ],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 118,
+      "Tijd": "2026-10-17T08:28:58.0036808+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        5,
+        9
+      ],
+      "Reeks": [
+        24,
+        14
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 119,
+      "Tijd": "2026-10-17T08:29:10.5251121+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        5
+      ],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 120,
+      "Tijd": "2026-10-17T08:29:23.8355778+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        5,
+        11
+      ],
+      "Reeks": [
+        24,
+        14
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 121,
+      "Tijd": "2026-10-17T08:29:37.5156812+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        5
+      ],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 122,
+      "Tijd": "2026-10-17T08:29:50.8254323+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        5,
+        12
+      ],
+      "Reeks": [
+        24,
+        14
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 123,
+      "Tijd": "2026-10-17T08:30:04.5109383+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        5
+      ],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 124,
+      "Tijd": "2026-10-17T08:30:18.0235539+02:00",
+      "Navigatie": false,
+      "Start": 24,
+      "Richting": "Achteruit",
+      "Afbuigend": [
+        5,
+        14
+      ],
+      "Reeks": [
+        24,
+        14
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 125,
+      "Tijd": "2026-10-17T08:30:31.7207096+02:00",
+      "Navigatie": true,
+      "Start": 14,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        5
+      ],
+      "Reeks": [
+        14,
+        24
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 126,
+      "Tijd": "2026-10-17T08:30:44.9596567+02:00",
+      "Navigatie": true,
+      "Start": 24,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        24,
+        21
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 127,
+      "Tijd": "2026-10-17T08:30:53.4334591+02:00",
+      "Navigatie": false,
+      "Start": 21,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        21,
+        29
+      ],
+      "Einde": "StapKlaar",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 128,
+      "Tijd": "2026-10-17T08:31:16.6569743+02:00",
+      "Navigatie": true,
+      "Start": 29,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        29,
+        21
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 129,
+      "Tijd": "2026-10-17T08:31:28.3920848+02:00",
+      "Navigatie": false,
+      "Start": 21,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        1
+      ],
+      "Reeks": [
+        21,
+        29
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 130,
+      "Tijd": "2026-10-17T08:31:57.8200784+02:00",
+      "Navigatie": true,
+      "Start": 29,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        29,
+        21
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 131,
+      "Tijd": "2026-10-17T08:32:09.6038748+02:00",
+      "Navigatie": false,
+      "Start": 21,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        2
+      ],
+      "Reeks": [
+        21,
+        29
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 132,
+      "Tijd": "2026-10-17T08:32:35.4264211+02:00",
+      "Navigatie": true,
+      "Start": 29,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        29,
+        21
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 133,
+      "Tijd": "2026-10-17T08:32:47.2340047+02:00",
+      "Navigatie": false,
+      "Start": 21,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        3
+      ],
+      "Reeks": [
+        21,
+        29
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 134,
+      "Tijd": "2026-10-17T08:33:13.4268875+02:00",
+      "Navigatie": true,
+      "Start": 29,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        29,
+        21
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 135,
+      "Tijd": "2026-10-17T08:33:25.217663+02:00",
+      "Navigatie": false,
+      "Start": 21,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        4
+      ],
+      "Reeks": [
+        21,
+        29
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 136,
+      "Tijd": "2026-10-17T08:33:51.6105823+02:00",
+      "Navigatie": true,
+      "Start": 29,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        29,
+        21
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 137,
+      "Tijd": "2026-10-17T08:34:03.3939596+02:00",
+      "Navigatie": false,
+      "Start": 21,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        6
+      ],
+      "Reeks": [
+        21,
+        29
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 138,
+      "Tijd": "2026-10-17T08:34:29.1886433+02:00",
+      "Navigatie": true,
+      "Start": 29,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        29,
+        21
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 139,
+      "Tijd": "2026-10-17T08:34:44.336152+02:00",
+      "Navigatie": false,
+      "Start": 21,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        7
+      ],
+      "Reeks": [
+        21,
+        29
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 140,
+      "Tijd": "2026-10-17T08:34:56.3508808+02:00",
+      "Navigatie": true,
+      "Start": 29,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        29,
+        21
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 141,
+      "Tijd": "2026-10-17T08:35:07.4323568+02:00",
+      "Navigatie": false,
+      "Start": 21,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        8
+      ],
+      "Reeks": [
+        21,
+        29
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 142,
+      "Tijd": "2026-10-17T08:35:19.3495593+02:00",
+      "Navigatie": true,
+      "Start": 29,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        29,
+        21
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 143,
+      "Tijd": "2026-10-17T08:35:30.6345743+02:00",
+      "Navigatie": false,
+      "Start": 21,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        9
+      ],
+      "Reeks": [
+        21,
+        29
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 144,
+      "Tijd": "2026-10-17T08:35:42.7622746+02:00",
+      "Navigatie": true,
+      "Start": 29,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        29,
+        21
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 145,
+      "Tijd": "2026-10-17T08:35:53.9934564+02:00",
+      "Navigatie": false,
+      "Start": 21,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        11
+      ],
+      "Reeks": [
+        21,
+        29
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 146,
+      "Tijd": "2026-10-17T08:36:23.5887921+02:00",
+      "Navigatie": true,
+      "Start": 29,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        29,
+        21
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 147,
+      "Tijd": "2026-10-17T08:36:35.4331378+02:00",
+      "Navigatie": false,
+      "Start": 21,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        12
+      ],
+      "Reeks": [
+        21,
+        29
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 148,
+      "Tijd": "2026-10-17T08:37:00.4112312+02:00",
+      "Navigatie": true,
+      "Start": 29,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        29,
+        21
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 149,
+      "Tijd": "2026-10-17T08:37:12.4023001+02:00",
+      "Navigatie": false,
+      "Start": 21,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        14
+      ],
+      "Reeks": [
+        21,
+        29
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 150,
+      "Tijd": "2026-10-17T08:37:24.5725347+02:00",
+      "Navigatie": true,
+      "Start": 29,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        29,
+        21
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 151,
+      "Tijd": "2026-10-17T08:37:35.9634289+02:00",
+      "Navigatie": true,
+      "Start": 21,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        21,
+        29
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 152,
+      "Tijd": "2026-10-17T08:37:54.843256+02:00",
+      "Navigatie": false,
+      "Start": 29,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        29,
+        30
+      ],
+      "Einde": "StapKlaar",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 153,
+      "Tijd": "2026-10-17T08:38:06.5231882+02:00",
+      "Navigatie": true,
+      "Start": 30,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        30,
+        29
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 154,
+      "Tijd": "2026-10-17T08:38:19.4298702+02:00",
+      "Navigatie": false,
+      "Start": 29,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        1
+      ],
+      "Reeks": [
+        29,
+        30
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 155,
+      "Tijd": "2026-10-17T08:38:33.1179104+02:00",
+      "Navigatie": true,
+      "Start": 30,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        30,
+        29
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 156,
+      "Tijd": "2026-10-17T08:38:49.3361224+02:00",
+      "Navigatie": false,
+      "Start": 29,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        2
+      ],
+      "Reeks": [
+        29,
+        30
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 157,
+      "Tijd": "2026-10-17T08:39:01.3517292+02:00",
+      "Navigatie": true,
+      "Start": 30,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        30,
+        29
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 158,
+      "Tijd": "2026-10-17T08:39:12.6383318+02:00",
+      "Navigatie": false,
+      "Start": 29,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        3
+      ],
+      "Reeks": [
+        29,
+        30
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 159,
+      "Tijd": "2026-10-17T08:39:26.5295791+02:00",
+      "Navigatie": true,
+      "Start": 30,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        30,
+        29
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 160,
+      "Tijd": "2026-10-17T08:39:39.6240594+02:00",
+      "Navigatie": false,
+      "Start": 29,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        4
+      ],
+      "Reeks": [
+        29,
+        30
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 161,
+      "Tijd": "2026-10-17T08:39:53.5101095+02:00",
+      "Navigatie": true,
+      "Start": 30,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        30,
+        29
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 162,
+      "Tijd": "2026-10-17T08:40:06.4135963+02:00",
+      "Navigatie": false,
+      "Start": 29,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        6
+      ],
+      "Reeks": [
+        29,
+        30
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 163,
+      "Tijd": "2026-10-17T08:40:20.3015429+02:00",
+      "Navigatie": true,
+      "Start": 30,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        30,
+        29
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 164,
+      "Tijd": "2026-10-17T08:40:33.210662+02:00",
+      "Navigatie": false,
+      "Start": 29,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        7
+      ],
+      "Reeks": [
+        29,
+        30
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 165,
+      "Tijd": "2026-10-17T08:40:47.1010038+02:00",
+      "Navigatie": true,
+      "Start": 30,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        30,
+        29
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 166,
+      "Tijd": "2026-10-17T08:41:00.0060141+02:00",
+      "Navigatie": false,
+      "Start": 29,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        8
+      ],
+      "Reeks": [
+        29,
+        30
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 167,
+      "Tijd": "2026-10-17T08:41:12.122149+02:00",
+      "Navigatie": true,
+      "Start": 30,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        30,
+        29
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 168,
+      "Tijd": "2026-10-17T08:41:23.407492+02:00",
+      "Navigatie": false,
+      "Start": 29,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        9
+      ],
+      "Reeks": [
+        29,
+        30
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 169,
+      "Tijd": "2026-10-17T08:41:37.3399515+02:00",
+      "Navigatie": true,
+      "Start": 30,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        30,
+        29
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 170,
+      "Tijd": "2026-10-17T08:41:50.4019027+02:00",
+      "Navigatie": false,
+      "Start": 29,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        11
+      ],
+      "Reeks": [
+        29,
+        30
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 171,
+      "Tijd": "2026-10-17T08:42:04.3393977+02:00",
+      "Navigatie": true,
+      "Start": 30,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        30,
+        29
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 172,
+      "Tijd": "2026-10-17T08:42:17.2383186+02:00",
+      "Navigatie": false,
+      "Start": 29,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        12
+      ],
+      "Reeks": [
+        29,
+        30
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 173,
+      "Tijd": "2026-10-17T08:42:31.1208518+02:00",
+      "Navigatie": true,
+      "Start": 30,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        30,
+        29
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 174,
+      "Tijd": "2026-10-17T08:42:44.227279+02:00",
+      "Navigatie": false,
+      "Start": 29,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        14
+      ],
+      "Reeks": [
+        29,
+        30
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 175,
+      "Tijd": "2026-10-17T08:42:58.1156535+02:00",
+      "Navigatie": true,
+      "Start": 30,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        30,
+        29
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 176,
+      "Tijd": "2026-10-17T08:43:11.3585042+02:00",
+      "Navigatie": true,
+      "Start": 29,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        29,
+        30
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 177,
+      "Tijd": "2026-10-17T08:43:19.8304422+02:00",
+      "Navigatie": false,
+      "Start": 30,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        30,
+        20
+      ],
+      "Einde": "StapKlaar",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 178,
+      "Tijd": "2026-10-17T08:43:42.1908012+02:00",
+      "Navigatie": true,
+      "Start": 20,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        20,
+        30
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 179,
+      "Tijd": "2026-10-17T08:43:57.3485691+02:00",
+      "Navigatie": false,
+      "Start": 30,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        1
+      ],
+      "Reeks": [
+        30,
+        20
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 180,
+      "Tijd": "2026-10-17T08:44:09.3146449+02:00",
+      "Navigatie": false,
+      "Start": 30,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        2
+      ],
+      "Reeks": [
+        30,
+        20
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 181,
+      "Tijd": "2026-10-17T08:44:38.2001481+02:00",
+      "Navigatie": true,
+      "Start": 20,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        20,
+        30
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 182,
+      "Tijd": "2026-10-17T08:44:50.1990963+02:00",
+      "Navigatie": false,
+      "Start": 30,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        3
+      ],
+      "Reeks": [
+        30,
+        20
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 183,
+      "Tijd": "2026-10-17T08:45:18.6360677+02:00",
+      "Navigatie": true,
+      "Start": 20,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        20,
+        30
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 184,
+      "Tijd": "2026-10-17T08:45:30.4340639+02:00",
+      "Navigatie": false,
+      "Start": 30,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        4
+      ],
+      "Reeks": [
+        30,
+        20
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 185,
+      "Tijd": "2026-10-17T08:45:56.0221772+02:00",
+      "Navigatie": true,
+      "Start": 20,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        20,
+        30
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 186,
+      "Tijd": "2026-10-17T08:46:08.0179176+02:00",
+      "Navigatie": false,
+      "Start": 30,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        6
+      ],
+      "Reeks": [
+        30,
+        20
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 187,
+      "Tijd": "2026-10-17T08:46:36.604483+02:00",
+      "Navigatie": true,
+      "Start": 20,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        20,
+        30
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 188,
+      "Tijd": "2026-10-17T08:46:48.4408597+02:00",
+      "Navigatie": false,
+      "Start": 30,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        7
+      ],
+      "Reeks": [
+        30,
+        20
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 189,
+      "Tijd": "2026-10-17T08:47:17.2219323+02:00",
+      "Navigatie": true,
+      "Start": 20,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        20,
+        30
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 190,
+      "Tijd": "2026-10-17T08:47:29.2113747+02:00",
+      "Navigatie": false,
+      "Start": 30,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        8
+      ],
+      "Reeks": [
+        30,
+        20
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 191,
+      "Tijd": "2026-10-17T08:47:58.0369186+02:00",
+      "Navigatie": true,
+      "Start": 20,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        20,
+        30
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 192,
+      "Tijd": "2026-10-17T08:48:13.1230164+02:00",
+      "Navigatie": false,
+      "Start": 30,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        9
+      ],
+      "Reeks": [
+        30,
+        20
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 193,
+      "Tijd": "2026-10-17T08:48:25.0959356+02:00",
+      "Navigatie": false,
+      "Start": 30,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        11
+      ],
+      "Reeks": [
+        30,
+        20
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 194,
+      "Tijd": "2026-10-17T08:48:50.2273493+02:00",
+      "Navigatie": true,
+      "Start": 20,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        20,
+        30
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 195,
+      "Tijd": "2026-10-17T08:49:05.3158316+02:00",
+      "Navigatie": false,
+      "Start": 30,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        12
+      ],
+      "Reeks": [
+        30,
+        20
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 196,
+      "Tijd": "2026-10-17T08:49:20.5817283+02:00",
+      "Navigatie": false,
+      "Start": 30,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        14
+      ],
+      "Reeks": [
+        30,
+        20
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 197,
+      "Tijd": "2026-10-17T08:49:48.8017604+02:00",
+      "Navigatie": true,
+      "Start": 20,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        20,
+        30
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 198,
+      "Tijd": "2026-10-17T08:50:00.8017955+02:00",
+      "Navigatie": true,
+      "Start": 30,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        30,
+        20
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 199,
+      "Tijd": "2026-10-17T08:50:12.5315981+02:00",
+      "Navigatie": false,
+      "Start": 20,
+      "Richting": "Vooruit",
+      "Afbuigend": [],
+      "Reeks": [
+        20,
+        27
+      ],
+      "Einde": "StapKlaar",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 200,
+      "Tijd": "2026-10-17T08:50:22.3946396+02:00",
+      "Navigatie": true,
+      "Start": 27,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        27,
+        20
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 201,
+      "Tijd": "2026-10-17T08:50:33.418973+02:00",
+      "Navigatie": false,
+      "Start": 20,
+      "Richting": "Vooruit",
+      "Afbuigend": [
+        1
+      ],
+      "Reeks": [
+        20,
+        27
+      ],
+      "Einde": "GelijkAanBasis",
+      "Onbetrouwbaar": false
+    },
+    {
+      "Nr": 202,
+      "Tijd": "2026-10-17T08:50:57.1961163+02:00",
+      "Navigatie": true,
+      "Start": 27,
+      "Richting": "Achteruit",
+      "Afbuigend": [],
+      "Reeks": [
+        27,
+        20
+      ],
+      "Einde": "DoelBereikt",
+      "Onbetrouwbaar": false
+    }
+  ],
+  "ControleVerslagen": []
+}
