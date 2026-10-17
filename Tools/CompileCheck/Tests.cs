@@ -862,6 +862,36 @@ public static class Tests
         Eis(v.BekendeAankomstKortsluiting(new Opdracht { Id = 5, Start = 2, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis }, Configuratie.Basis) is null, "aankomst: een opdracht zonder die wissel afbuigend blijft gewoon mogelijk");
     }
 
+    // BUG #193: kruiswissel herkennen door uitsluiting (log 17-10 16:01: motor 10+13 opgegeven, melder 24 had drie buren)
+    static void KruisUitsluitingTest()
+    {
+        Console.WriteLine("Test: kruiswissel door uitsluiting (BUG #193)");
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 14, DinamoBlokken = "1-8", KruisMotoren = "13+10" };
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var status = new VerkenStatus { Instellingen = ins, Kaart = Laad("baankaart_2026-10-17_1601.json") };
+        var v = new BaanVerkenner(sim, ins, klok, new VerkenLog(klok), (_, _) => Task.FromResult(true), status);
+        v.Kruis = KruisKennis.Parse("13+10");
+        status.Wachtrij.Clear();
+        Eis(v.KruisUitUitsluiting() == 24, "uitsluiting: op de kaart van 16:01 is melder 24 de kruiswissel (nu " + v.KruisUitUitsluiting() + ")");
+        status.Wachtrij.Add(new Opdracht { Id = 99, Start = 5, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis });
+        Eis(v.KruisUitUitsluiting() is null, "uitsluiting: niet zolang er nog opdrachten in de wachtrij staan");
+        status.Wachtrij.Clear();
+        v.Kruis = new KruisKennis();
+        Eis(v.KruisUitUitsluiting() is null, "uitsluiting: zonder opgegeven motoren niets afleiden");
+    }
+
+    // BUG #192 (log 17-10 16:01): aankomst op melder 12 met wissel 2 (nodig) en wissel 1 (oplossingspartner): wissel 1 mag niet rechtdoor blijven
+    static void Aankomst192Test()
+    {
+        Console.WriteLine("Test: aankomst melder 12 houdt wissel 1 bij wissel 2 afbuigend (BUG #192)");
+        var k = Laad("baankaart_2026-10-17_1601.json");
+        var e = new Etappe { Van = 5, Naar = 12, Richting = Richting.Achteruit, Pad = new List<int> { 5, 12 }, Configuratie = Configuratie.Basis.Met(1).Met(2) };
+        var c = Baanverkenner.Kern.BaanVerkenner.AankomstZonderKortsluitWissels(k, e, e.Configuratie, out var u);
+        Eis(c.Bevat(1) && c.Bevat(2), "192: 5 -> 12 houdt wissel 1 en 2 samen afbuigend (nu " + c + ", " + (u ?? "geen uitleg") + ")");
+    }
+
     // BUG #146: aankomst zonder kortsluit-wissels en overloop-partner in beide richtingen
     static void AankomstEnOverloopTest()
     {
@@ -2683,6 +2713,8 @@ public static class Tests
         AlarmOplossingVastleggenTest();
         AankomstOplossingWeerlegdTest();
         AankomstEnOverloopTest();
+        Aankomst192Test();
+        KruisUitsluitingTest();
         AlarmWisselBijLocTest();
         KruisRuisVoorafTest();
         AankomstViaIngangTest();

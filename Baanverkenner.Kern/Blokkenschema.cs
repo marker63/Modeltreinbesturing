@@ -10,6 +10,8 @@ public class SchemaVak
     public int? DinamoBlok { get; set; }
     public string Melders { get; set; } = "";
     public List<string> Markeringen { get; set; } = new();
+    /// <summary>BUG #193 (Marco 17-10): de gevonden wissels bij dit blok, als blokjes getekend ("2" = wissel 2, met de stand(en) waarin hij gezien is).</summary>
+    public List<SchemaWissel> Wissels { get; } = new();
     /// <summary>"normaal", "splitsing" (een melder met twee mogelijke vervolgen, bijv. de kruiswissel) of "onbekend" (geen Dinamo-blok gevonden).</summary>
     public string Soort { get; set; } = "normaal";
     public double X { get; set; }   // middelpunt
@@ -25,6 +27,15 @@ public class SchemaVak
     public string TitelPlek { get; set; } = "onder";
     /// <summary>BUG #88: alleen het echte Dinamo-bloknummer, geen verzonnen nummer.</summary>
     public string Titel => DinamoBlok is int ? $"Dinamo-blok {Label}" : $"Dinamo-blok {Label}";
+}
+
+/// <summary>BUG #193: een gevonden wissel (klein blokje in het vak waar hij ligt).</summary>
+public class SchemaWissel
+{
+    public const double Breedte = 52, Hoogte = 18;
+    public int Adres { get; set; }
+    public string Tekst { get; set; } = "";   // bv. "W2 rd+afb"
+    public string Uitleg { get; set; } = "";
 }
 
 /// <summary>BUG #90: een bezetmelder (klein vlakje) op de rand van een vak, of in de hoek van de kruiswissel.</summary>
@@ -102,6 +113,17 @@ public class SchemaTekening
                 v.Markeringen.Add($"{(kp.Opgelost ? "opgelost" : kp.Tijdelijk ? "tijdelijk" : kp.Opgegeven ? "opgegeven" : "open")} kortsluitpunt na {kp.NaMelder} ({kp.Richting.Tekst()})");
             foreach (var ks in k.Kopsporen.Where(x => b.Melders.Contains(x.Melder)))
                 v.Markeringen.Add($"doodlopend na {ks.Melder} ({ks.Richting.Tekst()})");
+            // BUG #193: gevonden wissels bij dit blok (de kaart noemt de melder waar de wissel direct na ligt)
+            foreach (var w in k.Wissels.OrderBy(x => x.Adres))
+            {
+                var hier = w.Waarnemingen.Where(o => b.Melders.Contains(o.NaMelder)).ToList();
+                if (hier.Count == 0) continue;
+                bool rd = hier.Any(o => o.VolgendeBijRechtdoor is not null), afb = hier.Any(o => o.VolgendeBijAfbuigend is not null);
+                string stand = rd && afb ? "rd+afb" : afb ? "afb" : rd ? "rd" : "";
+                v.Wissels.Add(new SchemaWissel { Adres = w.Adres, Tekst = $"W{w.Adres}" + (stand.Length > 0 ? " " + stand : ""),
+                    Uitleg = $"wissel {w.Adres} gezien bij melder {string.Join(", ", hier.Select(o => o.NaMelder).Distinct().OrderBy(x => x))}" });
+            }
+            if (v.Wissels.Count > 0) v.H = VakHoogte + 24;
             t.Vakken.Add(v);
         }
 
@@ -404,6 +426,19 @@ public class SchemaTekening
     private static string F(double d) => d.ToString("0.#", CultureInfo.InvariantCulture);
     private static string E(string s) => System.Net.WebUtility.HtmlEncode(s);
 
+    /// <summary>BUG #193: tekent de gevonden wissels van een vak als kleine blokjes naast elkaar (groen = gezien; oranje = alleen als oplossing/overloop bekend).</summary>
+    private static void WisselBlokjes(StringBuilder sb, SchemaVak v, double x0, double y0, bool kruis)
+    {
+        double x = x0;
+        foreach (var w in v.Wissels)
+        {
+            double bw = Math.Max(SchemaWissel.Breedte, w.Tekst.Length * 6.6 + 12);
+            sb.Append($"<g><title>{E(w.Uitleg)}</title><rect x=\"{F(x)}\" y=\"{F(y0)}\" width=\"{F(bw)}\" height=\"{F(SchemaWissel.Hoogte)}\" rx=\"3\" fill=\"#fff7d6\" stroke=\"#8a6d00\" stroke-width=\"1.3\"/>");
+            sb.Append($"<text x=\"{F(x + bw / 2)}\" y=\"{F(y0 + 13)}\" font-size=\"10.5\" font-weight=\"600\" text-anchor=\"middle\" fill=\"#5c4700\">{E(w.Tekst)}</text></g>");
+            x += bw + 4;
+        }
+    }
+
     /// <summary>De tekening als SVG (in een HTML-pagina te plakken of los op te slaan).</summary>
     public string AlsSvg(bool metXmlKop = false)
     {
@@ -452,6 +487,7 @@ public class SchemaTekening
                 sb.Append($"<text x=\"{F(tx)}\" y=\"{F(ty + 18)}\" font-size=\"12\" text-anchor=\"{anker}\" fill=\"#333\">melders {E(v.Melders)} (kruiswissel)</text>");
                 if (v.Markeringen.Count > 0)
                     sb.Append($"<text x=\"{F(tx)}\" y=\"{F(ty + 34)}\" font-size=\"10.5\" text-anchor=\"{anker}\" fill=\"#a12a2a\">{E(v.Markeringen[0])}{(v.Markeringen.Count > 1 ? $" (+{v.Markeringen.Count - 1})" : "")}</text>");
+                WisselBlokjes(sb, v, anker == "end" ? tx - 160 : anker == "middle" ? tx - 80 : tx, ty + 42, true);
                 continue;
             }
             sb.Append($"<rect x=\"{F(x)}\" y=\"{F(y)}\" width=\"{F(v.B)}\" height=\"{F(v.H)}\" rx=\"8\" fill=\"{vul}\" stroke=\"{rand}\" stroke-width=\"2\"{streep}/>");
@@ -459,6 +495,7 @@ public class SchemaTekening
             sb.Append($"<text x=\"{F(v.X)}\" y=\"{F(y + 46)}\" font-size=\"12\" text-anchor=\"middle\" fill=\"#333\">melders {E(v.Melders)}</text>");
             if (v.Markeringen.Count > 0)
                 sb.Append($"<text x=\"{F(v.X)}\" y=\"{F(y + 63)}\" font-size=\"10.5\" text-anchor=\"middle\" fill=\"#a12a2a\">{E(v.Markeringen[0])}{(v.Markeringen.Count > 1 ? $" (+{v.Markeringen.Count - 1})" : "")}</text>");
+            WisselBlokjes(sb, v, v.X - v.B / 2 + 10, y + v.H - 24, false);
         }
         foreach (var v in Vakken)
             foreach (var c in v.Chips)

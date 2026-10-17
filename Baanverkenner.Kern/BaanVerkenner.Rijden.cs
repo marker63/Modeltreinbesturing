@@ -638,6 +638,8 @@ public partial class BaanVerkenner
     }
 
     private bool _vrijRijdenBezig;
+    /// <summary>BUG #188: wissels waarvan we weten dat ze bij de melder liggen waar de loc nu staat, ook al staat dat nog niet in de kaart (net ontdekt door de proef).</summary>
+    private readonly HashSet<int> _bekendBijBezet = new();
 
     /// <summary>BUG #181 (Marco 17-10 11:46/11:51: "doorrijden totdat de laatste melder alleen actief is"): staat de loc nog op twee melders (de neus op de nieuwe melder, de staart
     /// nog op de vorige) en moet er een wissel om die de kaart bij een van die melders noemt, dan ligt de loc mogelijk op of tegen de tong. Eerst doorrijden tot alleen de laatste
@@ -655,7 +657,7 @@ public partial class BaanVerkenner
         _monitor.Bijwerken();
         var bezet = _monitor.Bezet;
         if (bezet.Count == 0 || !bezet.Contains(ing.Melder) || bezet.Any(m => m != ing.Melder && m != ing.Via)) return;
-        if (!WisselsBijBezet(_kaart, bezet).Contains(adres)) return;
+        if (!WisselsBijBezet(_kaart, bezet).Contains(adres) && !_bekendBijBezet.Contains(adres)) return;
         // BUG #183: alleen een wissel ACHTER de loc (waar hij net overheen reed) is een probleem; een wissel VOOR de loc (verderop in de sectie) niet. Doorkruipen
         // zette de loc juist op die wissel (129: wissel 9 achter, wissel 6 voor; kruipen voor wissel 5 zette de loc op de tong van wissel 6).
         if (bezet.Count == 1 && _kaart.Wissels.FirstOrDefault(w => w.Adres == adres) is { } wk && !WisselLigtAchter(wk, ing)) return;
@@ -1366,7 +1368,11 @@ public partial class BaanVerkenner
                                                    && (b.Contains(k.NaMelder) || k.TweedeMelders.Any(b.Contains))
                                                    && (alarmBlokken is not { Count: > 0 } || k.AlarmBlokken.Count == 0 || k.AlarmBlokken.Any(alarmBlokken.Contains)))
                                        .OrderByDescending(k => k.Id).FirstOrDefault();
-        if (kp is null || !_kaart.RegistreerHandmatigeOplossing(kp, adres, afbuigend, Kruis)) return;
+        if (kp is null)
+        {
+            return;
+        }
+        if (!_kaart.RegistreerHandmatigeOplossing(kp, adres, afbuigend, Kruis)) return;
         _log.Vondst($"Kortsluitpunt #{kp.Id} (na melder {kp.NaMelder}, {kp.Richting.Tekst()}, {kp.Configuratie}) is opgelost door wissel {adres} op afbuigend: " +
                     "het alarm verdween meteen nadat de verkenner die wissel omzette. Dit wordt voortaan in deze verkenning meteen toegepast (nog niet getest op de baan).");
         BewaarNu();

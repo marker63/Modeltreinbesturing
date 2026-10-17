@@ -1131,6 +1131,8 @@ public partial class BaanVerkenner
                 o.VolgendAdres = a;
                 if (_status.Geidentificeerd.Contains(a) || o.Configuratie.Bevat(a)) continue;
                 // BUG #172: de kruismotoren hebben alleen effect op de kruiswissel zelf; die krijgt een eigen proef (VoerKruisProefUit) vanaf elke ingang.
+                // BUG #193 (Marco 17-10 16:28: "zet wisselmotoren 10 en 13 gewoon om tijdens de testrun, dan ontdek je snel de kruiswissel"): zolang de kruiswissel nog niet bekend is,
+                // gaan de motoren gewoon mee in de adrestest; de rit laat zien waar ze geschakeld werden (andere melder, kortsluiting) en daaruit volgt de kruiswissel.
                 if (Stap && Kruis.IsMotor(a)) continue;
                 await PauzeMoment();
                 _bezig = $"opdracht #{o.Id}: adres {a} testen";
@@ -1256,7 +1258,11 @@ public partial class BaanVerkenner
                 if (afwijkendePad)
                 {
                     await TerugNaarMetControle(o, proef, cA0);
-                    await ZetWisselNaProef(a, false);
+                    // BUG #191 (meting: met 'doorrijden en blokproef na herstel' kwamen 24 valse wissels, zonder dit 0): de wissel die de loc net een andere kant op stuurde ligt bij de
+                    // melder waar de loc nu staat, maar de kaart kent hem pas na Vergelijk. Hij werd daardoor direct onder de loc teruggezet (de loc stond nog met zijn staart op de tong);
+                    // de volgende proef reed dan de verkeerde tak en kreeg de eer. Nu eerst doorrijden tot de loc de wissel voorbij is (VrijRijdenVoorWissel), dan pas terugzetten.
+                    _bekendBijBezet.Add(a);
+                    try { await ZetWissel(a, false); } finally { _bekendBijBezet.Remove(a); }
                     foreach (var (ex, _) in proefExtra) await ZetWisselNaProef(ex, rijstand.Bevat(ex), oplossingWissel: true);
                 }
                 else
@@ -2302,7 +2308,10 @@ public partial class BaanVerkenner
                                                            && (k.Route[^1].Pad.Count < 2 || e.Pad.Count < 2 || k.Route[^1].Pad[^2] == e.Pad[^2])))   // BUG #149: alleen dezelfde ingang
         {
             foreach (var a in k.Configuratie.Afbuigend) wissels.Add(a);
-            if (k.Opgelost && k.OpgelostMetAfbuigend == true && k.OpgelostDoorAdres is int oa) wissels.Add(oa);
+            // BUG #192 (Marco 17-10, log 16:01): wissel 2 is voor deze route nodig (kan niet rechtdoor blijven); dan mag zijn oplossingspartner (wissel 1, 'wissel 1 met
+            // wissel 2') niet rechtdoor blijven, want 2 afbuigend zonder 1 is precies de stand die de kortsluiting gaf. De loc reed zo opnieuw in dezelfde kortsluiting.
+            bool eigenNodig = k.Configuratie.Afbuigend.Any(a => nodig.Bevat(a));
+            if (k.Opgelost && k.OpgelostMetAfbuigend == true && k.OpgelostDoorAdres is int oa && !eigenNodig) wissels.Add(oa);
         }
         var weg = wissels.Where(a => cfg.Bevat(a) && !nodig.Bevat(a) && !(overKruis && kruis.IsMotor(a))).ToList();
         if (weg.Count == 0) return cfg;

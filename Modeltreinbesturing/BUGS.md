@@ -2350,3 +2350,24 @@ Wat de log laat zien (Marco 14:56/14:58):
 2. Dat wissel 1 mee afbuigend moet bij wissel 2 werd om 14:44:16 gevonden maar pas om 14:49:50 bij het kortsluitpunt vastgelegd (het punt bestaat pas na de rit); de rit van 14:48:47 reed daardoor weer in dezelfde kortsluiting.
 Geprobeerde oplossingen (allemaal teruggedraaid): (a) na herstel doorrijden + blokproef in HerstelNaKortsluiting; (b) wachtende zelf-gevonden alarmoplossing koppelen aan het kortsluitpunt zodra het bestaat; (c) Splitsing meetellen in VrijVanIngangsWissel; (d) wissel na afwijkende proef niet onder de loc terugzetten. Elk gaf in de simulatie valse wissels (3,4,7,8...) of ontbrekende melders bij start 5/13/17; zonder deze wijzigingen slagen start 17 en 5.
 Oorzaak van de valse wissels (nog te verhelpen): na TerugNaarMetControle staat de loc op melder 5 met zijn staart nog op de tong van wissel 2; wissel 2 wordt dan direct teruggezet (kaart kent hem nog niet, WisselsBijBezet leeg), blijft in de sim onder de loc staan en de volgende proef (wissel 3) rijdt daardoor naar melder 12 en krijgt de eer. Zonder eerst deze wisselvolgorde te herstellen is (a)/(b) niet veilig in te voeren.
+
+## BUG #189 – Verkenning pas "voltooid" als elk Dinamo-blok bekend is (17-10)
+Meting (BENCH=1, 16 simulatieruns): 8 runs meldden ten onrechte "voltooid" terwijl melders nog geen Dinamo-blok hadden; na de wijziging 1. Een verkenning waarvan een melder geen blok heeft, eindigt nu als "Gestopt (tussenstand)" met een waarschuwing in de kaart. Nog niet getest op de baan.
+
+## BUG #191 – Proefwissel pas terugzetten nadat de loc ervoor is doorgereden (17-10)
+Na een afwijkende proef werd de proefwissel onder de staart van de loc teruggezet (valse wissels 3, 4, 7, 8, 11, 12 in de simulatie). `_bekendBijBezet` laat `VrijRijdenVoorWissel` eerst doorrijden. Meting: neutraal (geen verslechtering). Nog niet getest op de baan.
+
+## BUG #190 – verworpen op basis van meting (17-10)
+Voorgestelde wijziging verslechterde de BENCH-totalen en is niet doorgevoerd.
+
+## BUG #192 – Wissel 1 bleef rechtdoor bij de aankomst op melder 12 terwijl wissel 2 afbuigend moest (Marco 17-10, log 16:01)
+Oorzaak: regel #146 (`AankomstZonderKortsluitWissels`) hield de oplossingspartner (wissel 1) rechtdoor tijdens de aankomst, ook als wissel 2 voor de route nodig was. Dat is precies de stand (2 afbuigend zonder 1) die de kortsluiting gaf: de loc zat vast tussen wissel 1 en 2, de blokproef voor melder 12 faalde (blok onbekend) en de binnencirkel werd nooit bereikt.
+Oplossing: is een wissel van het kortsluitpunt zelf nodig voor de route, dan blijft zijn partner ook afbuigend (wissel 1 samen met wissel 2). Bewijs: test op de echte kaart van 16:01 (5 -> 12 houdt 1 en 2 afbuigend); BENCH ongewijzigd. Nog niet getest op de baan.
+Nog open: de verkenner zette na de "oplossing" (VONDST 15:59:34) wissel 1 meteen weer terug; zie BUG #188 (onthouden van de oplossing + doorrijden + blokproef).
+
+## BUG #193 – Kruiswissel (motor 10 en 13) niet ontdekt (Marco 17-10 16:09 en 16:28)
+Oorzaak: kruiswissel werd alleen herkend bij 4 buren of als een motor was omgezet; in stap-voor-stap werden de motoren overgeslagen zolang de kruiswissel onbekend was (kip-en-ei). Melder 24 had 3 buren (14, 21, 8), het vierde been (129, de binnencirkel) is alleen met motor 10 afbuigend bereikbaar. Daardoor bleef de hele binnencirkel (blok 1 en 2) onbezocht.
+Oplossing: herkenning door uitsluiting (`KruisUitUitsluiting`): motoren opgegeven, wachtrij leeg en precies één melder met drie of meer buren die geen gevonden wissel verklaart; daarna krijgt die melder de gewone kruisproeven (motor 10 en 13 per ingang). Test op de echte kaart van 16:01 geeft melder 24.
+Marco (16:28) vroeg de motoren gewoon mee te schakelen in de testrun. Dat is geprobeerd (motoren niet overslaan in de adrestest zolang de kruiswissel onbekend is) en GEMETEN: de eigen regressietests faalden (start 5: verkenning rondt niet af, 20 van 21 melders; start 17: 11 kortsluitingen boven de grens). Daarom NIET doorgevoerd; de motoren komen via de uitsluiting aan bod. Nog niet getest op de baan.
+Meting BENCH (16 runs) met alleen de uitsluiting: melders 208 -> 210; valse wissels 4 -> 4; kortsluitingen 118 -> 127 (de motorproeven zelf); alle regressietests OK.
+Blokkenschema: gevonden wissels worden als gele blokjes (W2, W14, ...) in het blok getekend (test op kaart 16:01).

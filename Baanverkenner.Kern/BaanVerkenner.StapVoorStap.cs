@@ -380,6 +380,12 @@ public partial class BaanVerkenner
             LeerKruisMidden(bewezen);
             return;
         }
+        if (KruisUitUitsluiting() is int uitgesloten)
+        {
+            _log.Info($"Melder {uitgesloten} is de kruiswissel van motor {Kruis.MotorenTekst}: de wachtrij is leeg, alle gewone wisseladressen zijn geprobeerd en alleen melder {uitgesloten} heeft drie buren ({string.Join(", ", Buren(_kaart)[uitgesloten].OrderBy(x => x))}) die geen gevonden wissel verklaart. De motoren worden nu op deze melder geprobeerd (nog niet getest op de baan).");
+            LeerKruisMidden(uitgesloten);
+            return;
+        }
         var buren = Buren(_kaart);
         foreach (var (m, bm) in buren)
             if (bm.Count >= 4 && !Kruis.Middens.Contains(m))
@@ -412,6 +418,17 @@ public partial class BaanVerkenner
                 && g.GroupBy(t => t.Na).Select(x => x.Select(t => t.Motor).Distinct().Count()).All(c => c == 1)) return g.Key.M;
         }
         return null;
+    }
+
+    /// <summary>BUG #193 (Marco 17-10, log 16:01): motor 10 en 13 waren opgegeven maar de kruiswissel werd nooit herkend: melder 24 had maar drie buren (14, 21, 8), omdat het vierde been
+    /// (129, de hele binnencirkel) alleen met motor 10 afbuigend te bereiken is, en motoren worden pas geprobeerd als de kruiswissel bekend is. Herkenning door uitsluiting: motoren opgegeven,
+    /// geen kruiswissel bekend, geen opdrachten meer in de wachtrij, en precies één melder met drie of meer buren waar geen gevonden wissel een vertakking verklaart.</summary>
+    internal int? KruisUitUitsluiting()
+    {
+        if (Kruis.Motoren.Count == 0 || Kruis.Middens.Count > 0 || _status.Wachtrij.Count > 0) return null;
+        var verklaard = _kaart.Wissels.SelectMany(w => w.Waarnemingen).Select(o => o.NaMelder).ToHashSet();
+        var kandidaten = Buren(_kaart).Where(b => b.Value.Count >= 3 && !verklaard.Contains(b.Key)).Select(b => b.Key).ToList();
+        return kandidaten.Count == 1 ? kandidaten[0] : null;
     }
 
     /// <summary>BUG #174: de standen van de kruismotoren die op een proef getest worden: elke motor alleen, en bij een Engelse wissel met twee motoren ook beide tegelijk
