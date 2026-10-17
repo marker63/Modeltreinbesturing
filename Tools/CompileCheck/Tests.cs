@@ -2431,6 +2431,11 @@ public static class Tests
             var r = MiniworldRit(start, 10, insAanpassing: i => { i.StapVoorStap = true; i.StapAanloop = true; i.StapDoorrijSeconden = 2; }, simAanpassing: sa => sa.BuurwisselHeftKruisKortsluitingOp = streng);
             string k = $"matrix (start {start}, streng={streng})";
             Console.WriteLine($"  {k}: {r.Einde}, {r.Seconden / 60:0} min, {r.Kortsluitingen} kortsluiting(en), melders {r.V.Kaart.Melders.Count}, voltooid {r.V.Kaart.Voltooid}, wissels: {string.Join(",", r.V.Kaart.Wissels.Where(w => w.Waarnemingen.Count > 0).Select(w => w.Adres))}");
+            // BUG #187: blokproef direct bij de eerste aankomst op een nieuwe melder (niet pas bij het tweede bezoek)
+            var regels = r.Log.Regels.Select(x => x.Tekst).ToList();
+            int eersteRit = regels.FindIndex(x => x.Contains("Opdracht #1:"));
+            int eersteProef = regels.FindIndex(x => x.StartsWith("Blokproef voor melder") && !x.Contains($"melder {start}:"));
+            Eis(eersteProef > eersteRit && eersteProef - eersteRit < 25, $"{k} BUG #187: de eerste blokproef van een nieuwe melder volgt direct op de eerste rit (regel {eersteProef} na rit op {eersteRit})");
             Eis(r.V.Kaart.Voltooid, $"{k}: de verkenning rondt af");
             Eis(r.V.Kaart.Melders.Count == 21, $"{k}: alle 21 melders zijn gevonden (nu {r.V.Kaart.Melders.Count})");
             Eis(r.V.Kaart.Wissels.Any(w => w.Adres == 9 && w.Waarnemingen.Count > 0), $"{k}: wissel 9 (naar 4-11-12) is gevonden");

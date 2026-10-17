@@ -2334,3 +2334,8 @@ Test: CompileCheck (ALLES OK, KruisPlusTest met de kaart van 17:50). Nog niet ge
   * start 13: 18-20 van 21 melders; start 30 en 129: te veel kortsluitingen (14-20).
   * "voltooid" wordt gemeld terwijl er nog onbekend spoor is: de afronding moet kloppen met het aantal ontdekte uiteinden.
 - Alles hierboven: nog niet getest op de baan.
+
+## BUG #187 – Blokproef pas bij tweede bezoek van een nieuwe melder (17-10, echte log 14:06–14:16, melder 13/5 en 14/24)
+Marco: bij een onbekende melder volledig doorrijden tot alleen die melder bezet is en dan direct de blokkentest doen. De code wachtte met de blokproef tot de melder twee keer bereikt was (regel uit #176), waardoor de adrestests van de overgang 13→14 tientallen keren werden herhaald vóór melder 14 een blok had.
+Oplossing: tweede-bezoekregel in `BlokProefNaRit` verwijderd; `Nastellen` zet de loc eerst helemaal op de nieuwe melder, daarna volgt direct `BlokZoekenBijStart`. Test in `StapMatrixTest`. CompileCheck: ALLES OK (start 17 en 5, beide simulatiemodi, start 13 voltooid).
+NOG NIET GETEST OP DE BAAN.

@@ -970,9 +970,9 @@ public partial class BaanVerkenner
         if (m == _kaart.StartMelder || !ProefMogelijk(m) || Kruis.Middens.Contains(m) || Kruis.OpKruis(_monitor.Bezet)) return;
         if (rijstand.Afbuigend.Length > 0 || !_monitor.Bezet.Contains(m)) return;   // na de basisrit staat de loc nog met een deel in de melder ervoor: nastellen zet hem helemaal op m
         if (WisselsBijBezet(_kaart, new[] { m }).Count > 0) return;
-        // pas bij de tweede keer dat de melder bereikt wordt: een melder die voor het eerst gezien wordt kan de (nog niet herkende) kruiswissel zijn, en daar
-        // laat de blokproef de loc in de simulatie in de verkeerde kruismotor-stand achter.
-        if (_kaart.Overgangen.Where(x => x.Naar == m).Sum(x => x.AantalKeer) < 2) return;
+        // BUG #187 (Marco 17-10 14:20, echte log melder 13/5 en 14/24: "je zou helemaal doorrijden in die bezetmelder en dan de blokkentest doen, nu stop je al direct als de
+        // nieuwe bezetmelder gezien wordt"): de blokproef volgt direct bij de EERSTE aankomst op een nieuwe melder, nadat de loc helemaal is doorgereden tot alleen die melder bezet is
+        // (Nastellen hieronder). De tweede-bezoekregel (BUG #176) is vervallen.
         // een melder naast de kruiswissel: de loc zou bij het neerzetten de kruiswissel in kunnen rijden; die krijgt zijn blokproef los (VoerBlokProefUit)
         if (Buren(_kaart).TryGetValue(m, out var bm) && bm.Any(Kruis.Middens.Contains)) return;
         _bezig = $"blokproef voor melder {m}";
