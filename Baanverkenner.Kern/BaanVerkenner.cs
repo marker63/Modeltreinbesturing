@@ -2500,8 +2500,17 @@ public partial class BaanVerkenner
         _kaart.AdressenZonderEffect = _ins.WisselAdressen().Where(a => !gevonden.Contains(a)).ToList();
         _kaart.VoorgesteldeBlokken = BlokVoorstel.Bereken(_kaart);
         _kaart.Wisselstraatvoorstellen = WisselstraatVoorstel.Bereken(_kaart);
-        _kaart.Voltooid = true;
-        _fase = "Voltooid";
+        // BUG #188 (meting: 7 van 16 simulatieruns meldden 'voltooid' met 2-4 van de 21 melders, steeds met een melder zonder Dinamo-blok): een verkenning waarin nog een melder
+        // zijn blok niet kent is niet af. Het rapport blijft een tussenstand en noemt de melders, zodat Marco niet denkt dat de baan klaar is.
+        var zonderBlok = BlokVereist ? _kaart.Melders.Where(m => m.DinamoBlok is null).Select(m => m.Nummer).OrderBy(x => x).ToList() : new List<int>();
+        _kaart.Voltooid = zonderBlok.Count == 0;
+        if (zonderBlok.Count > 0)
+        {
+            var t = $"De verkenning is gestopt maar nog NIET af: van melder {string.Join(", ", zonderBlok)} is het Dinamo-blok niet bepaald, dus dit is een tussenstand. Start opnieuw (de kaart blijft bewaard) of zet de loc op een van die melders.";
+            _log.Waarschuwing(t);
+            if (!_kaart.Waarschuwingen.Contains(t)) _kaart.Waarschuwingen.Add(t);
+        }
+        _fase = _kaart.Voltooid ? "Voltooid" : "Gestopt (tussenstand)";
         _bezig = "";
         _log.Vondst($"Resultaat: {_kaart.Melders.Count} melders, {_kaart.Wissels.Count} wissels, {_kaart.Kopsporen.Count} doodlopende einden, {_kaart.VoorgesteldeBlokken.Count} voorgestelde blokken, {_kaart.AdressenZonderEffect.Count} adressen zonder gevonden effect.");
     }

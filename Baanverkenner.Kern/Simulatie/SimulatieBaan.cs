@@ -93,6 +93,8 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
 
     /// <summary>BUG #150: een wissel omzetten terwijl de loc er (deels) op staat geeft kortsluiting/ontsporing (zoals op de echte baan).</summary>
     public bool OmzettenOnderLocGeeftKortsluiting { get; set; }
+    /// <summary>Meting (BUG #188): hoe vaak een wissel werd omgezet terwijl de loc er (deels) op stond.</summary>
+    public int OnderLocOmgezet { get; private set; }
     private List<(Wissel W, bool Stand1, bool Stand2)>? _omzetOud;
     /// <summary>Echte Dinamo (logs 14-10): bij een kortsluiting blijven de melders staan zoals ze waren ("Ook bezet op dat moment: melder X"). Standaard aan.</summary>
     public bool MeldersBevrorenBijKortsluiting { get; set; }
@@ -298,6 +300,7 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
             if (veranderd && OmzettenOnderLocGeeftKortsluiting && !_kortsluiting && _element is not null
                 && (ReferenceEquals(_element, w) || ElementenOnderLoc().Any(e => ReferenceEquals(e, w))))
             {
+                OnderLocOmgezet++;
                 _bevroren = BezetteMelders();
                 _kortsluiting = true;
                 BijwerkenMelders(false);

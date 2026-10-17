@@ -2421,6 +2421,27 @@ public static class Tests
     }
 
 
+    /// <summary>BUG #188: meetopzet. BENCH=1 draait alleen deze meting (start-lijst in BENCH_START) en schrijft per run een regel plus een totaalscore; zo wordt elke wijziging
+    /// bewezen met cijfers vergeleken met de basislijn in plaats van geraden. Echte wissels in de nagebouwde baan: 1,2,5,6,9,14 (en de kruismotoren 10,13).</summary>
+    static void BenchTest()
+    {
+        var echt = new HashSet<int> { 1, 2, 5, 6, 9, 10, 13, 14 };
+        int totValsVoltooid = 0, totVoltooid = 0, totMelders = 0, totVals = 0, totMis = 0, totKort = 0, totOnder = 0, runs = 0;
+        foreach (var start in (Environment.GetEnvironmentVariable("BENCH_START") ?? "17,5,13,30,129,12,4,10").Split(',').Select(int.Parse))
+        foreach (var streng in new[] { false, true })
+        {
+            Baanverkenner.Kern.Simulatie.SimulatieBaan? sim = null;
+            var r = MiniworldRit(start, 10, insAanpassing: i => { i.StapVoorStap = true; i.StapAanloop = true; i.StapDoorrijSeconden = 2; }, simAanpassing: sa => { sim = sa; sa.BuurwisselHeftKruisKortsluitingOp = streng; });
+            var gevonden = r.V.Kaart.Wissels.Where(w => w.Waarnemingen.Count > 0).Select(w => w.Adres).ToList();
+            int vals = gevonden.Count(a => !echt.Contains(a));
+            int mis = new[] { 2, 5, 6, 9, 14 }.Count(a => !gevonden.Contains(a));
+            int onder = sim?.OnderLocOmgezet ?? 0;
+            Console.WriteLine($"BENCH start {start,3} streng={(streng ? 1 : 0)}: {(r.V.Kaart.Voltooid ? "voltooid" : "NIET-voltooid"),-13} melders {r.V.Kaart.Melders.Count,2}/21  valse-wissels {vals}  ontbrekende-wissels {mis}  kortsl {r.Kortsluitingen,2}  onder-loc {onder,2}  zonder-effect {r.V.Kaart.AdressenZonderEffect.Count,2}  open-ksl {r.V.Kaart.Kortsluitpunten.Count(k => k.Soort == KortsluitpuntSoort.Kortsluiting && !k.Opgelost)}  geen-blok {r.V.Kaart.Melders.Count(m => m.DinamoBlok is null)}  {r.Seconden / 60:0} min");
+            runs++; if (r.V.Kaart.Voltooid) totVoltooid++; if (r.V.Kaart.Voltooid && r.V.Kaart.Melders.Count < 21) totValsVoltooid++; totMelders += r.V.Kaart.Melders.Count; totVals += vals; totMis += mis; totKort += r.Kortsluitingen; totOnder += onder;
+        }
+        Console.WriteLine($"BENCH TOTAAL runs {runs}: voltooid {totVoltooid} (waarvan ten onrechte {totValsVoltooid}), melders {totMelders}, valse-wissels {totVals}, ontbrekende-wissels {totMis}, kortsluitingen {totKort}, onder-loc {totOnder}");
+    }
+
     // BUG #183-#185 (Marco 17-10): de echte instelling (doorrijden 2 s + aanloop) in beide simulatiemodi; gewoon en streng (buurwissel heft kruiskortsluiting op)
     static void StapMatrixTest()
     {
@@ -2578,6 +2599,7 @@ public static class Tests
 
     public static int Main()
     {
+        if (Environment.GetEnvironmentVariable("BENCH") == "1") { BenchTest(); return 0; }
         var kaart = Laad("baankaart_voltooid_2026-10-04.json");
 
         // 1. leeg project
