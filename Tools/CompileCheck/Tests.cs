@@ -1372,6 +1372,20 @@ public static class Tests
     }
 
     // BUG #171: kent de kaart bij de huidige wisselstand geen vervolg, dan bepaalt het bekende vervolg toch de kruismotoren
+    // BUG #173: waar rijdt de loc heen na een wisselprobleem? (kaart 17-10 08:19: de loc stond op melder 14, vlak bij wissel 5)
+    static void VeiligePlekTest()
+    {
+        Console.WriteLine("Test: terug naar een getest stuk baan na een wisselprobleem (BUG #173)");
+        var k = Laad("baankaart_2026-10-17_0819.json");
+        var kr = new KruisKennis(); kr.Motoren.Add(10); kr.Motoren.Add(13);
+        Eis(!BaanVerkenner.IsVeiligeMelder(k, kr, 14), "melder 14 (wissel 5 erachter) is geen veilige plek");
+        Eis(!BaanVerkenner.IsVeiligeMelder(k, kr, 24), "melder 24 (uitgang van wissel 5) is geen veilige plek");
+        Eis(BaanVerkenner.IsVeiligeMelder(k, kr, 13), "melder 13 is een veilige plek");
+        Eis(BaanVerkenner.KiesVeiligePlek(k, kr, 14) == 13, "vanaf melder 14 rijdt de loc terug naar melder 13 (nu " + BaanVerkenner.KiesVeiligePlek(k, kr, 14) + ")");
+        Eis(BaanVerkenner.KiesVeiligePlek(k, kr, 24) == 13, "vanaf melder 24 ook naar melder 13 (nu " + BaanVerkenner.KiesVeiligePlek(k, kr, 24) + ")");
+        Eis(BaanVerkenner.KiesVeiligePlek(k, kr, 13) == 13, "staat de loc al op een veilige plek, dan blijft hij daar");
+    }
+
     static void KruisRuimTest()
     {
         Console.WriteLine("Test: kruisingang ook bij onbekende wisselstand (BUG #171)");
@@ -2304,9 +2318,9 @@ public static class Tests
 
     // De geslaagde, volledige rit van 10-10 11:38 (blokken 10, 11, 12): referentie voor importer en leerprofiel
     /// <summary>BUG #150: een volledige verkenning vanaf nul op de nagebouwde Miniworld-baan (zie MiniworldBaan). Geeft het aantal kortsluitingen terug.</summary>
-    static (BaanVerkenner V, VerkenLog Log, int Kortsluitingen, double Seconden, string Einde) MiniworldRit(int startMelder, double maxUren = 6, Action<BaanVerkenner>? voorbereiding = null, bool omzettenOnderLoc = true, Action<Baanverkenner.Kern.Simulatie.SimulatieBaan>? simAanpassing = null, Action<VerkenInstellingen>? insAanpassing = null)
+    static (BaanVerkenner V, VerkenLog Log, int Kortsluitingen, double Seconden, string Einde) MiniworldRit(int startMelder, double maxUren = 6, Action<BaanVerkenner>? voorbereiding = null, bool omzettenOnderLoc = true, Action<Baanverkenner.Kern.Simulatie.SimulatieBaan>? simAanpassing = null, Action<VerkenInstellingen>? insAanpassing = null, Func<Baanverkenner.Kern.Simulatie.SimulatieBaan>? simFabriek = null)
     {
-        var sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(omzettenOnderLoc, startMelder);
+        var sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(omzettenOnderLoc, startMelder, simFabriek);
         simAanpassing?.Invoke(sim);
         var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 14, DinamoBlokken = "1-12", KruisMotoren = "10+13", HoogsteMelder = 150 };
         insAanpassing?.Invoke(ins);
@@ -2339,6 +2353,25 @@ public static class Tests
             Eis(r.V.Kaart.Melders.Count >= 18, $"stap voor stap (start {start}): de melders zijn gevonden (nu {r.V.Kaart.Melders.Count})");
             Eis(r.Kortsluitingen <= 5, $"stap voor stap (start {start}): weinig kortsluitingen (nu {r.Kortsluitingen})");
             Eis(r.V.Kaart.KruisMidden.Contains(24) && !r.V.Kaart.KruisMidden.Contains(129), $"stap voor stap (start {start}): alleen melder 24 is de kruiswissel (nu {string.Join(",", r.V.Kaart.KruisMidden)})");
+        }
+    }
+
+    // BUG #173: Dinamo-uitval midden in 'Stap voor stap': alles na het begin van het probleem telt niet, de loc rijdt terug naar een getest stuk en gaat daar verder
+    static void StapUitvalTest()
+    {
+        Console.WriteLine("Test: stap voor stap met een Dinamo-uitval (BUG #173)");
+        foreach (var vanaf in (Environment.GetEnvironmentVariable("UITVAL_VANAF") ?? "60").Split(',').Select(int.Parse))
+        {
+            Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan? uitval = null;
+            var r = MiniworldRit(int.Parse(Environment.GetEnvironmentVariable("STAP_START") ?? "17"), 10, insAanpassing: i => i.StapVoorStap = true,
+                simFabriek: () => uitval = new Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan { UitvalVanafCommando = vanaf, UitvalDuur = TimeSpan.FromSeconds(75) });
+            if (Environment.GetEnvironmentVariable("MINI_LOG") == "1") Console.WriteLine(r.Log.AlsTekst());
+            Console.WriteLine($"  uitval vanaf commando {vanaf}: {r.Einde}, {r.Seconden / 60:0} min, {r.Kortsluitingen} kortsluiting(en), {uitval!.GenegeerdeCommandos} commando's genegeerd, voltooid: {r.V.Kaart.Voltooid}, melders: {r.V.Kaart.Melders.Count}");
+            Eis(uitval.GenegeerdeCommandos > 0, $"uitval (vanaf {vanaf}): de uitval heeft plaatsgevonden");
+            Eis(r.Log.Regels.Any(x => x.Tekst.Contains("WISSELPROBLEEM")), $"uitval (vanaf {vanaf}): het wisselprobleem wordt herkend en de opdracht begint opnieuw");
+            Eis(r.Log.Regels.Any(x => x.Tekst.Contains("Hier gaat het verder")), $"uitval (vanaf {vanaf}): de loc staat eerst weer op een getest stuk baan");
+            Eis(r.V.Kaart.Voltooid, $"uitval (vanaf {vanaf}): de verkenning rondt toch af");
+            Eis(r.V.Kaart.Melders.Count >= 18, $"uitval (vanaf {vanaf}): alle melders gevonden (nu {r.V.Kaart.Melders.Count})");
         }
     }
 
@@ -2534,6 +2567,7 @@ public static class Tests
         ZaadAllesTest();
         if (Environment.GetEnvironmentVariable("MINI_DEBUG") == "1") MiniworldFoutzoek();
         MiniworldRitTest();
+        StapUitvalTest();
         StapVoorStapTest();
         MiniworldAlarmVertragingTest();
         MiniworldVoorkennisTest();
@@ -2564,6 +2598,7 @@ public static class Tests
         WisselRollenTest();
         VerbodenPadTest();
         KruisRuimTest();
+        VeiligePlekTest();
         KruisAankomstTest();
         OrientatieTekstTest();
         WisselEisenTest();

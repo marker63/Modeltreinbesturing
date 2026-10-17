@@ -205,6 +205,87 @@ public partial class BaanVerkenner
         _stapPlek = doel;
     }
 
+    // ------------------------------------------------------------------
+    // Wisselprobleem: info daarna negeren, terug naar een getest stuk baan (BUG #173)
+    // ------------------------------------------------------------------
+
+    /// <summary>Een melder waar de loc veilig kan staan: geen kruiswissel, geen bekende wissel erbij, geen kortsluitpunt, en eerder gereden met alle wissels rechtdoor.</summary>
+    internal static bool IsVeiligeMelder(Baankaart k, KruisKennis kr, int m)
+    {
+        if (kr.Middens.Contains(m)) return false;
+        if (WisselsBijBezet(k, new[] { m }).Count > 0) return false;
+        if (k.Kortsluitpunten.Any(p => p.NaMelder == m || p.TweedeMelders.Contains(m))) return false;
+        return k.Overgangen.Any(o => o.AantalKeer > 0 && (o.Van == m || o.Naar == m) && o.GezienBijConfiguraties.Contains(""));
+    }
+
+    /// <summary>De dichtstbijzijnde veilige melder, bereikbaar over geteste overgangen zonder afbuigende wissels (anders null). Staat de loc er al, dan die melder.</summary>
+    internal static int? KiesVeiligePlek(Baankaart k, KruisKennis kr, int nu)
+    {
+        if (IsVeiligeMelder(k, kr, nu)) return nu;
+        int? best = null; int bestLen = int.MaxValue;
+        foreach (var m in k.Melders.Select(x => x.Nummer).OrderBy(x => x))
+        {
+            if (!IsVeiligeMelder(k, kr, m)) continue;
+            var weg = StapWeg(k, kr, nu, m);
+            if (weg is null || weg.Any(s => s.Cfg.Afbuigend.Except(kr.Motoren).Any())) continue;
+            if (weg.Count < bestLen) { best = m; bestLen = weg.Count; }
+        }
+        return best;
+    }
+
+    /// <summary>Marco (17-10): "wissel probleem start, alle info hierna negeren en direct terug rijden naar een getest stuk baan, en vanuit daar weer verder gaan."
+    /// De opdracht die liep gaat terug in de wachtrij; wat sinds het begin van het probleem gepland of als getest genoteerd is, vervalt (de kaart is al teruggezet);
+    /// de loc rijdt naar de dichtstbijzijnde veilige melder en de opdracht begint daar opnieuw. Nog niet getest op de baan.</summary>
+    private async Task HerstelNaWisselProbleem(Opdracht o, string reden)
+    {
+        _log.Waarschuwing($"WISSELPROBLEEM ({reden}). Alles wat sinds het begin van het probleem gezien is, wordt genegeerd. De loc rijdt eerst terug naar een getest stuk baan; opdracht #{o.Id} begint daarna opnieuw.");
+        int grens = _uitvalIdGrens, getest = _uitvalGetest;
+        _uitvalIdGrens = int.MaxValue; _uitvalGetest = -1;
+        int weg = _status.Wachtrij.RemoveAll(x => x.Id >= grens && x.Id != o.Id);
+        if (weg > 0) _log.Info($"{weg} opdracht(en) die na het begin van het probleem gepland waren, vervallen.");
+        if (getest >= 0 && _status.GetesteOvergangen.Count > getest) _status.GetesteOvergangen.RemoveRange(getest, _status.GetesteOvergangen.Count - getest);
+        o.UitvalHersteld++;
+        if (o.UitvalHersteld > 3)
+        {
+            var t = $"Opdracht #{o.Id} is {o.UitvalHersteld} keer afgebroken door een wisselprobleem en wordt overgeslagen.";
+            _kaart.Waarschuwingen.Add(t); _log.Waarschuwing(t);
+            _status.AfgerondeOpdrachten++;
+        }
+        else _status.Wachtrij.Insert(0, o);
+        _status.Huidig = null;
+        BewaarNu();
+        // Terug naar het geteste stuk: eerst alle wissels rechtdoor (behalve die onder de loc), dan over geteste overgangen naar de veilige melder.
+        try
+        {
+            await VolledigeStop();
+            await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);
+            var nu = HuidigePlek();
+            int? veilig = nu is int n ? KiesVeiligePlek(_kaart, Kruis, n) : null;
+            if (veilig is int v)
+            {
+                if (nu != v || _monitor.Bezet.Count != 1)
+                {
+                    _log.Info($"Terug naar het geteste stuk: melder {v} (de loc staat nu op melder {nu}).");
+                    if (nu != v) await NaarPlekMelder(v, null);
+                    await Nastellen(v, o.Richting);
+                }
+                _stapPlek = v;
+                _log.Info($"De loc staat op melder {v}: een getest stuk baan. Hier gaat het verder.");
+            }
+            else
+            {
+                await VraagLocTerugTeZetten(_kaart.StartMelder, "Na het wisselprobleem is er geen geteste plek bereikbaar vanaf waar de loc staat. Zet de loc op de startmelder.");
+                _stapPlek = _kaart.StartMelder;
+            }
+        }
+        catch (NavigatieFout nf)
+        {
+            _log.Waarschuwing($"Terugrijden naar het geteste stuk lukte niet: {nf.Message}");
+            await VraagLocTerugTeZetten(_kaart.StartMelder, "Na het wisselprobleem kon de loc niet zelf terug naar een getest stuk baan. Zet de loc op de startmelder.");
+            _stapPlek = _kaart.StartMelder;
+        }
+    }
+
     /// <summary>De loc staat (deels) op de kruiswissel, bijvoorbeeld na een proef met een stand zonder doorgaand spoor. De motoren kunnen dan niet omgezet worden
     /// (kortsluiting). Hij rijdt eerst de kruiswissel uit met de motorstand die nu staat: een eerder gereden overgang vanaf deze plek waarvan de motorstand overeenkomt.
     /// Nog niet getest op de baan.</summary>

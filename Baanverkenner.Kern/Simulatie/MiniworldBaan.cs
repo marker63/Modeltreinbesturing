@@ -16,13 +16,11 @@ namespace Baanverkenner.Kern.Simulatie;
 /// </summary>
 public static class MiniworldBaan
 {
-    public static SimulatieBaan Maak(bool omzettenOnderLocGeeftKortsluiting = true, int startMelder = 13)
+    public static SimulatieBaan Maak(bool omzettenOnderLocGeeftKortsluiting = true, int startMelder = 13, Func<SimulatieBaan>? fabriek = null)
     {
-        var b = new SimulatieBaan
-        {
-            DinamoGedrag = true, StaatStilZonderBlokcommando = true, StilstaanRemtOpGrens = true, LocAdres = 5408,
-            OmzettenOnderLocGeeftKortsluiting = omzettenOnderLocGeeftKortsluiting, MeldersBevrorenBijKortsluiting = true, MeldBlokAlarm = true
-        };
+        var b = fabriek?.Invoke() ?? new SimulatieBaan();
+        b.DinamoGedrag = true; b.StaatStilZonderBlokcommando = true; b.StilstaanRemtOpGrens = true; b.LocAdres = 5408;
+        b.OmzettenOnderLocGeeftKortsluiting = omzettenOnderLocGeeftKortsluiting; b.MeldersBevrorenBijKortsluiting = true; b.MeldBlokAlarm = true;
         var A = SimulatieBaan.Eind.A; var B = SimulatieBaan.Eind.B;
         var P = SimulatieBaan.Poort.Stam; var R = SimulatieBaan.Poort.Recht; var Af = SimulatieBaan.Poort.Af;
 

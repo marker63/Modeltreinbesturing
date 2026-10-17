@@ -31,6 +31,8 @@ public class Opdracht
     public bool TestCombinaties { get; set; }
     /// <summary>BUG #172: proef van een kruiswissel-ingang (twee melders, precies de gevraagde motorstanden, geen adrestest).</summary>
     public bool KruisProef { get; set; }
+    /// <summary>BUG #173: hoe vaak deze opdracht is afgebroken door een wisselprobleem (Dinamo-uitval, klem) en opnieuw begonnen is.</summary>
+    public int UitvalHersteld { get; set; }
     public string Sleutel => $"{Configuratie.Sleutel}|{Start}|{Richting}";
 }
 
@@ -309,7 +311,12 @@ public partial class BaanVerkenner
                     _status.Wachtrij.Remove(o);
                     _status.Huidig = o;
                     BewaarNu();
-                    await VoerOpdrachtUit(o);
+                    try { await VoerOpdrachtUit(o); }
+                    catch (WisselProbleemFout wf) when (Stap)
+                    {
+                        await HerstelNaWisselProbleem(o, wf.Message);   // BUG #173
+                        continue;
+                    }
                     _status.Huidig = null;
                     _status.AfgerondeOpdrachten++;
                     BewaarNu();

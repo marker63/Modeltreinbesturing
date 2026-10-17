@@ -64,6 +64,13 @@ public class NavigatieFout : Exception
     public Configuratie? RitConfiguratie { get; init; }
 }
 
+/// <summary>BUG #173 (Marco 17-10): een wisselprobleem (Dinamo-uitval, loc die klem zit op een wissel) is begonnen. Alles wat daarna gezien is telt niet;
+/// de loc rijdt terug naar een getest stuk baan en de opdracht begint daar opnieuw (alleen in de werkwijze 'Stap voor stap').</summary>
+public class WisselProbleemFout : Exception
+{
+    public WisselProbleemFout(string melding) : base(melding) { }
+}
+
 public partial class BaanVerkenner
 {
     private static readonly TimeSpan Poll = TimeSpan.FromMilliseconds(50);
@@ -395,6 +402,9 @@ public partial class BaanVerkenner
 
     /// <summary>BUG #157: JSON van de kaart vóór de eerste ontbrekende terugmelding (null zolang de terugmeldingen binnenkomen).</summary>
     private string? _kaartVoorUitval;
+    /// <summary>BUG #173: opdracht-nummer en aantal geteste overgangen op het moment van de eerste ontbrekende terugmelding (begin van het wisselprobleem).</summary>
+    private int _uitvalIdGrens = int.MaxValue, _uitvalGetest = -1;
+    private DateTime _uitvalHersteldOm = DateTime.MinValue;
     /// <summary>BUG #157: de gebruiker koos "Nee" bij de uitvalmelding: alles daarna is onbetrouwbaar.</summary>
     private bool _onbetrouwbaar;
 
@@ -474,7 +484,12 @@ public partial class BaanVerkenner
         if (_hw is not IWisselBevestiging bron) return;
         if (bevestigd) { _echo.Noteer(true); _kaartVoorUitval = null; return; }
         // BUG #157: de kaart zoals die was vóór de eerste ontbrekende terugmelding, om bij een uitval alle latere (onbetrouwbare) bevindingen weg te kunnen halen.
-        if (_echo.Reeks == 0) _kaartVoorUitval ??= _kaart.AlsJson();
+        if (_echo.Reeks == 0 && _kaartVoorUitval is null)
+        {
+            _kaartVoorUitval = _kaart.AlsJson();
+            _uitvalIdGrens = _status.VolgendeOpdrachtId;     // BUG #173: opdrachten die hierna gepland worden zijn onbetrouwbaar
+            _uitvalGetest = _status.GetesteOvergangen.Count;
+        }
         _log.Rijden($"Wissel {adres}: geen terugmelding van Dinamo op het commando ({_echo.Reeks + 1} achter elkaar zonder).");
         if (!_echo.Noteer(false)) return;
         var tekst = _echo.OoitBevestigd
@@ -508,8 +523,17 @@ public partial class BaanVerkenner
         if (!vanzelfHersteld) await HoortestNaHerstel();
         _echo.Herstel();
         _log.Info("Dinamo hersteld volgens de gebruiker: alle wissels worden opnieuw gestuurd. Bevindingen sinds de eerste ontbrekende terugmelding zijn niet betrouwbaar.");
+        // BUG #173 (Marco 17-10: "de loc stond stil op wissel 5, toen de problemen met de wissels begonnen"): een wissel waar de loc op of tegenaan staat wordt
+        // niet opnieuw gestuurd (ook niet in dezelfde stand), en de kruismotoren niet als de loc op de kruiswissel staat. Hij blijft zoals hij stond.
+        var onderLoc = WisselsOnderLoc();
+        bool opKruis = Kruis.OpKruis(_monitor.Bezet);
         foreach (var kv in _wisselStand.ToList())
         {
+            if (onderLoc.TryGetValue(kv.Key, out var onderMelder) || (opKruis && Kruis.IsMotor(kv.Key)))
+            {
+                _log.Info($"Wissel {kv.Key} wordt na het herstel niet opnieuw gestuurd: de loc staat op of tegen die wissel{(onderLoc.ContainsKey(kv.Key) ? $" (melder {onderMelder})" : " (kruiswissel)")}.");
+                continue;
+            }
             long voor = bron.AantalWisselBevestigingen;
             _hw.ZetWissel(kv.Key, kv.Value);
             _laatsteWisselCommando = (kv.Key, kv.Value, _klok.Nu, _monitor.Bezet.OrderBy(x => x).ToList());
@@ -523,6 +547,9 @@ public partial class BaanVerkenner
             _log.Waarschuwing("Dinamo meldt na het herstel nog steeds niets terug: de verkenning stopt.");
             throw new OperationCanceledException("Dinamo meldt na het herstel nog steeds geen wissel-commando's terug.");
         }
+        _uitvalHersteldOm = _klok.Nu;
+        // BUG #173: stap voor stap negeert alles sinds het begin van het probleem en begint de opdracht opnieuw vanaf een getest stuk baan.
+        if (Stap) throw new WisselProbleemFout("Dinamo had een uitval en is hersteld");
     }
 
     /// <summary>BUG #131 (Marco 14-10 13:25): zegt de gebruiker 'Dinamo is hersteld', dan wordt dat eerst getest: een willekeurige wissel gaat heen en weer en de
@@ -1850,8 +1877,16 @@ public partial class BaanVerkenner
                         {
                             await HoortestNaHerstel();
                             _echo.Herstel();
-                            foreach (var kv in _wisselStand.ToList()) await ZetWissel(kv.Key, kv.Value, forceer: true);
+                            var onderLoc2 = WisselsOnderLoc();
+                            bool opKruis2 = Kruis.OpKruis(_monitor.Bezet);
+                            foreach (var kv in _wisselStand.ToList())
+                            {
+                                if (onderLoc2.ContainsKey(kv.Key) || (opKruis2 && Kruis.IsMotor(kv.Key))) { _log.Info($"Wissel {kv.Key} wordt niet opnieuw gestuurd: de loc staat op of tegen die wissel."); continue; }   // BUG #173
+                                await ZetWissel(kv.Key, kv.Value, forceer: true);
+                            }
                             _log.Info("Dinamo hersteld volgens de gebruiker: alle wissels zijn opnieuw gestuurd; de rit wordt hervat.");
+                            _uitvalHersteldOm = _klok.Nu;
+                            if (Stap) throw new WisselProbleemFout("Dinamo reageerde niet en is hersteld");   // BUG #173
                             bevestigd = true;
                         }
                     }
@@ -2101,6 +2136,9 @@ public partial class BaanVerkenner
     private async Task<bool> ProbeerKlemWegTeKrijgen(int start, Richting r, RitDoel doel, string stap)
     {
         if (_klemProbeActief || _hw is not IBlokAlarmBron) return false;
+        // BUG #173 (Marco 17-10): zit de loc klem (vaak op of tegen een wissel), dan eerst terug het geteste stuk op in plaats van andere wissels te proberen.
+        if (Stap && await ProbeerTerugNaarGetest(start, r))
+            throw new WisselProbleemFout($"De loc zat klem ({stap}) en is teruggereden naar een getest stuk baan");
         _monitor.Bijwerken();
         var bezet = _monitor.Bezet.ToHashSet();
         var bijLoc = WisselsBijBezet(_kaart, bezet);
@@ -2120,6 +2158,16 @@ public partial class BaanVerkenner
                 bool oud = _wisselStand.TryGetValue(a, out var nu) && nu;
                 await ZetWissel(a, !oud, forceer: true);
                 var vrij = await VrijheidsProef(r);
+                // BUG #173 (Marco 17-10: "de vondst van wissel 1 was puur toeval, hij stond meters van de wissel vandaan, waarschijnlijk timing"): een wissel waarvan de
+                // kaart niet weet dat hij bij deze plek ligt wordt niet als oplossing vastgelegd, en zeker niet kort na een Dinamo-uitval of in 'Stap voor stap'.
+                if (vrij && (Stap || _klok.Nu - _uitvalHersteldOm < TimeSpan.FromMinutes(15)) && !achterKlem.Contains(a))
+                {
+                    _log.Waarschuwing($"De loc reed weer nadat wissel {a} was omgezet, maar de kaart weet niet dat wissel {a} bij melder {start} ligt. Dat is vermoedelijk toeval (timing): er wordt niets vastgelegd en wissel {a} gaat terug naar {(oud ? "afbuigend" : "rechtdoor")}.");
+                    await ZetWissel(a, oud, forceer: true);
+                    _kortsluitingGemeld = false;
+                    _statischeKortsluiting = false;
+                    return true;
+                }
                 if (vrij)
                 {
                     _log.Vondst($"De loc reed weer zonder kortsluiting nadat wissel {a} naar {(oud ? "rechtdoor" : "afbuigend")} is geschakeld ({stap}). De wissel blijft zo staan (nog niet getest op de baan).");
@@ -2135,6 +2183,19 @@ public partial class BaanVerkenner
             return false;
         }
         finally { _klemProbeActief = false; }
+    }
+
+    /// <summary>BUG #173: de loc zit klem bij <paramref name="start"/> (rit in richting <paramref name="r"/>). Is de weg tegengesteld aan die rit een geteste overgang met alle wissels
+    /// rechtdoor, dan rijdt de loc die kort terug (hij kwam daar vandaan). Beweegt hij zonder alarm, dan is hij vrij. Nog niet getest op de baan.</summary>
+    private async Task<bool> ProbeerTerugNaarGetest(int start, Richting r)
+    {
+        var terug = _kaart.Overgangen.FirstOrDefault(x => x.Van == start && x.Richting == r.Om() && x.AantalKeer > 0 && x.GezienBijConfiguraties.Contains(""));
+        if (terug is null) return false;
+        _log.Waarschuwing($"De loc zit klem bij melder {start}. Eerst terug het geteste stuk op (richting melder {terug.Naar}, {r.Om().Tekst()}, alle wissels rechtdoor) in plaats van wissels uit te proberen.");
+        await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);
+        bool vrij = await VrijheidsProef(r.Om());
+        _log.Info(vrij ? "De loc reed terug: hij is vrij." : "De loc bewoog niet terug of er was alarm.");
+        return vrij;
     }
 
     /// <summary>BUG #164: stuurt de loc kort weg in richting <paramref name="r"/> en meldt true als hij beweegt zonder dat Dinamo kortsluiting meldt. De loc wordt

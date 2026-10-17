@@ -228,6 +228,9 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
 
     public IReadOnlyList<Wissel> Wissels => _wissels;
 
+    /// <summary>De tijd van de simulatie (laatste tik).</summary>
+    protected DateTime SimTijd => _vorigeTik ?? DateTime.Now;
+
     /// <summary>Alleen voor tests/foutzoeken: waar staat de loc nu?</summary>
     public string ToestandTest() => (_element switch { Sectie s => $"sectie {s.Melder}", Wissel w => w.Kruis ? $"kruis {w.Melder} in {_wisselIn} uit {_wisselUit}" : $"wissel {w.Adres} in {_wisselIn} uit {_wisselUit}", _ => "geen" })
         + $" pos {_pos:0.0} orient {_orientatie} stap {_decoderStap} {(_decoderVooruit ? "vooruit" : "achteruit")} kortsluiting {_kortsluiting} bezet [{string.Join(",", BezetteMelders().OrderBy(x => x))}]";
