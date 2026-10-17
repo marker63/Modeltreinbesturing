@@ -2430,7 +2430,7 @@ public static class Tests
         {
             var r = MiniworldRit(start, 10, insAanpassing: i => { i.StapVoorStap = true; i.StapAanloop = true; i.StapDoorrijSeconden = 2; }, simAanpassing: sa => sa.BuurwisselHeftKruisKortsluitingOp = streng);
             string k = $"matrix (start {start}, streng={streng})";
-            Console.WriteLine($"  {k}: {r.Einde}, {r.Seconden / 60:0} min, {r.Kortsluitingen} kortsluiting(en), melders {r.V.Kaart.Melders.Count}, voltooid {r.V.Kaart.Voltooid}, wissels: {string.Join(",", r.V.Kaart.Wissels.Where(w => w.Waarnemingen.Count > 0).Select(w => w.Adres))}");
+            Console.WriteLine($"  {k}: {r.Einde}, {r.Seconden / 60:0} min, {r.Kortsluitingen} kortsluiting(en), melders {r.V.Kaart.Melders.Count} ({string.Join(",", r.V.Kaart.Melders.Select(m => m.Nummer).OrderBy(x => x))}), voltooid {r.V.Kaart.Voltooid}, wissels: {string.Join(",", r.V.Kaart.Wissels.Where(w => w.Waarnemingen.Count > 0).Select(w => w.Adres))}");
             // BUG #187: blokproef direct bij de eerste aankomst op een nieuwe melder (niet pas bij het tweede bezoek)
             var regels = r.Log.Regels.Select(x => x.Tekst).ToList();
             int eersteRit = regels.FindIndex(x => x.Contains("Opdracht #1:"));

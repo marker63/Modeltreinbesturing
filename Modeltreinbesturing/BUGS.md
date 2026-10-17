@@ -2340,3 +2340,13 @@ Marco: bij een onbekende melder volledig doorrijden tot alleen die melder bezet 
 Oplossing: tweede-bezoekregel in `BlokProefNaRit` verwijderd; `Nastellen` zet de loc eerst helemaal op de nieuwe melder, daarna volgt direct `BlokZoekenBijStart`. Test in `StapMatrixTest`. CompileCheck: ALLES OK (start 17 en 5, beide simulatiemodi, start 13 voltooid).
 NOG NIET GETEST OP DE BAAN.
 Aanvulling: de blokproef start alleen als uitsluitend de nieuwe melder bezet is; anders wordt hij uitgesteld met een waarschuwing in het logboek. NOG NIET GETEST OP DE BAAN.
+
+## NOG OPEN voor de volgende versie (Marco 17-10 15:03, nu nog geen actie)
+- Wisselstanden gelden in beide richtingen: heeft de kaart 5→12 (achteruit) via wissel 2 (en 1) afbuigend, dan moet de terugrit 12→5 (vooruit) dezelfde wisselstand krijgen en in het blokkenschema/de wisselstraten staan. Nu staat de stand alleen bij de heenrichting. Bij de volgende versie direct meenemen.
+
+## BUG #188 – ANALYSE 14:53-log (17-10), NOG NIET OPGELOST (niet geleverd, omdat de simulatie ervan terugviel)
+Wat de log laat zien (Marco 14:56/14:58):
+1. Melder 12 (na wissel 2 afbuigend, achteruit vanaf 5) krijgt geen blokproef: de loc stopt met melder 5 nog actief, krijgt kortsluiting, het herstel (wissel 1 afbuigend) laat de loc "staan waar hij staat" (op 12 en 5 samen) en er volgt geen doorrijden tot alleen melder 12 bezet is, dus ook geen blokproef. Daarna wordt de overgang 5→12 nog 13 keer opnieuw getest voordat melder 12 een blok heeft.
+2. Dat wissel 1 mee afbuigend moet bij wissel 2 werd om 14:44:16 gevonden maar pas om 14:49:50 bij het kortsluitpunt vastgelegd (het punt bestaat pas na de rit); de rit van 14:48:47 reed daardoor weer in dezelfde kortsluiting.
+Geprobeerde oplossingen (allemaal teruggedraaid): (a) na herstel doorrijden + blokproef in HerstelNaKortsluiting; (b) wachtende zelf-gevonden alarmoplossing koppelen aan het kortsluitpunt zodra het bestaat; (c) Splitsing meetellen in VrijVanIngangsWissel; (d) wissel na afwijkende proef niet onder de loc terugzetten. Elk gaf in de simulatie valse wissels (3,4,7,8...) of ontbrekende melders bij start 5/13/17; zonder deze wijzigingen slagen start 17 en 5.
+Oorzaak van de valse wissels (nog te verhelpen): na TerugNaarMetControle staat de loc op melder 5 met zijn staart nog op de tong van wissel 2; wissel 2 wordt dan direct teruggezet (kaart kent hem nog niet, WisselsBijBezet leeg), blijft in de sim onder de loc staan en de volgende proef (wissel 3) rijdt daardoor naar melder 12 en krijgt de eer. Zonder eerst deze wisselvolgorde te herstellen is (a)/(b) niet veilig in te voeren.

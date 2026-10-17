@@ -21,3 +21,4 @@ niet) en `Modeltreinbesturing/BLOKKENSCHEMA.md`.
 - Commitberichten eindigen met de Co-Authored-By/Claude-Session regels.
 - Compile-controle zonder NuGet: `dotnet run --project Tools/CompileCheck` (dotnet-sdk-8.0 via apt) draait de
   regressietests op Kern/Hardware/importers met stubs. Het WPF-project zelf kan hier niet gecompileerd worden.
+- Wisselstanden gelden in beide richtingen (Marco 17-10): staat 5→12 vast met wissel 2 (en 1) afbuigend, dan moet 12→5 dezelfde stand krijgen, ook in blokkenschema en wisselstraten. Staat als open punt in BUGS.md; in de volgende versie meenemen.
