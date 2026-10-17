@@ -425,6 +425,8 @@ public class Baankaart
     /// <summary>BUG #78: voorstel voor wisselstraten per gereden overgang (zie <see cref="WisselstraatVoorstel"/>). Oudere kaarten: leeg.</summary>
     public List<WisselstraatVoorstel> Wisselstraatvoorstellen { get; set; } = new();
     public List<string> Waarschuwingen { get; set; } = new();
+    /// <summary>BUG #181: lijst van overschreven vastgestelde feiten (blok van een melder, kruismelder, rijrichting, wissel omgezet onder de loc).</summary>
+    public List<string> Overschrijvingen { get; set; } = new();
     public List<GeredenRit> Ritten { get; set; } = new();
     /// <summary>BUG #104: uitkomsten van 'Voltooide baan nogmaals checken'. De kaart zelf blijft bij een controle ongewijzigd; dit zijn alleen de verslagen.</summary>
     public List<ControleVerslag> ControleVerslagen { get; set; } = new();

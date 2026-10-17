@@ -138,6 +138,8 @@ public partial class BaanVerkenner
     private readonly IHardwareInterface _hw;
     private readonly VerkenInstellingen _ins;
     private readonly IKlok _klok;
+    /// <summary>BUG #181: register van vastgestelde feiten; elke overschrijving wordt gelogd en bewaard (zie <see cref="KennisRegister"/>).</summary>
+    public KennisRegister Kennis { get; } = new();
     private readonly VerkenLog _log;
     private readonly MelderMonitor _monitor;
     private readonly Func<string, string, Task<bool>> _vraag;
@@ -236,6 +238,7 @@ public partial class BaanVerkenner
         if (_hw is IVerbindingsBron stilteBron) stilteBron.StilteGewijzigd += HardwareMeldtStilte;
         try
         {
+            ZaaiKennis();
             bool uitbreiden = _status.Uitbreiden && _status.Kaart.StartMelder != 0;
             bool hervat = _status.Kaart.StartMelder != 0 && !uitbreiden;
             bool controleRit = _status.Controle;
@@ -405,6 +408,20 @@ public partial class BaanVerkenner
             : $"Engelse wissels: motor {Kruis.MotorenTekst}" + (Kruis.Middens.Count > 0 ? $", kruiswissel in melder {Kruis.MiddenTekst}" : ", melder nog onbekend (wordt ontdekt)") + (Kruis.MetReferentie ? "; vaste referentie uit eerdere verkenningen actief." : ". Alles wordt vanaf nul ontdekt."));
     }
 
+    /// <summary>BUG #181: alles wat de geladen kaart al weet geldt als vastgesteld; een afwijkende nieuwe waarde is dan een overschrijving.</summary>
+    private void ZaaiKennis()
+    {
+        Kennis.Nu = () => _klok.Nu;
+        Kennis.Gemeld = o =>
+        {
+            _log.Waarschuwing($"OVERSCHREVEN (BUG #181): {o}");
+            if (!_kaart.Overschrijvingen.Any(x => x.ToString() == o.ToString())) _kaart.Overschrijvingen.Add(o.ToString());
+        };
+        foreach (var m in _kaart.Melders.Where(x => x.DinamoBlok is not null)) Kennis.Zaai("blok", m.Nummer.ToString(), m.DinamoBlok!.Value.ToString());
+        foreach (var m in _kaart.KruisMidden) Kennis.Zaai("kruismelder", Kruis?.MotorenTekst ?? "", m.ToString());
+        foreach (var og in _kaart.Overgangen.Where(x => x.AantalKeer > 0)) Kennis.Zaai("rijrichting", $"{og.Van}>{og.Naar}", og.Richting.Tekst());
+    }
+
     private void BewaarKruis()
     {
         _kaart.KruisMotoren = Kruis.MotorenTekst;
@@ -416,6 +433,7 @@ public partial class BaanVerkenner
     private void LeerKruisMidden(int melder)
     {
         if (melder <= 0 || !Kruis.Middens.Add(melder)) return;
+        Kennis.Leg("kruismelder", Kruis.MotorenTekst, melder.ToString(), "LeerKruisMidden");
         BewaarKruis();
         _log.Vondst($"Melder {melder} is (waarschijnlijk) de kruiswissel van motor {Kruis.MotorenTekst}: omzetten van die motoren met de loc erop geeft kortsluiting.");
     }

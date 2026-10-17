@@ -2307,3 +2307,15 @@ Test: CompileCheck (ALLES OK, KruisPlusTest met de kaart van 17:50). Nog niet ge
   a. Navigatie 129 -> 14 voor een kruisproef (opdracht #43, motor 10 afbuigend): `NaarStartVan` zet voor de laatste etappe alle standen al vooraf (wissel 5 afbuigend, 6 rechtdoor, motor 10 afbuigend, 14 rechtdoor) terwijl de loc nog op melder 129 staat. Wissel 5 ligt vlak bij 129 en wordt van de samengevoegde kant bereden: direct kortsluiting in blok 9, en omzetten lost dat niet op (CLAUDE.md, BUG #169). Een poging om wissels bij een bezette melder niet vooraf te zetten (maar onderweg, `StaartWissels`) liet de gewone run al na 52 min vastlopen en is teruggedraaid.
   b. Rit 24 -> 21 met motor 13 nog afbuigend van een vorige rit: de loc rijdt naar 14, het terugrijden 14 -> 24 -> 21 gaat de verkeerde kant op (13), de verkenner raakt de loc kwijt. De kruiswissel is op dat moment nog niet herkend (nog geen vier buren), dus de navigatie weet niet dat de motoren er toe doen. Een extra herkenning uit 'twee vervolgmelders afhankelijk van een kruismotor' (`KruisUitMotorBewijs`) werd niet getriggerd, omdat navigatieritten hun wisselstand niet als bewijs in de overgangen zetten; teruggedraaid.
 - Volgende stap (niet gedaan): in navigatieritten de werkelijke motorstand als bewijs vastleggen, zodat de kruiswissel met motorbewijs eerder herkend wordt; en de standen voor de laatste etappe pas zetten zodra de loc de melder met die wissels verlaten heeft.
+
+## BUG #181 - #182 (Marco 17-10, 12:01-12:34: standen/melders worden overschreven; loc staat midden in een meldsectie stil)
+- #181 `KennisRegister` (nieuw): houdt per soort (blok, kruismelder, rijrichting, wissel-onder-loc) bij wat vastgesteld is en meldt elke overschrijving
+  (log "OVERSCHREVEN (BUG #181)" en `Baankaart.Overschrijvingen`). Wissen bij de blokproef telt niet als overschrijving. De regressietest eist 0 overschrijvingen.
+- #181 (oorzaak echte log 12:28): wissel omgezet terwijl de loc er net op aankwam (de tong ligt binnen het gebied van de melder) gaf kortsluiting/stilstand.
+  Opgelost met `VrijRijdenVoorWissel` (eerst doorrijden tot alleen die melder bezet is; overgeslagen bij alarm, kruismotor of geen verse aankomst),
+  `VrijVanIngangsWissel` met terugvalduur, wissels bij een bezette melder sparen (alleen zonder alarm), `kopHierBekend`, `VertrekWasBewezen` met configuratie,
+  "laatste redmiddel" in `ProbeerAlarmWegTeKrijgen`, en `KruisUitMotorBewijs` (motorstand als bewijs bij `DetecteerKruis`).
+- #181 simulator: optie `BuurwisselHeftKruisKortsluitingOp` (standaard uit) en test `SimBuurwisselTest`.
+- #182 een navigatierit volgt de stand die de route nodig heeft; de stand uit een eerder alarmherstel (`MetAlarmStand`) geldt alleen nog voor verkenningsritten.
+- Nog open (bekend): `STAP_STRENG=1 STAP_DOORRIJ=2 STAP_AANLOOP=1` loopt vast bij navigatie 129 -> 10: wissel 5/6 liggen in het gebied van melder 129 en worden
+  door het sparen onder de loc niet naar de stand van de route gezet. Gewone run, doorrijden 2 en strikt zonder aanloop slagen. Alles: nog niet getest op de baan.

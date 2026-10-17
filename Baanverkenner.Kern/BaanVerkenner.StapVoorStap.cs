@@ -374,6 +374,12 @@ public partial class BaanVerkenner
     private void DetecteerKruis()
     {
         if (Kruis.Motoren.Count == 0 || Kruis.Middens.Count > 0) return;   // één motorpaar = één kruiswissel; een melder met twee gewone wissels erachter (129) heeft ook vier buren
+        if (KruisUitMotorBewijs() is int bewezen && bewezen > 0)
+        {
+            _log.Info($"Melder {bewezen} is de kruiswissel van motor {Kruis.MotorenTekst}: de loc reed daar bij een andere stand van die motoren verder naar een andere melder.");
+            LeerKruisMidden(bewezen);
+            return;
+        }
         var buren = Buren(_kaart);
         foreach (var (m, bm) in buren)
             if (bm.Count >= 4 && !Kruis.Middens.Contains(m))
@@ -381,6 +387,31 @@ public partial class BaanVerkenner
                 _log.Info($"Melder {m} heeft {bm.Count} buren ({string.Join(", ", bm.OrderBy(x => x))}): dit is de kruiswissel van motor {Kruis.MotorenTekst}.");
                 LeerKruisMidden(m);
             }
+    }
+
+    /// <summary>BUG #181 (Marco 17-10 12:04: "je weet al snel als je melder 24 binnenrijdt en je had wisselmotor 13 geschakeld dat je een kortsluitmelding of een andere bezetmelder
+    /// kreeg; ik had bij het starten al opgegeven dat motor 10 en 13 een Engelse wissel vormen"): de stand van de kruismotoren tijdens elke gereden rit (ook navigatie) is bewijs.
+    /// Reden twee ritten (zelfde rijrichting, zelfde melder ervoor, zelfde stand van de gewone wissels) op een melder M verschillend verder bij een andere motorstand, dan kan alleen
+    /// een kruiswissel dat veroorzaken: M is de kruiswissel. Dit hoeft niet te wachten tot M vier verschillende buren heeft.</summary>
+    internal int? KruisUitMotorBewijs()
+    {
+        if (Kruis.Motoren.Count == 0 || Kruis.Middens.Count > 0) return null;
+        var trip = new List<(int Voor, int M, int Na, Richting R, string Restsleutel, string Motor)>();
+        // ritten van één stap (stap voor stap) leggen elke overgang apart vast, met de wisselstand van die rit: twee overgangen Voor->M en M->Na in dezelfde richting en bij
+        // dezelfde stand (gewone wissels én kruismotoren) vormen samen één doorgang door M
+        foreach (var a in _kaart.Overgangen.Where(x => x.AantalKeer > 0))
+            foreach (var b in _kaart.Overgangen.Where(x => x.AantalKeer > 0 && x.Van == a.Naar && x.Richting == a.Richting && x.Naar != a.Van))
+                foreach (var sa in a.GezienBijConfiguraties.Where(sa => b.GezienBijConfiguraties.Contains(sa)))
+                {
+                    var cfg = Configuratie.VanSleutel(sa);
+                    trip.Add((a.Van, a.Naar, b.Naar, a.Richting, KruisBewijs.ZonderMotoren(cfg, Kruis.Motoren).Sleutel, KruisBewijs.Project(cfg, Kruis.Motoren).Sleutel));
+                }
+        foreach (var g in trip.GroupBy(t => (t.Voor, t.M, t.R, t.Restsleutel)))
+        {
+            if (g.Select(t => t.Motor).Distinct().Count() >= 2 && g.Select(t => t.Na).Distinct().Count() >= 2
+                && g.GroupBy(t => t.Na).Select(x => x.Select(t => t.Motor).Distinct().Count()).All(c => c == 1)) return g.Key.M;
+        }
+        return null;
     }
 
     /// <summary>BUG #174: de standen van de kruismotoren die op een proef getest worden: elke motor alleen, en bij een Engelse wissel met twee motoren ook beide tegelijk

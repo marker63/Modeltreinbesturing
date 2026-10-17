@@ -96,6 +96,10 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
     private List<(Wissel W, bool Stand1, bool Stand2)>? _omzetOud;
     /// <summary>Echte Dinamo (logs 14-10): bij een kortsluiting blijven de melders staan zoals ze waren ("Ook bezet op dat moment: melder X"). Standaard aan.</summary>
     public bool MeldersBevrorenBijKortsluiting { get; set; }
+    /// <summary>BUG #181: strenger/realistischer: een loc die op de kruiswissel kortgesloten zit omdat de BUURWISSEL (bv. wissel 9 na melder 129) tegen hem in staat, komt vrij zodra die
+    /// buurwissel wordt omgezet (gesplitste tak richting de samenvoeging, BUG #169). Standaard uit: de herstelroutes van de verkenner zijn er nog niet allemaal op berekend
+    /// (zie BUGS.md #181, <c>STAP_STRENG=1</c> in de tests).</summary>
+    public bool BuurwisselHeftKruisKortsluitingOp { get; set; }
     private HashSet<int>? _bevroren;
 
     /// <summary>De uitgang van een Engelse wissel voor een loc die via <paramref name="inn"/> binnenkomt, en of dat een kortsluiting geeft.</summary>
@@ -319,6 +323,19 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
                     _kortsluiting = false; AlarmUit();
                     if (MeldtKortsluiting) KortsluitingStatusGewijzigd?.Invoke(false);
                 }
+            }
+        }
+        // BUG #181: de kortsluiting van een loc die van achteren tegen een verkeerd staande BUURWISSEL van de kruiswissel aan zit (8 -> kruiswissel -> wissel 9 afbuigend, van de
+        // tak af) gaat ook weg als die buurwissel wordt omgezet, niet alleen als de kruismotoren omgaan (gesplitste tak richting de samenvoeging: BUG #169). Zonder dit bleef de
+        // simulator na zo'n kortsluiting voorgoed vastzitten, terwijl de echte baan dan weer vrij is.
+        if (BuurwisselHeftKruisKortsluitingOp && _kortsluiting && _omzetOud is null && _element is Wissel { Kruis: true } kw)
+        {
+            var (kUit, kort) = KruisUit(kw, _wisselIn);
+            if (!kort)
+            {
+                _wisselUit = kUit;
+                _kortsluiting = false; AlarmUit();
+                if (MeldtKortsluiting) KortsluitingStatusGewijzigd?.Invoke(false);
             }
         }
         HardwareCommunicatieLog.Log("Uit", $"[Simulatie] wissel {adres} -> {(afbuigend ? "afbuigend" : "rechtdoor")}");

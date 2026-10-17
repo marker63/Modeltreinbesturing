@@ -163,8 +163,10 @@ public partial class BaanVerkenner
 
     /// <summary>BUG #125: is er in de kaart al een rit gemaakt die van <paramref name="start"/> in richting <paramref name="r"/> is vertrokken (een vervolgmelder
     /// gezien)? Dan is de blokkoppeling bewezen en wijst een loc die niet vertrekt op Dinamo/baanspanning, niet op het blok.</summary>
-    internal static bool VertrekWasBewezen(Baankaart k, int start, Richting r) =>
-        k.Overgangen.Any(o => o.Van == start && o.Richting == r && o.AantalKeer > 0);
+    /// <param name="cfg">BUG #181: bij deze wisselstand. Vertrok de loc eerder alleen bij een ANDERE stand (melder 12 vooruit met wissel 1 afbuigend), dan is een loc die nu niet vertrekt
+    /// (wissel 1 rechtdoor = doodlopend) geen bewijs voor een Dinamo-storing.</param>
+    internal static bool VertrekWasBewezen(Baankaart k, int start, Richting r, Configuratie? cfg = null) =>
+        cfg is null ? k.Overgangen.Any(o => o.Van == start && o.Richting == r && o.AantalKeer > 0) : k.BekendeVolgende(start, r, cfg).Count > 0;
 
     private List<int> HuidigeAlarmBlokken()
     {
@@ -372,8 +374,17 @@ public partial class BaanVerkenner
     private async Task ZetWissel(int adres, bool afbuigend, bool forceer = false)
     {
         if (!forceer && _wisselStand.TryGetValue(adres, out var huidig) && huidig == afbuigend) return;
+        if (!forceer) await VrijRijdenVoorWissel(adres);   // BUG #181
         long bevestigingenVoor = (_hw as IWisselBevestiging)?.AantalWisselBevestigingen ?? 0;
         _hw.ZetWissel(adres, afbuigend);
+        // BUG #181: tijdens het NAVIGEREN (de loc rijdt naar een andere plek) mag geen wissel omgaan die de kaart bij een nu bezette melder noemt: de loc staat er met een deel
+        // op of tegen de tong (de gevaarlijkste overschrijving van een stand). Verkenningsritten zetten de wissel vóór de loc bewust om en tellen niet mee.
+        if (_stapNavigeert && _wisselStand.TryGetValue(adres, out var vorige) && vorige != afbuigend && _monitor.Bezet.Count >= 2 && WisselsBijBezet(_kaart, _monitor.Bezet).Contains(adres))
+        {
+            string bij = string.Join("/", _monitor.Bezet.OrderBy(x => x));
+            Kennis.Zaai("wissel-onder-loc", $"{adres}@{bij}", vorige ? "afbuigend" : "rechtdoor");
+            Kennis.Leg("wissel-onder-loc", $"{adres}@{bij}", afbuigend ? "afbuigend" : "rechtdoor", $"navigatie zet wissel {adres} om terwijl melder {bij} bezet zijn (de loc staat dus op een grens)");
+        }
         _wisselStand[adres] = afbuigend;
         _laatsteWisselCommando = (adres, afbuigend, _klok.Nu, _monitor.Bezet.OrderBy(x => x).ToList());
         // BUG #65: meten is weten - hoeveel wisselcommando's zijn er sinds het verbinden verstuurd? Valt de Dinamo ooit
@@ -626,9 +637,42 @@ public partial class BaanVerkenner
         return uit;
     }
 
+    private bool _vrijRijdenBezig;
+
+    /// <summary>BUG #181 (Marco 17-10 11:46/11:51: "doorrijden totdat de laatste melder alleen actief is"): staat de loc nog op twee melders (de neus op de nieuwe melder, de staart
+    /// nog op de vorige) en moet er een wissel om die de kaart bij een van die melders noemt, dan ligt de loc mogelijk op of tegen de tong. Eerst doorrijden tot alleen de laatste
+    /// melder bezet is, daarna pas omzetten. In de simulator gaf het omzetten van wissel 14 met de loc op 8 en 24 (en wissel 9/6 op 129) kortsluiting die daarna niet meer
+    /// weg te krijgen was. Nog niet getest op de baan.</summary>
+    private (int Melder, int Rit) _vrijGecontroleerd;
+    /// <summary>Wordt vóór elk wisselcommando aangeroepen (ZetWissel): ligt de wissel bij een bezette melder waar de loc net aankwam, dan eerst doorrijden tot de loc de tong voorbij is.</summary>
+    private async Task VrijRijdenVoorWissel(int adres)
+    {
+        if (_vrijRijdenBezig || _ingang is not { } ing || Kruis.IsMotor(adres) || HuidigeAlarmBlokken().Count > 0) return;   // met een alarm is omzetten juist het herstel
+        _monitor.Bijwerken();
+        var bezet = _monitor.Bezet;
+        if (bezet.Count == 0 || !bezet.Contains(ing.Melder) || bezet.Any(m => m != ing.Melder && m != ing.Via)) return;
+        if (!WisselsBijBezet(_kaart, bezet).Contains(adres)) return;
+        // BUG #181: ook met alleen de nieuwe melder bezet kan de loc nog op de wisseltong staan (de tong ligt in het gebied van die melder): per aankomst één keer door naar de verste sectie
+        if (bezet.Count == 1 && _vrijGecontroleerd == (ing.Melder, _kaart.Ritten.Count)) return;
+        _vrijGecontroleerd = (ing.Melder, _kaart.Ritten.Count);
+        _log.Info($"Wissel {adres} moet om, maar die ligt bij melder {Lijst(bezet)} waar de loc net aankwam: eerst doorrijden tot alleen melder {ing.Melder} bezet is en de loc de wissel voorbij is (anders staat hij op de tong).");
+        _vrijRijdenBezig = true;
+        try
+        {
+            if (bezet.Count > 1) await Nastellen(ing.Melder, ing.Richting, achter: ing.Via);
+            else await VrijVanIngangsWissel(ing.Melder, ing.Richting, ookZonderWaarneming: true);
+        }
+        finally { _vrijRijdenBezig = false; }
+    }
+
     private async Task ZetConfiguratie(Configuratie c, bool spaarOnderLoc = false)
     {
         var onder = spaarOnderLoc ? WisselsOnderLoc() : new Dictionary<int, int>();
+        // BUG #181: is er GEEN alarm, dan blijven ook wissels die de kaart bij een bezette melder noemt staan zolang de loc daar staat (sim: wissel 5 en 9 werden na een onverwachte
+        // melder 129 rechtgezet terwijl de loc op die tongen stond: kortsluiting). Bij een alarm kan juist zo'n wissel de oplossing zijn (BUG #169).
+        if (spaarOnderLoc && _monitor.Bezet.Count > 0 && HuidigeAlarmBlokken().Count == 0)
+            foreach (var a in WisselsBijBezet(_kaart, _monitor.Bezet).Where(x => !Kruis.IsMotor(x)))
+                onder.TryAdd(a, _monitor.Bezet.OrderBy(x => x).First());
         foreach (var a in _ins.WisselAdressen())
         {
             bool wens = c.Bevat(a);
@@ -679,6 +723,7 @@ public partial class BaanVerkenner
 
     private void KoppelBlok(int melder, int blok)
     {
+        Kennis.Leg("blok", melder.ToString(), blok.ToString(), "KoppelBlok");
         _kaart.Melder(melder).DinamoBlok = blok;
         if (Referentie is { } rf && rf.KlopptMetKoploper(melder, blok) == false)
             _log.Waarschuwing($"Melder {melder} lijkt rijstroom van Dinamo-blok {blok} te krijgen, maar volgens de Koploper-export is dat {rf.Omschrijving(melder)}. Controleer dit (kan een spookmelding zijn).");
@@ -893,18 +938,28 @@ public partial class BaanVerkenner
     /// wisselgebied aan de ingang. Weet de kaart dat bij deze melder een wissel ligt (kortsluiting of oplossing direct na deze melder), dan kruipt de loc daarna nog een stuk
     /// door in de rijrichting (een derde van de bekende tijd tot de volgende melder), zodat hij op de verste sectie van de melder staat en vrij van de wissel.
     /// Onbekende tijd of niet-bekende wissel: niets doen. Nog niet getest op de baan.</summary>
-    private async Task VrijVanIngangsWissel(int doel, Richting r)
+    private async Task VrijVanIngangsWissel(int doel, Richting r, bool ookZonderWaarneming = false)
     {
-        bool wisselBij = _kaart.Wissels.Any(w => w.Waarnemingen.Any(o => o.NaMelder == doel
+        bool wisselBij = ookZonderWaarneming || _kaart.Wissels.Any(w => w.Waarnemingen.Any(o => o.NaMelder == doel
             && (o.Soort == WaarnemingSoort.KortsluitingBijOmzetten || o.Soort == WaarnemingSoort.LostKortsluitingOp)));
         if (!wisselBij) return;
         _monitor.Bijwerken();
         if (!(_monitor.Bezet.Count == 1 && _monitor.Bezet.Contains(doel))) return;
         var uit = _kaart.Overgangen.Where(x => x.Van == doel && x.Richting == r && x.AantalMetingen > 0).ToList();
-        if (uit.Count == 0) return;
-        double sec = uit.Min(x => x.GemiddeldeSeconden) * RefSnelheid / Math.Max(1, _ins.Verkensnelheid)
-                     * Math.Max(1, _ins.Verkensnelheid) / Math.Max(1, _ins.Kruipsnelheid);
-        double duur = Math.Min(30, sec / 3);
+        double duur;
+        if (uit.Count > 0)
+        {
+            double sec = uit.Min(x => x.GemiddeldeSeconden) * RefSnelheid / Math.Max(1, _ins.Verkensnelheid)
+                         * Math.Max(1, _ins.Verkensnelheid) / Math.Max(1, _ins.Kruipsnelheid);
+            duur = Math.Min(30, sec / 3);
+        }
+        else if (ookZonderWaarneming && _ins.StapDoorrijSeconden > 0)
+        {
+            // BUG #181: de tijd naar de volgende melder is nog niet gemeten (bij stap voor stap stopt elke rit op de nieuwe melder): dezelfde afstand als het doorrijden na de nieuwe
+            // melder (Marco 11:18: minstens 2 s na het zien van de melder), maar met de kruipsnelheid.
+            duur = Math.Min(30, _ins.StapDoorrijSeconden * Math.Max(1, _ins.Verkensnelheid) / Math.Max(1, _ins.Kruipsnelheid));
+        }
+        else return;
         if (duur < 1) return;
         _log.Rijden($"Melder {doel} heeft een wissel in het gebied: de loc kruipt nog {duur:0.0} s door {r.Tekst()} naar de verste sectie van de melder, zodat hij niet in de wissel blijft staan (niet getest op de baan).");
         await StuurSnelheid(r, _ins.Kruipsnelheid, null);
@@ -1229,6 +1284,19 @@ public partial class BaanVerkenner
                 foreach (var a in verdacht)
                     if (await Probeer(a, " (ligt bij de loc, met toestemming van de gebruiker)")) return true;
         }
+        // BUG #181: laatste redmiddel. De rollen (achter/kop) komen uit de kaart en kunnen ontbreken of net andersom liggen (sim: loc van 129 naar zijspoor 10, wissel 5 en 6 stonden als
+        // 'samengevoegde kant' aangemerkt maar wissel 5 stond tegen de loc in). Dan blijft de loc voor altijd vastzitten. Nu worden ook die wissels (met toestemming, bij de loc) nog
+        // één voor één geprobeerd voordat de verkenner opgeeft.
+        var laatste = bijLoc.Where(a => !Kruis.IsMotor(a) && _ins.WisselAdressen().Contains(a) && kopAdressen.Contains(a)).OrderBy(a => a).ToList();
+        if (laatste.Count > 0 && VraagJaNee is not null)
+        {
+            var mag = await VraagJaNee("Wissel bij de loc proberen?",
+                $"Geen enkele andere wissel haalt de kortsluiting weg. Wissel {string.Join(" en ", laatste)} lijkt van de samengevoegde kant bereden te worden (omzetten zou dan niet helpen), maar dat is uit de kaart afgeleid en kan onjuist zijn.\n\n" +
+                $"Ja = de verkenner probeert die wissel(s) één voor één (de loc staat stil; kleine kans dat hij daarbij ontspoort).\nNee = u zet hem zelf goed.");
+            if (mag == true)
+                foreach (var a in laatste)
+                    if (await Probeer(a, " (laatste redmiddel, ligt bij de loc, met toestemming van de gebruiker)")) return true;
+        }
         _log.Waarschuwing("Geen enkele wissel haalde de kortsluiting weg.");
         return false;
     }
@@ -1404,7 +1472,10 @@ public partial class BaanVerkenner
         // blokken; de sectie wordt gekoppeld zodra de loc er helemaal in staat.
 
         await ControleerGeenAlarmVoorStapMet($"rit {r.Tekst()} vanaf melder {start}", start, r);
-        cfgNu = MetAlarmStand(cfgNu);
+        // BUG #182: een navigatie volgt de stand die de route nodig heeft (bv. wissel 6 afbuigend naar melder 10). De stand die eerder een
+        // kortsluiting wegnam (laatste redmiddel: wissel 6 rechtdoor) mag die route niet overschrijven; komt de kortsluiting terug, dan volgt
+        // opnieuw het herstel.
+        if (!doel.IsNavigatie) cfgNu = MetAlarmStand(cfgNu);
 
         int snelheid = _ins.Verkensnelheid;
         _log.Rijden(doel.IsNavigatie
@@ -1572,6 +1643,7 @@ public partial class BaanVerkenner
                 double? dtOpgeslagen = dt is double d1 && !doelInzicht ? d1 * _ins.Verkensnelheid / RefSnelheid : null;
                 // BUG #165: vastleggen met de stand waarin de wissels WERKELIJK stonden (ZetConfiguratie slaat een motor over die onder de loc ligt).
                 var cfgWerkelijk = WerkelijkeStand(cfgNu);
+                Kennis.Leg("rijrichting", $"{res.Reeks[^1]}>{m}", r.Tekst(), "gereden rit");
                 _kaart.RegistreerOvergang(res.Reeks[^1], m, r, cfgWerkelijk, dtOpgeslagen);
                 // BUG #74: ingangskant onthouden. Binnen de rit is het de melder daarvoor; bij de eerste stap van de rit de ingang van
                 // de vorige rit, mits de loc daar nog in dezelfde richting rijdt en niet met de hand verplaatst is.
@@ -1809,7 +1881,11 @@ public partial class BaanVerkenner
                     continue;
                 }
                 await StopLoc();
-                if (BlokVereist && res.Reeks.Count == 1 && !blokGecontroleerd && !doelInzicht)
+                // BUG #181: staat deze melder in deze rijrichting al als doodlopend einde in de kaart (bij welke wisselstand ook), dan staat de loc tegen het stootjuk (stap voor stap
+                // rijdt hem na de melder nog even door): geen Dinamo-storing en geen blokproef, maar gewoon weer een doodlopend einde.
+                bool kopHierBekend = res.Reeks.Count == 1 && _kaart.Kopsporen.Any(k => k.Melder == start && k.Richting == r);
+                if (kopHierBekend) _log.Info($"De loc vertrok niet van melder {start}: dat is een bekend doodlopend einde ({r.Tekst()}); geen blokproef nodig.");
+                if (BlokVereist && res.Reeks.Count == 1 && !blokGecontroleerd && !doelInzicht && !kopHierBekend)
                 {
                     // De loc is helemaal niet vertrokken: klopt de blokkoppeling van deze
                     // melder wel? Eén keer opnieuw bepalen voordat we iets concluderen.
@@ -1895,7 +1971,7 @@ public partial class BaanVerkenner
                     // BUG #125 (Marco 14-10 09:42: Dinamo reageerde niet meer, wissels schakelden niet, na het uitzetten van de netspanning kwam er geen melding): de
                     // interface bleef keepalives sturen, dus de stiltemelding (#81) ging niet af. De loc vertrok om 09:41:59 niet van melder 13, terwijl hij daar de hele
                     // ochtend probleemloos vertrok met blok 3: dat is geen blokprobleem. Vroeger volgde een blokproef van minuten die ook niets kon vinden.
-                    if (!bevestigd && bekendBlok is not null && VertrekWasBewezen(_kaart, start, r))
+                    if (!bevestigd && bekendBlok is not null && VertrekWasBewezen(_kaart, start, r, cfgNu))
                     {
                         var tekst = $"De loc vertrok niet van melder {start} (blok {bekendBlok}), terwijl hij van deze melder eerder in deze verkenning wel gewoon vertrok. Dat lijkt geen blokprobleem maar een Dinamo of baanspanning die niet meer reageert (wissels schakelen dan ook niet).";
                         _log.Waarschuwing("DINAMO REAGEERT WAARSCHIJNLIJK NIET OP COMMANDO'S: " + tekst);
@@ -1924,6 +2000,7 @@ public partial class BaanVerkenner
                     if (!bevestigd)
                     {
                         _log.Waarschuwing($"De loc vertrok niet van melder {start}. Blokkoppeling wordt gecontroleerd.");
+                        Kennis.Wis("blok", start.ToString(), "blokproef bij start (loc vertrok niet)");
                         _kaart.Melder(start).DinamoBlok = null;
                         // BUG #69: een mislukte blokproef mag een eerder vastgesteld blok niet wissen (log 15:41-16:01: 2 x 9 minuten
                         // geen beweging door een verkeerd staande wissel, daarna was blok 8 van melder 24 weg en kreeg de melder

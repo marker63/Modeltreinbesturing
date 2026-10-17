@@ -2351,17 +2351,59 @@ public static class Tests
         return (v, log, kort, (klok.Nu - t0).TotalSeconds, einde);
     }
 
+
+    // BUG #181: het register van vastgestelde feiten meldt elke overschrijving
+    static void KennisRegisterTest()
+    {
+        Console.WriteLine("Test: register van vastgestelde feiten (BUG #181)");
+        var r = new KennisRegister();
+        var gemeld = new List<string>();
+        r.Gemeld = o => gemeld.Add(o.ToString());
+        Eis(!r.Leg("blok", "13", "3", "test") && gemeld.Count == 0, "register: de eerste waarde is geen overschrijving");
+        Eis(!r.Leg("blok", "13", "3", "test") && r.Bevestigingen == 1, "register: dezelfde waarde is een bevestiging");
+        Eis(r.Leg("blok", "13", "4", "test") && gemeld.Count == 1 && gemeld[0].Contains("3 -> 4"), "register: een andere waarde is een overschrijving met oud en nieuw");
+        r.Wis("blok", "13", "blokproef");
+        Eis(gemeld.Count == 1 && r.Wissingen == 1, "register: wissen alleen telt niet als overschrijving");
+        Eis(!r.Leg("blok", "13", "4", "herstel"), "register: na wissen dezelfde waarde terug = niets verloren");
+        r.Zaai("rijrichting", "5>16", "vooruit");
+        Eis(r.Leg("rijrichting", "5>16", "achteruit", "rit") && gemeld.Count == 2, "register: een uit de kaart gezaaide rijrichting wordt bewaakt");
+    }
+
+    // BUG #181: een loc die op de kruiswissel kortgesloten zit door de BUURWISSEL komt vrij als die wordt omgezet (alleen in de strenge simulatiemodus)
+    static void SimBuurwisselTest()
+    {
+        Console.WriteLine("Test: simulator - buurwissel heft kortsluiting op de kruiswissel op (BUG #181)");
+        foreach (var streng in new[] { false, true })
+        {
+            var sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(true, 8);
+            sim.BuurwisselHeftKruisKortsluitingOp = streng;
+            sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+            // wissel 9 (na melder 129, tak richting de kruiswissel) staat afbuigend: een loc die 8 -> kruiswissel -> 129 rijdt, loopt tegen die tong op
+            sim.ZetWissel(14, true); sim.ZetWissel(9, true);
+            var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+            bool kort = false; sim.KortsluitingStatusGewijzigd += a => kort = a;
+            sim.ZetLocSnelheid(5408, 12, false, 4, 28);
+            for (int i = 0; i < 1200 && !kort; i++) klok.Wacht(TimeSpan.FromMilliseconds(100)).GetAwaiter().GetResult();
+            Eis(kort, $"sim (streng={streng}): 8 -> kruiswissel met wissel 9 afbuigend geeft kortsluiting");
+            sim.ZetWissel(9, false);
+            for (int i = 0; i < 60; i++) klok.Wacht(TimeSpan.FromMilliseconds(100)).GetAwaiter().GetResult();
+            Eis(streng ? !kort : kort, $"sim (streng={streng}): wissel 9 terugzetten {(streng ? "heft" : "heft niet")} de kortsluiting op");
+        }
+    }
+
     // BUG #172: werkwijze 'Stap voor stap' op de nagebouwde Miniworld-baan
     static void StapVoorStapTest()
     {
         Console.WriteLine("Test: stap voor stap op de nagebouwde Miniworld-baan (BUG #172)");
         foreach (var start in (Environment.GetEnvironmentVariable("STAP_START") ?? "17").Split(',').Select(int.Parse))
         {
-            var r = MiniworldRit(start, double.Parse(Environment.GetEnvironmentVariable("STAP_UREN") ?? "8", System.Globalization.CultureInfo.InvariantCulture), insAanpassing: i => { i.StapVoorStap = true; i.StapAanloop = Environment.GetEnvironmentVariable("STAP_AANLOOP") == "1"; i.StapDoorrijSeconden = double.Parse(Environment.GetEnvironmentVariable("STAP_DOORRIJ") ?? "0", System.Globalization.CultureInfo.InvariantCulture); });   // volledige run zonder aanloop: met aanloop loopt de sim vast in het herstel na de kruisproef (zie AanloopTest en BUGS.md #175)
+            var r = MiniworldRit(start, double.Parse(Environment.GetEnvironmentVariable("STAP_UREN") ?? "8", System.Globalization.CultureInfo.InvariantCulture), insAanpassing: i => { i.StapVoorStap = true; i.StapAanloop = Environment.GetEnvironmentVariable("STAP_AANLOOP") == "1"; i.StapDoorrijSeconden = double.Parse(Environment.GetEnvironmentVariable("STAP_DOORRIJ") ?? "0", System.Globalization.CultureInfo.InvariantCulture); }, simAanpassing: sa => sa.BuurwisselHeftKruisKortsluitingOp = Environment.GetEnvironmentVariable("STAP_STRENG") == "1");   // volledige run zonder aanloop: met aanloop loopt de sim vast in het herstel na de kruisproef (zie AanloopTest en BUGS.md #175)
             Console.WriteLine($"  start {start}: {r.Einde}, {r.Seconden / 60:0} min, {r.Kortsluitingen} kortsluiting(en), melders: {string.Join(",", r.V.Kaart.Melders.Select(m => m.Nummer).OrderBy(x => x))}, voltooid: {r.V.Kaart.Voltooid}, wissels: {string.Join(",", r.V.Kaart.Wissels.Where(w => w.Waarnemingen.Count > 0).Select(w => w.Adres))}");
             if (Environment.GetEnvironmentVariable("MINI_OVERGANGEN") == "1")
                 foreach (var ov in r.V.Kaart.Overgangen.Where(x => new[] { 4, 5, 11, 12 }.Contains(x.Van) && new[] { 4, 5, 11, 12 }.Contains(x.Naar)))
                     Console.WriteLine($"  OVERGANG {ov.Van}->{ov.Naar} {ov.Richting} x{ov.AantalKeer} configs: {string.Join(" | ", ov.GezienBijConfiguraties)}");
+            foreach (var ow in r.V.Kennis.Lijst) Console.WriteLine("  OVERSCHREVEN: " + ow);
+            Eis(!r.V.Kennis.Lijst.Any(x => x.Soort is "blok" or "kruismelder" or "rijrichting"), $"stap voor stap (start {start}) BUG #181: vastgestelde blokken, kruismelder en rijrichtingen worden niet overschreven (nu {r.V.Kennis.Lijst.Count(x => x.Soort is "blok" or "kruismelder" or "rijrichting")})");
             Eis(r.V.Kaart.Voltooid, $"stap voor stap (start {start}): de verkenning rondt af");
             Eis(r.V.Kaart.Melders.Count >= 18, $"stap voor stap (start {start}): de melders zijn gevonden (nu {r.V.Kaart.Melders.Count})");
             Eis(r.Kortsluitingen <= 5, $"stap voor stap (start {start}): weinig kortsluitingen (nu {r.Kortsluitingen})");
@@ -2597,6 +2639,8 @@ public static class Tests
         MiniworldRitTest();
         StapUitvalTest();
         OnbekendeBlokkenTest();
+        KennisRegisterTest();
+        SimBuurwisselTest();
         StapVoorStapTest();
         AanloopTest();
         MiniworldAlarmVertragingTest();
