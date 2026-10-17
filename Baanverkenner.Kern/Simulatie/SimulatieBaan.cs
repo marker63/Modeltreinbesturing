@@ -99,7 +99,7 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
     /// <summary>BUG #181: strenger/realistischer: een loc die op de kruiswissel kortgesloten zit omdat de BUURWISSEL (bv. wissel 9 na melder 129) tegen hem in staat, komt vrij zodra die
     /// buurwissel wordt omgezet (gesplitste tak richting de samenvoeging, BUG #169). Standaard uit: de herstelroutes van de verkenner zijn er nog niet allemaal op berekend
     /// (zie BUGS.md #181, <c>STAP_STRENG=1</c> in de tests).</summary>
-    public bool BuurwisselHeftKruisKortsluitingOp { get; set; }
+    public bool BuurwisselHeftKruisKortsluitingOp { get; set; } = true;
     private HashSet<int>? _bevroren;
 
     /// <summary>De uitgang van een Engelse wissel voor een loc die via <paramref name="inn"/> binnenkomt, en of dat een kortsluiting geeft.</summary>

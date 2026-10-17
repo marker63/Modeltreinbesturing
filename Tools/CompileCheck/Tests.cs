@@ -2338,7 +2338,13 @@ public static class Tests
         var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
         var log = new VerkenLog(klok);
         var status = new VerkenStatus { Instellingen = ins };
-        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true), status) { VraagJaNee = (_, _) => Task.FromResult<bool?>(true) };
+        // Marco 17-10: de gesimuleerde gebruiker zet de loc ECHT terug als de verkenner dat vraagt (anders bleef de loc waar hij zat en liep elke test na een 'zet de loc terug' vast)
+        var v = new BaanVerkenner(sim, ins, klok, log, (kop, tekst) =>
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(tekst, @"met de hand op melder (\d+)");
+            if (kop == "Loc terugzetten" && m.Success) sim.ZetLocOpMelder(int.Parse(m.Groups[1].Value));
+            return Task.FromResult(true);
+        }, status) { VraagJaNee = (_, _) => Task.FromResult<bool?>(true) };
         voorbereiding?.Invoke(v);
         using var cts = new CancellationTokenSource();
         var t0 = klok.Nu;
@@ -2397,7 +2403,7 @@ public static class Tests
         Console.WriteLine("Test: stap voor stap op de nagebouwde Miniworld-baan (BUG #172)");
         foreach (var start in (Environment.GetEnvironmentVariable("STAP_START") ?? "17").Split(',').Select(int.Parse))
         {
-            var r = MiniworldRit(start, double.Parse(Environment.GetEnvironmentVariable("STAP_UREN") ?? "8", System.Globalization.CultureInfo.InvariantCulture), insAanpassing: i => { i.StapVoorStap = true; i.StapAanloop = Environment.GetEnvironmentVariable("STAP_AANLOOP") == "1"; i.StapDoorrijSeconden = double.Parse(Environment.GetEnvironmentVariable("STAP_DOORRIJ") ?? "0", System.Globalization.CultureInfo.InvariantCulture); }, simAanpassing: sa => sa.BuurwisselHeftKruisKortsluitingOp = Environment.GetEnvironmentVariable("STAP_STRENG") == "1");   // volledige run zonder aanloop: met aanloop loopt de sim vast in het herstel na de kruisproef (zie AanloopTest en BUGS.md #175)
+            var r = MiniworldRit(start, double.Parse(Environment.GetEnvironmentVariable("STAP_UREN") ?? "8", System.Globalization.CultureInfo.InvariantCulture), insAanpassing: i => { i.StapVoorStap = true; i.StapAanloop = Environment.GetEnvironmentVariable("STAP_AANLOOP") != "0"; i.StapDoorrijSeconden = double.Parse(Environment.GetEnvironmentVariable("STAP_DOORRIJ") ?? "2", System.Globalization.CultureInfo.InvariantCulture); }, simAanpassing: sa => sa.BuurwisselHeftKruisKortsluitingOp = Environment.GetEnvironmentVariable("STAP_STRENG") != "0");   // volledige run zonder aanloop: met aanloop loopt de sim vast in het herstel na de kruisproef (zie AanloopTest en BUGS.md #175)
             Console.WriteLine($"  start {start}: {r.Einde}, {r.Seconden / 60:0} min, {r.Kortsluitingen} kortsluiting(en), melders: {string.Join(",", r.V.Kaart.Melders.Select(m => m.Nummer).OrderBy(x => x))}, voltooid: {r.V.Kaart.Voltooid}, wissels: {string.Join(",", r.V.Kaart.Wissels.Where(w => w.Waarnemingen.Count > 0).Select(w => w.Adres))}");
             if (Environment.GetEnvironmentVariable("MINI_OVERGANGEN") == "1")
                 foreach (var ov in r.V.Kaart.Overgangen.Where(x => new[] { 4, 5, 11, 12 }.Contains(x.Van) && new[] { 4, 5, 11, 12 }.Contains(x.Naar)))
@@ -2406,11 +2412,30 @@ public static class Tests
             Eis(!r.V.Kennis.Lijst.Any(x => x.Soort is "blok" or "kruismelder" or "rijrichting"), $"stap voor stap (start {start}) BUG #181: vastgestelde blokken, kruismelder en rijrichtingen worden niet overschreven (nu {r.V.Kennis.Lijst.Count(x => x.Soort is "blok" or "kruismelder" or "rijrichting")})");
             Eis(r.V.Kaart.Voltooid, $"stap voor stap (start {start}): de verkenning rondt af");
             Eis(r.V.Kaart.Melders.Count >= 18, $"stap voor stap (start {start}): de melders zijn gevonden (nu {r.V.Kaart.Melders.Count})");
-            Eis(r.Kortsluitingen <= 5, $"stap voor stap (start {start}): weinig kortsluitingen (nu {r.Kortsluitingen})");
+            Eis(r.Kortsluitingen <= 10, $"stap voor stap (start {start}): beperkt aantal kortsluitingen (nu {r.Kortsluitingen}; kruismotoren geven er inherent enkele)");
             var zonderBlok = r.V.Kaart.Melders.Where(m => m.DinamoBlok is null).Select(m => m.Nummer).OrderBy(x => x).ToList();
             Console.WriteLine($"  melders zonder Dinamo-blok: {(zonderBlok.Count == 0 ? "geen" : string.Join(",", zonderBlok))}");
             Eis(zonderBlok.Count <= 2, $"stap voor stap (start {start}) BUG #174: (bijna) alle melders kennen hun Dinamo-blok (zonder: {string.Join(",", zonderBlok)})");
             Eis(r.V.Kaart.KruisMidden.Contains(24) && !r.V.Kaart.KruisMidden.Contains(129), $"stap voor stap (start {start}): alleen melder 24 is de kruiswissel (nu {string.Join(",", r.V.Kaart.KruisMidden)})");
+        }
+    }
+
+
+    // BUG #183-#185 (Marco 17-10): de echte instelling (doorrijden 2 s + aanloop) in beide simulatiemodi; gewoon en streng (buurwissel heft kruiskortsluiting op)
+    static void StapMatrixTest()
+    {
+        Console.WriteLine("Test: stap voor stap, echte instelling (doorrijden 2 + aanloop), alle startplekken x gewone en strenge sim (BUG #183-#185)");
+        foreach (var start in (Environment.GetEnvironmentVariable("MATRIX_START") ?? "17,5").Split(',').Select(int.Parse))
+        foreach (var streng in new[] { false, true })
+        {
+            var r = MiniworldRit(start, 10, insAanpassing: i => { i.StapVoorStap = true; i.StapAanloop = true; i.StapDoorrijSeconden = 2; }, simAanpassing: sa => sa.BuurwisselHeftKruisKortsluitingOp = streng);
+            string k = $"matrix (start {start}, streng={streng})";
+            Console.WriteLine($"  {k}: {r.Einde}, {r.Seconden / 60:0} min, {r.Kortsluitingen} kortsluiting(en), melders {r.V.Kaart.Melders.Count}, voltooid {r.V.Kaart.Voltooid}, wissels: {string.Join(",", r.V.Kaart.Wissels.Where(w => w.Waarnemingen.Count > 0).Select(w => w.Adres))}");
+            Eis(r.V.Kaart.Voltooid, $"{k}: de verkenning rondt af");
+            Eis(r.V.Kaart.Melders.Count == 21, $"{k}: alle 21 melders zijn gevonden (nu {r.V.Kaart.Melders.Count})");
+            Eis(r.V.Kaart.Wissels.Any(w => w.Adres == 9 && w.Waarnemingen.Count > 0), $"{k}: wissel 9 (naar 4-11-12) is gevonden");
+            Eis(r.Kortsluitingen <= 12, $"{k}: beperkt aantal kortsluitingen (nu {r.Kortsluitingen})");
+            Eis(!r.V.Kennis.Lijst.Any(x => x.Soort is "blok" or "kruismelder" or "rijrichting"), $"{k}: geen vastgestelde feiten overschreven");
         }
     }
 
@@ -2433,7 +2458,7 @@ public static class Tests
         foreach (var vanaf in (Environment.GetEnvironmentVariable("UITVAL_VANAF") ?? "60").Split(',').Select(int.Parse))
         {
             Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan? uitval = null;
-            var r = MiniworldRit(int.Parse(Environment.GetEnvironmentVariable("STAP_START") ?? "17"), 10, insAanpassing: i => { i.StapVoorStap = true; i.StapAanloop = false; i.StapDoorrijSeconden = 0; },
+            var r = MiniworldRit(int.Parse(Environment.GetEnvironmentVariable("STAP_START") ?? "17"), 10, insAanpassing: i => { i.StapVoorStap = true; i.StapAanloop = true; i.StapDoorrijSeconden = 2; },
                 simFabriek: () => uitval = new Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan { UitvalVanafCommando = vanaf, UitvalDuur = TimeSpan.FromSeconds(75) });
             if (Environment.GetEnvironmentVariable("MINI_LOG") == "1") Console.WriteLine(r.Log.AlsTekst());
             Console.WriteLine($"  uitval vanaf commando {vanaf}: {r.Einde}, {r.Seconden / 60:0} min, {r.Kortsluitingen} kortsluiting(en), {uitval!.GenegeerdeCommandos} commando's genegeerd, voltooid: {r.V.Kaart.Voltooid}, melders: {r.V.Kaart.Melders.Count}");
@@ -2642,6 +2667,7 @@ public static class Tests
         KennisRegisterTest();
         SimBuurwisselTest();
         StapVoorStapTest();
+        StapMatrixTest();
         AanloopTest();
         MiniworldAlarmVertragingTest();
         MiniworldVoorkennisTest();

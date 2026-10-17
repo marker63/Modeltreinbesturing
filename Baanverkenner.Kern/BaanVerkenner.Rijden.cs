@@ -645,6 +645,10 @@ public partial class BaanVerkenner
     /// weg te krijgen was. Nog niet getest op de baan.</summary>
     private (int Melder, int Rit) _vrijGecontroleerd;
     /// <summary>Wordt vóór elk wisselcommando aangeroepen (ZetWissel): ligt de wissel bij een bezette melder waar de loc net aankwam, dan eerst doorrijden tot de loc de tong voorbij is.</summary>
+    /// <summary>BUG #183: ligt de wissel achter de loc? Dan komt de kaart hem tegen als overgang van de vorige melder naar de huidige.</summary>
+    private static bool WisselLigtAchter(WisselVondst w, (int Via, int Melder, Richting Richting) ing)
+        => w.Waarnemingen.Any(o => o.NaMelder == ing.Via && (o.VolgendeBijRechtdoor == ing.Melder || o.VolgendeBijAfbuigend == ing.Melder));
+
     private async Task VrijRijdenVoorWissel(int adres)
     {
         if (_vrijRijdenBezig || _ingang is not { } ing || Kruis.IsMotor(adres) || HuidigeAlarmBlokken().Count > 0) return;   // met een alarm is omzetten juist het herstel
@@ -652,6 +656,9 @@ public partial class BaanVerkenner
         var bezet = _monitor.Bezet;
         if (bezet.Count == 0 || !bezet.Contains(ing.Melder) || bezet.Any(m => m != ing.Melder && m != ing.Via)) return;
         if (!WisselsBijBezet(_kaart, bezet).Contains(adres)) return;
+        // BUG #183: alleen een wissel ACHTER de loc (waar hij net overheen reed) is een probleem; een wissel VOOR de loc (verderop in de sectie) niet. Doorkruipen
+        // zette de loc juist op die wissel (129: wissel 9 achter, wissel 6 voor; kruipen voor wissel 5 zette de loc op de tong van wissel 6).
+        if (bezet.Count == 1 && _kaart.Wissels.FirstOrDefault(w => w.Adres == adres) is { } wk && !WisselLigtAchter(wk, ing)) return;
         // BUG #181: ook met alleen de nieuwe melder bezet kan de loc nog op de wisseltong staan (de tong ligt in het gebied van die melder): per aankomst één keer door naar de verste sectie
         if (bezet.Count == 1 && _vrijGecontroleerd == (ing.Melder, _kaart.Ritten.Count)) return;
         _vrijGecontroleerd = (ing.Melder, _kaart.Ritten.Count);

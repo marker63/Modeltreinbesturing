@@ -2308,14 +2308,29 @@ Test: CompileCheck (ALLES OK, KruisPlusTest met de kaart van 17:50). Nog niet ge
   b. Rit 24 -> 21 met motor 13 nog afbuigend van een vorige rit: de loc rijdt naar 14, het terugrijden 14 -> 24 -> 21 gaat de verkeerde kant op (13), de verkenner raakt de loc kwijt. De kruiswissel is op dat moment nog niet herkend (nog geen vier buren), dus de navigatie weet niet dat de motoren er toe doen. Een extra herkenning uit 'twee vervolgmelders afhankelijk van een kruismotor' (`KruisUitMotorBewijs`) werd niet getriggerd, omdat navigatieritten hun wisselstand niet als bewijs in de overgangen zetten; teruggedraaid.
 - Volgende stap (niet gedaan): in navigatieritten de werkelijke motorstand als bewijs vastleggen, zodat de kruiswissel met motorbewijs eerder herkend wordt; en de standen voor de laatste etappe pas zetten zodra de loc de melder met die wissels verlaten heeft.
 
-## BUG #181 - #182 (Marco 17-10, 12:01-12:34: standen/melders worden overschreven; loc staat midden in een meldsectie stil)
-- #181 `KennisRegister` (nieuw): houdt per soort (blok, kruismelder, rijrichting, wissel-onder-loc) bij wat vastgesteld is en meldt elke overschrijving
+## BUG #181 - #185 (Marco 17-10, 12:01-12:55: standen/melders worden overschreven; loc staat midden in een meldsectie stil; "simulator met ALLE probleemgevallen")
+- #181 `KennisRegister` (nieuw): houdt per soort (blok, kruismelder, rijrichting, wissel-onder-loc) bij wat vaststaat en meldt elke overschrijving
   (log "OVERSCHREVEN (BUG #181)" en `Baankaart.Overschrijvingen`). Wissen bij de blokproef telt niet als overschrijving. De regressietest eist 0 overschrijvingen.
-- #181 (oorzaak echte log 12:28): wissel omgezet terwijl de loc er net op aankwam (de tong ligt binnen het gebied van de melder) gaf kortsluiting/stilstand.
+- #181 (oorzaak echte log 12:28): een wissel omgezet terwijl de loc er net op aankwam (de tong ligt binnen het gebied van de melder) gaf kortsluiting/stilstand.
   Opgelost met `VrijRijdenVoorWissel` (eerst doorrijden tot alleen die melder bezet is; overgeslagen bij alarm, kruismotor of geen verse aankomst),
   `VrijVanIngangsWissel` met terugvalduur, wissels bij een bezette melder sparen (alleen zonder alarm), `kopHierBekend`, `VertrekWasBewezen` met configuratie,
   "laatste redmiddel" in `ProbeerAlarmWegTeKrijgen`, en `KruisUitMotorBewijs` (motorstand als bewijs bij `DetecteerKruis`).
-- #181 simulator: optie `BuurwisselHeftKruisKortsluitingOp` (standaard uit) en test `SimBuurwisselTest`.
 - #182 een navigatierit volgt de stand die de route nodig heeft; de stand uit een eerder alarmherstel (`MetAlarmStand`) geldt alleen nog voor verkenningsritten.
-- Nog open (bekend): `STAP_STRENG=1 STAP_DOORRIJ=2 STAP_AANLOOP=1` loopt vast bij navigatie 129 -> 10: wissel 5/6 liggen in het gebied van melder 129 en worden
-  door het sparen onder de loc niet naar de stand van de route gezet. Gewone run, doorrijden 2 en strikt zonder aanloop slagen. Alles: nog niet getest op de baan.
+- #183 `VrijRijdenVoorWissel` kruipt alleen door voor een wissel ACHTER de loc (waar hij net overheen reed), niet voor een wissel VOOR de loc in dezelfde sectie
+  (129: wissel 9 achter, wissel 6 voor; het kruipen voor wissel 5 zette de loc op de tong van wissel 6). Via `WisselLigtAchter`.
+- #184 na een adrestest blijven de proefwissels en de bekende oplossingswissel staan als de loc op een melder staat waar die wissel ligt (`ZetWisselNaProef`);
+  eerder werd wissel 1 bij melder 12 eerst rechtgezet en bij de terugweg weer afbuigend: twee keer omzetten onder de loc, elke keer kortsluiting (36 s herstel, 9 keer per ronde).
+- #185 een kruisproef (alleen de twee motoren getest) telde als "alle adressen getest" voor die overgang. Daardoor werd de adrestest van 129 -> 24 overgeslagen,
+  wissel 9 (afbuigend naar 4 - 11 - 12) nooit gevonden en meldde de verkenning "voltooid" met melder 4 en 11 ontbrekend. Niet meer als getest gemarkeerd.
+- Simulator: (1) strenge buurwissel-regel (BUG #169: omzetten heft de kortsluiting op de kruiswissel op) is nu STANDAARD (`BuurwisselHeftKruisKortsluitingOp`);
+  de gewone variant blijft testbaar; (2) de gesimuleerde gebruiker zet de loc nu ECHT terug op de gevraagde melder (`ZetLocOpMelder`); eerder bleef de loc staan waar hij stond
+  en liep elke test na "zet de loc terug" vast; (3) nieuwe tests `KennisRegisterTest`, `SimBuurwisselTest`, `StapMatrixTest`; de tests draaien nu op Marco's echte instelling
+  (doorrijden 2 s + aanloop). Resultaat start 17 en 5, beide simulatiemodi: alle 21 melders, wissel 9 gevonden, 0 overschrijvingen, 7-9 kortsluitingen (kruismotoren geven er inherent enkele).
+- NOG OPEN (door de matrix gemeten, `MATRIX_START=13,30,129,12,4,10 dotnet run --project Tools/CompileCheck`):
+  * start op de binnenring (melder 4, 11, 12) of het zijspoor (melder 10): de verkenning meldt "voltooid" met 2-6 van de 21 melders. De eerste rit van 4 naar 129 vraagt wissel 9
+    afbuigend; de oplossing van een kortsluiting tijdens de TERUGWEG werd niet als kortsluitpunt vastgelegd, dus elke volgende terugweg herhaalt het herstel (12 keer in één opdracht).
+    Een poging om het vervolg na een opgelost punt altijd in te plannen en om na het herstel door te rijden tot één melder bezet is, verbeterde start 12 (4 -> 6 melders) maar maakte start 5 slechter;
+    teruggedraaid.
+  * start 13: 18-20 van 21 melders; start 30 en 129: te veel kortsluitingen (14-20).
+  * "voltooid" wordt gemeld terwijl er nog onbekend spoor is: de afronding moet kloppen met het aantal ontdekte uiteinden.
+- Alles hierboven: nog niet getest op de baan.

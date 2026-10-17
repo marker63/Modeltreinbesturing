@@ -526,7 +526,8 @@ public partial class BaanVerkenner
         PlanVervolg(o, rit);
         if (rit.Einde != RitEinde.Kortsluiting)
         {
-            _status.GetesteOvergangen.AddRange(Overgangen(rit.Reeks, o.Richting).Where(s => !_status.GetesteOvergangen.Contains(s)));
+            // BUG #185: een kruisproef test alleen de twee motoren, NIET alle wisseladressen. Als 'getest' markeren sloeg de adrestest van 129 -> 24 over, waardoor wissel 9
+            // (afbuigend naar 4 - 11 - 12) nooit werd gevonden en de verkenning 'voltooid' meldde terwijl melder 4 en 11 ontbraken.
             // De terugweg door de kruiswissel heeft zijn eigen motorstand: de stand van de proef kan de loc bij een andere uitgang brengen
             // (motor 10 afbuigend stuurt 21 naar 129 in plaats van naar 14). Daarom de kleinste bewezen stand voor dezelfde doorgang.
             // De loc staat na de rit nog half in de kruiswissel-melder; de motoren omzetten kan pas als hij helemaal op de uitgang staat.

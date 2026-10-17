@@ -1249,14 +1249,14 @@ public partial class BaanVerkenner
                 if (afwijkendePad)
                 {
                     await TerugNaarMetControle(o, proef, cA0);
-                    await ZetWissel(a, false);
-                    foreach (var (ex, _) in proefExtra) await ZetWissel(ex, rijstand.Bevat(ex));
+                    await ZetWisselNaProef(a, false);
+                    foreach (var (ex, _) in proefExtra) await ZetWisselNaProef(ex, rijstand.Bevat(ex), oplossingWissel: true);
                 }
                 else
                 {
                     // BUG #35: de loc staat hier altijd stil; eerst terugzetten, dan de terugrit.
-                    await ZetWissel(a, false);
-                    foreach (var (ex, _) in proefExtra) await ZetWissel(ex, rijstand.Bevat(ex));
+                    await ZetWisselNaProef(a, false);
+                    foreach (var (ex, _) in proefExtra) await ZetWisselNaProef(ex, rijstand.Bevat(ex), oplossingWissel: true);
                     await TerugNaarMetControle(o, proef, rijstand);
                 }
 
@@ -2127,6 +2127,21 @@ public partial class BaanVerkenner
     // =====================================================================
     // Navigeren
     // =====================================================================
+
+    /// <summary>BUG #184 (sim, herhaalde kortsluiting na elke adrestest): na de proefrit staat de loc stil op de eindmelder; een wissel die de kaart bij die melder noemt (bv. wissel 1 bij
+    /// melder 12) werd daar eerst rechtgezet en bij de terugweg weer afbuigend gezet: twee keer omzetten onder de loc, elke keer kortsluiting (en 36 s herstel). Zulke wissels blijven nu staan;
+    /// de terugweg zet ze op de stand die de route nodig heeft, nadat de loc ver genoeg voorbij is. Nog niet getest op de baan.</summary>
+    private async Task ZetWisselNaProef(int adres, bool afbuigend, bool oplossingWissel = false)
+    {
+        _monitor.Bijwerken();
+        if (!Kruis.IsMotor(adres) && _monitor.Bezet.Count > 0 && (oplossingWissel || WisselsBijBezet(_kaart, _monitor.Bezet).Contains(adres))
+            && !(_wisselStand.TryGetValue(adres, out var nu) && nu == afbuigend))
+        {
+            _log.Info($"Wissel {adres} blijft nu staan: de loc staat op een melder waar die wissel ligt; de terugweg zet hem op de stand van de route.");
+            return;
+        }
+        await ZetWissel(adres, afbuigend);
+    }
 
     /// <summary>BUG #74: staat de loc op een melder waar hij vanaf een bekende kant binnenkwam (kruiswissel-sectie) en rijdt hij in dezelfde
     /// richting door, dan telt die ingangskant mee bij de keuze van de wisselstand voor de eerste stap (zie
