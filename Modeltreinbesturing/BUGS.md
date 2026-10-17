@@ -2291,3 +2291,11 @@ Test: CompileCheck (ALLES OK, KruisPlusTest met de kaart van 17:50). Nog niet ge
 - Test: de bestaande tests zijn groen (volledige Stap-run in de simulatie met doorrijden uit, `AanloopTest` met de nieuwe standaard 2 s). Een kortsluiting bij een wissel naar de samenvoeging toe is in de simulatie niet nagebootst op de tong; het aantal seconden is dus afgesproken op jouw waarneming, niet gemeten.
 - Let op: bij een heel korte sectie kan de loc in 2 s de volgende melder halen; dan stopt hij daar (de rit telt dan twee melders).
 - NOG NIET GETEST OP DE BAAN.
+
+## BUG #179 - Doorrijden tot de melder erachter vrij is (Marco 17-10 11:46)
+- Marco: "heeft het een reden dat je steeds stopt als er nog 2 bezetmelders actief zijn? Doorrijden totdat de laatste melder niet meer actief is en de nieuwe melder alleen actief is."
+- Antwoord: nee, geen inhoudelijke reden. De stap-rit stopte op het eerste bezet-signaal van de nieuwe melder (BUG #172: één melder per rit), later met een vaste doorrijtijd (#175/#178), zonder te kijken of de loc al helemaal in de sectie stond. Met een deel van de loc nog in de vorige sectie heeft hij de wisseltongen van de nieuwe sectie hooguit met de neus bereden.
+- Fix (`Rit`, stap-stop): na de doorrijtijd (`StapDoorrijSeconden`, nu minimaal) rijdt de loc door totdat de melder erachter vrij is en alleen de nieuwe melder bezet is; hoogstens 20 s extra. Blijft de melder erachter hangen (of is de sectie korter dan de loc), dan stopt hij na 20 s met een regel in het logboek ('bleef na de doorrijtijd en 20 s extra nog bezet'). Komt er een volgende melder bij, dan geldt de laatste als nieuwe.
+- Staat doorrijden uit (0 s), dan stopt de loc zoals voorheen meteen.
+- Test: alle bestaande tests groen (21 melders, voltooid, zonder doorrijden). Met doorrijden aan (STAP_DOORRIJ=2) loopt de volledige simulatie na 119 min vast bij 20 van 21 melders: hetzelfde herstelprobleem na een kortsluiting bij de kruiswissel als bij #175 (niet opgelost). 
+- NOG NIET GETEST OP DE BAAN.

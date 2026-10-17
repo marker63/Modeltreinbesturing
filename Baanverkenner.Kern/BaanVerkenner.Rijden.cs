@@ -1468,9 +1468,18 @@ public partial class BaanVerkenner
             }
             if (stapStopTot is DateTime stopTijd && _klok.Nu >= stopTijd)
             {
-                await StopLoc();
-                res.Einde = RitEinde.StapKlaar;
-                return res;
+                // BUG #179 (Marco 17-10 11:46: "doorrijden totdat de laatste melder niet meer actief is en de nieuwe melder alleen actief is"): na de minimale doorrijtijd
+                // stopt de loc pas als hij helemaal in de nieuwe sectie staat, dus de melder erachter weer vrij is. Zo is de hele loc langs de wisseltongen van die sectie
+                // gereden. Hoogstens 20 s extra (een sectie die korter is dan de loc, of een melder die blijft hangen).
+                bool staartNog = res.Reeks.Count >= 2 && bezet.Contains(res.Reeks[^2]) && bezet.Contains(res.Reeks[^1]) && _klok.Nu < stopTijd + TimeSpan.FromSeconds(20);
+                if (!staartNog)
+                {
+                    if (res.Reeks.Count >= 2 && bezet.Contains(res.Reeks[^2]))
+                        _log.Info($"  gestopt op melder {res.Reeks[^1]}: melder {res.Reeks[^2]} bleef na de doorrijtijd en 20 s extra nog bezet.");
+                    await StopLoc();
+                    res.Einde = RitEinde.StapKlaar;
+                    return res;
+                }
             }
             if (bezet.Count == 0)
             {
