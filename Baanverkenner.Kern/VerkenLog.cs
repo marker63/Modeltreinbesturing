@@ -20,6 +20,9 @@ public class VerkenLog
 
     public void Schrijf(LogSoort soort, string tekst)
     {
+        // BUG #177 (Marco 17-10 10:53: "rare tekens bij adres 5 afbuigend"): pijlen en het weglatingsteken staan in het venster en in sommige editors als blokjes of
+        // gekke tekens. In het logboek dus gewone tekens.
+        tekst = tekst.Replace("\u2192", "->").Replace("\u2190", "<-").Replace("\u2194", "<->").Replace("\u2026", "...");
         var r = new Regel(_klok.Nu, soort, tekst);
         lock (_slot) _regels.Add(r);
         NieuweRegel?.Invoke(r);

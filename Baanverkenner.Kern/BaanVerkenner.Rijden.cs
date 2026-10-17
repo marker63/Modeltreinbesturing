@@ -379,7 +379,7 @@ public partial class BaanVerkenner
         // BUG #65: meten is weten - hoeveel wisselcommando's zijn er sinds het verbinden verstuurd? Valt de Dinamo ooit
         // weer uit (wissels bewegen niet meer), dan is in het log te zien na hoeveel commando's dat gebeurde.
         _wisselCommandos++;
-        _log.Rijden($"Adres {adres} â†’ {(afbuigend ? "afbuigend" : "rechtdoor")} (wisselcommando {_wisselCommandos} sinds het verbinden)");
+        _log.Rijden($"Adres {adres}: {(afbuigend ? "afbuigend" : "rechtdoor")} (wisselcommando {_wisselCommandos} sinds het verbinden)");
         await Wacht(TimeSpan.FromMilliseconds(Math.Max(100, _ins.WisselPauzeMs)));
         // Dinamo: pas verder als het commando echt de deur uit is
         for (int i = 0; i < 40 && !_hw.KlaarVoorVolgendeWisselCommando; i++) await Wacht(DinamoCyclus);
@@ -694,7 +694,7 @@ public partial class BaanVerkenner
     {
         _log.Stap($"Blokproef voor melder {melder}: elk Dinamo-blok krijgt om beurten een rijcommando.");
         _monitor.Bijwerken();
-        var bezetVoorProef = _monitor.Bezet.ToList();   // BUG #176: een melder die erbij komt ligt vóór de loc in de proefrichting
+        var bezetVoorProef = _monitor.Bezet.ToList();   // BUG #176: een melder die erbij komt ligt vÃ³Ã³r de loc in de proefrichting
         foreach (var r in new[] { Richting.Vooruit, Richting.Achteruit })
         {
             foreach (var blok in BlokKandidaten(null, melder))
