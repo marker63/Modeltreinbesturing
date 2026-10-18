@@ -1413,6 +1413,17 @@ public partial class BaanVerkenner
     private async Task<(int Partner, RitResultaat Rit)?> PartnerwisselZoeken(Opdracht o, int a, RitResultaat proef, Configuratie? rijstand = null)
     {
         int x = proef.Reeks[^1];
+        // BUG #213 (Marco 18-10 09:43, log 09:19-09:22): wissel 13 haalde het alarm weg (09:20:27 commando, 09:20:28 'geen kortsluiting meer'), pas 7 s later werd 14 als 'partner' afbuigend
+        // gezet en 09:21:56 stond er 'Kortsluiting opgelost: adres 14 én 12 samen'. Staat er een wissel afbuigend die net het alarm wegnam (klemoplossing), dan is elke partnerproef
+        // zinloos: het alarm is al weg, dus alles lijkt een oplossing. Geen partnerzoektocht en niets vastleggen.
+        var klemAnders = _klemOplossing.Where(kv => kv.Key != a && _wisselStand.TryGetValue(kv.Key, out var kst) && kst
+                && (_klok.Nu - kv.Value.Tijd).TotalMinutes < 10 && _monitor.Bezet.Any(kv.Value.Melders.Contains))
+            .Select(kv => kv.Key).OrderBy(k => k).ToList();
+        if (klemAnders.Count > 0)
+        {
+            _log.Waarschuwing($"Geen partnerzoektocht voor adres {a}: wissel {string.Join(", ", klemAnders)} haalde het alarm net weg en staat nog afbuigend. Het alarm is dus al weg; een 'oplossing' met adres {a} en een partner zou niets bewijzen.");
+            return null;
+        }
         var cBasis = rijstand ?? o.Configuratie;   // BUG #118: de werkelijke rijstand, niet de nominale stand van de opdracht
         var cA = cBasis.Met(a);
         var kandidaten = PartnerVolgorde(_kaart, _ins.WisselAdressen(), a, x, cBasis, _ins.MaxPartnerProeven, Kruis.Motoren.ToList());
