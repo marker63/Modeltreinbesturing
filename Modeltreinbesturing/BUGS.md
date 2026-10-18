@@ -2423,3 +2423,6 @@ De kortsluiting na melder 129 (rit met 5, 7, 10 afbuigend) kwam door wissel 10 d
 
 ## BUG #206 – OPEN: tussenstand na Dinamo-uitval haalt bevindingen uit de kaart (log 19:21, 19:54, 19:56)
 Na "geen terugmelding van Dinamo" worden alle bevindingen sinds de eerste ontbrekende terugmelding verwijderd. Dat is veilig, maar kostte rit #13 tot en met #28 (bijna 10 minuten) opnieuw. Nog te doen: de wissel- en melderbevindingen waarvan de terugmelding wel kwam behouden, of na het herstel alleen de opdracht opnieuw rijden waarin de uitval zat.
+
+## BUG #207 – OPEN: rapport toont bij een overgang alle geteste wisselstanden in plaats van de wissels die er echt toe doen (Marco 18-10 08:26)
+Marco: "soms vind je bij de overgang van melder x naar y andere wisselstanden, maar fysiek verandert er niets." De kaart (Overgangen.GezienBijConfiguraties en het rapportdeel "Doorgangen") bewaart voor elke overgang alle rijstanden waarin hij gereden is, ook wissels die niet op dat stuk liggen (melder 5 vooruit vanaf 16 -> 13: zeventien "standen", terwijl geen enkele van belang is). Dat leest alsof de baan verandert. Nog te doen: per overgang alleen de wissels tonen die er aantoonbaar toe doen (uit splitsingen en kortsluitingen), de rest als "geen invloed gezien", en per richting (van de puntzijde of van een tak) aangeven wat nodig is. Hangt samen met #202.
