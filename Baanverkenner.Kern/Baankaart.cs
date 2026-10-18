@@ -348,6 +348,8 @@ public class Baankaart
         // BUG #122: een wissel die zelf in de geteste stand zit terugzetten (bv. wissel 2 rechtdoor bij stand '2 afbuigend') is geen extra wissel
         // die de kortsluiting oplost, maar gewoon een andere stand; die zou later ten onrechte als 'oplossing' worden toegepast.
         if (kp.Opgelost || kp.Configuratie.Bevat(adres) || !afbuigend) return false;
+        // BUG #217: een wissel die dezelfde overgang (ook omgekeerd) afbuigend juist kortsluiting geeft kan die kortsluiting niet oplossen.
+        if (OplossingStrijdigMetVerbod(kp, adres)) return false;
         kp.Opgelost = true;
         kp.OpgelostDoorAdres = adres;
         kp.OpgelostMetAfbuigend = afbuigend;
@@ -624,6 +626,21 @@ public class Baankaart
     /// <summary>BUG #159: een 'oplossing' die zelf de verboden ingang afbuigend neemt (kortsluitpunt #3 van 15-10: na melder 5 vooruit 'opgelost door wissel 2
     /// afbuigend', terwijl 16 -> 5 met wissel 2 afbuigend juist de kortsluiting is) is onjuist: ze ontstond tijdens een Dinamo-uitval. Zo'n oplossing wordt
     /// ingetrokken.</summary>
+    /// <summary>BUG #217 (log 18-10 10:22 en 11:31-11:34): kortsluitpunt #2 (129 -> 14 achteruit) stond "opgelost door wissel 6", terwijl 14 -> 129 vooruit met wissel 6 afbuigend
+    /// kortsluiting geeft (dezelfde overgang andersom; wisselstanden gelden in beide richtingen). De verkenner zette 6 daarna steeds afbuigend voor de terugweg en zat vast op 129.
+    /// True als <paramref name="adres"/> afbuigend voor de overgang van dit kortsluitpunt (zelfde of omgekeerde richting) als verboden ingang bekend is.</summary>
+    public bool OplossingStrijdigMetVerbod(Kortsluitpunt kp, int adres)
+    {
+        var pad = kp.Route.Count > 0 ? kp.Route[^1].Pad : new List<int>();
+        int via = pad.Count >= 2 && pad[^1] == kp.NaMelder ? pad[^2] : (kp.TweedeMelders.Count == 1 ? kp.TweedeMelders[0] : -1);
+        foreach (var v in VerbodenIngangen().Where(v => v.Adres == adres))
+        {
+            if (v.Na == kp.NaMelder && v.R == kp.Richting && (via < 0 || v.Via == via)) return true;
+            if (via >= 0 && v.Via == kp.NaMelder && v.Na == via && v.R == kp.Richting.Om()) return true;
+        }
+        return false;
+    }
+
     public List<string> HerstelStrijdigeOplossingen()
     {
         var res = new List<string>();
@@ -633,7 +650,15 @@ public class Baankaart
             int a = kp.OpgelostDoorAdres!.Value;
             var pad = kp.Route.Count > 0 ? kp.Route[^1].Pad : new List<int>();
             int via = pad.Count >= 2 && pad[^1] == kp.NaMelder ? pad[^2] : -1;
-            if (!verboden.Any(v => v.Adres == a && v.Na == kp.NaMelder && v.R == kp.Richting && (via < 0 || v.Via == via))) continue;
+            bool zelfde = verboden.Any(v => v.Adres == a && v.Na == kp.NaMelder && v.R == kp.Richting && (via < 0 || v.Via == via));
+            if (!zelfde)
+            {
+                // BUG #217: dezelfde overgang andersom: het punt blijft zoeken (niet opgegeven), want een andere wissel kan het nog oplossen
+                if (!OplossingStrijdigMetVerbod(kp, a)) continue;
+                kp.Opgelost = false; kp.OpgelostDoorAdres = null; kp.OpgelostMetAfbuigend = null;
+                res.Add($"Kortsluitpunt #{kp.Id} (na melder {kp.NaMelder}, {kp.Richting.Tekst()}): de oplossing 'wissel {a} afbuigend' is ingetrokken, want dezelfde overgang andersom (melder {kp.NaMelder} -> {via}) met wissel {a} afbuigend geeft juist kortsluiting.");
+                continue;
+            }
             kp.Opgelost = false; kp.OpgelostDoorAdres = null; kp.OpgelostMetAfbuigend = null; kp.Opgegeven = true;
             res.Add($"Kortsluitpunt #{kp.Id} (na melder {kp.NaMelder}, {kp.Richting.Tekst()}): de oplossing 'wissel {a} afbuigend' is ingetrokken, want rijden naar melder {kp.NaMelder} met wissel {a} afbuigend geeft juist kortsluiting.");
         }

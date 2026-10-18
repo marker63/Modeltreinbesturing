@@ -2650,6 +2650,7 @@ public partial class BaanVerkenner
         _kaart.VulOntbrekendeVia();   // BUG #160
         if (Stap) BouwTrajecten();   // BUG #172
         // BUG #214: pas bij het afronden (niet tijdens de verkenning, anders verandert het wat de verkenner nog probeert)
+        foreach (var t in _kaart.HerstelStrijdigeOplossingen()) { _log.Waarschuwing("Kaart hersteld (BUG #217): " + t); _kaart.Waarschuwingen.Add(t); }
         foreach (var t in _kaart.LosKortsluitpuntenOpUitRitten()) _log.Vondst("Kortsluitpunt afgeleid (BUG #214): " + t);
         BerekenAdressenZonderEffect();
         _kaart.VoorgesteldeBlokken = BlokVoorstel.Bereken(_kaart);

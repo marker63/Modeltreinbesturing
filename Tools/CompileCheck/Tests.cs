@@ -2364,6 +2364,14 @@ public static class Tests
         var k215b = new Baankaart();
         Eis(BaanVerkenner.KnipLus(k215b, pad215, Richting.Achteruit).Count == pad215.Count, "terugweg (#215): is de overgang na de lus onbekend, dan blijft het pad zoals het was");
         Eis(BaanVerkenner.HerhaaldeOvergang(new List<int> { 129, 10, 9, 1, 12, 11, 4, 129, 10 }) && !BaanVerkenner.HerhaaldeOvergang(new List<int> { 129, 10, 9, 1, 12, 11, 4, 129 }), "navigatie (#215): herhaalde overgang 129 -> 10 wordt na één rondje gezien, niet eerder");
+        // BUG #217: kaart 18-10 11:46 - kortsluitpunt #2 stond 'opgelost met wissel 6', maar 14 -> 129 vooruit met 6 afbuigend geeft kortsluiting
+        var k217 = Laad("baankaart_2026-10-18_1146.json");
+        var kp217 = k217.Kortsluitpunten.First(x => x.Id == 2);
+        Eis(kp217.Opgelost && kp217.OpgelostDoorAdres == 6, "kortsluitpunt #2 (#217): staat in de kaart van 11:46 op 'opgelost met 6'");
+        Eis(k217.HerstelStrijdigeOplossingen().Any(t => t.Contains("#2")) && !kp217.Opgelost && !kp217.Opgegeven, "kortsluitpunt #2 (#217): de oplossing met wissel 6 wordt ingetrokken (nog niet opgegeven)");
+        Eis(!k217.RegistreerHandmatigeOplossing(kp217, 6, true), "kortsluitpunt #2 (#217): wissel 6 wordt niet opnieuw als oplossing geaccepteerd");
+        k217.LosKortsluitpuntenOpUitRitten();
+        Eis(kp217.Opgelost && kp217.OpgelostDoorAdres == 5, "kortsluitpunt #2 (#217): daarna volgt adres 5 uit de ritten (nu " + kp217.OpgelostDoorAdres + ")");
         // BUG #160: voltooide kaart van 12:42 - ingangen afgeleid, kruismotor 10 blijft staan bij de aankomst op melder 129
         var k160 = Laad("baankaart_2026-10-15_1242.json");
         int? ViaVan(int adres, int na) => k160.Wissel(adres).Waarnemingen.FirstOrDefault(x => x.Soort == WaarnemingSoort.KortsluitingBijOmzetten && x.NaMelder == na)?.Via;
