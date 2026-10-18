@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 
 namespace Baanverkenner.Kern;
 
@@ -9,6 +9,15 @@ namespace Baanverkenner.Kern;
 public static class AutoTussenstand
 {
     public static string Stempel(DateTime nu) => nu.ToString("yyyy-MM-dd_HHmm");
+
+    /// <summary>BUG #233 (Marco 18-10 13:50: "het moet C:\Marco\ zijn"): de eerste versie schreef standaard naar C:\Marco\Autolog en die waarde kan al in de bewaarde
+    /// instellingen staan. Die oude standaardwaarde wordt C:\Marco; een zelf gekozen andere map blijft zoals hij is.</summary>
+    public static string Map(string? ingesteld)
+    {
+        var m = (ingesteld ?? "").Trim().TrimEnd('\\', '/');
+        if (m.Length == 0 || string.Equals(m, @"C:\Marco\Autolog", StringComparison.OrdinalIgnoreCase)) return @"C:\Marco";
+        return m;
+    }
 
     /// <summary>Is het tijd voor een nieuwe tussenstand?</summary>
     public static bool IsTijd(DateTime? vorige, DateTime nu, int minuten)

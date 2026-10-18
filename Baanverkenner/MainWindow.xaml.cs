@@ -999,16 +999,17 @@ public partial class MainWindow : Window
     private void SchrijfAutoTussenstand(string reden)
     {
         _laatsteAutoTussenstand = DateTime.Now;
-        if (_autoIns is not { } ai || string.IsNullOrWhiteSpace(ai.AutoTussenstandMap)) return;
+        if (_autoIns is not { } ai) return;
+        var map = AutoTussenstand.Map(ai.AutoTussenstandMap);   // BUG #233
         try
         {
             var hw = new System.Text.StringBuilder();
             hw.AppendLine("Baanverkenner - hardware-communicatie (zonder keepalives)");
             foreach (var r in HardwareCommunicatieLog.Regels)
                 hw.AppendLine($"{r.Tijdstip:yyyy-MM-dd HH:mm:ss.fff}  {r.Richting,-4} {r.Tekst}");
-            var bestanden = AutoTussenstand.Schrijf(ai.AutoTussenstandMap, HuidigeKaart(), _log?.AlsTekst(), hw.ToString(), DateTime.Now, reden, out var fout);
-            if (fout is not null) _log?.Waarschuwing($"Automatische tussenstand naar {ai.AutoTussenstandMap} mislukte: {fout}");
-            else _log?.Info($"Automatische tussenstand ({reden}) geschreven naar {ai.AutoTussenstandMap}: {bestanden.Count} bestanden.");
+            var bestanden = AutoTussenstand.Schrijf(map, HuidigeKaart(), _log?.AlsTekst(), hw.ToString(), DateTime.Now, reden, out var fout);
+            if (fout is not null) _log?.Waarschuwing($"Automatische tussenstand naar {map} mislukte: {fout}");
+            else _log?.Info($"Automatische tussenstand ({reden}) geschreven naar {map}: {bestanden.Count} bestanden.");
         }
         catch (Exception ex) { _log?.Waarschuwing($"Automatische tussenstand mislukte: {ex.Message}"); }
     }

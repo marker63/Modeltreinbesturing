@@ -1,4 +1,4 @@
-# Baanverkenner – handleiding
+﻿# Baanverkenner – handleiding
 
 De Baanverkenner brengt je baan automatisch in kaart met één testloc. Je hoeft vooraf niets over de baan in te voeren. Het programma zoekt zelf uit:
 
@@ -83,4 +83,4 @@ Zet de loc waar je wilt (liefst op een hoofdlus). De verkenner rijdt vanaf die p
 Met de knop "Melderschema tonen" (en onder het blokkenschema in het rapport) zie je alle gevonden melders als punten met hun gereden verbindingen. Het gele blokje op een lijn is de wissel en stand die daar hoort; oranje melders hebben drie of meer buren (kruiswissel of splitsing). Dit werkt ook tijdens een rondrit (optie 6), als de bloknummers nog niet bekend zijn. De plaatsing is automatisch en klopt dus niet met de afstanden op de baan.
 
 ## Automatische tussenstand (vanaf 18-10)
-Tijdens een verkenning worden elke 10 minuten en aan het einde automatisch het baanrapport (txt en html), de baankaart, het logboek en de hardwarelog weggeschreven naar `C:\Marco\Autolog`. In `LAATSTE.txt` staat welke set de nieuwste is. Instelbaar in de instellingen (`AutoTussenstandMinuten`, 0 = uit, en `AutoTussenstandMap`).
+Tijdens een verkenning worden elke 10 minuten en aan het einde automatisch het baanrapport (txt en html), de baankaart, het logboek en de hardwarelog weggeschreven naar `C:\Marco`. In `LAATSTE.txt` staat welke set de nieuwste is. Instelbaar in de instellingen (`AutoTussenstandMinuten`, 0 = uit, en `AutoTussenstandMap`).

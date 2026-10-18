@@ -2447,6 +2447,7 @@ public static class Tests
         var v231 = BaanVerkenner.AndereTakVerdachten(k231, new[] { 10, 129 }, new List<int> { 14, 129, 4, 11, 12, 1, 9, 10, 129 });
         Eis(v231.Contains(6), "keerlus (#231): na 10 -> 129 is wissel 6 de eerste verdachte (afbuigend gaf kortsluiting vanaf 14) (nu " + string.Join(",", v231) + ")");
         Eis(!BaanVerkenner.AndereTakVerdachten(k231, new[] { 129 }, new List<int> { 13, 14, 129 }).Contains(6), "keerlus (#231): vanaf 14 (dezelfde ingang) is wissel 6 geen verdachte van de andere tak");
+        Eis(AutoTussenstand.Map(@"C:\Marco\Autolog") == @"C:\Marco" && AutoTussenstand.Map(@"C:\Marco\autolog\") == @"C:\Marco" && AutoTussenstand.Map("") == @"C:\Marco" && AutoTussenstand.Map(@"D:\Logs") == @"D:\Logs" && new VerkenInstellingen().AutoTussenstandMap == @"C:\Marco", "tussenstand (#233): standaard en oude standaard C:\\Marco\\Autolog worden C:\\Marco; een eigen map blijft");
         // BUG #226: automatische tussenstand
         var map226 = Path.Combine(Path.GetTempPath(), "autotussenstand_test_" + Guid.NewGuid().ToString("N"));
         var nu226 = new DateTime(2026, 10, 18, 12, 31, 0);

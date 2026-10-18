@@ -55,8 +55,8 @@ public class VerkenInstellingen
     /// <summary>BUG #226 (Marco 18-10 12:31): tijdens een verkenning elke zoveel minuten automatisch een tussenstand (rapport, logboek, hardwarelog, baankaart) naar
     /// <see cref="AutoTussenstandMap"/> schrijven, zodat de logs zonder handwerk geanalyseerd kunnen worden. 0 = uit.</summary>
     public int AutoTussenstandMinuten { get; set; } = 10;
-    /// <summary>BUG #226: map voor de automatische tussenstanden (wordt aangemaakt als hij nog niet bestaat).</summary>
-    public string AutoTussenstandMap { get; set; } = @"C:\Marco\Autolog";
+    /// <summary>BUG #226: map voor de automatische tussenstanden (wordt aangemaakt als hij nog niet bestaat). BUG #233 (Marco 18-10 13:50): standaard C:\Marco zelf, niet C:\Marco\Autolog.</summary>
+    public string AutoTussenstandMap { get; set; } = @"C:\Marco";
     public int MinSecondenTussenMelders { get; set; } = 10;
     /// <summary>Als tijdens het rijden GEEN enkele melder meer bezet is gedurende deze tijd,
     /// wordt dat als kortsluiting/ontsporing behandeld (stroomdetectie valt weg zonder
