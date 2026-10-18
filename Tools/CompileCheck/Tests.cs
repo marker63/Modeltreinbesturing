@@ -2506,6 +2506,16 @@ public static class Tests
         lp238.LeerKortsluitOplossingen(k238);
         Eis(!lp238.KortsluitOplossingen.Any(x => x.Adres == 6 && x.NaMelder == 14), "voorkennis (#238): het leerprofiel haalt de weerlegde oplossing weg en neemt hem niet opnieuw over");
         Eis(k238.WeerlegVoorkennis(new List<int> { 13, 14, 24 }, Richting.Vooruit, Configuratie.Basis, 24, null).Count == 0, "voorkennis (#238): een rit zonder die wissels weerlegt niets");
+        // BUG #239: eenmalige aanpassing wissel 6 omgekeerd
+        var ins239 = new VerkenInstellingen();
+        var g239 = EenmaligeAanpassingen.PasToe(ins239);
+        Eis(g239.Count == 1 && ins239.OmgekeerdeWissels().SetEquals(new[] { 6 }) && ins239.UitgevoerdeAanpassingen.Contains("239-wissel6-omgekeerd"), "eenmalig (#239): wissel 6 wordt één keer bij 'Omgekeerd aangesloten' gezet");
+        ins239.OmgekeerdAangesloten = "";
+        Eis(EenmaligeAanpassingen.PasToe(ins239).Count == 0 && ins239.OmgekeerdeWissels().Count == 0 && !EenmaligeAanpassingen.Open(ins239), "eenmalig (#239): haalt Marco hem weg, dan komt hij niet terug");
+        var ins239b = new VerkenInstellingen { OmgekeerdAangesloten = "3" }; EenmaligeAanpassingen.PasToe(ins239b);
+        Eis(ins239b.OmgekeerdeWissels().SetEquals(new[] { 3, 6 }), "eenmalig (#239): een al ingevulde wissel blijft staan, 6 komt erbij");
+        var js239 = System.Text.Json.JsonSerializer.Serialize(ins239);
+        Eis(System.Text.Json.JsonSerializer.Deserialize<VerkenInstellingen>(js239)!.UitgevoerdeAanpassingen.Contains("239-wissel6-omgekeerd"), "eenmalig (#239): het bewaren en laden van de instellingen onthoudt dat het gedaan is");
         // BUG #226: automatische tussenstand
         var map226 = Path.Combine(Path.GetTempPath(), "autotussenstand_test_" + Guid.NewGuid().ToString("N"));
         var nu226 = new DateTime(2026, 10, 18, 12, 31, 0);

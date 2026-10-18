@@ -34,6 +34,8 @@ public class VerkenInstellingen
     /// is (motor andersom aangesloten), bijv. "6". Alleen voor de meldingen in logboek en rapport: de verkenner blijft intern met de Dinamo-commando's rekenen, zodat de
     /// kaart klopt met wat er verstuurd wordt. Leeg = geen.</summary>
     public string OmgekeerdAangesloten { get; set; } = "";
+    /// <summary>BUG #239: sleutels van eenmalige aanpassingen (<see cref="EenmaligeAanpassingen"/>) die op deze instellingen al zijn uitgevoerd.</summary>
+    public List<string> UitgevoerdeAanpassingen { get; set; } = new();
 
     /// <summary>BUG #235: de adressen uit <see cref="OmgekeerdAangesloten"/>.</summary>
     public HashSet<int> OmgekeerdeWissels()

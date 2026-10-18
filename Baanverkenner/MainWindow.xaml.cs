@@ -100,6 +100,9 @@ public partial class MainWindow : Window
     // Instellingen lezen/schrijven
     // =====================================================================
 
+    /// <summary>BUG #239: blijft bewaard bij elke keer dat de instellingen uit het scherm worden opgeslagen (anders zou een eenmalige aanpassing steeds opnieuw gebeuren).</summary>
+    private List<string> _uitgevoerdeAanpassingen = new();
+
     private void LaadKeuzes()
     {
         var k = new OpgeslagenKeuzes();
@@ -113,7 +116,17 @@ public partial class MainWindow : Window
         InterfaceCombo.SelectedItem = Centrales.FirstOrDefault(c => c.Soort == k.Centrale) ?? Centrales[0];
         ComPoortCombo.Text = k.ComPoort ?? "";
         SimSnelheidCombo.SelectedIndex = k.SimTempo switch { 1 => 0, 5 => 1, 50 => 3, _ => 2 };
+        // BUG #239: eenmalige aanpassingen van Claude (bijv. wissel 6 omgekeerd aangesloten); daarna meteen bewaren, zodat ze maar één keer gebeuren
+        bool open239 = EenmaligeAanpassingen.Open(k.Instellingen);
+        _uitgevoerdeAanpassingen = k.Instellingen.UitgevoerdeAanpassingen;
+        var gedaan239 = EenmaligeAanpassingen.PasToe(k.Instellingen);
         ToonInstellingen(k.Instellingen);
+        if (open239)
+        {
+            try { Directory.CreateDirectory(Map); File.WriteAllText(InstellingenPad, JsonSerializer.Serialize(k, new JsonSerializerOptions { WriteIndented = true })); } catch { /* comfort */ }
+            if (gedaan239.Count > 0)
+                Dispatcher.BeginInvoke(() => MessageBox.Show("De volgende instelling is eenmalig aangepast:\n\n" + string.Join("\n", gedaan239) + "\n\nU kunt dit in het scherm altijd zelf weer wijzigen.", "Instelling aangepast", MessageBoxButton.OK, MessageBoxImage.Information));
+        }
     }
 
     private void BewaarKeuzes(VerkenInstellingen ins)
@@ -197,6 +210,7 @@ public partial class MainWindow : Window
             HoogsteMelder = Geheel(HoogsteMelderBox, "Hoogste meldernummer", 1, 2048),
             KruisMotoren = KruisMotorenBox.Text.Trim(),
             OmgekeerdAangesloten = OmgekeerdBox.Text.Trim(),   // BUG #235
+            UitgevoerdeAanpassingen = _uitgevoerdeAanpassingen.ToList(),   // BUG #239
             MaxSecondenTussenMelders = Geheel(MaxSecBox, "Max. seconden tussen melders", 5, 600),
             SlimmeTimeout = SlimmeTimeoutCheck.IsChecked == true,
             MinSecondenTussenMelders = Geheel(MinSecBox, "Min. seconden tussen melders", 2, 600),
