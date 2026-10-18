@@ -1604,6 +1604,10 @@ public partial class BaanVerkenner
     private async Task<RitResultaat> Rit(int start, Richting r, RitDoel doel)
     {
         _ritStartStand = null;
+        // BUG #248 (autolog 18-10 16:01:10-16:02:25): wissel 6 werd bij de proef van adres 6 (14 -> 129) losgemaakt. Twee ritten later (terugweg na de proef van adres 7) haalde de bekende
+        // oplossing van kortsluitpunt #1 (wissel 10) een andere kortsluiting weg en ging wissel 6 'als partner' weer afbuigend (Dinamo; op de baan rechtdoor): de loc reed de keerlus in
+        // naar melder 10. Een losgemaakte proefwissel hoort alleen bij de kortsluiting van zijn eigen proef en de terugweg daarna; een nieuwe verkenningsrit begint zonder.
+        if (!doel.IsNavigatie && _losgemaakteProefWissels.Count > 0) _losgemaakteProefWissels.Clear();
         _ritMinDt = double.MaxValue; _ritMaxDt = 0;
         lock (_alarmSlot) _genegeerdeAlarmen.Clear();
         var uitkomst = await RitUitvoeren(start, r, doel);

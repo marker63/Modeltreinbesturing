@@ -2605,3 +2605,11 @@ Dinamo 'afbuigend' voor wissel 6 gaf op 14 -> 129 kortsluiting, en Dinamo 'recht
 de wisselstraten in het rapport lieten de Dinamo-stand zien zonder omrekening (alleen logboek en rapportkop hadden de uitleg). Nu tonen ze bij een omgekeerd aangesloten wissel de
 stand op de baan: "W6 niet rd. (baan) (kortsl.)", "wissel 6 afbuigend op de baan (Dinamo rechtdoor)"; de wisseltabel noemt beide. Intern blijft alles Dinamo-commando's
 (nodig voor de aansturing en de export). Test: baanstand (#247).
+
+## BUG #248 – OPGELOST (nog niet getest op de baan): losgemaakte proefwissel 6 twee ritten later als 'partner' teruggezet, loc reed de keerlus in (autolog 18-10 16:01:10-16:02:25)
+16:01 proef van adres 6 vanaf 14 (stand 5): kortsluiting na 129, wissel 6 losgemaakt (terug naar Dinamo rechtdoor = op de baan afbuigend; goed). Daarna terugweg, proef van adres 7, en op de
+terugweg daarvan (24 -> 129 -> 14) een kortsluiting die de bekende oplossing van kortsluitpunt #1 (wissel 10) wegnam. De #194-regel zette toen ook de nog bewaarde losgemaakte wissel 6
+weer op Dinamo afbuigend ("samen vormen ze de oplossing"; het alarm was al weg, dat bewees niets). Met wissel 6 Dinamo afbuigend (op de baan rechtdoor) reed de loc van 129 naar
+melder 10 (keerlus) in plaats van naar 14, en Marco moest de loc terugzetten. Oorzaak: _losgemaakteProefWissels werd pas leeggemaakt na een gevonden partner; #219 keek alleen naar
+de melders (129 was bij beide bezet). Oplossing: bij het begin van elke nieuwe verkenningsrit wordt de lijst leeggemaakt; een losgemaakte proefwissel hoort alleen bij zijn eigen
+proef en de terugweg daarna. Test: bestaande simulaties (overloop 1+2, #194/#219) blijven slagen; deze precieze volgorde is niet apart nagebootst.
