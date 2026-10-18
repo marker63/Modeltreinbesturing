@@ -2321,9 +2321,27 @@ public partial class BaanVerkenner
     /// <summary>BUG #184 (sim, herhaalde kortsluiting na elke adrestest): na de proefrit staat de loc stil op de eindmelder; een wissel die de kaart bij die melder noemt (bv. wissel 1 bij
     /// melder 12) werd daar eerst rechtgezet en bij de terugweg weer afbuigend gezet: twee keer omzetten onder de loc, elke keer kortsluiting (en 36 s herstel). Zulke wissels blijven nu staan;
     /// de terugweg zet ze op de stand die de route nodig heeft, nadat de loc ver genoeg voorbij is. Nog niet getest op de baan.</summary>
+    /// <summary>BUG #245: ligt deze wissel bij de loc volgens wat de kortsluitingen lieten zien? Ja als hij een klemoplossing is voor (een deel van) de bezette melders, of als de
+    /// kaart een kortsluitoplossing met deze wissel kent direct na een bezette melder.</summary>
+    private bool LigtBijLocVolgensKortsluiting(int adres, IReadOnlyCollection<int> bezet)
+        => (_klemOplossing.TryGetValue(adres, out var ko) && bezet.Any(ko.Melders.Contains))
+           || _kaart.BekendeKortsluitOplossingen.Concat(_kaart.AlleKortsluitOplossingen()).Any(o => o.Adres == adres && bezet.Contains(o.NaMelder));
+
     private async Task ZetWisselNaProef(int adres, bool afbuigend, bool oplossingWissel = false)
     {
         _monitor.Bijwerken();
+        // BUG #245 (Marco 18-10 15:40: "je schakelde wissel 1 terwijl de loc er bovenop stond en die ontspoorde"; autolog 15:38:34-15:39:10): wissel 1 haalde om 15:38:34 de
+        // kortsluiting bij melder 12 weg (klemoplossing, kortsluitpunt #3). De proef van adres 1 reed daarna 13 -> 5 -> 12 en stopte op 12; wissel 1 ging toen hier terug naar
+        // rechtdoor met de loc erop, want de kaart kende wissel 1 niet als wissel bij melder 12 (alleen als kortsluitoplossing). Een wissel die een kortsluiting bij een bezette
+        // melder oploste, of een klemoplossing voor die melders is, ligt bij de loc en blijft staan.
+        if (!Kruis.IsMotor(adres) && _monitor.Bezet.Count > 0 && LigtBijLocVolgensKortsluiting(adres, _monitor.Bezet)
+            && !(_wisselStand.TryGetValue(adres, out var nu245) && nu245 == afbuigend))
+        {
+            _log.Waarschuwing($"Wissel {adres} wordt nu NIET omgezet: hij loste eerder een kortsluiting op bij melder {Lijst(_monitor.Bezet)} waar de loc nu staat, dus hij ligt bij de loc (omzetten met de loc erop laat hem ontsporen, BUG #245). De terugweg zet hem pas om als de loc daar weg is.");
+            // de terugweg (ZetConfiguratie) laat hem dan ook staan zolang de loc op deze melders staat (#218); alleen als hij nu afbuigend staat is het een klemoplossing
+            if (_wisselStand.TryGetValue(adres, out var st245) && st245) _klemOplossing[adres] = (_monitor.Bezet.ToHashSet(), _klok.Nu);
+            return;
+        }
         if (!Kruis.IsMotor(adres) && _monitor.Bezet.Count > 0 && (oplossingWissel || WisselsBijBezet(_kaart, _monitor.Bezet).Contains(adres))
             && !(_wisselStand.TryGetValue(adres, out var nu) && nu == afbuigend))
         {

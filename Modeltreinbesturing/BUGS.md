@@ -2579,3 +2579,15 @@ gevonden in de bewaarde voortgang en wordt na het hervatten niet opnieuw geprobe
 Marco hervatte met bug241, maar het logboek had geen regel "Omgekeerd aangesloten: wissel 6" en de kaart had OmgekeerdeWissels leeg. Oorzaak: bij hervatten gebruikt de verkenner de
 instellingen van de onderbroken verkenning; alleen snelheden en tijden kwamen uit het scherm. Nu komen ook 'Omgekeerd aangesloten' en de uitgevoerde eenmalige aanpassingen uit het
 scherm (hervatten en controle). Test: hervatten (#244).
+
+## BUG #245 – OPGELOST (nog niet getest op de baan): wissel 1 omgezet terwijl de loc erop stond, loc ontspoord (Marco 18-10 15:40; autolog 15:38:34-15:39:37)
+15:38:34 haalde wissel 1 afbuigend de kortsluiting bij melder 12 weg (kortsluitpunt #3, achteruit met wissel 2 afbuigend). Daarna reed de proef van adres 1 (stand 1+2) 13 -> 5 -> 12 en
+stopte op 12. Omdat die proef dezelfde melders reed als de basisrit, zette ZetWisselNaProef wissel 1 vóór de terugrit terug naar rechtdoor (15:39:10) met de loc erop: de kaart kende
+wissel 1 niet als wissel bij melder 12 (alleen als kortsluitoplossing), en de klemoplossing was al vervallen toen de loc op 13 stond. Gevolg: ontsporing. Daarna zette de klemregel
+#230 wissel 1 terug (15:39:23) en bij de volgende klem nóg eens om (15:39:37): zijn eigen terugzetting werd als 'laatst omgezette wissel' gezien.
+Oplossing: (1) ZetWisselNaProef zet een wissel niet om als hij een klemoplossing is voor de bezette melders of als de kaart een kortsluitoplossing met die wissel kent direct na
+een bezette melder; staat hij afbuigend, dan wordt hij weer klemoplossing zodat ook de terugweg (ZetConfiguratie, #218) hem laat staan. (2) #230 zet een wissel die hij net zelf
+terugzette niet nog eens om. Test: KeerlusTest (de simulatie komt precies in deze situatie; de melding BUG #245 moet verschijnen). De naar-10-telling in KeerlusTest telt de
+blokfase niet meer mee: daar rijdt de loc na de keerlus nog verkeerd (open punt #234).
+Let op (open): de simulatie laat een wissel onder de loc gewoon omzetten zonder ontsporing, dus dit soort fouten valt in de simulatie niet op. Een algemene regel in ZetConfiguratie
+(nooit een wissel met een kortsluitoplossing bij de bezette melder omzetten) brak de keerlus-simulatie en is daarom niet ingevoerd.

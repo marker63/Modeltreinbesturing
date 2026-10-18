@@ -2528,6 +2528,8 @@ public partial class BaanVerkenner
     }
 
     private bool _klemProbeActief;
+    /// <summary>BUG #245: wissel die de #230-regel het laatst zelf terugzette (niet nog eens omzetten).</summary>
+    private (int Adres, DateTime Tijd)? _teruggezet230;
 
     /// <summary>BUG #164 (Marco 16-10 09:13: "je kon de situatie rond wissel 2 en 1 niet zelf oplossen?"): de loc zit klem op een wissel, maar Dinamo meldt de kortsluiting
     /// alleen zolang er een rijcommando loopt; bij een stilstaande loc verdwijnt het alarm na 0,8 s. De alarmroutine (#108) kijkt of het alarm na het omzetten van
@@ -2552,9 +2554,13 @@ public partial class BaanVerkenner
         // BUG #230 (autolog 18-10 13:31:23-13:33:52): wissel 5 werd net omgezet terwijl de loc op melder 14 stond (de neus bij de tong), en direct daarna zat de loc klem. De routine
         // probeerde 2 minuten lang alle andere wissels (elk met een kortsluiting) en sloeg juist wissel 5 over. Is de laatste wissel kort geleden omgezet terwijl de loc op dezelfde melders
         // stond, dan gaat eerst die terug naar de vorige stand (daarin stond de loc er zonder kortsluiting). Gaat het alarm weg, dan wordt de stap afgebroken en later opnieuw gereden.
-        if (_laatsteWisselCommando is { } lw && !Kruis.IsMotor(lw.Adres) && (_klok.Nu - lw.Tijd).TotalSeconds <= 15 && lw.Bezet.Count > 0 && lw.Bezet.ToHashSet().SetEquals(bezet))
+        // BUG #245 (autolog 18-10 15:39:23-15:39:37): de terugzetting door deze regel zelf (wissel 1 terug naar afbuigend) werd bij de volgende klem weer als 'laatst omgezette wissel'
+        // gezien en ging opnieuw om, met de loc erop: heen en weer onder de loc. Een wissel die deze regel net zelf terugzette, gaat niet nog eens om.
+        if (_laatsteWisselCommando is { } lw && !Kruis.IsMotor(lw.Adres) && (_klok.Nu - lw.Tijd).TotalSeconds <= 15 && lw.Bezet.Count > 0 && lw.Bezet.ToHashSet().SetEquals(bezet)
+            && !(_teruggezet230 is { } tz && tz.Adres == lw.Adres && lw.Tijd >= tz.Tijd && (_klok.Nu - tz.Tijd).TotalMinutes < 5))
         {
             _log.Waarschuwing($"Wissel {lw.Adres} is {(_klok.Nu - lw.Tijd).TotalSeconds:0.0} s geleden naar {(lw.Afbuigend ? "afbuigend" : "rechtdoor")} gezet terwijl de loc al op melder {Lijst(bezet)} stond; daarvoor stond hij er zonder kortsluiting. Wissel {lw.Adres} gaat eerst terug (BUG #230).");
+            _teruggezet230 = (lw.Adres, _klok.Nu);
             await ZetWissel(lw.Adres, !lw.Afbuigend, forceer: true);
             var eindT = _klok.Nu + TimeSpan.FromSeconds(3);
             while (HuidigeAlarmBlokken().Count > 0 && _klok.Nu < eindT) await Wacht(TimeSpan.FromMilliseconds(200));
