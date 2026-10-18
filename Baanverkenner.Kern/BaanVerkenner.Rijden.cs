@@ -1851,6 +1851,8 @@ public partial class BaanVerkenner
                 if (doel.IsNavigatie && doel.VerwachtPad is { } pad && !pad.Contains(m))
                 {
                     await StopLoc();
+                    int laatsteGoed238 = bezet.Where(x => x != m && pad.Contains(x)).OrderByDescending(x => pad.LastIndexOf(x)).Cast<int?>().FirstOrDefault() ?? res.Reeks[^1];
+                    foreach (var t238 in _kaart.WeerlegVoorkennis(pad, r, doel.Configuratie, null, laatsteGoed238)) { _log.Waarschuwing("Voorkennis weerlegd (BUG #238): " + t238 + "."); _kaart.Waarschuwingen.Add(t238); }
                     throw new NavigatieFout($"Onderweg naar melder {doel.DoelMelder} werd onverwacht melder {m} bezet (verwacht: {Lijst(pad)}). Staat er een wissel niet goed?")
                     {
                         // De loc kan bij vertrek al half op de volgende melder gestaan hebben

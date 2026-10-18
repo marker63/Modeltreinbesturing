@@ -285,6 +285,35 @@ public class Baankaart
 
     /// <summary>BUG #87: kortsluitoplossingen uit eerdere verkenningen (leerprofiel) of door de gebruiker aangewezen.</summary>
     public List<KortsluitOplossing> BekendeKortsluitOplossingen { get; set; } = new();
+    /// <summary>BUG #238: sleutels van oplossingen uit de voorkennis die in deze verkenning weerlegd zijn; het leerprofiel neemt ze niet meer over en haalt ze weg.</summary>
+    public List<string> WeerlegdeOplossingen { get; set; } = new();
+
+    /// <summary>BUG #238 (autolog 18-10 14:24-14:26): de voorkennis bevat oplossingen die niet kloppen (ruis uit eerdere sessies, o.a. "wissel 6 afbuigend voor 129 -> 14 achteruit",
+    /// door #217 al uit de kaart gehaald maar nog in het leerprofiel). Een oplossing uit de voorkennis wordt weerlegd als de rit waarin ze werd toegepast juist daar misging:
+    /// een kortsluiting na de melder van de oplossing (<paramref name="kortsluitNa"/>), of een onverwachte melder direct na de ingang van de oplossing (<paramref name="afwijkingNa"/> -> volgende
+    /// melder van het pad). Geeft per weerlegde oplossing een tekst; ze verdwijnt uit de kaart en komt in <see cref="WeerlegdeOplossingen"/>.</summary>
+    public List<string> WeerlegVoorkennis(IReadOnlyList<int> pad, Richting r, Configuratie c, int? kortsluitNa, int? afwijkingNa)
+    {
+        var res = new List<string>();
+        foreach (var o in BekendeKortsluitOplossingen.ToList())
+        {
+            if (!o.Afbuigend || !c.Bevat(o.Adres)) continue;
+            bool raak = false;
+            if (kortsluitNa is int x && o.NaMelder == x && (o.Richting == r || o.Richting == r.Om())) raak = true;
+            if (afwijkingNa is int y)
+            {
+                int i = pad.ToList().IndexOf(y);
+                // alleen een oplossing met precies deze ingang, en niet een wissel die de kaart voor deze stap zelf afbuigend eist (wissel 5 voor 129 -> 14 is wel nodig)
+                if (i >= 0 && i + 1 < pad.Count && o.NaMelder == pad[i + 1] && o.Via == y && o.Richting == r
+                    && !WisselEisenVoorStap(y, pad[i + 1], r).Contains((o.Adres, true))) raak = true;
+            }
+            if (!raak) continue;
+            BekendeKortsluitOplossingen.Remove(o);
+            if (!WeerlegdeOplossingen.Contains(o.Sleutel)) WeerlegdeOplossingen.Add(o.Sleutel);
+            res.Add($"eerder gevonden oplossing 'wissel {o.Adres} afbuigend' (na melder {o.NaMelder}, {o.Richting.Tekst()}, stand {(o.Stand == "" ? "alle rechtdoor" : o.Stand)}{(o.Via > 0 ? $", ingang {o.Via}" : "")}) klopt niet: de rit met die stand ging daar mis");
+        }
+        return res;
+    }
     /// <summary>BUG #129: Engelse wissels van deze verkenning (motoren, bijv. "13+10"), de melder(s) van de kruiswissel (opgegeven of ontdekt) en of de vaste referentie is gebruikt.</summary>
     public string KruisMotoren { get; set; } = "";
     public List<int> KruisMidden { get; set; } = new();

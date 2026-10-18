@@ -1293,6 +1293,9 @@ public partial class BaanVerkenner
                 // dan gaat hij ook met dezelfde wisselstand terug; pas daarna wordt teruggezet.
                 // Volgde de proefrit de basisrit, dan blijft BUG #35 gelden (eerst terugzetten).
                 var cA0 = proefCfg;
+                // BUG #238: gaf de proef met een extra wissel uit de voorkennis toch kortsluiting op de plek van die oplossing, dan klopt die oplossing niet
+                if (proef.Einde == RitEinde.Kortsluiting && proefExtra.Count > 0)
+                    foreach (var t238 in _kaart.WeerlegVoorkennis(proef.Reeks, o.Richting, proefCfg, proef.Reeks[^1], null)) { _log.Waarschuwing("Voorkennis weerlegd (BUG #238): " + t238 + "."); _kaart.Waarschuwingen.Add(t238); }
                 bool afwijkendePad = ProefWijktAf(basis.Reeks, proef.Reeks);
                 bool zelfdeKortsluiting = basis.Einde == RitEinde.Kortsluiting && proef.Reeks.SequenceEqual(basis.Reeks);
                 (int Partner, RitResultaat Rit)? partner = null;

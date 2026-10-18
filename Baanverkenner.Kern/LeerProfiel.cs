@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace Baanverkenner.Kern;
 
@@ -35,7 +35,9 @@ public class LeerProfiel
 
     public void LeerKortsluitOplossingen(Baankaart kaart)
     {
-        foreach (var o in kaart.AlleKortsluitOplossingen())
+        // BUG #238: wat deze verkenning weerlegde, gaat ook uit het leerprofiel (anders komt het bij de volgende verkenning terug)
+        KortsluitOplossingen.RemoveAll(x => kaart.WeerlegdeOplossingen.Contains(x.Sleutel));
+        foreach (var o in kaart.AlleKortsluitOplossingen().Where(o => !kaart.WeerlegdeOplossingen.Contains(o.Sleutel)))
             if (!KortsluitOplossingen.Any(x => x.Sleutel == o.Sleutel)) KortsluitOplossingen.Add(o);
     }
 

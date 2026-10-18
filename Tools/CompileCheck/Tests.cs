@@ -2497,6 +2497,15 @@ public static class Tests
         foreach (var (v236, n236) in new[] { (13, 14), (14, 16), (16, 5), (5, 13) }) k236c.Overgangen.Add(new Overgang { Van = v236, Naar = n236, Richting = Richting.Vooruit, AantalKeer = 3, GezienBijConfiguraties = new List<string> { "" } });
         k236c.BekendeKortsluitOplossingen.Add(new KortsluitOplossing { NaMelder = 5, Via = 16, Richting = Richting.Vooruit, Stand = "2", Start = 13, Adres = 1, Afbuigend = true });
         Eis(k236c.MetBekendeOplossingenVoorStart(13, Richting.Vooruit, Configuratie.Basis.Met(2), out _).Bevat(1), "voorkennis (#236): zonder verbod en met de juiste ingang wordt de oplossing wel gebruikt");
+        // BUG #238: voorkennis 'wissel 6 afbuigend voor 129 -> 14 achteruit' stuurde de loc naar 10 (autolog 18-10 14:26:22)
+        var k238 = Laad("baankaart_2026-10-18_1424.json");
+        int voor238 = k238.BekendeKortsluitOplossingen.Count;
+        var t238 = k238.WeerlegVoorkennis(new List<int> { 24, 129, 14, 13 }, Richting.Achteruit, Configuratie.VanSleutel("5,6,9,10"), null, 129);
+        Eis(t238.Count == 1 && t238[0].Contains("wissel 6") && k238.BekendeKortsluitOplossingen.Count == voor238 - 1 && k238.WeerlegdeOplossingen.Count == 1, "voorkennis (#238): de oplossing 'wissel 6' na melder 14 (ingang 129) wordt weerlegd (nu: " + string.Join(" | ", t238) + ")");
+        var lp238 = new LeerProfiel(); lp238.KortsluitOplossingen.Add(new KortsluitOplossing { NaMelder = 14, Via = 129, Richting = Richting.Achteruit, Stand = "10", Start = 24, Adres = 6, Afbuigend = true });
+        lp238.LeerKortsluitOplossingen(k238);
+        Eis(!lp238.KortsluitOplossingen.Any(x => x.Adres == 6 && x.NaMelder == 14), "voorkennis (#238): het leerprofiel haalt de weerlegde oplossing weg en neemt hem niet opnieuw over");
+        Eis(k238.WeerlegVoorkennis(new List<int> { 13, 14, 24 }, Richting.Vooruit, Configuratie.Basis, 24, null).Count == 0, "voorkennis (#238): een rit zonder die wissels weerlegt niets");
         // BUG #226: automatische tussenstand
         var map226 = Path.Combine(Path.GetTempPath(), "autotussenstand_test_" + Guid.NewGuid().ToString("N"));
         var nu226 = new DateTime(2026, 10, 18, 12, 31, 0);
