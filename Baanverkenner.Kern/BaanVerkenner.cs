@@ -675,15 +675,20 @@ public partial class BaanVerkenner
     /// <summary>BUG #164: zoals <see cref="ZelfTerugWeg"/>, maar valt terug op overgangen die bij een andere wisselstand gezien zijn als er geen weg met alle
     /// wissels rechtdoor is (de loc kwam bij een kortsluiting-oplossing op een onverwachte melder, bijv. 12 achter wissel 1 en 2). Per stap de bekende
     /// configuratie met de minste afbuigende wissels. Null als er ook zo geen weg is.</summary>
-    internal static List<(int Van, int Naar, Richting Richting, Configuratie Cfg)>? ZelfTerugWegAlleStanden(Baankaart kaart, int van, int naar)
+    internal static List<(int Van, int Naar, Richting Richting, Configuratie Cfg)>? ZelfTerugWegAlleStanden(Baankaart kaart, int van, int naar, int? aankomstVia = null, Richting? aankomstRichting = null)
     {
         if (van == naar) return new();
-        var vorige = new Dictionary<int, (int Van, Richting R, Configuratie C)>();
-        var rij = new Queue<int>(); rij.Enqueue(van);
-        var gezien = new HashSet<int> { van };
+        // BUG #232 (autolog 18-10 13:45:29 en 13:48:30, nagebootst in de keerlus-simulatie): de weg 10 -> 129 (vooruit) en dan 129 -> 14 (achteruit) keert op 129 naar een ANDERE buur
+        // dan waar de loc vandaan kwam. Dat kan alleen als een wissel in het gebied van 129 onder de loc omgaat (wissel 6); de loc ging beide keren terug naar 10. De zoektocht houdt
+        // nu bij vanaf welke melder en in welke richting de loc op een melder aankomt; keren mag alleen terug naar die melder.
+        var start = (M: van, Via: aankomstVia ?? 0, R: aankomstRichting);
+        var vorige = new Dictionary<(int M, int Via, Richting? R), ((int M, int Via, Richting? R) Van, Richting R, Configuratie C)>();
+        var rij = new Queue<(int M, int Via, Richting? R)>(); rij.Enqueue(start);
+        var gezien = new HashSet<(int, int, Richting?)> { start };
         while (rij.Count > 0)
         {
-            int m = rij.Dequeue();
+            var st = rij.Dequeue();
+            int m = st.M;
             // Eerst de overgangen die in deze richting gereden zijn, daarna de omgekeerde van overgangen die naar m toe liepen (de loc rijdt dan dezelfde
             // route de andere kant op; zo komt de loc terug van een melder die alleen als eindpunt van een rit bekend is, zoals 12 achter wissel 1 en 2).
             var opties = kaart.Overgangen.Where(o => o.Van == m && o.GezienBijConfiguraties.Count > 0).OrderBy(o => o.Naar)
@@ -692,22 +697,30 @@ public partial class BaanVerkenner
                     .Select(o => (Naar: o.Van, R: o.Richting.Om(), O: o)));
             foreach (var (nxt, rch, o) in opties)
             {
-                if (!gezien.Add(nxt)) continue;
+                if (!KerenToegestaan(st.Via, st.R, nxt, rch)) continue;   // BUG #232
+                var volgend = (M: nxt, Via: m, R: (Richting?)rch);
+                if (!gezien.Add(volgend)) continue;
                 var c = o.GezienBijConfiguraties.Select(Configuratie.VanSleutel).OrderBy(x => x.Afbuigend.Length).ThenBy(x => x.Sleutel, StringComparer.Ordinal).First();
-                vorige[nxt] = (m, rch, c);
+                vorige[volgend] = (st, rch, c);
                 if (nxt == naar)
                 {
                     var weg = new List<(int, int, Richting, Configuratie)>();
-                    int cur = naar;
-                    while (cur != van) { var (v, r, cc) = vorige[cur]; weg.Add((v, cur, r, cc)); cur = v; }
+                    var cur = volgend;
+                    while (cur != start) { var (v, r, cc) = vorige[cur]; weg.Add((v.M, cur.M, r, cc)); cur = v; }
                     weg.Reverse();
                     return weg;
                 }
-                rij.Enqueue(nxt);
+                rij.Enqueue(volgend);
             }
         }
         return null;
     }
+
+    /// <summary>BUG #232: mag de loc, die op een melder aankwam vanaf <paramref name="via"/> in richting <paramref name="aankomst"/>, verder naar <paramref name="naar"/> in richting
+    /// <paramref name="r"/>? Doorrijden in dezelfde richting altijd; keren alleen terug naar de melder waar hij vandaan kwam (anders moet een wissel onder de loc om).
+    /// Onbekende aankomst (via 0 of geen richting): alles mag.</summary>
+    internal static bool KerenToegestaan(int via, Richting? aankomst, int naar, Richting r)
+        => via == 0 || aankomst is null || r == aankomst || naar == via;
 
     /// <summary>BUG #161 (Marco 15-10 13:51: de controle reed alleen de twee basisrondes; 18 overgangen met melder 129, 4, 11, 12, 1, 9, 10 waren 'niet gereden'):
     /// de controle begint zonder overgangen en plande daarom alleen "start, vooruit" en "start, achteruit". Nu plant ze daarna ook elk traject uit de bestaande kaart
@@ -2641,7 +2654,9 @@ public partial class BaanVerkenner
         while (geknipt)
         {
             geknipt = false;
-            for (int i = 0; i < res.Count && !geknipt; i++)
+            // BUG #232: niet knippen op de plek waar de loc staat (i = 0): de loc kwam daar aan vanaf res[1] en kan alleen terug naar die kant; naar res[j + 1] keren vraagt een
+            // wissel onder de loc (keerlus 129: twee keer ging de loc terug naar 10 in plaats van naar 14).
+            for (int i = 1; i < res.Count && !geknipt; i++)
                 for (int j = res.Count - 2; j > i; j--)
                 {
                     if (res[j] != res[i]) continue;

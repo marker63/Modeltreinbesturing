@@ -882,6 +882,29 @@ public static class Tests
         Eis(r.Kortsluitingen <= 10, $"rondrit: beperkt aantal kortsluitingen (nu {r.Kortsluitingen})");
     }
 
+    // BUG #232: optie 6 op de Miniworld-simulatie MET de keerlus 129-4-11-12-1-9-10-129 (zoals de logs van 18-10 laten zien)
+    static void KeerlusTest()
+    {
+        Console.WriteLine("Test: rondrijden met de keerlus achter melder 129 (BUG #232)");
+        Baanverkenner.Kern.Simulatie.MiniworldBaan.Keerlus = true;
+        try
+        {
+            foreach (var start in (Environment.GetEnvironmentVariable("KEERLUS_START") ?? "13").Split(',').Select(int.Parse))
+            {
+                var r = MiniworldRit(start, 10, insAanpassing: i => { i.Rondrit = true; i.StapVoorStap = false; });
+                var k = r.V.Kaart;
+                var regels = r.Log.Regels.Select(x => x.Tekst).ToList();
+                int naar10 = regels.Count(x => x.Contains("onverwacht melder 10 bezet (verwacht: 129, 14)"));
+                Console.WriteLine($"  keerlus start {start}: {r.Einde}, {r.Seconden / 60:0} min, {r.Kortsluitingen} kortsluiting(en), melders {k.Melders.Count} ({string.Join(",", k.Melders.Select(m => m.Nummer).OrderBy(x => x))}), voltooid {k.Voltooid}, 129->14-maar-10: {naar10}");
+                if (Environment.GetEnvironmentVariable("KEERLUS_LOG") == "1") Console.WriteLine(r.Log.AlsTekst());
+                Eis(k.Melders.Count == 23, $"keerlus (start {start}): alle 23 melders (met 1 en 9) gevonden (nu {k.Melders.Count})");
+                Eis(naar10 == 0, $"keerlus (start {start}): de terugweg 129 -> 14 gaat niet steeds naar 10 (nu {naar10}x)");
+                // Nog open (#234): in deze simulatie lukt de blokfase daarna niet voor 15 melders (de loc rijdt na de keerlus de verkeerde kant op); daarom geen eis op 'voltooid'.
+            }
+        }
+        finally { Baanverkenner.Kern.Simulatie.MiniworldBaan.Keerlus = false; }
+    }
+
     // BUG #195: optie 6 'Rondrijden' in de Miniworld-simulatie, per startplek en in gewone en strenge sim
     static void RondritBench()
     {
@@ -2361,7 +2384,11 @@ public static class Tests
         foreach (var (v215, n215) in new[] { (129, 10), (10, 9), (9, 1), (1, 12), (12, 11), (11, 4), (4, 129), (129, 14), (14, 13) })
             k215.Overgangen.Add(new Overgang { Van = v215, Naar = n215, Richting = Richting.Achteruit, AantalKeer = 1, GezienBijConfiguraties = new List<string> { "5,10" } });
         var pad215 = new List<int> { 129, 10, 9, 1, 12, 11, 4, 129, 14, 13 };
-        Eis(BaanVerkenner.KnipLus(k215, pad215, Richting.Achteruit).SequenceEqual(new[] { 129, 14, 13 }), "terugweg (#215): de lus 129-10-9-1-12-11-4 wordt uit het pad geknipt (nu " + string.Join(",", BaanVerkenner.KnipLus(k215, pad215, Richting.Achteruit)) + ")");
+        // BUG #232: op de plek waar de loc staat (begin van het pad) wordt niet meer geknipt: 129 -> 14 keren na aankomst vanaf 10 ging op de baan twee keer naar 10
+        Eis(BaanVerkenner.KnipLus(k215, pad215, Richting.Achteruit).SequenceEqual(pad215), "terugweg (#215/#232): op de plek van de loc (129, aangekomen vanaf 10) wordt de lus niet geknipt (nu " + string.Join(",", BaanVerkenner.KnipLus(k215, pad215, Richting.Achteruit)) + ")");
+        var pad232 = new List<int> { 13, 129, 10, 9, 1, 12, 11, 4, 129, 14, 13 };
+        Eis(BaanVerkenner.KnipLus(k215, pad232, Richting.Achteruit).SequenceEqual(new[] { 13, 129, 14, 13 }), "terugweg (#215): verderop in het pad wordt een lus nog wel geknipt (nu " + string.Join(",", BaanVerkenner.KnipLus(k215, pad232, Richting.Achteruit)) + ")");
+        Eis(!BaanVerkenner.KerenToegestaan(10, Richting.Vooruit, 14, Richting.Achteruit) && BaanVerkenner.KerenToegestaan(10, Richting.Vooruit, 10, Richting.Achteruit) && BaanVerkenner.KerenToegestaan(10, Richting.Vooruit, 24, Richting.Vooruit), "terugweg (#232): na aankomst op 129 vanaf 10 (vooruit) mag keren alleen terug naar 10; doorrijden mag");
         var k215b = new Baankaart();
         Eis(BaanVerkenner.KnipLus(k215b, pad215, Richting.Achteruit).Count == pad215.Count, "terugweg (#215): is de overgang na de lus onbekend, dan blijft het pad zoals het was");
         Eis(BaanVerkenner.HerhaaldeOvergang(new List<int> { 129, 10, 9, 1, 12, 11, 4, 129, 10 }) && !BaanVerkenner.HerhaaldeOvergang(new List<int> { 129, 10, 9, 1, 12, 11, 4, 129 }), "navigatie (#215): herhaalde overgang 129 -> 10 wordt na één rondje gezien, niet eerder");
@@ -2837,6 +2864,7 @@ public static class Tests
 
     public static int Main()
     {
+        if (Environment.GetEnvironmentVariable("ALLEEN_KEERLUS") == "1") { KeerlusTest(); Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)"); return _fouten == 0 ? 0 : 1; }
         if (Environment.GetEnvironmentVariable("BENCH") == "1") { BenchTest(); return 0; }
         if (Environment.GetEnvironmentVariable("RONDRIT") == "1") { RondritBench(); return 0; }
         var kaart = Laad("baankaart_voltooid_2026-10-04.json");
@@ -2939,6 +2967,7 @@ public static class Tests
         SimBuurwisselTest();
         StapVoorStapTest();
         StapMatrixTest();
+        if (Environment.GetEnvironmentVariable("KEERLUS") != "0") KeerlusTest();
         AanloopTest();
         MiniworldAlarmVertragingTest();
         MiniworldVoorkennisTest();

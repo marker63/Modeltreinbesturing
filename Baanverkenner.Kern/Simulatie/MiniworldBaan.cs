@@ -1,4 +1,4 @@
-namespace Baanverkenner.Kern.Simulatie;
+﻿namespace Baanverkenner.Kern.Simulatie;
 
 /// <summary>
 /// BUG #150: nagebouwde testbaan van Marco (Miniworld Rotterdam) voor de volledige test van de verkenning, afgeleid uit ALLE baankaarten van 10 t/m 14-10
@@ -16,6 +16,11 @@ namespace Baanverkenner.Kern.Simulatie;
 /// </summary>
 public static class MiniworldBaan
 {
+    /// <summary>BUG #232 (autolog 18-10 13:42-13:48): de echte baan heeft achter de binnenring een KEERLUS: 129 -> [wissel 9 afbuigend] 4 - 11 - 12 -> [wissel 1 rechtdoor] 1 - 9 - 10
+    /// -> [wissel 6 afbuigend] 129 (rit 13:42:48: 14, 129, 4, 11, 12, 1, 9, 10, 129). Melder 1, 9 en 10 liggen in Dinamo-blok 1 (alarm 'blok 1 en 9' met de loc op 10/129).
+    /// Afgeleid uit de logs, niet door Marco bevestigd. Standaard uit, zodat de bestaande tests (21 melders, 10 als zijspoor) hetzelfde blijven.</summary>
+    public static bool Keerlus { get; set; }
+
     public static SimulatieBaan Maak(bool omzettenOnderLocGeeftKortsluiting = true, int startMelder = 13, Func<SimulatieBaan>? fabriek = null)
     {
         var b = fabriek?.Invoke() ?? new SimulatieBaan();
@@ -32,7 +37,9 @@ public static class MiniworldBaan
         var s5 = b.NieuweSectie(5, 120, 3);
         var s129 = b.NieuweSectie(129, 65, 9); var s10 = b.NieuweSectie(10, 60, 9);
         var s4 = b.NieuweSectie(4, 30, 2); var s11 = b.NieuweSectie(11, 245, 2); var s12 = b.NieuweSectie(12, 120, 2);
-        var verbinding = b.NieuweSectie(5, 25, 3);   // verbindingsstuk van de overloop: ligt in het gebied van melder 5 (geen losse melder, anders valt de loc zonder voeding stil)
+        var verbinding = b.NieuweSectie(5, 25, 3);
+        SimulatieBaan.Sectie? s1 = null, s9 = null;
+        if (Keerlus) { s1 = b.NieuweSectie(1, 150, 1); s9 = b.NieuweSectie(9, 120, 1); s10.Blok = 1; }   // verbindingsstuk van de overloop: ligt in het gebied van melder 5 (geen losse melder, anders valt de loc zonder voeding stil)
 
         var k = b.NieuweKruis(13, 10, melder: 24, blok: 8, lengte: 50);
         var w5 = b.NieuweWissel(5, true, 3); var w6 = b.NieuweWissel(6, true, 9); var w9 = b.NieuweWissel(9, true, 9);
@@ -55,6 +62,7 @@ public static class MiniworldBaan
         b.Verbind(s4, B, s11, A); b.Verbind(s11, B, s12, A);
         b.Verbind(w1, P, s12, B);
         b.Verbind(w1, Af, verbinding, A);
+        if (Keerlus) { b.Verbind(w1, R, s1!, A); b.Verbind(s1!, B, s9!, A); b.Verbind(s9!, B, s10, B); }
         b.Verbind(w2, Af, verbinding, B);
         b.Verbind(w2, P, s5, A);
         b.Verbind(w2, R, s16, B);
@@ -67,7 +75,7 @@ public static class MiniworldBaan
         b.Verbind(w14, P, s8, A);
         b.Verbind(s8, B, s15, A); b.Verbind(s15, B, s16, A);
 
-        var start = new[] { s13, s14, s21, s29, s30, s20, s27, s28, s26, s25, s17, s8, s15, s16, s5, s129, s10, s4, s11, s12 }.First(x => x.Melder == startMelder);
+        var start = new[] { s13, s14, s21, s29, s30, s20, s27, s28, s26, s25, s17, s8, s15, s16, s5, s129, s10, s4, s11, s12 }.Concat(Keerlus ? new[] { s1!, s9! } : Array.Empty<SimulatieBaan.Sectie>()).First(x => x.Melder == startMelder);
         b.PlaatsLoc(start, start.Lengte / 2, +1);
         return b;
     }

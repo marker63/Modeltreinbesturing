@@ -2914,9 +2914,13 @@ public partial class BaanVerkenner
                 foreach (var ko in _kaart.AlleKortsluitOplossingen().Where(o => o.NaMelder == lg && o.Richting == rr)) terugCfg = terugCfg.MetStand(ko.Adres, ko.Afbuigend);
                 voorstap.Add((x, lg, rr.Om(), terugCfg)); vanaf = lg;
             }
+            // BUG #232: met een voorstap (x -> lg) komt de loc op lg aan vanaf x; keren op lg mag dan alleen terug naar x.
+            int? aankVia = voorstap.Count > 0 ? x : _ingang is { } ing232 && ing232.Melder == x ? ing232.Via : null;
+            Richting? aankR = voorstap.Count > 0 ? voorstap[^1].Richting : _ingang is { } ing232b && ing232b.Melder == x ? ing232b.Richting : null;
             var basisWeg = ZelfTerugWeg(_kaart, vanaf, _kaart.StartMelder);
+            if (basisWeg is { Count: > 0 } bw && aankVia is int av && aankR is Richting ar && !KerenToegestaan(av, ar, bw[0].Naar, bw[0].Richting)) basisWeg = null;
             var restWeg = basisWeg?.Select(w => (w.Van, w.Naar, w.Richting, Cfg: Configuratie.Basis)).ToList()
-                      ?? ZelfTerugWegAlleStanden(_kaart, vanaf, _kaart.StartMelder);
+                      ?? ZelfTerugWegAlleStanden(_kaart, vanaf, _kaart.StartMelder, aankVia, aankR);
             var weg = restWeg is null ? null : voorstap.Concat(restWeg).ToList();
             if (voorstap.Count > 0) basisWeg = null;
             if (weg is null) { _log.Info($"Melder {x} ligt niet op de route terug en er is geen bekende weg naar melder {_kaart.StartMelder}; de verkenner rijdt niet zelf terug."); return false; }
