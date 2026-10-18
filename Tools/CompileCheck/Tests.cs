@@ -2442,6 +2442,11 @@ public static class Tests
         Eis(!c228b.Bevat(5), "navigatie (#228): bij een kering op melder 14 wordt niets vooraf gezet");
         var c229 = BaanVerkenner.StartmelderWisselsVooraf(k228, e228b, Configuratie.Basis.Met(5).Met(10), Configuratie.Basis.Met(5).Met(6), out var u229);
         Eis(c229.Bevat(10), "navigatie (#229): wissel 10 blijft afbuigend (oplossing kortsluitpunt #1) en wordt niet vooraf rechtdoor gezet voor startmelder 24 (nu " + c229 + "; " + u229 + ")");
+        // BUG #231: keerlus 10 -> 129 (autolog 18-10 13:43)
+        var k231 = Laad("baankaart_2026-10-18_1349.json");
+        var v231 = BaanVerkenner.AndereTakVerdachten(k231, new[] { 10, 129 }, new List<int> { 14, 129, 4, 11, 12, 1, 9, 10, 129 });
+        Eis(v231.Contains(6), "keerlus (#231): na 10 -> 129 is wissel 6 de eerste verdachte (afbuigend gaf kortsluiting vanaf 14) (nu " + string.Join(",", v231) + ")");
+        Eis(!BaanVerkenner.AndereTakVerdachten(k231, new[] { 129 }, new List<int> { 13, 14, 129 }).Contains(6), "keerlus (#231): vanaf 14 (dezelfde ingang) is wissel 6 geen verdachte van de andere tak");
         // BUG #226: automatische tussenstand
         var map226 = Path.Combine(Path.GetTempPath(), "autotussenstand_test_" + Guid.NewGuid().ToString("N"));
         var nu226 = new DateTime(2026, 10, 18, 12, 31, 0);

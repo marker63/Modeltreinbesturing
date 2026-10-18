@@ -1326,6 +1326,15 @@ public partial class BaanVerkenner
         var ctx = _laatsteKortsluitContext;
         var (achter, kop) = ctx is { } c0 && _monitor.Bezet.Contains(c0.Melder) ? WisselRollen(_kaart, c0.Melder, c0.Richting, _laatsteKortsluitReeks) : (new List<int>(), new HashSet<int>());
         achter = achter.Where(a => alle.Contains(a)).ToList();
+        // BUG #231 (autolog 18-10 13:43:29-13:45:25): de loc kwam via de keerlus 10 -> 129 terug op melder 129 en kreeg kortsluiting. De kaart wist alleen dat 14 -> 129 met wissel 6
+        // afbuigend kortsluiting geeft (wissel 6 rechtdoor hoort bij de tak van 14). De routine probeerde 1 min 45 s lang 14 andere adressen voordat wissel 6 (de oplossing) aan de beurt kwam.
+        // Komt de loc vanaf een ANDERE melder op zo'n melder aan, dan rijdt hij van de andere tak richting de samenvoeging: die wissel gaat dan voorop (BUG #169).
+        foreach (var a in AndereTakVerdachten(_kaart, bezet, LaatsteReeksBijLoc(bezet)))
+            if (alle.Contains(a) && !achter.Contains(a))
+            {
+                achter.Insert(0, a);
+                _log.Info($"Wissel {a}: de kaart weet dat afbuigend hier vanaf een andere ingang kortsluiting geeft; de loc kwam nu via de andere tak, dus wissel {a} is de eerste verdachte (BUG #231).");
+            }
         var kopAdressen = kop.Where(a => !achter.Contains(a) && alle.Contains(a)).ToHashSet();
         // BUG #222: de proefwissel die de loc net van de puntzijde nam (wissel 5 bij 14 -> 129) staat nog niet in de kaart, maar hoort ook bij de 'samengevoegde kant'.
         if (PuntzijdeProefNu() is int pzw && alle.Contains(pzw)) { achter.Remove(pzw); kopAdressen.Add(pzw); }
@@ -1464,6 +1473,25 @@ public partial class BaanVerkenner
         }
         _log.Waarschuwing("Geen enkele wissel haalde de kortsluiting weg.");
         return false;
+    }
+
+    /// <summary>BUG #231: de laatste gereden melderreeks die eindigt op een melder waar de loc nu staat (eerst die van de laatste kortsluiting, anders de laatste rit).</summary>
+    private IReadOnlyList<int> LaatsteReeksBijLoc(IReadOnlyCollection<int> bezet)
+    {
+        if (_laatsteKortsluitReeks.Count >= 2 && bezet.Contains(_laatsteKortsluitReeks[^1])) return _laatsteKortsluitReeks;
+        var rit = _kaart.Ritten.LastOrDefault();
+        return rit is not null && rit.Reeks.Count >= 2 && bezet.Contains(rit.Reeks[^1]) ? rit.Reeks : Array.Empty<int>();
+    }
+
+    /// <summary>BUG #231: wissels met een waarneming 'afbuigend geeft kortsluiting na melder X vanaf ingang V', terwijl de loc nu op X staat en er vanaf een andere melder U (niet V)
+    /// aankwam (laatste stap van <paramref name="reeks"/>). Die wissel wordt dan van de andere tak richting de samenvoeging bereden: omzetten kan de kortsluiting opheffen.</summary>
+    internal static List<int> AndereTakVerdachten(Baankaart kaart, IReadOnlyCollection<int> bezet, IReadOnlyList<int> reeks)
+    {
+        if (reeks.Count < 2) return new List<int>();
+        int x = reeks[^1], u = reeks[^2];
+        if (!bezet.Contains(x)) return new List<int>();
+        return kaart.Wissels.Where(w => w.Waarnemingen.Any(o => o.Soort == WaarnemingSoort.KortsluitingBijOmzetten && o.NaMelder == x && o.Via is int v && v != u))
+                            .Select(w => w.Adres).OrderBy(a => a).ToList();
     }
 
     /// <summary>BUG #169: de kruismotoren in de volgorde waarin ze verdacht zijn voor een loc die op de kruiswissel staat: eerst de motor waarvan de huidige stand
