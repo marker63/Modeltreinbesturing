@@ -2552,6 +2552,28 @@ public partial class BaanVerkenner
 
     /// <summary>Na een rit terug naar de startmelder van die rit (achteruit langs dezelfde
     /// melders - meteen ook de controle dat de weg terug klopt).</summary>
+    /// <summary>BUG #215: knipt een lus uit een pad. Komt melder X eerst op plaats i en later op plaats j voor (i &lt; j), en kent de kaart de overgang X -> pad[j+1] in
+    /// <paramref name="richting"/>, dan wordt het pad pad[..i] + pad[j..]. Bij meerdere kandidaten wordt de langste lus eerst geknipt.</summary>
+    internal static List<int> KnipLus(Baankaart kaart, List<int> pad, Richting richting)
+    {
+        var res = pad.ToList();
+        bool geknipt = true;
+        while (geknipt)
+        {
+            geknipt = false;
+            for (int i = 0; i < res.Count && !geknipt; i++)
+                for (int j = res.Count - 2; j > i; j--)
+                {
+                    if (res[j] != res[i]) continue;
+                    if (!kaart.Overgangen.Any(o => o.Van == res[j] && o.Naar == res[j + 1] && o.Richting == richting && (o.AantalKeer > 0 || o.GezienBijConfiguraties.Count > 0))) continue;
+                    res = res.Take(i).Concat(res.Skip(j)).ToList();
+                    geknipt = true;
+                    break;
+                }
+        }
+        return res;
+    }
+
     private async Task TerugNaar(int start, RitResultaat rit, Configuratie c)
     {
         var bezet = _monitor.Bezet;
@@ -2579,6 +2601,14 @@ public partial class BaanVerkenner
         }
         var pad = rit.Reeks.ToList();
         pad.Reverse();
+        // BUG #215 (log 18-10 10:22): na een rit die op een keerlus (129-4-11-12-1-9-10-129) eindigde reed de terugweg het omgekeerde pad met één vaste wisselstand: de loc bleef 7 rondjes in de lus
+        // (47 melders, 4 minuten). Komt een melder twee keer in het terugpad voor, dan wordt de lus eruit geknipt als de overgang daarna bekend is.
+        var geknipt = KnipLus(_kaart, pad, rit.Richting.Om());
+        if (geknipt.Count < pad.Count)
+        {
+            _log.Info($"Terugweg naar melder {start}: de lus in het pad ({Lijst(pad)}) wordt overgeslagen, de loc rijdt {Lijst(geknipt)} (niet getest op de baan).");
+            pad = geknipt;
+        }
         int vanaf = pad[0];
         if (!bezet.Contains(vanaf))
         {

@@ -2355,6 +2355,15 @@ public static class Tests
         k214.VerwijderNietBestaandeAdressen(new[] { 11 });
         Eis(!k214.Wissels.Any(w => w.Adres == 11) && !k214.Overgangen.Any(o => o.GezienBijConfiguraties.Any(c => Configuratie.VanSleutel(c).Bevat(11))) && !k214.Doorgangen.Any(d => d.Configuraties.Any(c => Configuratie.VanSleutel(c).Bevat(11))), "opruimen (#209): wissel 11 is overal uit de kaart van 09:50 verdwenen");
         Eis(Baankaart.VanJson(k214.AlsJson()) is not null, "opruimen (#209): de opgeruimde kaart blijft laden");
+        // BUG #215: terugweg over een keerlus (log 18-10 10:22)
+        var k215 = new Baankaart();
+        foreach (var (v215, n215) in new[] { (129, 10), (10, 9), (9, 1), (1, 12), (12, 11), (11, 4), (4, 129), (129, 14), (14, 13) })
+            k215.Overgangen.Add(new Overgang { Van = v215, Naar = n215, Richting = Richting.Achteruit, AantalKeer = 1, GezienBijConfiguraties = new List<string> { "5,10" } });
+        var pad215 = new List<int> { 129, 10, 9, 1, 12, 11, 4, 129, 14, 13 };
+        Eis(BaanVerkenner.KnipLus(k215, pad215, Richting.Achteruit).SequenceEqual(new[] { 129, 14, 13 }), "terugweg (#215): de lus 129-10-9-1-12-11-4 wordt uit het pad geknipt (nu " + string.Join(",", BaanVerkenner.KnipLus(k215, pad215, Richting.Achteruit)) + ")");
+        var k215b = new Baankaart();
+        Eis(BaanVerkenner.KnipLus(k215b, pad215, Richting.Achteruit).Count == pad215.Count, "terugweg (#215): is de overgang na de lus onbekend, dan blijft het pad zoals het was");
+        Eis(BaanVerkenner.HerhaaldeOvergang(new List<int> { 129, 10, 9, 1, 12, 11, 4, 129, 10 }) && !BaanVerkenner.HerhaaldeOvergang(new List<int> { 129, 10, 9, 1, 12, 11, 4, 129 }), "navigatie (#215): herhaalde overgang 129 -> 10 wordt na één rondje gezien, niet eerder");
         // BUG #160: voltooide kaart van 12:42 - ingangen afgeleid, kruismotor 10 blijft staan bij de aankomst op melder 129
         var k160 = Laad("baankaart_2026-10-15_1242.json");
         int? ViaVan(int adres, int na) => k160.Wissel(adres).Waarnemingen.FirstOrDefault(x => x.Soort == WaarnemingSoort.KortsluitingBijOmzetten && x.NaMelder == na)?.Via;

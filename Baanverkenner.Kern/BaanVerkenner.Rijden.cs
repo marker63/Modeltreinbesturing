@@ -956,6 +956,16 @@ public partial class BaanVerkenner
     /// (<paramref name="achter"/>), dan rijdt hij verder; staat hij er deels voorbij
     /// (<paramref name="voor"/>) of helemaal voorbij, dan kruipt hij terug. Onbekend: eerst
     /// verder, en bij doorschieten terug.</summary>
+    /// <summary>BUG #215: true als de laatste overgang (voorlaatste -> laatste melder) eerder in dezelfde reeks al voorkwam.</summary>
+    internal static bool HerhaaldeOvergang(List<int> reeks)
+    {
+        if (reeks.Count < 3) return false;
+        int a = reeks[^2], b = reeks[^1];
+        for (int i = 0; i + 1 < reeks.Count - 1; i++)
+            if (reeks[i] == a && reeks[i + 1] == b) return true;
+        return false;
+    }
+
     private async Task Nastellen(int doel, Richting laatsteRichting, int? achter = null, int? voor = null)
     {
         await NastellenKern(doel, laatsteRichting, achter, voor);
@@ -1771,6 +1781,13 @@ public partial class BaanVerkenner
                 {
                     // BUG #195 (simulatie optie 6): een navigatie die zijn doel niet haalt (de stand om er te komen ontbrak, bv. wissel 6 bleef rechtdoor door de alarmstand) reed eindeloos
                     // rondjes over de lus (600 minuten). Meer melders dan de kaart er heeft x 2 = de loc rijdt rondjes: stoppen en de aanroeper laten herstellen.
+                    // BUG #215 (log 18-10 10:22-10:26): 47 melders = 7 rondjes over een keerlus van 7 melders (4 minuten) voordat de grens hierboven werd bereikt. Dezelfde gerichte overgang
+                    // (vorige melder -> deze melder) voor de tweede keer terwijl de wissels niet veranderen betekent: de loc rijdt rondjes en haalt zijn doel zo nooit.
+                    if (res.Reeks.Count >= 4 && m != doel.DoelMelder && HerhaaldeOvergang(res.Reeks))
+                    {
+                        await StopLoc();
+                        throw new NavigatieFout($"De loc bereikte melder {doel.DoelMelder} niet: hij reed voor de tweede keer {res.Reeks[^2]} -> {m} (hij rijdt rondjes); de rit is gestopt op melder {m}.");
+                    }
                     if (res.Reeks.Count > Math.Max(20, 2 * _kaart.Melders.Count) && m != doel.DoelMelder)
                     {
                         await StopLoc();
