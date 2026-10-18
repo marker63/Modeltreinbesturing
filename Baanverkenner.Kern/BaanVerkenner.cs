@@ -417,6 +417,7 @@ public partial class BaanVerkenner
         }
         BewaarKruis();
         foreach (var t in _kaart.VerwijderNietBestaandeAdressen(_ins.NietBestaandeAdressen())) { _log.Waarschuwing("Kaart opgeruimd (BUG #209): " + t); _kaart.Waarschuwingen.Add(t); }
+        foreach (var t in _kaart.ToetsVoorlopigeOplossingen()) _log.Vondst("Voorlopige oplossing getoetst (BUG #204): " + t);
         foreach (var t in _kaart.HerstelStrijdigeOplossingen()) { _log.Waarschuwing("Kaart hersteld (BUG #159): " + t); _kaart.Waarschuwingen.Add(t); }
         foreach (var t in _kaart.HerstelOnmogelijkeKruisOplossingen(Kruis)) { _log.Waarschuwing("Kaart hersteld (BUG #137): " + t); _kaart.Waarschuwingen.Add(t); }
         _log.Info(Kruis.Motoren.Count == 0
@@ -2650,6 +2651,7 @@ public partial class BaanVerkenner
         _kaart.VulOntbrekendeVia();   // BUG #160
         if (Stap) BouwTrajecten();   // BUG #172
         // BUG #214: pas bij het afronden (niet tijdens de verkenning, anders verandert het wat de verkenner nog probeert)
+        foreach (var t in _kaart.ToetsVoorlopigeOplossingen()) _log.Vondst("Voorlopige oplossing getoetst (BUG #204): " + t);
         foreach (var t in _kaart.HerstelStrijdigeOplossingen()) { _log.Waarschuwing("Kaart hersteld (BUG #217): " + t); _kaart.Waarschuwingen.Add(t); }
         foreach (var t in _kaart.LosKortsluitpuntenOpUitRitten()) _log.Vondst("Kortsluitpunt afgeleid (BUG #214): " + t);
         BerekenAdressenZonderEffect();

@@ -2372,6 +2372,19 @@ public static class Tests
         Eis(!k217.RegistreerHandmatigeOplossing(kp217, 6, true), "kortsluitpunt #2 (#217): wissel 6 wordt niet opnieuw als oplossing geaccepteerd");
         k217.LosKortsluitpuntenOpUitRitten();
         Eis(kp217.Opgelost && kp217.OpgelostDoorAdres == 5, "kortsluitpunt #2 (#217): daarna volgt adres 5 uit de ritten (nu " + kp217.OpgelostDoorAdres + ")");
+        // BUG #204: een voorlopige (alleen uit het alarm afgeleide) oplossing wordt door ritten vervangen of bevestigd
+        var k204 = Laad("baankaart_2026-10-18_1146.json");
+        var kp204 = k204.Kortsluitpunten.First(x => x.Id == 2);
+        kp204.Voorlopig = true;
+        var t204 = k204.ToetsVoorlopigeOplossingen();
+        Eis(t204.Count == 1 && kp204.Opgelost && kp204.OpgelostDoorAdres == 5 && !kp204.Voorlopig, "voorlopig (#204): ruis 'wissel 6' wordt door de ritten vervangen door wissel 5 (nu " + kp204.OpgelostDoorAdres + "; " + string.Join(";", t204) + ")");
+        var kp204b = k204.Kortsluitpunten.First(x => x.Id == 1);
+        kp204b.Voorlopig = true;
+        k204.ToetsVoorlopigeOplossingen();
+        Eis(kp204b.Opgelost && !kp204b.Voorlopig && kp204b.OpgelostDoorAdres == 1, "voorlopig (#204): wissel 1 bij kortsluitpunt #1 wordt door de ritten 12 -> 5 met 1 en 2 afbuigend bevestigd");
+        var kp204c = new Kortsluitpunt { Id = 9, NaMelder = 99, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis.Met(2), Opgelost = true, OpgelostDoorAdres = 3, OpgelostMetAfbuigend = true, Voorlopig = true };
+        k204.Kortsluitpunten.Add(kp204c); k204.ToetsVoorlopigeOplossingen();
+        Eis(kp204c.Opgelost && kp204c.Voorlopig, "voorlopig (#204): zonder ritten over de overgang blijft een voorlopige oplossing staan (geen bewijs en geen weerlegging)");
         // BUG #160: voltooide kaart van 12:42 - ingangen afgeleid, kruismotor 10 blijft staan bij de aankomst op melder 129
         var k160 = Laad("baankaart_2026-10-15_1242.json");
         int? ViaVan(int adres, int na) => k160.Wissel(adres).Waarnemingen.FirstOrDefault(x => x.Soort == WaarnemingSoort.KortsluitingBijOmzetten && x.NaMelder == na)?.Via;

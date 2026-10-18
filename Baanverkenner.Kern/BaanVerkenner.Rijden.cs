@@ -1450,8 +1450,9 @@ public partial class BaanVerkenner
             return;
         }
         if (!_kaart.RegistreerHandmatigeOplossing(kp, adres, afbuigend, Kruis)) return;
-        _log.Vondst($"Kortsluitpunt #{kp.Id} (na melder {kp.NaMelder}, {kp.Richting.Tekst()}, {kp.Configuratie}) is opgelost door wissel {adres} op afbuigend: " +
-                    "het alarm verdween meteen nadat de verkenner die wissel omzette. Dit wordt voortaan in deze verkenning meteen toegepast (nog niet getest op de baan).");
+        kp.Voorlopig = true;   // BUG #204/#211/#217: alleen uit het alarm afgeleid, ritten bevestigen of weerleggen dit
+        _log.Vondst($"Kortsluitpunt #{kp.Id} (na melder {kp.NaMelder}, {kp.Richting.Tekst()}, {kp.Configuratie}) is voorlopig opgelost door wissel {adres} op afbuigend: " +
+                    "het alarm verdween nadat de verkenner die wissel omzette. Dit wordt voortaan in deze verkenning toegepast tot ritten het bevestigen of weerleggen (nog niet getest op de baan).");
         BewaarNu();
     }
 
@@ -1494,6 +1495,7 @@ public partial class BaanVerkenner
             Afbuigend = _wisselStand.Where(kv => kv.Value).Select(kv => kv.Key).OrderBy(a => a).ToList(),
             Reeks = uitkomst.Reeks.ToList(), Einde = uitkomst.Einde, Onbetrouwbaar = _onbetrouwbaar || _echo.Reeks > 0
         });
+        foreach (var t in _kaart.ToetsVoorlopigeOplossingen()) _log.Vondst("Voorlopige oplossing getoetst (BUG #204): " + t);
         // BUG #74: waar kwam de loc vandaan? (Na een kortsluiting/herstel is dat niet meer te weten.)
         if (uitkomst.Einde == RitEinde.Kortsluiting) _ingang = null;
         else if (uitkomst.Reeks.Count >= 2) _ingang = (uitkomst.Reeks[^2], uitkomst.Reeks[^1], r);

@@ -184,6 +184,9 @@ public class Kortsluitpunt
     /// tijdelijk (bijv. een tong die te laat omschakelde) en wordt niet verder "opgelost".</summary>
     public bool Tijdelijk { get; set; }
     public int? OpgelostDoorAdres { get; set; }
+    /// <summary>BUG #204/#211/#217: de oplossing is alleen afgeleid uit het wegvallen van het alarm bij een stilstaande loc (Dinamo zet het alarm zelf aan en uit) en nog niet door een rit bewezen.
+    /// <see cref="Baankaart.ToetsVoorlopigeOplossingen"/> bevestigt, vervangt of trekt haar in zodra ritten over dezelfde overgang dat laten zien.</summary>
+    public bool Voorlopig { get; set; }
     public bool? OpgelostMetAfbuigend { get; set; }
     public List<int> GeprobeerdeAdressen { get; set; } = new();
 }
@@ -899,7 +902,7 @@ public class Baankaart
         {
             int via = k.Route.Count > 0 && k.Route[^1].Pad.Count > 1 && k.Route[^1].Pad[^1] == k.NaMelder ? k.Route[^1].Pad[^2] : (k.TweedeMelders.Count == 1 ? k.TweedeMelders[0] : 0);
             if (via == 0) continue;
-            var ritten = Ritten.Where(r => !r.Onbetrouwbaar && r.Einde != RitEinde.Kortsluiting && k.Configuratie.Afbuigend.All(r.Afbuigend.Contains) && HeeftOvergang(r, via, k.NaMelder, k.Richting)).ToList();
+            var ritten = Ritten.Where(r => !r.Onbetrouwbaar && r.Einde != RitEinde.Kortsluiting && r.Einde != RitEinde.BekendKortsluitpunt && k.Configuratie.Afbuigend.All(r.Afbuigend.Contains) && HeeftOvergang(r, via, k.NaMelder, k.Richting)).ToList();
             if (ritten.Count == 0) continue;
             var extra = ritten.Select(r => r.Afbuigend.Except(k.Configuratie.Afbuigend).ToHashSet()).Aggregate((x, y) => { x.IntersectWith(y); return x; });
             if (extra.Count != 1) continue;
@@ -916,6 +919,46 @@ public class Baankaart
             res.Add($"kortsluitpunt #{k.Id} opgelost met adres {adres} afbuigend (afgeleid uit ritten {string.Join(", ", ritten.Select(r => "#" + r.Nr))})");
         }
         return res;
+    }
+
+    /// <summary>BUG #204/#211/#217: een voorlopige oplossing (alleen uit het alarm afgeleid) wordt getoetst aan de gereden ritten over dezelfde overgang (ook omgekeerd). Rijdt een rit
+    /// zonder kortsluiting over de overgang met de stand van het punt plus extra wissels, en bevat de doorsnede van die extra wissels het adres van de oplossing, dan is zij bewezen. Bevat die
+    /// doorsnede het adres niet, dan was zij ruis: bij precies één ander adres wordt zij daardoor vervangen, anders is het punt weer open. Geeft een melding per wijziging.</summary>
+    public List<string> ToetsVoorlopigeOplossingen()
+    {
+        var res = new List<string>();
+        foreach (var k in Kortsluitpunten.Where(k => k.Voorlopig && k.Opgelost && k.OpgelostDoorAdres is int && k.Configuratie.Afbuigend.Length > 0))
+        {
+            int x = k.OpgelostDoorAdres!.Value;
+            var extra = ExtraUitRitten(k, out var ritten);
+            if (extra is null) continue;
+            if (extra.Contains(x)) { k.Voorlopig = false; res.Add($"kortsluitpunt #{k.Id}: oplossing wissel {x} bevestigd door ritten {string.Join(", ", ritten.Select(r => "#" + r.Nr))}"); continue; }
+            if (extra.Count == 1)
+            {
+                int e = extra.First();
+                k.OpgelostDoorAdres = e; k.OpgelostMetAfbuigend = true; k.Voorlopig = false;
+                if (!k.GeprobeerdeAdressen.Contains(e)) k.GeprobeerdeAdressen.Add(e);
+                res.Add($"kortsluitpunt #{k.Id}: de voorlopige oplossing wissel {x} was ruis; ritten {string.Join(", ", ritten.Select(r => "#" + r.Nr))} bewijzen wissel {e}");
+            }
+            else if (extra.Count == 0) continue;
+            else
+            {
+                k.Opgelost = false; k.OpgelostDoorAdres = null; k.OpgelostMetAfbuigend = null; k.Voorlopig = false;
+                res.Add($"kortsluitpunt #{k.Id}: de voorlopige oplossing wissel {x} is niet bevestigd door ritten {string.Join(", ", ritten.Select(r => "#" + r.Nr))}; het punt is weer open");
+            }
+        }
+        return res;
+    }
+
+    /// <summary>De wissels (naast de stand van het punt) die afbuigend stonden in ALLE betrouwbare ritten zonder kortsluiting over de overgang van het punt; null als er geen zo'n rit is.</summary>
+    private HashSet<int>? ExtraUitRitten(Kortsluitpunt k, out List<GeredenRit> ritten)
+    {
+        ritten = new List<GeredenRit>();
+        int via = k.Route.Count > 0 && k.Route[^1].Pad.Count > 1 && k.Route[^1].Pad[^1] == k.NaMelder ? k.Route[^1].Pad[^2] : (k.TweedeMelders.Count == 1 ? k.TweedeMelders[0] : 0);
+        if (via == 0) return null;
+        ritten = Ritten.Where(r => !r.Onbetrouwbaar && r.Einde != RitEinde.Kortsluiting && r.Einde != RitEinde.BekendKortsluitpunt && k.Configuratie.Afbuigend.All(r.Afbuigend.Contains) && HeeftOvergang(r, via, k.NaMelder, k.Richting)).ToList();
+        if (ritten.Count == 0) return null;
+        return ritten.Select(r => r.Afbuigend.Except(k.Configuratie.Afbuigend).ToHashSet()).Aggregate((a, b) => { a.IntersectWith(b); return a; });
     }
 
     private static bool HeeftOvergang(GeredenRit r, int via, int na, Richting richting)
