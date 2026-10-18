@@ -2402,3 +2402,24 @@ Oplossing: (1) eerst de oplossing van een opgelost kortsluitpunt waarvan de meld
 ## BUG #199 – Melderschema, en "adressen zonder effect" ook in een tussenstand (Marco 17-10 20:14)
 Nieuw: `Melderschema` (alle melders als punten, gereden overgangen als lijnen, wissel en stand bij de lijn, melders met drie of meer buren oranje, het Dinamo-blok eronder als dat bekend is). In het HTML-rapport onder het blokkenschema en als venster ("Melderschema tonen" in het scherm, WPF-venster niet gecompileerd hier). De plaatsing is deterministisch (ring van de langste rit + korte krachtsimulatie).
 Het rapport van 20:05 meldde "0 adressen zonder effect" omdat die lijst pas bij afronden werd berekend; nu bij elke tussenstand, met de tekst dat sommige adressen misschien nog niet getest zijn. Nog niet getest op de baan.
+
+## BUG #200 – OPEN: loc schiet door naar melder 21 bij het neerzetten op melder 24 (log 17-10 19:59, 20:03, 20:04)
+Bij elke terugkeer naar melder 24 ("Neerzetten op melder 24") schiet de loc door naar 21, waarna "doorgeschoten, terug naar melder 24" volgt: 20 tot 30 seconden per keer, en bij het kruipen terug staat de loc een tijd deels in twee melders. Nog niet opgelost; vraagt een kortere remweg of een neerzetmelder vóór 24 voor deze ingang.
+
+## BUG #201 – OPEN: wissels zonder effect worden in elke richting en combinatie opnieuw gereden (log 17-10, rit #13-20, #38-50, #54-57)
+Wissel 3, 4, 7, 8, 9 en 12 deden volgens de ritten niets, maar kostten elk twee tot drie volledige rondes van circa 1 min 45 s (20 tot 30 minuten). Gevolgd Marco's regel "één wisselmotor tegelijk" is dat nu zo bedoeld; versnellen kan door adressen te groeperen (meerdere tegelijk omzetten, bij verschil halveren) of door een adres over te slaan dat al een volledige lus zonder effect had. Beide wijken af van die regel: eerst Marco vragen.
+
+## BUG #202 – OPEN: wisselstanden gelden in beide richtingen (Marco 17-10, zie ook #188)
+Staat 5 -> 12 vast met wissel 2 (en 1) afbuigend, dan moet 12 -> 5 dezelfde stand krijgen, ook in blokkenschema en wisselstraten. In het rapport van 20:05 staat 12 -> 5 nog met "wissel 2 afbuigend (uit splitsing), wissel 4 afbuigend (aangenomen)" en 5 -> 12 met "wissel 1 afbuigend (bewezen)": de twee richtingen zeggen verschillende dingen. Nog niet gebouwd.
+
+## BUG #203 – OPEN: optie 6 rijdt na elke opdracht terug naar de startmelder (Marco 17-10 18:06)
+Marco wil steeds doorrijden vanaf waar de loc staat. De opdrachtwachtrij kiest nu de dichtstbijzijnde opdracht, maar de navigatie en de terugweg (`TerugNaarMetControle`) brengen de loc nog terug naar de start van de opdracht. Nog niet gebouwd.
+
+## BUG #204 – OPEN: valse "oplossingen" bij een kortsluiting met stilstaande loc kunnen in de kaart terechtkomen (log 17-10 19:53-19:56)
+BUG #198 laat de verkenner eerst de bekende oplossing proberen, maar `Probeer` blijft elke wissel die het alarm 2,5 s wegneemt als oplossing vastleggen (`RegistreerAlarmOplossing`). Bij een terugkerend alarm (Dinamo zet de stroom steeds even terug) is dat onbetrouwbaar: wissel 1, 2 en 14 werden zo "oplossing" en bleven afbuigend staan. Nog te doen: een oplossing pas vastleggen als de loc daarna werkelijk weg kan rijden, en bij een volgend alarm met die stand weer intrekken (zoals `WeerlegAankomstOplossing` doet bij aankomst).
+
+## BUG #205 – OPEN: wissel 7 en 6 aan de 129-kant en de kortsluiting van 19:51 zijn nog niet goed uit elkaar gehaald
+De kortsluiting na melder 129 (rit met 5, 7, 10 afbuigend) kwam door wissel 10 die 2,2 s ervoor onder de loc werd omgezet (opgelost via de splitsing van wissel 5, BUG #197), maar de verkenner schreef hem aan wissel 7 toe en sloeg de proef over. Controleren in de volgende echte run of wissel 7 (en 6: afbuigend gaf doodlopend zonder melder) nu goed gevonden worden; anders de proef met 7 afbuigend en 10 al voor melder 129 omgezet herhalen.
+
+## BUG #206 – OPEN: tussenstand na Dinamo-uitval haalt bevindingen uit de kaart (log 19:21, 19:54, 19:56)
+Na "geen terugmelding van Dinamo" worden alle bevindingen sinds de eerste ontbrekende terugmelding verwijderd. Dat is veilig, maar kostte rit #13 tot en met #28 (bijna 10 minuten) opnieuw. Nog te doen: de wissel- en melderbevindingen waarvan de terugmelding wel kwam behouden, of na het herstel alleen de opdracht opnieuw rijden waarin de uitval zat.
