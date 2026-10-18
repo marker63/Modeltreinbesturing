@@ -1093,20 +1093,26 @@ public partial class BaanVerkenner
 
             if (Stap) PlanVervolg(o, basis);   // BUG #172
 
-            if (o.BronAdres is int bron && basis.Reeks.Count >= 2
-                && !_kaart.Wissel(bron).Waarnemingen.Any(w => w.Soort == WaarnemingSoort.Splitsing && w.NaMelder == o.Start && w.Richting == o.Richting))
+            if (o.BronAdres is int bron && basis.Reeks.Count >= 2)
             {
-                _kaart.Wissel(bron).Waarnemingen.Add(new WisselWaarneming
+                // BUG #197 (log 17-10 20:05: "wissel 5: na melder 13 rechtdoor -> 14, afbuigend -> 14"): de andere kant van een wissel werd altijd direct na de startmelder gezocht.
+                // Ligt de wissel pas verderop (hier tussen 14 en 24/129: beide ritten beginnen met 13, 14), dan is de eerste melder gelijk en hoort de splitsing bij de melder
+                // vóór het eerste verschil met de bekende rit zonder deze wissel.
+                var splits = ZoekAndereKantSplitsing(_kaart, o, basis.Reeks, bron);
+                if (splits is { } sp && !_kaart.Wissel(bron).Waarnemingen.Any(w => w.Soort == WaarnemingSoort.Splitsing && w.NaMelder == sp.Na && w.Richting == o.Richting))
                 {
-                    Soort = WaarnemingSoort.Splitsing,
-                    NaMelder = o.Start,
-                    Richting = o.Richting,
-                    VolgendeBijRechtdoor = o.BronRechtdoorVolgende,
-                    VolgendeBijAfbuigend = basis.Reeks[1],
-                    Configuratie = o.Configuratie.Zonder(bron).ToString(),
-                    Toelichting = $"Na melder {o.Start} ({o.Richting.Tekst()}): rechtdoor → melder {o.BronRechtdoorVolgende?.ToString() ?? "?"}, afbuigend → melder {basis.Reeks[1]} (puntzijde, gevonden door andersom te rijden)."
-                });
-                _log.Vondst($"Adres {bron}, andere kant: na melder {o.Start} ({o.Richting.Tekst()}) afbuigend → melder {basis.Reeks[1]}.");
+                    _kaart.Wissel(bron).Waarnemingen.Add(new WisselWaarneming
+                    {
+                        Soort = WaarnemingSoort.Splitsing,
+                        NaMelder = sp.Na,
+                        Richting = o.Richting,
+                        VolgendeBijRechtdoor = sp.Rechtdoor,
+                        VolgendeBijAfbuigend = sp.Afbuigend,
+                        Configuratie = o.Configuratie.Zonder(bron).ToString(),
+                        Toelichting = $"Na melder {sp.Na} ({o.Richting.Tekst()}): rechtdoor → melder {sp.Rechtdoor?.ToString() ?? "?"}, afbuigend → melder {sp.Afbuigend} (puntzijde, gevonden door andersom te rijden)."
+                    });
+                    _log.Vondst($"Adres {bron}, andere kant: na melder {sp.Na} ({o.Richting.Tekst()}) afbuigend → melder {sp.Afbuigend}.");
+                }
             }
 
             // BUG #162 (Marco 15-10 16:19: "de controle heeft uren geduurd, wat niet echt nodig is"): een controle rijdt de trajecten van de kaart en vergelijkt;
@@ -1520,13 +1526,32 @@ public partial class BaanVerkenner
         }, vooraan: true);
     }
 
+    /// <summary>BUG #197: waar splitst de rit met wissel <paramref name="bron"/> afbuigend van de rit zonder? Eerst direct na de startmelder (zoals voorheen, met de
+    /// rechtdoor-melder uit de opdracht); is die melder gelijk aan de eerste melder van de rit, dan wordt de bekende rit zonder deze wissel (zelfde start en richting) gezocht
+    /// en de eerste afwijking genomen. Null als er niets te zeggen valt (dan wordt geen valse splitsing "14 -> 14" vastgelegd).</summary>
+    internal static (int Na, int? Rechtdoor, int Afbuigend)? ZoekAndereKantSplitsing(Baankaart kaart, Opdracht o, List<int> reeks, int bron)
+    {
+        if (reeks.Count < 2) return null;
+        if (o.BronRechtdoorVolgende != reeks[1]) return (o.Start, o.BronRechtdoorVolgende, reeks[1]);
+        var zonder = o.Configuratie.Zonder(bron);
+        var ref0 = kaart.Trajecten.Where(t => t.Start == o.Start && t.Richting == o.Richting && t.Reeks.Count > 2 && t.Configuratie.Afbuigend.All(zonder.Bevat))
+                                   .OrderBy(t => t.Configuratie.Afbuigend.Length).FirstOrDefault();
+        if (ref0 is null) return null;
+        for (int x = 1; x < Math.Min(ref0.Reeks.Count, reeks.Count); x++)
+            if (ref0.Reeks[x] != reeks[x]) return (reeks[x - 1], ref0.Reeks[x], reeks[x]);
+        return null;
+    }
+
     /// <summary>De basisrit (zonder omgezet adres), bij de instelling "herhalen" twee keer,
     /// en bij verschil een derde keer als scheidsrechter.</summary>
     private async Task<RitResultaat?> Basisrit(Opdracht o)
     {
         var stops = KortsluitStops(o.Configuratie, o.Richting);
         RitResultaat? eerste = null;
-        int aantal = _ins.BasisritHerhalen && !Stap ? 2 : 1;   // BUG #172: stap voor stap vergelijkt elke proef toch met deze ene korte rit
+        // BUG #172: stap voor stap vergelijkt elke proef toch met deze ene korte rit.
+        // BUG #196 (log 17-10 20:05, Marco: "het duurt nogal lang"): ook bij optie 6 (rondrijden) was elke basisrit dubbel gereden (rit #1 en #2, #6 en #7, ...), met een derde als de overgangen
+        // verschilden: een kwart van alle ritten. Optie 6 vergelijkt toch alleen de melders onderling, een enkele basisrit volstaat.
+        int aantal = _ins.BasisritHerhalen && !Stap && !Rondrit ? 2 : 1;
         var ritten = new List<RitResultaat>();
         for (int i = 0; i < aantal + 1; i++)
         {
@@ -1534,6 +1559,9 @@ public partial class BaanVerkenner
             _bezig = $"opdracht #{o.Id}: basisrit {(i == 0 ? "" : $"(controle {i})")}";
             MeldVoortgang();
             var rijstandBasis = RijStand(o);
+            // BUG #196 (log 17-10 20:03:54): de stops werden alleen aan het begin berekend. Werd het kortsluitpunt tijdens de eerste rit opgelost (wissel 5 afbuigend bij kortsluitpunt #3),
+            // dan stopte de volgende basisrit (met 5 en 10 afbuigend) nog steeds op melder 14 alsof de kortsluiting er nog was. Elke rit rekent de stops opnieuw uit.
+            if (i > 0) stops = KortsluitStops(o.Configuratie, o.Richting);
             var rit = await Rit(o.Start, o.Richting, new RitDoel { Configuratie = rijstandBasis, StopBijMelders = stops, StaartWissels = true, MaxStappen = Stap ? (o.Aanloop ? 2 : 1) : null });
             _log.Info($"Basisrit: {Lijst(rit.Reeks)} - einde: {EindeTekst(rit.Einde)}.");
             VerwerkEinde(o, rit);
@@ -2418,6 +2446,21 @@ public partial class BaanVerkenner
             if (idx >= 1)
             {
                 int w = rit.Reeks[idx - 1];
+                // BUG #197 (log 17-10 20:05, open punt #1 "heen 16 naar 5, terug 5 naar 16 - niet terug naar 16"): ging de loc terug naar de melder waar hij vandaan kwam, dan is dat
+                // geen onverwachte terugweg maar gewoon terug; het verschil zat in de verwachte route van de navigatie (hier wissel 2). Geen kortsluitpunt aanmaken.
+                if (nf.Onverwacht == w)
+                {
+                    _log.Info($"Terugweg na melder {w}/{y}: de loc kwam terug op melder {w}, dus gewoon de weg waarlangs hij heen kwam; geen onverwachte terugweg (de verwachte route van de navigatie klopte niet).");
+                    throw;
+                }
+                // BUG #197 (log 17-10 19:15, open punt #4: 8 naar 24 en terug 24 naar 21): melder y heeft al drie of meer buren (kruiswissel of splitsing in dezelfde melder): daar hoeft de
+                // terugweg niet langs de heenweg te gaan. De heenweg 'w naar y' is dan wel gewoon gereden en blijft in de kaart; het is geen mislukte overgang.
+                if (Buren(_kaart).TryGetValue(y, out var burenY) && burenY.Count >= 3)
+                {
+                    string uitleg = $"Melder {y} heeft meer dan twee buren ({string.Join(", ", burenY.OrderBy(x => x))}), dus een kruiswissel of splitsing in of bij die melder. De overgang {w} naar {y} ({o.Richting.Tekst()}, {c}) is gereden en blijft in de kaart; dat de loc daarna via melder {nf.Onverwacht} terugkwam is hier te verwachten.";
+                    _log.Info(uitleg);
+                    throw;
+                }
                 // BUG #40. Gebruikerswaarneming: "bezetmelder 136 zit in blok 11 en is
                 // gewoon goed berijdbaar, [...] geen idee hoe je daar bij kwam" - en later:
                 // "blok 10, 11, 12 is een recht stukje spoor waar je alleen heen en weer kan
@@ -2516,14 +2559,21 @@ public partial class BaanVerkenner
     // Afronden
     // =====================================================================
 
-    private void Afronden()
+    /// <summary>BUG #160/#198: de adressen waar (nog) geen effect van gezien is. Ook in een tussenstand bijgehouden (het rapport van 17-10 20:05 meldde "0 adressen zonder effect"
+    /// terwijl wissel 3, 4, 7, 8, 9 en 12 volgens de ritten niets deden); in een tussenstand kunnen er nog ongeteste adressen bij staan.</summary>
+    private void BerekenAdressenZonderEffect()
     {
         var gevonden = _status.Geidentificeerd.ToHashSet();
         foreach (var k in _kaart.Kortsluitpunten.Where(k => k.OpgelostDoorAdres is not null)) gevonden.Add(k.OpgelostDoorAdres!.Value);
         foreach (var w in _kaart.Wissels.Where(w => w.Waarnemingen.Count > 0)) gevonden.Add(w.Adres);   // BUG #160: wissel 11 stond in de lijst 'zonder effect' terwijl hij waarnemingen had
+        _kaart.AdressenZonderEffect = _ins.WisselAdressen().Where(a => !gevonden.Contains(a)).ToList();
+    }
+
+    private void Afronden()
+    {
         _kaart.VulOntbrekendeVia();   // BUG #160
         if (Stap) BouwTrajecten();   // BUG #172
-        _kaart.AdressenZonderEffect = _ins.WisselAdressen().Where(a => !gevonden.Contains(a)).ToList();
+        BerekenAdressenZonderEffect();
         _kaart.VoorgesteldeBlokken = BlokVoorstel.Bereken(_kaart);
         _kaart.Wisselstraatvoorstellen = WisselstraatVoorstel.Bereken(_kaart);
         // BUG #188 (meting: 7 van 16 simulatieruns meldden 'voltooid' met 2-4 van de 21 melders, steeds met een melder zonder Dinamo-blok): een verkenning waarin nog een melder
@@ -2566,6 +2616,7 @@ public partial class BaanVerkenner
     private void BewaarNu()
     {
         _kaart.Bijgewerkt = _klok.Nu;
+        BerekenAdressenZonderEffect();
         try { Bewaren?.Invoke(_status); }
         catch (Exception ex) { _log.Waarschuwing($"Voortgang bewaren mislukte: {ex.Message}"); }
     }

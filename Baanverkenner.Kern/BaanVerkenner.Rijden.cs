@@ -1298,6 +1298,18 @@ public partial class BaanVerkenner
             return false;
         }
 
+        // BUG #198 (log 17-10 19:52-19:56): een kortsluiting bij de bezette melders 24 en 129 werd met wissels 1, 2 en 14 'opgelost' (alle in numerieke volgorde geprobeerd, de kortsluiting verdween
+        // steeds vanzelf of tijdelijk), terwijl kortsluitpunt #3 al bewees dat wissel 5 afbuigend de oplossing is. Eerst de oplossing die de kaart zelf voor deze bezette melders kent.
+        var stNu = new Configuratie(_wisselStand.Where(w => w.Value).Select(w => w.Key).ToArray());
+        foreach (var kpOpl in _kaart.Kortsluitpunten.Where(k => k.Opgelost && k.OpgelostMetAfbuigend == true && k.OpgelostDoorAdres is int && !Kruis.IsMotor(k.OpgelostDoorAdres!.Value)
+                                                                && (bezet.Contains(k.NaMelder) || k.TweedeMelders.Any(bezet.Contains)) && k.Configuratie.Afbuigend.All(stNu.Bevat)).OrderBy(k => k.Id).ToList())
+        {
+            int oa = kpOpl.OpgelostDoorAdres!.Value;
+            if (stNu.Bevat(oa) || bijLoc.Contains(oa) || !alle.Contains(oa)) continue;
+            _log.Info($"Eerst de bekende oplossing van kortsluitpunt #{kpOpl.Id}: wissel {oa} afbuigend.");
+            if (await Probeer(oa, $" (bekende oplossing van kortsluitpunt #{kpOpl.Id})")) return true;
+        }
+
         // stap 1: de wissels die van achteren bereden worden en niet bij de loc liggen
         foreach (var a in achter.Where(a => !bijLoc.Contains(a)))
             if (await Probeer(a, " (van een tak richting de samenvoeging bereden)")) return true;
@@ -1320,7 +1332,17 @@ public partial class BaanVerkenner
         }
 
         // stap 3: de overige wissels, behalve die van de samengevoegde kant (omzetten helpt daar niet) en die bij de loc
-        foreach (var a in alle.Where(a => !bijLoc.Contains(a) && !achter.Contains(a) && !kopAdressen.Contains(a)))
+        // BUG #198: wissels waarvan de kaart de plek kent en die ver van de bezette melders liggen komen als laatste; de wissels bij de loc (buren van de bezette melders) eerst.
+        var burenKaart = Buren(_kaart);
+        var dichtbij = bezet.ToHashSet();
+        foreach (var bm in bezet) if (burenKaart.TryGetValue(bm, out var bb)) foreach (var n in bb) dichtbij.Add(n);
+        int Afstand(int ad)
+        {
+            var wm = _kaart.Wissels.Where(w => w.Adres == ad).SelectMany(w => w.Waarnemingen)
+                .SelectMany(o => new[] { (int?)o.NaMelder, o.Via, o.VolgendeBijRechtdoor, o.VolgendeBijAfbuigend }).Where(x => x is not null).Select(x => x!.Value).ToList();
+            return wm.Count == 0 ? 1 : wm.Any(dichtbij.Contains) ? 0 : 2;
+        }
+        foreach (var a in alle.Where(a => !bijLoc.Contains(a) && !achter.Contains(a) && !kopAdressen.Contains(a)).OrderBy(Afstand).ThenBy(a => a))
             if (await Probeer(a, "")) return true;
 
         // BUG #147 (Marco 18:41: "nu weer wissel 14"; ook wissel 2 bij melder 5 om 17:27): de wissel die de kortsluiting veroorzaakt ligt bijna altijd bij de

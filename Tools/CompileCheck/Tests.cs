@@ -2675,6 +2675,37 @@ public static class Tests
     }
 
     static void Eis(bool ok, string tekst) { Console.WriteLine((ok ? "OK    " : "FOUT  ") + tekst); if (!ok) _fouten++; }
+    // BUG #196-#199 (log 17-10 20:05): wissel 5 na melder 14, melderschema, onverwachte-terugwegregel
+    static void Log2005Test()
+    {
+        var k = Laad("baankaart_2026-10-17_2005.json");
+        var o = new Opdracht { Start = 13, Richting = Richting.Vooruit, Configuratie = new Configuratie(new[] { 5 }), BronAdres = 5, BronRechtdoorVolgende = 14 };
+        var sp = BaanVerkenner.ZoekAndereKantSplitsing(k, o, new List<int> { 13, 14, 129, 24, 21, 29 }, 5);
+        Eis(sp is { Na: 14, Rechtdoor: 24, Afbuigend: 129 }, "#197: wissel 5 splitst na melder 14 (rechtdoor 24, afbuigend 129), niet 14 -> 14 na melder 13 (nu " + (sp is null ? "null" : $"{sp.Value.Na}:{sp.Value.Rechtdoor}/{sp.Value.Afbuigend}") + ")");
+        var o2 = new Opdracht { Start = 13, Richting = Richting.Vooruit, Configuratie = new Configuratie(new[] { 2 }), BronAdres = 2, BronRechtdoorVolgende = 14 };
+        var sp2 = BaanVerkenner.ZoekAndereKantSplitsing(k, o2, new List<int> { 13, 5 }, 2);
+        Eis(sp2 is { Na: 13, Rechtdoor: 14, Afbuigend: 5 }, "#197: een verschil direct na de startmelder blijft gewoon na de startmelder");
+        var o3 = new Opdracht { Start = 13, Richting = Richting.Vooruit, Configuratie = new Configuratie(new[] { 3 }), BronAdres = 3, BronRechtdoorVolgende = 14 };
+        Eis(BaanVerkenner.ZoekAndereKantSplitsing(k, o3, new List<int> { 13, 14, 24, 21 }, 3) is null, "#197: dezelfde rit als zonder de wissel geeft geen (valse) splitsing");
+
+        var m = Melderschema.Maak(k);
+        Eis(m.Knopen.Count == 19, "melderschema: 19 melders (nu " + m.Knopen.Count + ")");
+        Eis(m.Knopen.First(x => x.Melder == 24).Splitsing && m.Knopen.First(x => x.Melder == 14).Splitsing, "melderschema: melder 14 en 24 zijn splitsingen (drie of meer buren)");
+        Eis(m.Knopen.All(x => x.X > 0 && x.Y > 0 && x.X < m.Breedte && x.Y < m.Hoogte), "melderschema: alle melders liggen binnen de tekening");
+        double min = double.MaxValue;
+        for (int i = 0; i < m.Knopen.Count; i++)
+            for (int j = i + 1; j < m.Knopen.Count; j++)
+                min = Math.Min(min, Math.Sqrt(Math.Pow(m.Knopen[i].X - m.Knopen[j].X, 2) + Math.Pow(m.Knopen[i].Y - m.Knopen[j].Y, 2)));
+        Eis(min > 36, "melderschema: geen twee melders liggen over elkaar (kleinste afstand " + min.ToString("0") + ")");
+        Eis(Melderschema.Maak(k).AlsSvg() == m.AlsSvg(), "melderschema: dezelfde kaart geeft steeds dezelfde tekening");
+        var svg = m.AlsSvg();
+        Eis(svg.Contains("W10 afb.") && svg.Contains("W2 rd."), "melderschema: wissels staan bij de lijnen");
+        Eis(Rapport.AlsHtml(k).Contains("<h2>Melderschema</h2>"), "melderschema: het HTML-rapport bevat het schema");
+        var uit = Environment.GetEnvironmentVariable("MELDERSCHEMA_UIT");
+        if (!string.IsNullOrEmpty(uit)) { File.WriteAllText(uit, svg); Console.WriteLine("  melderschema geschreven naar " + uit); }
+        Eis(k.AdressenZonderEffect is not null, "kaart geladen");
+    }
+
     static Baankaart Laad(string f) => Baankaart.VanJson(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "testdata", f)))!;
 
     public static int Main()
@@ -2767,6 +2798,7 @@ public static class Tests
         Aankomst192Test();
         KruisUitsluitingTest();
         SchemaWisselsTest();
+        Log2005Test();
         RondritTest();
         AlarmWisselBijLocTest();
         KruisRuisVoorafTest();

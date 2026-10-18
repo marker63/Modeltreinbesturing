@@ -1074,6 +1074,12 @@ public partial class MainWindow : Window
         new BlokkenschemaWindow(HuidigeKaart) { Owner = this }.Show();
     }
 
+    private void Melderschema_Click(object sender, RoutedEventArgs e)
+    {
+        if (KaartOfMelding() is null) return;
+        new MelderschemaWindow(HuidigeKaart) { Owner = this }.Show();
+    }
+
     private void RapportHtml_Click(object sender, RoutedEventArgs e)
     {
         var k = KaartOfMelding();

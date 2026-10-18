@@ -268,6 +268,7 @@
                 <Button x:Name="RapportHtmlKnop" Content="Rapport opslaan (HTML)…" Click="RapportHtml_Click" Margin="0,0,6,4"/>
                 <Button x:Name="ImporterenKnop" Content="Importeren in Modeltreinbesturing…" Click="Importeren_Click" Margin="0,0,6,4"/>
                 <Button x:Name="BlokkenschemaKnop" Content="Blokkenschema tonen" Click="Blokkenschema_Click" Margin="0,0,6,4"/>
+                <Button x:Name="MelderschemaKnop" Content="Melderschema tonen" Click="Melderschema_Click" Margin="0,0,6,4"/>
                 <Button x:Name="RapportTekstKnop" Content="Rapport opslaan (tekst)…" Click="RapportTekst_Click" Margin="0,0,6,4"/>
                 <Button x:Name="BaankaartKnop" Content="Baankaart opslaan (voor import)…" Click="Baankaart_Click" Margin="0,0,6,4"/>
                 <Button x:Name="LogOpslaanKnop" Content="Logboek opslaan…" Click="LogOpslaan_Click" Margin="0,0,6,4"/>
