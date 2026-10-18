@@ -147,6 +147,7 @@ public partial class MainWindow : Window
         DinamoBlokkenBox.Text = i.DinamoBlokken;
         HoogsteMelderBox.Text = i.HoogsteMelder.ToString();
         KruisMotorenBox.Text = i.KruisMotoren ?? "";
+        OmgekeerdBox.Text = i.OmgekeerdAangesloten ?? "";   // BUG #235
         MaxSecBox.Text = i.MaxSecondenTussenMelders.ToString();
         SlimmeTimeoutCheck.IsChecked = i.SlimmeTimeout;
         MinSecBox.Text = i.MinSecondenTussenMelders.ToString();
@@ -195,6 +196,7 @@ public partial class MainWindow : Window
             DinamoBlokken = DinamoBlokkenBox.Text.Trim(),
             HoogsteMelder = Geheel(HoogsteMelderBox, "Hoogste meldernummer", 1, 2048),
             KruisMotoren = KruisMotorenBox.Text.Trim(),
+            OmgekeerdAangesloten = OmgekeerdBox.Text.Trim(),   // BUG #235
             MaxSecondenTussenMelders = Geheel(MaxSecBox, "Max. seconden tussen melders", 5, 600),
             SlimmeTimeout = SlimmeTimeoutCheck.IsChecked == true,
             MinSecondenTussenMelders = Geheel(MinSecBox, "Min. seconden tussen melders", 2, 600),

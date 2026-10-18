@@ -30,6 +30,14 @@ public class VerkenInstellingen
     /// <summary>Dinamo-blokadressen die geprobeerd worden bij het koppelen van secties aan
     /// blokken, bijv. "1-16" of "1-8,12,20-24".</summary>
     public string DinamoBlokken { get; set; } = "1-16";
+    /// <summary>BUG #235 (Marco 18-10 14:06: "je meldt wissel 6 afbuigend maar hij stond rechtdoor"): wissels waarvan het Dinamo-commando 'afbuigend' op de baan rechtdoor
+    /// is (motor andersom aangesloten), bijv. "6". Alleen voor de meldingen in logboek en rapport: de verkenner blijft intern met de Dinamo-commando's rekenen, zodat de
+    /// kaart klopt met wat er verstuurd wordt. Leeg = geen.</summary>
+    public string OmgekeerdAangesloten { get; set; } = "";
+
+    /// <summary>BUG #235: de adressen uit <see cref="OmgekeerdAangesloten"/>.</summary>
+    public HashSet<int> OmgekeerdeWissels()
+        => OmgekeerdAangesloten.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries).Select(x => int.TryParse(x.Trim(), out var a) ? a : 0).Where(a => a > 0).ToHashSet();
     /// <summary>Hoogste meldernummer dat bij de start opgevraagd wordt (alleen als de
     /// hardware de melderstand kan opvragen, zoals Dinamo).</summary>
     public int HoogsteMelder { get; set; } = 64;

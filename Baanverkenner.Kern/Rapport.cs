@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Text;
 
 namespace Baanverkenner.Kern;
@@ -198,6 +198,8 @@ ul{margin:6px 0 0 18px;padding:0}
 
         // Wissels
         sb.Append("<h2>Wissels</h2>");
+        if (k.OmgekeerdeWissels.Count > 0)
+            sb.Append($"<p class=\"uitleg\">Standen zijn de Dinamo-commando's. <b>Omgekeerd aangesloten: wissel {string.Join(", ", k.OmgekeerdeWissels.OrderBy(a => a))}</b>; daar is 'afbuigend' op de baan rechtdoor en andersom (BUG #235).</p>");
         var wr = WisselRegels(k);
         if (wr.Count == 0) sb.Append("<p>Geen wissels gevonden.</p>");
         else
@@ -358,8 +360,10 @@ ul{margin:6px 0 0 18px;padding:0}
         sb.AppendLine("(Richtingen zijn die van de testloc zelf.)");
 
         Kop("WISSELS");
+        if (k.OmgekeerdeWissels.Count > 0)
+            sb.AppendLine($"  (Standen zijn de Dinamo-commando's. Omgekeerd aangesloten: wissel {string.Join(", ", k.OmgekeerdeWissels.OrderBy(a => a))}; daar is 'afbuigend' op de baan rechtdoor en andersom.)");
         foreach (var r in WisselRegels(k))
-            sb.AppendLine($"  Adres {r.Adres,-4} {r.Ligging}\n             rechtdoor: {r.Rechtdoor}   afbuigend: {r.Afbuigend}");
+            sb.AppendLine($"  Adres {r.Adres,-4} {r.Ligging}{(k.OmgekeerdeWissels.Contains(r.Adres) ? "   [OMGEKEERD AANGESLOTEN: op de baan andersom]" : "")}\n             rechtdoor: {r.Rechtdoor}   afbuigend: {r.Afbuigend}");
         if (k.Wissels.Count == 0) sb.AppendLine("  (geen)");
 
         if (k.Ritten.Count > 0)

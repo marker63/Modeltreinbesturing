@@ -269,6 +269,8 @@ public class Baankaart
     /// (zie <see cref="VerkenStatus.VoorUitbreiding"/>). <see cref="StartMelder"/> is altijd de meest recente.</summary>
     public List<int> EerdereStartMelders { get; set; } = new();
     public int WisselAdresVan { get; set; }
+    /// <summary>BUG #235: wissels die omgekeerd zijn aangesloten (Dinamo 'afbuigend' = op de baan rechtdoor); alleen voor het rapport.</summary>
+    public List<int> OmgekeerdeWissels { get; set; } = new();
     public int WisselAdresTot { get; set; }
 
     public List<MelderInfo> Melders { get; set; } = new();

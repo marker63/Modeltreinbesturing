@@ -285,6 +285,9 @@ public partial class BaanVerkenner
             foreach (var t in _kaart.VerwijderAchterkantOvergangen())   // BUG #227
                 _log.Waarschuwing($"Uit de kaart verwijderd (BUG #227): {t}.");
             if (Voorkennis is { AantalMetingen: > 0 } lp) _log.Info($"Leerprofiel: {lp.Overgangen.Count} overgangen uit eerdere verkenningen (tijden worden omgerekend naar verkensnelheid {_ins.Verkensnelheid}).");
+            _log.OmgekeerdeWissels = _ins.OmgekeerdeWissels();   // BUG #235
+            _kaart.OmgekeerdeWissels = _log.OmgekeerdeWissels.OrderBy(a => a).ToList();
+            if (_log.OmgekeerdeWissels.Count > 0) _log.Info($"Omgekeerd aangesloten: wissel {string.Join(", ", _log.OmgekeerdeWissels.OrderBy(a => a))} (Dinamo 'afbuigend' = op de baan rechtdoor). De meldingen over die wissel krijgen dat erbij.");
             _log.Info($"Hardware: {_hw.Naam}. Testloc adres {_ins.LocAdres} ({_ins.LocStappen} stappen), verkensnelheid {_ins.Verkensnelheid}, kruipsnelheid {_ins.Kruipsnelheid}.");
             _log.Info($"Wisseladressen {_kaart.WisselAdresVan} t/m {_kaart.WisselAdresTot}." + (BlokVereist ? $" Dinamo-blokken: {_ins.DinamoBlokken}." : ""));
 

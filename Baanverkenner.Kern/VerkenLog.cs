@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 
 namespace Baanverkenner.Kern;
 
@@ -18,10 +18,24 @@ public class VerkenLog
 
     public event Action<Regel>? NieuweRegel;
 
+    /// <summary>BUG #235: wissels die omgekeerd zijn aangesloten (Dinamo 'afbuigend' = op de baan rechtdoor). Een logregel die zo'n wissel met een stand noemt krijgt een uitleg erachter.</summary>
+    public HashSet<int> OmgekeerdeWissels { get; set; } = new();
+
+    /// <summary>BUG #235: zet achter een tekst die wissel/adres N met 'afbuigend' of 'rechtdoor' noemt (N omgekeerd aangesloten) wat dat op de baan is.</summary>
+    public static string MetBaanstand(string tekst, IReadOnlyCollection<int> omgekeerd)
+    {
+        if (omgekeerd.Count == 0 || !(tekst.Contains("afbuigend") || tekst.Contains("rechtdoor"))) return tekst;
+        var genoemd = omgekeerd.Where(a => System.Text.RegularExpressions.Regex.IsMatch(tekst, $@"\b(?:[Ww]issels?|[Aa]dres(?:sen)?)\s+(?:\d+\s*(?:,|en)\s*)*{a}\b")
+                                        || System.Text.RegularExpressions.Regex.IsMatch(tekst, $@"afbuigend:\s*(?:\d+\s*,\s*)*{a}\b")).OrderBy(a => a).ToList();
+        if (genoemd.Count == 0) return tekst;
+        return tekst + $" [wissel {string.Join(", ", genoemd)} is omgekeerd aangesloten: 'afbuigend' in deze melding is op de baan rechtdoor en andersom]";
+    }
+
     public void Schrijf(LogSoort soort, string tekst)
     {
         // BUG #177 (Marco 17-10 10:53: "rare tekens bij adres 5 afbuigend"): pijlen en het weglatingsteken staan in het venster en in sommige editors als blokjes of
         // gekke tekens. In het logboek dus gewone tekens.
+        tekst = MetBaanstand(tekst, OmgekeerdeWissels);   // BUG #235
         tekst = tekst.Replace("\u2192", "->").Replace("\u2190", "<-").Replace("\u2194", "<->").Replace("\u2026", "...");
         var r = new Regel(_klok.Nu, soort, tekst);
         lock (_slot) _regels.Add(r);

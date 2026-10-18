@@ -2475,6 +2475,14 @@ public static class Tests
         Eis(v231.Contains(6), "keerlus (#231): na 10 -> 129 is wissel 6 de eerste verdachte (afbuigend gaf kortsluiting vanaf 14) (nu " + string.Join(",", v231) + ")");
         Eis(!BaanVerkenner.AndereTakVerdachten(k231, new[] { 129 }, new List<int> { 13, 14, 129 }).Contains(6), "keerlus (#231): vanaf 14 (dezelfde ingang) is wissel 6 geen verdachte van de andere tak");
         Eis(AutoTussenstand.Map(@"C:\Marco\Autolog") == @"C:\Marco" && AutoTussenstand.Map(@"C:\Marco\autolog\") == @"C:\Marco" && AutoTussenstand.Map("") == @"C:\Marco" && AutoTussenstand.Map(@"D:\Logs") == @"D:\Logs" && new VerkenInstellingen().AutoTussenstandMap == @"C:\Marco", "tussenstand (#233): standaard en oude standaard C:\\Marco\\Autolog worden C:\\Marco; een eigen map blijft");
+        // BUG #235: wissel 6 omgekeerd aangesloten
+        var om235 = new VerkenInstellingen { OmgekeerdAangesloten = "6" }.OmgekeerdeWissels();
+        Eis(om235.SetEquals(new[] { 6 }) && new VerkenInstellingen().OmgekeerdeWissels().Count == 0, "omgekeerd (#235): instelling '6' geeft wissel 6, standaard geen");
+        var t235 = VerkenLog.MetBaanstand("De kortsluiting ging weg nadat wissel 6 (ligt bij de loc) naar afbuigend is geschakeld.", om235);
+        Eis(t235.Contains("omgekeerd aangesloten") && VerkenLog.MetBaanstand("Adres 6: afbuigend (wisselcommando 74)", om235).Contains("op de baan rechtdoor") && VerkenLog.MetBaanstand("Niet geprobeerd: wissel 5, 6 (ligt bij de loc), afbuigend", om235).Contains("omgekeerd"), "omgekeerd (#235): meldingen over wissel 6 met een stand krijgen de uitleg");
+        Eis(VerkenLog.MetBaanstand("Adres 16: afbuigend", om235) == "Adres 16: afbuigend" && VerkenLog.MetBaanstand("Wissel 6 gevonden", om235) == "Wissel 6 gevonden" && VerkenLog.MetBaanstand("Rijstand: afbuigend: 5, 6, 10", om235).Contains("omgekeerd"), "omgekeerd (#235): adres 16 of een melding zonder stand blijft gewoon; 'afbuigend: 5, 6' wel");
+        var k235 = Laad("baankaart_2026-10-18_1349.json"); k235.OmgekeerdeWissels = new List<int> { 6 };
+        Eis(Rapport.AlsTekst(k235).Contains("OMGEKEERD AANGESLOTEN") && Rapport.AlsHtml(k235).Contains("Omgekeerd aangesloten: wissel 6"), "omgekeerd (#235): rapport (tekst en html) noemt het");
         // BUG #226: automatische tussenstand
         var map226 = Path.Combine(Path.GetTempPath(), "autotussenstand_test_" + Guid.NewGuid().ToString("N"));
         var nu226 = new DateTime(2026, 10, 18, 12, 31, 0);
