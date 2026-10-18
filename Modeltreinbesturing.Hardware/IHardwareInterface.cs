@@ -73,6 +73,11 @@ public interface IHardwareInterface
     /// ZetLocSnelheid; DinamoHardware heeft een eigen voorrangs-wachtrij en vervangt dit.</summary>
     void ZetLocSnelheidUrgent(int decoderAdres, int stap, bool vooruit, int blokNummer = 0, int stappen = 126) => ZetLocSnelheid(decoderAdres, stap, vooruit, blokNummer, stappen);
 
+    /// <summary>BUG #221 (hardwarelog 18-10 12:07:29): bij een kortsluiting stonden er nog rijcommando's (snelheid 12 naar blok 5 t/m 9) in de wachtrij; die gingen eerst
+    /// de deur uit en de STOP voor het blok met de kortsluiting pas 3 s na het alarm. Gooit alle nog niet verstuurde snelheidscommando's voor deze loc weg.
+    /// Standaard niets (andere centrales hebben geen eigen wachtrij); DinamoHardware vervangt dit.</summary>
+    void VerwijderWachtendeSnelheidscommandosVoor(int decoderAdres) { }
+
     /// <summary>BAANVERKENNER: true als ZetLocSnelheid/ZetFunctie een blokNummer nodig
     /// hebben om de loc te bereiken (Dinamo: DCC-commando's gaan altijd via een blok).
     /// DCC-EX/LocoNet/Simulatie adresseren de decoder rechtstreeks - standaard false.</summary>

@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Modeltreinbesturing.Hardware;
 
 namespace Baanverkenner.Kern;
@@ -1307,7 +1307,10 @@ public partial class BaanVerkenner
                     // BUG #191 (meting: met 'doorrijden en blokproef na herstel' kwamen 24 valse wissels, zonder dit 0): de wissel die de loc net een andere kant op stuurde ligt bij de
                     // melder waar de loc nu staat, maar de kaart kent hem pas na Vergelijk. Hij werd daardoor direct onder de loc teruggezet (de loc stond nog met zijn staart op de tong);
                     // de volgende proef reed dan de verkeerde tak en kreeg de eer. Nu eerst doorrijden tot de loc de wissel voorbij is (VrijRijdenVoorWissel), dan pas terugzetten.
-                    _bekendBijBezet.Add(a);
+                    // BUG #224 (log 18-10 12:10:18): wissel 5 splitst pas na melder 14; terug op melder 13 ligt hij een hele melder achter de loc. Het doorkruipen (4,8 s,
+                    // "wissel 5 ligt bij melder 13") was dan niet nodig. Alleen als de afwijking direct na de startmelder begint, ligt de wissel bij de startmelder.
+                    bool wisselBijStart = EersteAfwijking(basis.Reeks, proef.Reeks) == 1;
+                    if (wisselBijStart) _bekendBijBezet.Add(a);
                     try { await ZetWissel(a, false); } finally { _bekendBijBezet.Remove(a); }
                     foreach (var (ex, _) in proefExtra) await ZetWisselNaProef(ex, rijstand.Bevat(ex), oplossingWissel: true);
                 }
@@ -1436,6 +1439,14 @@ public partial class BaanVerkenner
         if (!kruis.IsMotor(adres) || proef.Einde != RitEinde.Kortsluiting || proef.Reeks.Count < 1) return false;
         // BUG #129: is de kruiswissel-melder nog niet bekend (vanaf nul), dan telt elke kortsluiting van een kruismotor als zodanig: die melder wordt dan ontdekt
         return kruis.Middens.Count == 0 || kruis.Middens.Contains(proef.Reeks[^1]);
+    }
+
+    /// <summary>BUG #224: de plaats in <paramref name="proef"/> waar die voor het eerst van <paramref name="basis"/> afwijkt (-1 als hij niet afwijkt).</summary>
+    internal static int EersteAfwijking(IReadOnlyList<int> basis, IReadOnlyList<int> proef)
+    {
+        for (int i = 0; i < proef.Count; i++)
+            if (i >= basis.Count || proef[i] != basis[i]) return i;
+        return -1;
     }
 
     private static bool ProefWijktAf(List<int> basis, List<int> proef)

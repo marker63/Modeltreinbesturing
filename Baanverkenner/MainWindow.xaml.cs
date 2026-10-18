@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Ports;
@@ -64,6 +64,9 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _cts;
     private bool _bezig;
     private DateTime _startTijd;
+    /// <summary>BUG #226: tijdstip van de laatste automatische tussenstand en de instellingen van de lopende verkenning.</summary>
+    private DateTime? _laatsteAutoTussenstand;
+    private VerkenInstellingen? _autoIns;
     private string? _laatsteStatusJson;
     private readonly DispatcherTimer _tijdTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly ObservableCollection<LogItem> _logRegels = new();
@@ -85,6 +88,9 @@ public partial class MainWindow : Window
         _tijdTimer.Tick += (_, _) =>
         {
             if (_bezig) TellerTijd.Text = $"Tijd: {DateTime.Now - _startTijd:h\\:mm\\:ss}";
+            // BUG #226: elke AutoTussenstandMinuten (standaard 10) automatisch een tussenstand wegschrijven
+            if (_bezig && _autoIns is { } ai && AutoTussenstand.IsTijd(_laatsteAutoTussenstand ?? _startTijd, DateTime.Now, ai.AutoTussenstandMinuten))
+                SchrijfAutoTussenstand("elke " + ai.AutoTussenstandMinuten + " minuten");
         };
         HardwareCommunicatieLog.NieuweRegel += HardwareRegelBinnen;
         WerkKnoppenBij();
@@ -656,6 +662,8 @@ public partial class MainWindow : Window
         _cts = new CancellationTokenSource();
         _bezig = true;
         _startTijd = DateTime.Now;
+        _autoIns = ins;
+        _laatsteAutoTussenstand = null;
         _tijdTimer.Start();
         PauzeKnop.Content = "Pauze";
         FaseTekst.Text = hervat is null ? "Verkenning gestart" : "Verkenning hervat";
@@ -701,6 +709,8 @@ public partial class MainWindow : Window
         }
         finally
         {
+            // BUG #226: ook bij het einde (voltooid, gestopt of fout) de laatste stand wegschrijven
+            if (_autoIns is { AutoTussenstandMinuten: > 0 }) SchrijfAutoTussenstand("einde van de verkenning");
             _bezig = false;
             _tijdTimer.Stop();
             _cts?.Dispose();
@@ -983,6 +993,24 @@ public partial class MainWindow : Window
     {
         var dlg = new Microsoft.Win32.SaveFileDialog { FileName = standaardNaam, Filter = filter, AddExtension = true };
         return dlg.ShowDialog(this) == true ? dlg.FileName : null;
+    }
+
+    /// <summary>BUG #226: schrijft rapport, logboek, hardwarelog en baankaart naar de map voor automatische tussenstanden. Een fout komt alleen in het logboek.</summary>
+    private void SchrijfAutoTussenstand(string reden)
+    {
+        _laatsteAutoTussenstand = DateTime.Now;
+        if (_autoIns is not { } ai || string.IsNullOrWhiteSpace(ai.AutoTussenstandMap)) return;
+        try
+        {
+            var hw = new System.Text.StringBuilder();
+            hw.AppendLine("Baanverkenner - hardware-communicatie (zonder keepalives)");
+            foreach (var r in HardwareCommunicatieLog.Regels)
+                hw.AppendLine($"{r.Tijdstip:yyyy-MM-dd HH:mm:ss.fff}  {r.Richting,-4} {r.Tekst}");
+            var bestanden = AutoTussenstand.Schrijf(ai.AutoTussenstandMap, HuidigeKaart(), _log?.AlsTekst(), hw.ToString(), DateTime.Now, reden, out var fout);
+            if (fout is not null) _log?.Waarschuwing($"Automatische tussenstand naar {ai.AutoTussenstandMap} mislukte: {fout}");
+            else _log?.Info($"Automatische tussenstand ({reden}) geschreven naar {ai.AutoTussenstandMap}: {bestanden.Count} bestanden.");
+        }
+        catch (Exception ex) { _log?.Waarschuwing($"Automatische tussenstand mislukte: {ex.Message}"); }
     }
 
     private static string Datumstempel() => DateTime.Now.ToString("yyyy-MM-dd_HHmm");

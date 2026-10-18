@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -244,6 +244,14 @@ public static class DinamoLogVertaler
                     CombineerToelichting(groepTekst, faultTekst), ruw);
             }
 
+            // BUG #225 (hardwarelog 18-10 11:57:26): de standvraag voor melder 1 t/m 64 (VraagMelderStatusOp: (1100SSSS)(sssssss)) stond 64 keer als "onbekend commando" in het log.
+            if (data.Length == 2 && (data[0] & 0x70) == 0x40)
+            {
+                int gevraagd = (((data[0] & 0x0F) << 7) | data[1]) + 1;
+                return new VertaaldeRegel(tijdstip, richting, "Melderstand opvragen", "", "", "", "", "", "",
+                    gevraagd.ToString(CultureInfo.InvariantCulture), "", CombineerToelichting("Vraagt Dinamo de huidige stand van deze melder (antwoord komt als bezetmelding).", faultTekst), ruw);
+            }
+
             return new VertaaldeRegel(tijdstip, richting, "Onbekend commando", "", "", "", "", "", "", "", "",
                 CombineerToelichting($"Header niet herkend als een van onze eigen commando's ({toggleInfo}).", faultTekst), ruw);
         }
@@ -292,6 +300,7 @@ public static class DinamoLogVertaler
                 return v.Snelheid == "0" ? $"STOP blok {v.Blok}{Loc()}" : $"snelheid {v.Snelheid} {v.RijRichting}, blok {v.Blok}{Loc()}";
             if (v.Type.StartsWith("Magneetartikel", StringComparison.Ordinal)) return $"wissel/sein {v.WisselOfSeinAdres} {v.Stand}";
             if (v.Type.StartsWith("Terugmelding", StringComparison.Ordinal)) return $"terugmelding wissel {v.WisselOfSeinAdres} {v.Stand}";
+            if (v.Type.StartsWith("Melderstand opvragen", StringComparison.Ordinal)) return $"stand opvragen van melder {v.MelderNummer}";
             if (v.Type.StartsWith("Bezetmelding", StringComparison.Ordinal)) return $"melder {v.MelderNummer} {v.Bezet.ToLowerInvariant()}";
             if (v.Type.StartsWith("Blok-alarm", StringComparison.Ordinal)) return v.Toelichting;
             if (v.Type.StartsWith("Functies", StringComparison.Ordinal)) return $"{v.Type.ToLowerInvariant()} blok {v.Blok}{Loc()}";

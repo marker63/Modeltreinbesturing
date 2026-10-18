@@ -1,4 +1,4 @@
-using Baanverkenner.Kern;
+﻿using Baanverkenner.Kern;
 using Modeltreinbesturing;
 using Modeltreinbesturing.Model;
 
@@ -2405,6 +2405,32 @@ public static class Tests
         var k212 = Laad("baankaart_2026-10-18_1146.json");
         k212.HerstelStrijdigeOplossingen(); k212.LosKortsluitpuntenOpUitRitten(); k212.VulOntbrekendeOplossingWaarnemingen();
         Eis(k212.Kortsluitpunten.Where(x => x.Opgelost && x.OpgelostDoorAdres is int).All(x => k212.Wissel(x.OpgelostDoorAdres!.Value).Waarnemingen.Any(w => w.Soort == WaarnemingSoort.LostKortsluitingOp && w.NaMelder == x.NaMelder && w.Richting == x.Richting)), "kaartcontrole (#212): elk opgelost kortsluitpunt heeft een waarneming bij zijn oplossingswissel");
+        // BUG #218-#225: echte log en kaart 18-10 12:21
+        Eis(BaanVerkenner.KlemNogOnderLoc(new[] { 24, 129 }, new[] { 129 }, false), "klem (#218): loc nog op 129 na de oplossing bij 24/129: wissel 10 blijft afbuigend, ook zonder sparen");
+        Eis(!BaanVerkenner.KlemNogOnderLoc(new[] { 24, 129 }, new[] { 129, 14 }, false) && BaanVerkenner.KlemNogOnderLoc(new[] { 24, 129 }, new[] { 129, 14 }, true), "klem (#218): staat de loc al deels op 14, dan bepaalt een nieuwe route de wissel weer (met sparen blijft hij staan)");
+        Eis(!BaanVerkenner.KlemNogOnderLoc(new[] { 24, 129 }, new[] { 13 }, true), "klem (#218): loc op 13: de klemoplossing geldt niet meer");
+        Eis(!BaanVerkenner.PartnerHoortBijPlek(new[] { 5, 16 }, new[] { 24, 129 }) && BaanVerkenner.PartnerHoortBijPlek(new[] { 24 }, new[] { 24, 129 }), "partner (#219): wissel 2 (losgemaakt op 5/16) gaat bij de kortsluiting op 24/129 niet terug naar afbuigend");
+        var bas222 = new List<int> { 13, 14, 24, 21, 29 };
+        Eis(BaanVerkenner.ProefWisselVanPuntzijdeBereden(bas222, new List<int> { 13, 14, 129, 24 }), "puntzijde (#222): 13-14-129-24 met wissel 5: de loc nam de tak en reed verder, wissel 5 is van de puntzijde bereden");
+        Eis(!BaanVerkenner.ProefWisselVanPuntzijdeBereden(bas222, new List<int> { 13, 14, 24 }) && !BaanVerkenner.ProefWisselVanPuntzijdeBereden(bas222, new List<int> { 13, 14, 129 }), "puntzijde (#222): zelfde melders als de basis (wissel 10) of kortsluiting direct op de tak: wel losmaken");
+        Eis(BaanVerkenner.StopVolgorde(BaanVerkenner.StopVolgordeEerst(new[] { 9, 8 }, new[] { 8 }, new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9 }), new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9 }).SequenceEqual(new[] { 9, 8, 1, 2, 3, 4, 5, 6, 7 }), "stop (#221): de blokken met de kortsluiting krijgen de STOP als eerste");
+        Eis(BaanVerkenner.EersteAfwijking(bas222, new List<int> { 13, 14, 129, 24 }) == 2 && BaanVerkenner.EersteAfwijking(bas222, new List<int> { 13, 5 }) == 1 && BaanVerkenner.EersteAfwijking(bas222, new List<int> { 13, 14 }) == -1, "kruipen (#224): wissel 5 splitst na melder 14, niet bij de startmelder 13");
+        string K225(string r, string hex) => Modeltreinbesturing.Hardware.DinamoLogVertaler.KortTekst(r, Convert.FromHexString(hex));
+        Eis(K225("Uit", "0AC080B6") == "stand opvragen van melder 1" && K225("Uit", "4AC0BFB7") == "stand opvragen van melder 64", "hardwarelog (#225): de standvraag voor melder 1 en 64 is geen 'onbekend commando' meer (nu '" + K225("Uit", "0AC080B6") + "')");
+        var k223 = Laad("baankaart_2026-10-18_1221.json");
+        var kp223 = k223.Kortsluitpunten.First(x => x.Id == 1);
+        Eis(!kp223.Opgelost && kp223.NaMelder == 24, "kortsluitpunt #1 (#223): staat in de kaart van 12:21 nog open");
+        Eis(BaanVerkenner.AlarmOplossingPastBij(kp223, new[] { 24, 129 }, new[] { 8, 9 }) && !BaanVerkenner.AlarmOplossingPastBij(kp223, new[] { 5, 16 }, new[] { 3, 4 }), "kortsluitpunt #1 (#223): de oplossing van 12:08 (loc op 24/129, blok 8/9) hoort erbij, die bij 5/16 niet");
+        Eis(k223.RegistreerHandmatigeOplossing(kp223, 10, true) && kp223.OpgelostDoorAdres == 10, "kortsluitpunt #1 (#223): wissel 10 afbuigend wordt geaccepteerd als oplossing");
+        // BUG #226: automatische tussenstand
+        var map226 = Path.Combine(Path.GetTempPath(), "autotussenstand_test_" + Guid.NewGuid().ToString("N"));
+        var nu226 = new DateTime(2026, 10, 18, 12, 31, 0);
+        var b226 = AutoTussenstand.Schrijf(map226, k223, "log", "hw", nu226, "test", out var f226);
+        Eis(f226 is null && b226.Count == 5 && File.Exists(Path.Combine(map226, "baanrapport_2026-10-18_1231.txt")) && File.ReadAllText(Path.Combine(map226, "LAATSTE.txt")).Contains("hardwarelog_2026-10-18_1231.txt"), "tussenstand (#226): rapport, html, kaart, logboek en hardwarelog + LAATSTE.txt geschreven (nu " + b226.Count + (f226 ?? "") + ")");
+        Eis(AutoTussenstand.IsTijd(nu226.AddMinutes(-10), nu226, 10) && !AutoTussenstand.IsTijd(nu226.AddMinutes(-9), nu226, 10) && !AutoTussenstand.IsTijd(null, nu226, 0), "tussenstand (#226): elke 10 minuten, 0 = uit");
+        try { Directory.Delete(map226, true); } catch { }
+        k223.Wisselstraatvoorstellen = WisselstraatVoorstel.Bereken(k223);
+        Console.WriteLine("    wisselstraten 12:21 met kortsluitpunt #1 opgelost: " + string.Join(" | ", k223.Wisselstraatvoorstellen.Select(w => $"{w.VanMelder}->{w.NaarMelder} {w.Richting}: {w.EisenTekst}")));
         // BUG #160: voltooide kaart van 12:42 - ingangen afgeleid, kruismotor 10 blijft staan bij de aankomst op melder 129
         var k160 = Laad("baankaart_2026-10-15_1242.json");
         int? ViaVan(int adres, int na) => k160.Wissel(adres).Waarnemingen.FirstOrDefault(x => x.Soort == WaarnemingSoort.KortsluitingBijOmzetten && x.NaMelder == na)?.Via;

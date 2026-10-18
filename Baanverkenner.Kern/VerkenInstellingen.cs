@@ -1,4 +1,4 @@
-namespace Baanverkenner.Kern;
+﻿namespace Baanverkenner.Kern;
 
 /// <summary>Alle instellingen van één verkenning. Wordt ook in het voortgangsbestand
 /// bewaard, zodat een hervatte verkenning met exact dezelfde waarden verdergaat.</summary>
@@ -52,6 +52,11 @@ public class VerkenInstellingen
     /// hooguit 3x de langste gemeten reistijd (maar nooit korter dan MinSecondenTussenMelders
     /// en nooit langer dan MaxSecondenTussenMelders).</summary>
     public bool SlimmeTimeout { get; set; } = true;
+    /// <summary>BUG #226 (Marco 18-10 12:31): tijdens een verkenning elke zoveel minuten automatisch een tussenstand (rapport, logboek, hardwarelog, baankaart) naar
+    /// <see cref="AutoTussenstandMap"/> schrijven, zodat de logs zonder handwerk geanalyseerd kunnen worden. 0 = uit.</summary>
+    public int AutoTussenstandMinuten { get; set; } = 10;
+    /// <summary>BUG #226: map voor de automatische tussenstanden (wordt aangemaakt als hij nog niet bestaat).</summary>
+    public string AutoTussenstandMap { get; set; } = @"C:\Marco\Autolog";
     public int MinSecondenTussenMelders { get; set; } = 10;
     /// <summary>Als tijdens het rijden GEEN enkele melder meer bezet is gedurende deze tijd,
     /// wordt dat als kortsluiting/ontsporing behandeld (stroomdetectie valt weg zonder
