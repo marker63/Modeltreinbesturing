@@ -1153,6 +1153,12 @@ public partial class BaanVerkenner
                 }
                 o.VolgendAdres = a;
                 if (_status.Geidentificeerd.Contains(a) || o.Configuratie.Bevat(a)) continue;
+                // BUG #201: een adres zonder enig effect hoeft niet opnieuw als elk stuk van deze rit al eens met dat adres afbuigend is gereden (zie RouteAlGedekt). Nog steeds één wissel tegelijk.
+                if (!Kruis.IsMotor(a) && RouteAlGedekt(_kaart, basis.Reeks, o.Richting, a))
+                {
+                    _log.Info($"Adres {a} wordt in opdracht #{o.Id} niet opnieuw getest: elk stuk van deze rit is al eerder met adres {a} afbuigend gereden zonder effect (BUG #201).");
+                    continue;
+                }
                 // BUG #172: de kruismotoren hebben alleen effect op de kruiswissel zelf; die krijgt een eigen proef (VoerKruisProefUit) vanaf elke ingang.
                 // BUG #193 (Marco 17-10 16:28: "zet wisselmotoren 10 en 13 gewoon om tijdens de testrun, dan ontdek je snel de kruiswissel"): zolang de kruiswissel nog niet bekend is,
                 // gaan de motoren gewoon mee in de adrestest; de rit laat zien waar ze geschakeld werden (andere melder, kortsluiting) en daaruit volgt de kruiswissel.
@@ -1375,6 +1381,18 @@ public partial class BaanVerkenner
     /// <summary>BUG #209: het deel van <see cref="_proefAfwijkend"/> dat een nog actieve klemoplossing is (daar start de proef niet mee).</summary>
     private readonly HashSet<int> _klemAfwijkend = new();
 
+    /// <summary>BUG #201: true als adres <paramref name="a"/> geen enkel effect had (geen waarneming in de kaart) en elke overgang van <paramref name="reeks"/> (ook omgekeerd) al eens is
+    /// gereden met dat adres afbuigend. Dan kan een nieuwe proef over dit stuk niets nieuws opleveren. Een adres met waarnemingen of een reeks korter dan twee melders: altijd false.</summary>
+    internal static bool RouteAlGedekt(Baankaart kaart, List<int> reeks, Richting r, int a)
+    {
+        if (reeks.Count < 2) return false;
+        if (kaart.Wissels.Any(w => w.Adres == a && w.Waarnemingen.Count > 0)) return false;
+        var omgekeerd = reeks.AsEnumerable().Reverse().ToList();
+        // Alleen een eerdere betrouwbare rit over exact dezelfde reeks (of omgekeerd) met adres a afbuigend en zonder ander resultaat telt.
+        return kaart.Ritten.Any(g => !g.Onbetrouwbaar && g.Einde == RitEinde.GelijkAanBasis && g.Afbuigend.Count == 1 && g.Afbuigend[0] == a
+            && (g.Reeks.SequenceEqual(reeks) || g.Reeks.SequenceEqual(omgekeerd)));
+    }
+
     private async Task<bool> HerstelRijstand(Configuratie rijstand, int proefAdres)
     {
         _proefAfwijkend.Clear();
@@ -1475,6 +1493,20 @@ public partial class BaanVerkenner
             MeldVoortgang();
             var cAb = cA.Met(b);
             await ZetWissel(b, true);
+            // BUG #211: een partnerproef bewijst alleen iets als de werkelijke stand precies a + b (+ de rijstand) is. Staat er nog een andere wissel afbuigend (bijvoorbeeld een klemoplossing
+            // of een achtergebleven proefstand), dan kan die de kortsluiting weghalen en lijkt elk adres een partner. Zulke wissels gaan eerst terug; kan dat niet, dan geen proef.
+            var afwijkendPartner = _wisselStand.Where(kv => kv.Value != cAb.Bevat(kv.Key) && kv.Key != b).Select(kv => kv.Key).OrderBy(k => k).ToList();
+            foreach (var w in afwijkendPartner.Where(w => !bijX.Contains(w)).ToList())
+            {
+                await ZetWissel(w, cAb.Bevat(w), forceer: true);
+                afwijkendPartner.Remove(w);
+            }
+            if (afwijkendPartner.Count > 0)
+            {
+                _log.Waarschuwing($"Partnerzoektocht voor adres {a} afgebroken: wissel {string.Join(", ", afwijkendPartner)} staat anders dan de proefstand ({cAb}) en ligt bij de loc. Zo'n proef zou niets bewijzen (BUG #211).");
+                await ZetWissel(b, false);
+                return null;
+            }
             _alarmStand.Clear();
             var rit = await Rit(x, o.Richting, new RitDoel { Configuratie = cAb, Basis = new List<int> { x }, ExtraNaAfwijking = 0 });
             // BUG #130 (Marco 11:42, log 11:32-11:36): de kortsluiting bleef staan terwijl de loc stilstond; ProbeerAlarmWegTeKrijgen haalde haar weg door
