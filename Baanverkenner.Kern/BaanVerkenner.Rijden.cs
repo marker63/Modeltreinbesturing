@@ -1368,7 +1368,7 @@ public partial class BaanVerkenner
             while (HuidigeAlarmBlokken().Count > 0 && _klok.Nu < eind) await Wacht(TimeSpan.FromMilliseconds(300));
             if (HuidigeAlarmBlokken().Count == 0)
             {
-                _log.Vondst($"De kortsluiting ging weg nadat wissel {a}{toelichting} naar {(oud ? "rechtdoor" : "afbuigend")} is geschakeld ({stap}). De wissel blijft zo staan.");
+                _log.Vondst($"De kortsluiting ging weg nadat wissel {a}{toelichting} naar {(oud ? "rechtdoor" : "afbuigend")} is geschakeld ({stap}). De wissel blijft zo staan. Let op: dit is nog geen bewijs, Dinamo zet het alarm ook zelf soms even uit; een rit zonder kortsluiting over dezelfde overgang bevestigt het (BUG #249).");
                 _kortsluitingGemeld = false;
                 _alarmStand[a] = !oud;
                 RegistreerAlarmOplossing(a, !oud, bezet, alarmBlokkenVoor);
@@ -1392,7 +1392,7 @@ public partial class BaanVerkenner
                         while (_klok.Nu < eind2) await Wacht(TimeSpan.FromMilliseconds(300));
                         if (HuidigeAlarmBlokken().Count == 0)
                         {
-                            _log.Vondst($"Wissel {pw} staat weer op afbuigend samen met wissel {a}: het alarm blijft weg. Samen vormen ze de oplossing en ze blijven zo staan tot de loc de melder verlaten heeft (nog niet getest op de baan).");
+                            _log.Vondst($"Wissel {pw} is teruggezet op afbuigend (de stand van vóór het losmaken van de loc) naast wissel {a}: het alarm bleef weg. Dit is geen bewijs dat wissel {pw} iets oplost: het alarm was al weg door het omzetten van wissel {a}. De wissels blijven zo staan tot de loc de melder verlaten heeft (BUG #249, nog niet getest op de baan).");
                             _klemOplossing[pw] = (KlemMelders(bezet), _klok.Nu);   // BUG #240
                             _alarmStand[pw] = true;
                         }
