@@ -2561,3 +2561,10 @@ haalde hem weg (15:08:01). De melding bleef in het logboek staan alsof het vasts
 en HerstelNaKortsluiting meldt daarna of het terugzetten de kortsluiting wegnam ("de loc zat daar klem") of niet ("de loc zit daar niet klem; de andere wissels worden geprobeerd").
 Verder klopte alles in deze set: de wisselstand-controle (108 meldingen) vond geen verschil met de hardwarelog. Wissel 13 (na 24: rechtdoor 21, afbuigend 8) en wissel 14 (bij melder 8: vanaf 24 afbuigend, vanaf 17 rechtdoor) zijn goed gevonden.
 Test: StatischeKortsluitingTest.
+
+## BUG #242 – ONDERZOCHT, BEWUST NIET VERANDERD: wissel 13 wordt achteruit bij melder 15 "voor de loc er is" afbuigend gezet (autolog 18-10 15:16-15:21)
+Achteruit 15 -> 8 -> 17 zet de verkenner op 15 wissel 13 afbuigend en op 29 weer rechtdoor. Van 8 achteruit kent de kaart twee vervolgen: 17 (geen eis) en 24 (13 afbuigend);
+de staartwissel-regel (#108) zet een wissel die maar één bekend vervolg vraagt toch alvast goed. Met 14 rechtdoor komt de loc niet bij wissel 13, dus hier was het onnodig
+(2 wisselcommando's, ca. 4 s per rit), maar het is onschadelijk: wissel 13 ligt niet onder of voor de loc. Twee aanpassingen geprobeerd (elk vervolg moet dezelfde stand vragen;
+vervolgen uitsluiten die alleen met een andere wissel afbuigend gereden zijn): beide braken de simulatie vanaf startmelder 5 (verkenning rondt niet af, vastgestelde feiten
+overschreven). De voorzorg is daar nodig, dus de regel blijft zoals hij is.
