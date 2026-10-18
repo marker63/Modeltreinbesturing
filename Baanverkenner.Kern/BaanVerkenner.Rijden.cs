@@ -1972,6 +1972,15 @@ public partial class BaanVerkenner
                 // rijdt hem na de melder nog even door): geen Dinamo-storing en geen blokproef, maar gewoon weer een doodlopend einde.
                 bool kopHierBekend = res.Reeks.Count == 1 && _kaart.Kopsporen.Any(k => k.Melder == start && k.Richting == r);
                 if (kopHierBekend) _log.Info($"De loc vertrok niet van melder {start}: dat is een bekend doodlopend einde ({r.Tekst()}); geen blokproef nodig.");
+                // BUG #210 (Marco 18-10 09:38; log 09:36-09:37): 9 s na het herstel van een Dinamo-uitval reed de loc 31 s lang niet weg van melder 13 (geen enkele melder-melding in het
+                // hardwarelog) en dat werd als 'afbuigend: doodlopend' van wissel 11 opgeslagen - een wissel die fysiek niet bestaat. In optie 6 (Rondrit) wordt de blokcontrole hieronder overgeslagen,
+                // dus niets stopte die conclusie. Vertrekt de loc kort na een Dinamo-uitval niet, dan zegt de rit niets over de baan: de opdracht wordt opnieuw gereden.
+                if (!doel.IsNavigatie && res.Reeks.Count == 1 && !kopHierBekend && _klok.Nu - _uitvalHersteldOm < TimeSpan.FromMinutes(15))
+                {
+                    var uitvalTekst = $"De loc vertrok niet van melder {start} ({r.Tekst()}), {(_klok.Nu - _uitvalHersteldOm).TotalSeconds:0} s na het herstel van Dinamo. Dat zegt niets over de wissels (Dinamo reageert nog niet goed op rijcommando's): de rit telt niet en de opdracht wordt opnieuw gereden.";
+                    _log.Waarschuwing(uitvalTekst);
+                    throw new NavigatieFout(uitvalTekst);
+                }
                 if (BlokVereist && !Rondrit && res.Reeks.Count == 1 && !blokGecontroleerd && !doelInzicht && !kopHierBekend)
                 {
                     // De loc is helemaal niet vertrokken: klopt de blokkoppeling van deze
