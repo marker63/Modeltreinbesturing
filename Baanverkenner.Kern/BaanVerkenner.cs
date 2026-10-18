@@ -1322,9 +1322,25 @@ public partial class BaanVerkenner
                         partner = await PartnerwisselZoeken(o, a, proef, rijstand);
                 }
 
+                // BUG #243 (autolog 18-10 15:10:07-15:10:27 en 15:15:27): de vondst van een proef wordt pas na de terugrit vastgelegd (Vergelijk). Marco stopte de verkenning
+                // tijdens de terugrit (loc net op 13): de kortsluiting met wissel 14 afbuigend was nergens bewaard en na het hervatten reed de verkenner dezelfde kortsluiting
+                // opnieuw. Wordt er tijdens de terugrit gestopt, dan eerst de vondst vastleggen (de kaart en het adres als gevonden worden bij het stoppen bewaard).
+                bool vergeleken = false;
+                async Task Terug(Configuratie cfgTerug)
+                {
+                    try { await TerugNaarMetControle(o, proef, cfgTerug); }
+                    catch (OperationCanceledException)
+                    {
+                        vergeleken = true;
+                        Vergelijk(o, basis, proef, a);
+                        if (partner is { } pp0) VerwerkPartner(o, basis, proef, a, pp0.Partner, pp0.Rit);
+                        _log.Info($"Gestopt tijdens de terugrit na de proef met adres {a}: wat die proef liet zien is eerst vastgelegd, zodat hij na het hervatten niet opnieuw hoeft (BUG #243).");
+                        throw;
+                    }
+                }
                 if (afwijkendePad)
                 {
-                    await TerugNaarMetControle(o, proef, cA0);
+                    await Terug(cA0);
                     // BUG #191 (meting: met 'doorrijden en blokproef na herstel' kwamen 24 valse wissels, zonder dit 0): de wissel die de loc net een andere kant op stuurde ligt bij de
                     // melder waar de loc nu staat, maar de kaart kent hem pas na Vergelijk. Hij werd daardoor direct onder de loc teruggezet (de loc stond nog met zijn staart op de tong);
                     // de volgende proef reed dan de verkeerde tak en kreeg de eer. Nu eerst doorrijden tot de loc de wissel voorbij is (VrijRijdenVoorWissel), dan pas terugzetten.
@@ -1340,11 +1356,14 @@ public partial class BaanVerkenner
                     // BUG #35: de loc staat hier altijd stil; eerst terugzetten, dan de terugrit.
                     await ZetWisselNaProef(a, false);
                     foreach (var (ex, _) in proefExtra) await ZetWisselNaProef(ex, rijstand.Bevat(ex), oplossingWissel: true);
-                    await TerugNaarMetControle(o, proef, rijstand);
+                    await Terug(rijstand);
                 }
 
-                Vergelijk(o, basis, proef, a);
-                if (partner is { } pp) VerwerkPartner(o, basis, proef, a, pp.Partner, pp.Rit);
+                if (!vergeleken)
+                {
+                    Vergelijk(o, basis, proef, a);
+                    if (partner is { } pp) VerwerkPartner(o, basis, proef, a, pp.Partner, pp.Rit);
+                }
             }
             o.VolgendAdres = int.MaxValue;
             foreach (var s in overgangen)

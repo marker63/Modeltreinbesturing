@@ -2608,7 +2608,7 @@ public static class Tests
 
     // De geslaagde, volledige rit van 10-10 11:38 (blokken 10, 11, 12): referentie voor importer en leerprofiel
     /// <summary>BUG #150: een volledige verkenning vanaf nul op de nagebouwde Miniworld-baan (zie MiniworldBaan). Geeft het aantal kortsluitingen terug.</summary>
-    static (BaanVerkenner V, VerkenLog Log, int Kortsluitingen, double Seconden, string Einde) MiniworldRit(int startMelder, double maxUren = 6, Action<BaanVerkenner>? voorbereiding = null, bool omzettenOnderLoc = true, Action<Baanverkenner.Kern.Simulatie.SimulatieBaan>? simAanpassing = null, Action<VerkenInstellingen>? insAanpassing = null, Func<Baanverkenner.Kern.Simulatie.SimulatieBaan>? simFabriek = null)
+    static (BaanVerkenner V, VerkenLog Log, int Kortsluitingen, double Seconden, string Einde) MiniworldRit(int startMelder, double maxUren = 6, Action<BaanVerkenner>? voorbereiding = null, bool omzettenOnderLoc = true, Action<Baanverkenner.Kern.Simulatie.SimulatieBaan>? simAanpassing = null, Action<VerkenInstellingen>? insAanpassing = null, Func<Baanverkenner.Kern.Simulatie.SimulatieBaan>? simFabriek = null, Func<VerkenLog, bool>? stopWanneer = null)
     {
         var sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(omzettenOnderLoc, startMelder, simFabriek);
         simAanpassing?.Invoke(sim);
@@ -2629,7 +2629,7 @@ public static class Tests
         using var cts = new CancellationTokenSource();
         var t0 = klok.Nu;
         var vorigeSpoor = DateTime.MinValue;
-        klok.Getikt += nu => { if ((nu - t0).TotalHours > maxUren) cts.Cancel(); if (Environment.GetEnvironmentVariable("MINI_TRACE") == "1" && (nu - vorigeSpoor).TotalSeconds >= 1.0) { vorigeSpoor = nu; log.Info("[sim] " + sim.ToestandTest()); } };
+        klok.Getikt += nu => { if ((nu - t0).TotalHours > maxUren || stopWanneer?.Invoke(log) == true) cts.Cancel(); if (Environment.GetEnvironmentVariable("MINI_TRACE") == "1" && (nu - vorigeSpoor).TotalSeconds >= 1.0) { vorigeSpoor = nu; log.Info("[sim] " + sim.ToestandTest()); } };
         string einde = "klaar";
         try { v.VoerUit(cts.Token).GetAwaiter().GetResult(); } catch (OperationCanceledException) { einde = "tijdslimiet"; } catch (Exception ex) { einde = "gestopt: " + ex.Message; }
         if (Environment.GetEnvironmentVariable("MINI_LOG") == "1") Console.WriteLine(log.AlsTekst());
@@ -2637,6 +2637,28 @@ public static class Tests
         return (v, log, kort, (klok.Nu - t0).TotalSeconds, einde);
     }
 
+
+    // BUG #243: stoppen tijdens de terugrit na een proef met kortsluiting -> de vondst is toch vastgelegd
+    static void StopTijdensTerugritTest()
+    {
+        Console.WriteLine("Test: stoppen tijdens de terugrit na een proef (BUG #243, autolog 18-10 15:10)");
+        int gezien = 0; int? adres = null;
+        bool Stop(VerkenLog l)
+        {
+            for (; gezien < l.Regels.Count; gezien++)
+            {
+                var m = System.Text.RegularExpressions.Regex.Match(l.Regels[gezien].Tekst, @"met adres (\d+) afbuigend, terwijl de loc dezelfde melders reed");
+                if (m.Success && adres is null) adres = int.Parse(m.Groups[1].Value);
+            }
+            return adres is not null;
+        }
+        var r = MiniworldRit(13, 10, insAanpassing: i => { i.Rondrit = true; i.StapVoorStap = true; }, stopWanneer: Stop);
+        Eis(adres is not null, "terugrit (#243): in de simulatie komt een proef voor waarbij de loc dezelfde melders reed en kortsluiting kreeg");
+        if (adres is not int a) return;
+        var status = (VerkenStatus)typeof(BaanVerkenner).GetField("_status", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(r.V)!;
+        Eis(r.Log.Regels.Any(x => x.Tekst.Contains("BUG #243")), "terugrit (#243): het log meldt dat de vondst bij het stoppen is vastgelegd (einde: " + r.Einde + ")");
+        Eis(status.Geidentificeerd.Contains(a), $"terugrit (#243): adres {a} staat als gevonden in de bewaarde voortgang, dus na hervatten geen herhaalde kortsluiting");
+    }
 
     // BUG #181: het register van vastgestelde feiten meldt elke overschrijving
     static void KennisRegisterTest()
@@ -2984,6 +3006,7 @@ public static class Tests
         WisselTerugmeldingTest();
         NastellenAnderBlokTest();
         StatischeKortsluitingTest();
+        StopTijdensTerugritTest();
         BuurmelderBlokproefTest();
         OverloopPaarEisenTest();
         TweedeMelderTest();

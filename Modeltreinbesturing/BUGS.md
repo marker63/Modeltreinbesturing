@@ -2568,3 +2568,9 @@ de staartwissel-regel (#108) zet een wissel die maar één bekend vervolg vraagt
 (2 wisselcommando's, ca. 4 s per rit), maar het is onschadelijk: wissel 13 ligt niet onder of voor de loc. Twee aanpassingen geprobeerd (elk vervolg moet dezelfde stand vragen;
 vervolgen uitsluiten die alleen met een andere wissel afbuigend gereden zijn): beide braken de simulatie vanaf startmelder 5 (verkenning rondt niet af, vastgestelde feiten
 overschreven). De voorzorg is daar nodig, dus de regel blijft zoals hij is.
+
+## BUG #243 – OPGELOST (nog niet getest op de baan): stoppen tijdens de terugrit na een proef liet de vondst van die proef verloren gaan (autolog 18-10 15:10:27 en 15:15:27)
+15:09:53 kortsluiting na melder 8 met wissel 14 afbuigend (vanaf 17). De verkenner reed verder terug naar 13 (15:10:25); Marco stopte de verkenning om 15:10:27, twee seconden
+voordat de vondst ("niet van 17 naar 8 met wissel 14 afbuigend") werd vastgelegd: dat gebeurde pas na de terugrit. Na het hervatten (15:11) reed de verkenner dezelfde proef opnieuw
+en kreeg om 15:15:27 dezelfde kortsluiting. Oplossing: wordt er tijdens de terugrit gestopt, dan wordt de vondst eerst vastgelegd (Vergelijk + partner), het adres staat dan als
+gevonden in de bewaarde voortgang en wordt na het hervatten niet opnieuw geprobeerd. Test: StopTijdensTerugritTest (Miniworld-simulatie, stoppen direct na zo'n proef; faalt zonder de fix).
