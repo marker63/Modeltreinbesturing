@@ -22,3 +22,4 @@ niet) en `Modeltreinbesturing/BLOKKENSCHEMA.md`.
 - Compile-controle zonder NuGet: `dotnet run --project Tools/CompileCheck` (dotnet-sdk-8.0 via apt) draait de
   regressietests op Kern/Hardware/importers met stubs. Het WPF-project zelf kan hier niet gecompileerd worden.
 - Wisselstanden gelden in beide richtingen (Marco 17-10): staat 5→12 vast met wissel 2 (en 1) afbuigend, dan moet 12→5 dezelfde stand krijgen, ook in blokkenschema en wisselstraten. Staat als open punt in BUGS.md; in de volgende versie meenemen.
+- Fysiek ontdekt/niet ontdekt (Marco 18-10): wissels 3, 4, 7, 8, 11 en 12 bestaan op de baan niet (niet ontdekt). Dit is ALLEEN kennis om logs en rapporten beter te analyseren: nooit hard coderen of uit de kaart/instellingen verwijderen, het programma moet zelflerend blijven. Een vondst voor zo'n adres is dus een aanwijzing voor een valse vondst (zoals #210), geen reden om het adres uit te sluiten.

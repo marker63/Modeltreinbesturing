@@ -187,7 +187,6 @@ public partial class MainWindow : Window
             WisselAdresTot = Geheel(AdresTotBox, "Adressen t/m", 1, 2048),
             WisselPauzeMs = Geheel(WisselPauzeBox, "Pauze na wisselcommando", 50, 10000),
             DinamoBlokken = DinamoBlokkenBox.Text.Trim(),
-            NietBestaandeWissels = "11",   // BUG #209: Marco 18-10: wissel 11 bestaat niet op de baan
             HoogsteMelder = Geheel(HoogsteMelderBox, "Hoogste meldernummer", 1, 2048),
             KruisMotoren = KruisMotorenBox.Text.Trim(),
             MaxSecondenTussenMelders = Geheel(MaxSecBox, "Max. seconden tussen melders", 5, 600),
