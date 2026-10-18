@@ -2483,6 +2483,20 @@ public static class Tests
         Eis(VerkenLog.MetBaanstand("Adres 16: afbuigend", om235) == "Adres 16: afbuigend" && VerkenLog.MetBaanstand("Wissel 6 gevonden", om235) == "Wissel 6 gevonden" && VerkenLog.MetBaanstand("Rijstand: afbuigend: 5, 6, 10", om235).Contains("omgekeerd"), "omgekeerd (#235): adres 16 of een melding zonder stand blijft gewoon; 'afbuigend: 5, 6' wel");
         var k235 = Laad("baankaart_2026-10-18_1349.json"); k235.OmgekeerdeWissels = new List<int> { 6 };
         Eis(Rapport.AlsTekst(k235).Contains("OMGEKEERD AANGESLOTEN") && Rapport.AlsHtml(k235).Contains("Omgekeerd aangesloten: wissel 6"), "omgekeerd (#235): rapport (tekst en html) noemt het");
+        // BUG #236: eerder gevonden oplossing (1 bij 2) geldt alleen voor haar eigen ingang
+        var k236 = Laad("baankaart_2026-10-18_1424.json");
+        k236.BekendeKortsluitOplossingen.Add(new KortsluitOplossing { NaMelder = 5, Via = 12, Richting = Richting.Vooruit, Stand = "2", Start = 13, Adres = 1, Afbuigend = true, Bron = "test" });
+        var c236 = k236.MetBekendeOplossingenVoorStart(13, Richting.Vooruit, Configuratie.Basis.Met(2), out _);
+        Eis(!c236.Bevat(1), "voorkennis (#236): oplossing 'wissel 1' voor ingang 12 -> 5 wordt niet gebruikt als de loc vanaf 16 op melder 5 komt (nu " + c236 + ")");
+        var k236b = Laad("baankaart_2026-10-18_1424.json");
+        Eis(k236b.BekendeKortsluitOplossingen.Any(o => o.NaMelder == 5 && o.Via == 0 && o.Stand == "2" && o.Adres == 1 && o.Richting == Richting.Vooruit), "voorkennis (#236): de kaart van 14:24 bevat de oude oplossing '5 vooruit, stand 2 -> wissel 1' zonder ingang");
+        Eis(!k236b.MetBekendeOplossingenVoorStart(13, Richting.Vooruit, Configuratie.Basis.Met(2), out _).Bevat(1), "voorkennis (#236): die oplossing wordt niet meer toegepast nu bekend is dat 16 -> 5 met wissel 2 afbuigend kortsluiting geeft");
+        k236.BekendeKortsluitOplossingen[^1].Via = 16;
+        Eis(!k236.MetBekendeOplossingenVoorStart(13, Richting.Vooruit, Configuratie.Basis.Met(2), out _).Bevat(1), "voorkennis (#236): ook met ingang 16 niet: de kaart weet dat 16 -> 5 met wissel 2 afbuigend kortsluiting geeft (zelfde regel als #217)");
+        var k236c = new Baankaart();
+        foreach (var (v236, n236) in new[] { (13, 14), (14, 16), (16, 5), (5, 13) }) k236c.Overgangen.Add(new Overgang { Van = v236, Naar = n236, Richting = Richting.Vooruit, AantalKeer = 3, GezienBijConfiguraties = new List<string> { "" } });
+        k236c.BekendeKortsluitOplossingen.Add(new KortsluitOplossing { NaMelder = 5, Via = 16, Richting = Richting.Vooruit, Stand = "2", Start = 13, Adres = 1, Afbuigend = true });
+        Eis(k236c.MetBekendeOplossingenVoorStart(13, Richting.Vooruit, Configuratie.Basis.Met(2), out _).Bevat(1), "voorkennis (#236): zonder verbod en met de juiste ingang wordt de oplossing wel gebruikt");
         // BUG #226: automatische tussenstand
         var map226 = Path.Combine(Path.GetTempPath(), "autotussenstand_test_" + Guid.NewGuid().ToString("N"));
         var nu226 = new DateTime(2026, 10, 18, 12, 31, 0);

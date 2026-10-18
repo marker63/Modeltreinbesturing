@@ -400,6 +400,14 @@ public class Baankaart
             bool veranderd = false;
             foreach (var o in Oplossingen(r).Where(o => (o.Start == start || BereiktMelder(start, o.NaMelder, r, c)) && !o.K.Bevat(o.Adres)))
             {
+                // BUG #236 (autolog 18-10 14:18:28-14:19:58): een eerder gevonden oplossing (wissel 1 bij wissel 2 afbuigend) hoort bij de ingang 12 -> 5 (overloop); de proef
+                // reed vanaf 13 via de hele ring en kwam vanaf 16 op melder 5: kortsluiting ondanks de 'oplossing'. Weet de kaart via welke melder de loc op die melder aankomt
+                // en is dat een andere ingang dan die van de oplossing, dan geldt de oplossing hier niet.
+                var viaNu = ViaBijAankomst(start, o.NaMelder, r, c) ?? ViaBijAankomst(start, o.NaMelder, r, Configuratie.Basis);
+                if (o.Via != 0 && viaNu is int via && via != o.Via) continue;
+                // BUG #236: ook zonder bekende ingang (oude oplossingen hebben Via = 0): weet de kaart dat een wissel uit de stand van de oplossing afbuigend op déze ingang
+                // kortsluiting geeft (wissel 2 afbuigend van 16 naar 5), dan kan die oplossing hier niets oplossen.
+                if (viaNu is int v2 && o.K.Afbuigend.Any(a => VerbodenIngangen().Contains((v2, o.NaMelder, r, a)))) continue;
                 if (!o.K.Afbuigend.All(c.Bevat) || c.Bevat(o.Adres) == o.Afbuigend) continue;
                 c = c.MetStand(o.Adres, o.Afbuigend);
                 veranderd = true;
@@ -413,6 +421,23 @@ public class Baankaart
     /// alleen toegepast bij een opdracht die op dezelfde startmelder (13) begon als toen. Begint de opdracht op een melder LATER op dezelfde weg (5), dan is de weg
     /// van daar naar de melder van de kortsluiting even goed bekend: rijdt de loc volgens de kaart (stappen met deze wisselstand eerder gereden, zonder keuze)
     /// van <paramref name="van"/> naar <paramref name="doel"/>, dan geldt de oplossing ook.</summary>
+    /// <summary>BUG #236: volgt de bekende weg (stappen eerder gereden met stand <paramref name="c"/>, zonder keuze) van <paramref name="van"/> naar <paramref name="doel"/> en geeft de melder
+    /// vlak voor <paramref name="doel"/> (de ingang). Null als de weg niet eenduidig bekend is of van == doel.</summary>
+    internal int? ViaBijAankomst(int van, int doel, Richting r, Configuratie c)
+    {
+        if (van == doel) return null;
+        int huidig = van; var gezien = new HashSet<int> { huidig };
+        for (int i = 0; i < 60; i++)
+        {
+            var volg = Overgangen.Where(x => x.Van == huidig && x.Richting == r && x.GezienBijConfiguraties.Contains(c.Sleutel)).Select(x => x.Naar).Distinct().ToList();
+            if (volg.Count != 1) return null;
+            if (volg[0] == doel) return huidig;
+            huidig = volg[0];
+            if (!gezien.Add(huidig)) return null;
+        }
+        return null;
+    }
+
     internal bool BereiktMelder(int van, int doel, Richting r, Configuratie c)
     {
         int huidig = van; var gezien = new HashSet<int> { huidig };
