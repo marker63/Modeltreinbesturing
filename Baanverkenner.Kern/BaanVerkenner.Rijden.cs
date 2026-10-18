@@ -2701,6 +2701,9 @@ public partial class BaanVerkenner
     private int? PuntzijdeProefNu()
         => _puntzijdeProef is { } pz && (_klok.Nu - pz.Tijd).TotalMinutes < 10 && _monitor.Bezet.Any(pz.Melders.Contains) ? pz.Adres : null;
 
+    /// <summary>BUG #241: wissels die <see cref="LosMakenProefWissel"/> bij dit herstel terugzette (om achteraf te melden of het vermoeden klopte).</summary>
+    private readonly List<int> _zojuistLosgemaakt = new();
+
     private async Task<bool> LosMakenProefWissel()
     {
         // BUG #150: blijft het alarm ook na de stop aan (Dinamo meldt niet opnieuw), dan telt dat ook als vastzittende loc.
@@ -2726,9 +2729,12 @@ public partial class BaanVerkenner
                 if (toe != true) continue;
             }
             _statischeKortsluiting = false;
-            _log.Waarschuwing($"De kortsluiting komt steeds terug terwijl de loc stilstaat: hij zit klem op wissel {pa} (afbuigend). Die wissel gaat nu terug naar rechtdoor om de loc vrij te maken; anders blijft Dinamo de stroom steeds even terugzetten en weer afsluiten.");
+            // BUG #241 (autolog 18-10 15:06): de melding zei stellig "hij zit klem op wissel 13", maar het bleek wissel 14 (13 terugzetten hielp niet). Het is een vermoeden:
+            // de afbuigende wissel van deze rit is de eerste verdachte. Of het klopte, meldt HerstelNaKortsluiting daarna.
+            _log.Waarschuwing($"De kortsluiting komt steeds terug terwijl de loc stilstaat: waarschijnlijk zit hij klem op wissel {pa} (afbuigend gezet voor deze rit). Die wissel gaat nu terug naar rechtdoor om de loc vrij te maken; anders blijft Dinamo de stroom steeds even terugzetten en weer afsluiten.");
             await ZetWissel(pa, false, forceer: true);
             _losgemaakteProefWissels[pa] = _monitor.Bezet.ToHashSet();
+            _zojuistLosgemaakt.Add(pa);
             iets = true;
         }
         if (!iets) return false;
@@ -2742,8 +2748,14 @@ public partial class BaanVerkenner
         var terug = richtingVanRit.Om();
         for (int poging = 1; poging <= 2; poging++)
         {
+            _zojuistLosgemaakt.Clear();
             await LosMakenProefWissel();
             await Wacht(TimeSpan.FromSeconds(1));
+            // BUG #241: zeggen of het vermoeden klopte, zodat het logboek niet blijft beweren dat de loc op die wissel klem zat
+            if (_zojuistLosgemaakt.Count > 0)
+                _log.Info(HuidigeAlarmBlokken().Count > 0
+                    ? $"Wissel {Lijst(_zojuistLosgemaakt)} terugzetten haalde de kortsluiting niet weg: de loc zit daar niet klem. De andere wissels worden geprobeerd."
+                    : $"Wissel {Lijst(_zojuistLosgemaakt)} terugzetten haalde de kortsluiting weg: de loc zat daar klem.");
             // BUG #150: staat de loc stil en blijft het alarm, dan zit hij klem op een wissel (meestal de samenvoegende partner van de proefwissel,
             // bv. wissel 1 bij wissel 2): eerst wissels proberen (de ene na de andere, bij de loc alleen met toestemming), niet blind terugrijden.
             if (!_alarmWegProbeerd && HuidigeAlarmBlokken().Count > 0)

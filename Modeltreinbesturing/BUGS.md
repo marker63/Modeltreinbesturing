@@ -2554,3 +2554,10 @@ Marco: "waarom heb je er niet zelf even een omzetting voor 6 ingezet die 1 malig
 
 ## BUG #240 – OPGELOST (nog niet getest op de baan): klemoplossing wissel 10 toch losgelaten doordat melder 24 tijdens de kortsluiting wegviel (autolog 18-10 14:53:16)
 Na #218 bleef het mis gaan: wissel 10 afbuigend haalde om 14:53:16.721 de kortsluiting weg, 16 ms later ging hij rechtdoor (14:53:16.737) en volgde een tweede zoekronde van een minuut. Tijdens de kortsluiting meldde melder 24 'vrij' (geen stroom); de klemoplossing werd alleen aan melder 129 gekoppeld en `KlemNogOnderLoc` zag de loc op 24 + 129 daarna als 'niet meer alleen op de klemmelders'. Nu horen bij een klemoplossing ook de melder van de kortsluiting en de melders die bij de kortsluiting bezet waren (`KlemMelders`, binnen 5 minuten). CompileCheck ALLES OK.
+
+## BUG #241 – OPGELOST (nog niet getest op de baan): klemmelding "hij zit klem op wissel 13" was stellig maar fout (autolog 18-10 15:06:31)
+Kortsluiting na melder 8 bij wissel 13 afbuigend. Het programma meldde "hij zit klem op wissel 13 (afbuigend)" en zette 13 terug, maar de kortsluiting bleef. Pas wissel 14 afbuigend
+haalde hem weg (15:08:01). De melding bleef in het logboek staan alsof het vaststond. Oplossing: de melding zegt nu "waarschijnlijk zit hij klem op wissel X (afbuigend gezet voor deze rit)",
+en HerstelNaKortsluiting meldt daarna of het terugzetten de kortsluiting wegnam ("de loc zat daar klem") of niet ("de loc zit daar niet klem; de andere wissels worden geprobeerd").
+Verder klopte alles in deze set: de wisselstand-controle (108 meldingen) vond geen verschil met de hardwarelog. Wissel 13 (na 24: rechtdoor 21, afbuigend 8) en wissel 14 (bij melder 8: vanaf 24 afbuigend, vanaf 17 rechtdoor) zijn goed gevonden.
+Test: StatischeKortsluitingTest.

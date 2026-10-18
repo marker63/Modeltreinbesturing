@@ -1968,7 +1968,10 @@ public static class Tests
 
         var (v1, w1, log1) = Maak(2, true);
         Eis(Los(v1), "statisch (#141): proefwissel 2 afbuigend + terugkerende kortsluiting -> wordt losgemaakt");
-        Eis(log1.Regels.Any(r => r.Tekst.Contains("zit klem op wissel 2")), "statisch (#141): het log legt uit waarom wissel 2 terug naar rechtdoor gaat");
+        Eis(log1.Regels.Any(r => r.Tekst.Contains("klem op wissel 2")), "statisch (#141): het log legt uit waarom wissel 2 terug naar rechtdoor gaat");
+        // BUG #241: het is een vermoeden, geen zekerheid; en de wissel wordt onthouden om achteraf te melden of het klopte
+        Eis(log1.Regels.Any(r => r.Tekst.Contains("waarschijnlijk zit hij klem op wissel 2")), "klemmelding (#241): de melding brengt het als vermoeden");
+        Eis(((List<int>)typeof(BaanVerkenner).GetField("_zojuistLosgemaakt", bf)!.GetValue(v1)!).SequenceEqual(new[] { 2 }), "klemmelding (#241): wissel 2 staat in de lijst om achteraf te melden of het hielp");
         Eis(!(bool)typeof(BaanVerkenner).GetField("_statischeKortsluiting", bf)!.GetValue(v1)!, "statisch (#141): de vlag is daarna gewist (geen herhaling)");
 
         var (v2, _, _) = Maak(2, false);
