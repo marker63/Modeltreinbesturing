@@ -113,10 +113,18 @@ public class VerkenInstellingen
         return res.ToList();
     }
 
+    /// <summary>BUG #209/#210: wisseladressen die op de baan niet bestaan (Marco 18-10: wissel 11 bestaat niet). Ze worden niet getest, niet omgezet en uit een bestaande kaart gehaald.
+    /// Komma-gescheiden lijst.</summary>
+    public string NietBestaandeWissels { get; set; } = "";
+
+    public List<int> NietBestaandeAdressen() =>
+        (NietBestaandeWissels ?? "").Split(',', ';', ' ').Select(x => x.Trim()).Where(x => int.TryParse(x, out _)).Select(int.Parse).Distinct().ToList();
+
     public IEnumerable<int> WisselAdressen()
     {
         int van = Math.Max(1, Math.Min(WisselAdresVan, WisselAdresTot));
         int tot = Math.Max(WisselAdresVan, WisselAdresTot);
-        for (int a = van; a <= tot; a++) yield return a;
+        var geen = NietBestaandeAdressen();
+        for (int a = van; a <= tot; a++) if (!geen.Contains(a)) yield return a;
     }
 }

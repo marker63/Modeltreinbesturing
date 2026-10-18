@@ -416,6 +416,7 @@ public partial class BaanVerkenner
             }
         }
         BewaarKruis();
+        foreach (var t in _kaart.VerwijderNietBestaandeAdressen(_ins.NietBestaandeAdressen())) { _log.Waarschuwing("Kaart opgeruimd (BUG #209): " + t); _kaart.Waarschuwingen.Add(t); }
         foreach (var t in _kaart.HerstelStrijdigeOplossingen()) { _log.Waarschuwing("Kaart hersteld (BUG #159): " + t); _kaart.Waarschuwingen.Add(t); }
         foreach (var t in _kaart.HerstelOnmogelijkeKruisOplossingen(Kruis)) { _log.Waarschuwing("Kaart hersteld (BUG #137): " + t); _kaart.Waarschuwingen.Add(t); }
         _log.Info(Kruis.Motoren.Count == 0
@@ -1219,6 +1220,21 @@ public partial class BaanVerkenner
                     _log.Waarschuwing($"Adres {a} wordt in opdracht #{o.Id} nu niet getest: de wisselstand kon niet veilig gelijk gemaakt worden aan de rijstand ({rijstand}); een proef met een andere stand zou valse vondsten geven.");
                     continue;
                 }
+                // BUG #209: kon een klemoplossing-wissel niet naar de rijstand terug (de loc stond nog op de melders waar hij het alarm wegnam), dan begon de proef met een afwijkende stand en gaf
+                // "5,11"/"5,10"-vervuiling. Eerst de loc volledig op de startmelder zetten en opnieuw herstellen; lukt het dan nog niet, dan gaat de proef door maar #208 voorkomt een valse vondst (de proef overslaan liet adressen ongetest).
+                if (_klemAfwijkend.Count > 0)
+                {
+                    var afwLijst = string.Join(", ", _klemAfwijkend.OrderBy(x => x));
+                    _monitor.Bijwerken();
+                    if (!(_monitor.Bezet.Count == 1 && _monitor.Bezet.Contains(o.Start)))
+                    {
+                        _log.Info($"Adres {a}: wissel {afwLijst} kon niet naar de rijstand terug; de loc wordt eerst op melder {o.Start} gezet en daarna wordt de stand opnieuw hersteld.");
+                        await Nastellen(o.Start, o.Richting);
+                        if (!await HerstelRijstand(rijstand, a)) { _log.Waarschuwing($"Adres {a} wordt in opdracht #{o.Id} nu niet getest: de wisselstand kon niet veilig gelijk gemaakt worden aan de rijstand ({rijstand})."); continue; }
+                    }
+                    if (_klemAfwijkend.Count > 0)
+                        _log.Waarschuwing($"Adres {a}: wissel {afwLijst} staat nog anders dan de rijstand ({rijstand}) en kan niet omgezet worden; de proef gaat door, maar een kortsluiting wordt niet aan adres {a} toegeschreven (#208).");
+                }
                 await ZetWissel(a, true);
                 // BUG #117 (Marco 16:12, log 15:58): wissel 2 afbuigend (rit achteruit vanaf 13) reed weer in de kortsluiting na melder 12 die de kaart al
                 // kent én waarvan de oplossing bekend is (wissel 1 afbuigend). De proefrit krijgt die oplossing nu mee, net als een gewone opdracht.
@@ -1355,10 +1371,13 @@ public partial class BaanVerkenner
     /// <summary>BUG #208: wissels die bij de laatste <see cref="HerstelRijstand"/> niet naar de rijstand teruggezet konden worden (de loc stond erbij of de stand was een klemoplossing).
     /// Een proefrit met zo'n afwijkende stand mag geen kortsluiting aan het proefadres toeschrijven.</summary>
     private readonly HashSet<int> _proefAfwijkend = new();
+    /// <summary>BUG #209: het deel van <see cref="_proefAfwijkend"/> dat een nog actieve klemoplossing is (daar start de proef niet mee).</summary>
+    private readonly HashSet<int> _klemAfwijkend = new();
 
     private async Task<bool> HerstelRijstand(Configuratie rijstand, int proefAdres)
     {
         _proefAfwijkend.Clear();
+        _klemAfwijkend.Clear();
         var bijBezet = WisselsBijBezet(_kaart, _monitor.Bezet);
         var teDoen = new List<(int Adres, bool Afb)>();
         foreach (var adres in _ins.WisselAdressen())
@@ -1369,7 +1388,7 @@ public partial class BaanVerkenner
             if (nu == wens) continue;
             if (Kruis.IsMotor(adres) && Kruis.OpKruis(_monitor.Bezet)) return false;
             // BUG #194: een stand die net het alarm wegnam (wissel 1 bij wissel 2) niet terugzetten zolang de loc nog op die melders staat
-            if (!wens && nu && _klemOplossing.TryGetValue(adres, out var ko) && _monitor.Bezet.Any(ko.Melders.Contains) && (_klok.Nu - ko.Tijd).TotalMinutes < 10) { _proefAfwijkend.Add(adres); continue; }
+            if (!wens && nu && _klemOplossing.TryGetValue(adres, out var ko) && _monitor.Bezet.Any(ko.Melders.Contains) && (_klok.Nu - ko.Tijd).TotalMinutes < 10) { _proefAfwijkend.Add(adres); _klemAfwijkend.Add(adres); continue; }
             if (bijBezet.Contains(adres)) { _proefAfwijkend.Add(adres); continue; }   // ligt bij de melder waar de loc staat: niet onder de loc omzetten (de staartwissels regelt de rit zelf, #107)
             teDoen.Add((adres, wens));
         }
@@ -2600,6 +2619,8 @@ public partial class BaanVerkenner
     {
         _kaart.VulOntbrekendeVia();   // BUG #160
         if (Stap) BouwTrajecten();   // BUG #172
+        // BUG #214: pas bij het afronden (niet tijdens de verkenning, anders verandert het wat de verkenner nog probeert)
+        foreach (var t in _kaart.LosKortsluitpuntenOpUitRitten()) _log.Vondst("Kortsluitpunt afgeleid (BUG #214): " + t);
         BerekenAdressenZonderEffect();
         _kaart.VoorgesteldeBlokken = BlokVoorstel.Bereken(_kaart);
         _kaart.Wisselstraatvoorstellen = WisselstraatVoorstel.Bereken(_kaart);

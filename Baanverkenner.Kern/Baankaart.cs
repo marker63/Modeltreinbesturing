@@ -801,6 +801,108 @@ public class Baankaart
             Kopsporen.Add(new Eindpunt { Melder = melder, Richting = r, Configuratie = c.ToString() });
     }
 
+    /// <summary>BUG #209/#210 (Marco 18-10: "wissel 11 bestaat niet"): haalt alles weg wat aan een wisseladres hangt dat op de baan niet bestaat: waarnemingen, de adres-afhankelijke
+    /// kortsluitoplossingen, en het adres in configuraties van overgangen, doorgangen, trajecten, ritten en kortsluitpunten (de overgang zelf is wel echt gereden en blijft, met
+    /// de stand zonder dat adres). Geeft een melding per opgeruimd onderdeel. Nog niet getest op de baan.</summary>
+    public List<string> VerwijderNietBestaandeAdressen(IEnumerable<int> adressen)
+    {
+        var meldingen = new List<string>();
+        foreach (var a in adressen.Distinct().OrderBy(x => x))
+        {
+            string Zonder(string sleutel) => string.IsNullOrEmpty(sleutel) ? sleutel : Configuratie.VanSleutel(sleutel).Zonder(a).Sleutel;
+            bool Heeft(string sleutel) => !string.IsNullOrEmpty(sleutel) && Configuratie.VanSleutel(sleutel).Bevat(a);
+            int n = 0;
+
+            n = Wissels.RemoveAll(w => w.Adres == a);
+            if (n > 0) meldingen.Add($"wissel {a} (niet bestaand) uit de wisselslijst gehaald");
+
+            n = 0;
+            foreach (var o in Overgangen.Where(o => o.GezienBijConfiguraties.Any(Heeft)))
+            {
+                o.GezienBijConfiguraties = o.GezienBijConfiguraties.Select(Zonder).Distinct().ToList();
+                n++;
+            }
+            if (n > 0) meldingen.Add($"{n} overgang(en): stand met adres {a} vervangen door de stand zonder dat adres");
+
+            n = 0;
+            foreach (var d in Doorgangen.Where(d => d.Configuraties.Any(Heeft) || d.Tellers.Keys.Any(Heeft)))
+            {
+                var nieuweTellers = new Dictionary<string, int>();
+                foreach (var kv in d.Tellers) { var z = Zonder(kv.Key); nieuweTellers[z] = nieuweTellers.GetValueOrDefault(z) + kv.Value; }
+                d.Tellers = nieuweTellers;
+                d.Configuraties = d.Configuraties.Select(Zonder).Distinct().ToList();
+                n++;
+            }
+            if (n > 0) meldingen.Add($"{n} doorgang(en): adres {a} uit de standen gehaald");
+
+            n = 0;
+            foreach (var t in Trajecten.Where(t => t.Configuratie.Bevat(a))) { t.Configuratie = t.Configuratie.Zonder(a); n++; }
+            foreach (var k in Kopsporen.Where(k => Heeft(k.Configuratie))) { k.Configuratie = Zonder(k.Configuratie); n++; }
+            foreach (var r in Ritten) if (r.Afbuigend.Remove(a)) n++;
+            if (n > 0) meldingen.Add($"{n} traject(en)/kopspoor/rit(ten): adres {a} uit de stand gehaald");
+
+            n = 0;
+            foreach (var k in Kortsluitpunten)
+            {
+                bool geraakt = false;
+                if (k.Configuratie.Bevat(a)) { k.Configuratie = k.Configuratie.Zonder(a); geraakt = true; }
+                foreach (var e in k.Route.Where(e => e.Configuratie.Bevat(a))) { e.Configuratie = e.Configuratie.Zonder(a); geraakt = true; }
+                if (k.GeprobeerdeAdressen.Remove(a)) geraakt = true;
+                if (k.OpgelostDoorAdres == a) { k.Opgelost = false; k.OpgelostDoorAdres = null; k.OpgelostMetAfbuigend = null; geraakt = true; }
+                if (geraakt) n++;
+            }
+            if (n > 0) meldingen.Add($"{n} kortsluitpunt(en): adres {a} verwijderd (een oplossing door dit adres is weer open)");
+
+            n = BekendeKortsluitOplossingen.RemoveAll(o => o.Adres == a);
+            foreach (var o in BekendeKortsluitOplossingen.Where(o => Heeft(o.Stand))) { o.Stand = Zonder(o.Stand); n++; }
+            if (n > 0) meldingen.Add($"{n} bekende kortsluitoplossing(en) met adres {a} aangepast/verwijderd");
+
+            if (AdressenZonderEffect.Remove(a)) meldingen.Add($"adres {a} uit 'adressen zonder effect' gehaald");
+            if (Wisselstraatvoorstellen.Count > 0) { Wisselstraatvoorstellen = new(); meldingen.Add("wisselstraatvoorstellen worden opnieuw berekend"); }
+        }
+        return meldingen;
+    }
+
+    /// <summary>BUG #214 (rapport 18-10 09:50): een open kortsluitpunt (na melder N in richting R vanaf melder V, met stand S) is opgelost zodra een gewone rit over precies die overgang
+    /// (V en N na elkaar, in dezelfde richting, of omgekeerd in de andere richting: wisselstanden gelden in beide richtingen) zonder kortsluiting is gereden met alle wissels van S afbuigend
+    /// plus precies één extra wissel die in elke zo'n rit afbuigend stond. Is dat extra adres niet eenduidig (meerdere kandidaten in alle ritten), dan gebeurt er niets.
+    /// Geeft een melding per opgelost kortsluitpunt. Nog niet getest op de baan.</summary>
+    public List<string> LosKortsluitpuntenOpUitRitten()
+    {
+        var res = new List<string>();
+        foreach (var k in Kortsluitpunten.Where(k => !k.Opgelost && !k.Opgegeven && !k.Tijdelijk && k.Soort == KortsluitpuntSoort.Kortsluiting && k.Configuratie.Afbuigend.Length > 0))
+        {
+            int via = k.Route.Count > 0 && k.Route[^1].Pad.Count > 1 && k.Route[^1].Pad[^1] == k.NaMelder ? k.Route[^1].Pad[^2] : (k.TweedeMelders.Count == 1 ? k.TweedeMelders[0] : 0);
+            if (via == 0) continue;
+            var ritten = Ritten.Where(r => !r.Onbetrouwbaar && r.Einde != RitEinde.Kortsluiting && k.Configuratie.Afbuigend.All(r.Afbuigend.Contains) && HeeftOvergang(r, via, k.NaMelder, k.Richting)).ToList();
+            if (ritten.Count == 0) continue;
+            var extra = ritten.Select(r => r.Afbuigend.Except(k.Configuratie.Afbuigend).ToHashSet()).Aggregate((x, y) => { x.IntersectWith(y); return x; });
+            if (extra.Count != 1) continue;
+            int adres = extra.First();
+            k.Opgelost = true; k.OpgelostDoorAdres = adres; k.OpgelostMetAfbuigend = true;
+            var w = Wissel(adres);
+            if (!w.Waarnemingen.Any(x => x.Soort == WaarnemingSoort.LostKortsluitingOp && x.NaMelder == k.NaMelder && x.Richting == k.Richting))
+                w.Waarnemingen.Add(new WisselWaarneming
+                {
+                    Soort = WaarnemingSoort.LostKortsluitingOp, NaMelder = k.NaMelder, Via = via, Richting = k.Richting, VolgendeBijAfbuigend = null,
+                    Configuratie = k.Configuratie.ToString(),
+                    Toelichting = $"Afgeleid uit {ritten.Count} rit(ten) zonder kortsluiting over {via} → {k.NaMelder} met adres {adres} afbuigend (naast {string.Join(", ", k.Configuratie.Afbuigend)})."
+                });
+            res.Add($"kortsluitpunt #{k.Id} opgelost met adres {adres} afbuigend (afgeleid uit ritten {string.Join(", ", ritten.Select(r => "#" + r.Nr))})");
+        }
+        return res;
+    }
+
+    private static bool HeeftOvergang(GeredenRit r, int via, int na, Richting richting)
+    {
+        for (int i = 0; i + 1 < r.Reeks.Count; i++)
+        {
+            if (r.Richting == richting && r.Reeks[i] == via && r.Reeks[i + 1] == na) return true;
+            if (r.Richting == richting.Om() && r.Reeks[i] == na && r.Reeks[i + 1] == via) return true;
+        }
+        return false;
+    }
+
     public double LangsteReistijd() => Overgangen.Where(o => o.AantalMetingen > 0).Select(o => o.GemiddeldeSeconden).DefaultIfEmpty(0).Max();
 
     // ---- Opslaan/laden ----

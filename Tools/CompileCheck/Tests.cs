@@ -2330,6 +2330,31 @@ public static class Tests
             k159.HerstelStrijdigeOplossingen();
             Eis(!k159.Kortsluitpunten.Any(x => x.Opgelost && x.OpgelostMetAfbuigend == true && x.OpgelostDoorAdres == 2 && x.NaMelder == 5), "ingang (#159): " + naam + " heeft geen opgelost kortsluitpunt meer met 'wissel 2 afbuigend' na melder 5");
         }
+        // BUG #209: niet-bestaand wissel 11 wordt uit een bestaande kaart gehaald
+        var k209 = new Baankaart();
+        k209.Wissels.Add(new WisselVondst { Adres = 11 });
+        k209.Wissels.Add(new WisselVondst { Adres = 5 });
+        k209.Overgangen.Add(new Overgang { Van = 13, Naar = 14, Richting = Richting.Vooruit, AantalKeer = 2, GezienBijConfiguraties = new List<string> { "5", "5,11" } });
+        k209.Doorgangen.Add(new Doorgang { Via = 13, Melder = 14, Volgende = 129, Richting = Richting.Vooruit, Configuraties = new List<string> { "5,11" }, Tellers = new Dictionary<string, int> { ["5,11"] = 1, ["5"] = 2 } });
+        k209.AdressenZonderEffect.Add(11);
+        k209.VerwijderNietBestaandeAdressen(new[] { 11 });
+        Eis(k209.Wissels.Count == 1 && k209.Wissels[0].Adres == 5, "opruimen (#209): wissel 11 is uit de wisselslijst");
+        Eis(k209.Overgangen[0].GezienBijConfiguraties.SequenceEqual(new[] { "5" }), "opruimen (#209): '5,11' is '5' geworden en niet dubbel (nu " + string.Join("|", k209.Overgangen[0].GezienBijConfiguraties) + ")");
+        Eis(k209.Doorgangen[0].Tellers["5"] == 3 && k209.Doorgangen[0].Tellers.Count == 1, "opruimen (#209): tellers van de doorgang samengevoegd");
+        Eis(!k209.AdressenZonderEffect.Contains(11), "opruimen (#209): adres 11 niet meer 'zonder effect'");
+        var i209 = new VerkenInstellingen { WisselAdresVan = 9, WisselAdresTot = 13, NietBestaandeWissels = "11" };
+        Eis(!i209.WisselAdressen().Contains(11) && i209.WisselAdressen().Count() == 4, "opruimen (#209): adres 11 wordt niet meer getest");
+        // BUG #214 + #209 met de echte kaart van 18-10 09:50 (kortsluitpunt #2 stond nog open; valse wissel 11 zat erin)
+        var k214 = Laad("baankaart_2026-10-18_0950.json");
+        var kp214 = k214.Kortsluitpunten.First(x => x.Id == 2);
+        Eis(!kp214.Opgelost, "kortsluitpunt #2 (#214): staat in de kaart van 09:50 nog open");
+        var meld214 = k214.LosKortsluitpuntenOpUitRitten();
+        Eis(kp214.Opgelost && kp214.OpgelostDoorAdres == 5 && kp214.OpgelostMetAfbuigend == true, "kortsluitpunt #2 (#214): opgelost met adres 5 afbuigend (nu " + kp214.Opgelost + "/" + kp214.OpgelostDoorAdres + "; " + string.Join(";", meld214) + ")");
+        Eis(k214.LosKortsluitpuntenOpUitRitten().Count == 0, "kortsluitpunt #2 (#214): tweede keer niets meer te doen");
+        Eis(k214.Wissels.Any(w => w.Adres == 11), "opruimen (#209): de kaart van 09:50 bevat de valse wissel 11");
+        k214.VerwijderNietBestaandeAdressen(new[] { 11 });
+        Eis(!k214.Wissels.Any(w => w.Adres == 11) && !k214.Overgangen.Any(o => o.GezienBijConfiguraties.Any(c => Configuratie.VanSleutel(c).Bevat(11))) && !k214.Doorgangen.Any(d => d.Configuraties.Any(c => Configuratie.VanSleutel(c).Bevat(11))), "opruimen (#209): wissel 11 is overal uit de kaart van 09:50 verdwenen");
+        Eis(Baankaart.VanJson(k214.AlsJson()) is not null, "opruimen (#209): de opgeruimde kaart blijft laden");
         // BUG #160: voltooide kaart van 12:42 - ingangen afgeleid, kruismotor 10 blijft staan bij de aankomst op melder 129
         var k160 = Laad("baankaart_2026-10-15_1242.json");
         int? ViaVan(int adres, int na) => k160.Wissel(adres).Waarnemingen.FirstOrDefault(x => x.Soort == WaarnemingSoort.KortsluitingBijOmzetten && x.NaMelder == na)?.Via;
