@@ -2414,6 +2414,9 @@ public partial class BaanVerkenner
                 var cVolg = _kaart.MetWisselEisen(volg.Pad, volg.Richting, KiesBijIngang(volg.Van, volg.Richting, volg.Pad, volg.Configuratie), out _);
                 cfg = KruisVoorafStand(e, cfg, cVolg, Kruis, out var uitleg3);   // BUG #135: ook zonder vaste referentie
                 if (uitleg3 is not null) _log.Info(uitleg3);
+                cVolg = _kaart.MetBekendeKortsluitOplossingen(volg.Pad, volg.Richting, cVolg, out _);
+                cfg = GrensWisselsVooraf(_kaart, e, volg, cfg, cVolg, out var uitleg6, Kruis);   // BUG #228
+                if (uitleg6 is not null) _log.Info(uitleg6);
             }
             if (doel is not null && i == route.Count - 1)
             {
@@ -2426,6 +2429,31 @@ public partial class BaanVerkenner
             await ZetConfiguratie(cfg);
             await Rit(e.Van, e.Richting, new RitDoel { Configuratie = cfg, DoelMelder = e.Naar, VerwachtPad = e.Pad });
         }
+    }
+
+    /// <summary>BUG #228 (autolog 18-10 13:31:23): de navigatie 13 -> 14 en daarna 14 -> 129 -> 24 (vooruit) zette wissel 5 pas afbuigend toen de loc al op melder 14 stond,
+    /// met de neus bij de tong: direct kortsluiting in blok 3 en daarna 2 minuten klem. Een wissel waarvan de puntzijde na de grensmelder ligt (splitsing na melder 14 vooruit)
+    /// en die de volgende etappe in dezelfde richting nodig heeft, wordt nu al tijdens de etappe ervoor gezet. Niet als de etappe ervoor die wissel zelf nodig heeft, niet bij
+    /// een kering op de grensmelder en nooit voor kruismotoren.</summary>
+    internal static Configuratie GrensWisselsVooraf(Baankaart kaart, Etappe e, Etappe volg, Configuratie cfg, Configuratie cVolg, out string? uitleg, KruisKennis? kruis = null)
+    {
+        kruis ??= KruisKennis.Referentie();
+        uitleg = null;
+        if (volg.Richting != e.Richting || volg.Van != e.Naar) return cfg;
+        var eigen = new HashSet<int>();
+        for (int i = 0; i + 1 < e.Pad.Count; i++)
+            foreach (var (a, _) in kaart.WisselEisenVoorStap(e.Pad[i], e.Pad[i + 1], e.Richting)) eigen.Add(a);
+        var gezet = new List<string>();
+        foreach (var w in kaart.Wissels)
+        {
+            if (kruis.IsMotor(w.Adres) || eigen.Contains(w.Adres)) continue;
+            if (!w.Waarnemingen.Any(o => o.Soort == WaarnemingSoort.Splitsing && o.NaMelder == e.Naar && o.Richting == volg.Richting)) continue;
+            if (cfg.Bevat(w.Adres) == cVolg.Bevat(w.Adres)) continue;
+            cfg = cfg.MetStand(w.Adres, cVolg.Bevat(w.Adres));
+            gezet.Add($"{w.Adres} {(cVolg.Bevat(w.Adres) ? "afbuigend" : "rechtdoor")}");
+        }
+        if (gezet.Count > 0) uitleg = $"Wissel {string.Join(", ", gezet)} ligt direct na melder {e.Naar} en is nodig voor de volgende etappe ({string.Join("-", volg.Pad)}): die wordt al gezet voordat de loc op melder {e.Naar} aankomt (BUG #228, nog niet getest op de baan).";
+        return cfg;
     }
 
     /// <summary>BUG #146 (Marco 17:29 en 17:50): reed de loc eerder via DEZELFDE laatste etappe (zelfde aankomstmelder en -richting) in een kortsluiting terwijl
@@ -2477,11 +2505,15 @@ public partial class BaanVerkenner
         foreach (var a in doel.Afbuigend)
             if (!kaart.Wissels.Any(w => w.Adres == a && w.Waarnemingen.Count > 0)) bijStart.Add(a);
         var eis = kaart.MetWisselEisen(e.Pad, e.Richting, Configuratie.Basis, out _);
+        // BUG #229 (autolog 18-10 13:31:23): "10 afbuigend (kortsluitpunt #1 na melder 24 was daarmee opgelost)" en direct daarna "wissels bij startmelder 24 worden al gezet: 10 rechtdoor".
+        // Een wissel die de bekende oplossing van een kortsluitpunt op dit pad afbuigend vraagt, blijft afbuigend tot de loc op de startmelder staat.
+        var metOpl = kaart.MetBekendeKortsluitOplossingen(e.Pad, e.Richting, eis, out _);
         var gezet = new List<string>();
         foreach (var a in bijStart.OrderBy(x => x))
         {
             if (kruis.IsMotor(a)) continue;   // die hebben hun eigen regels (#95, #119)
             if (onderLoc.Contains(a) || eis.Bevat(a) || cfg.Bevat(a) == doel.Bevat(a)) continue;
+            if (metOpl.Bevat(a) && cfg.Bevat(a) && !doel.Bevat(a)) continue;   // BUG #229
             cfg = cfg.MetStand(a, doel.Bevat(a));
             gezet.Add($"{a} {(doel.Bevat(a) ? "afbuigend" : "rechtdoor")}");
         }

@@ -2432,6 +2432,16 @@ public static class Tests
         Eis(!k227.Wissel(10).Waarnemingen.Any(o => o.Soort == WaarnemingSoort.Splitsing && o.NaMelder == 21) && k227.Wissel(10).Waarnemingen.Any(o => o.Soort == WaarnemingSoort.KortsluitingBijOmzetten && o.NaMelder == 24), "kaart 13:25 (#227): de valse splitsing van wissel 10 na melder 21 is weg, de echte waarneming bij 24 blijft");
         Eis(!k227.WisselEisenVoorStap(24, 21, Richting.Vooruit).Contains((10, false)) && k227.Overgangen.Any(o => o.Van == 21 && o.Naar == 29 && o.Richting == Richting.Vooruit), "kaart 13:25 (#227): geen eis 'wissel 10 rechtdoor' meer voor 24 -> 21; 21 -> 29 vooruit blijft");
         Eis(Baankaart.VanJson(k227.AlsJson()) is not null && Laad("baankaart_2026-10-18_1221.json").VerwijderAchterkantOvergangen().Count == 0, "kaart (#227): de opgeruimde kaart laadt; de kaart van 12:21 heeft niets op te ruimen");
+        // BUG #228/#229: navigatie 13 -> 14 -> 129 -> 24 (autolog 18-10 13:31)
+        var k228 = Laad("baankaart_2026-10-18_1333.json");
+        var e228a = new Etappe { Van = 13, Naar = 14, Richting = Richting.Vooruit, Pad = new List<int> { 13, 14 }, Configuratie = Configuratie.Basis };
+        var e228b = new Etappe { Van = 14, Naar = 24, Richting = Richting.Vooruit, Pad = new List<int> { 14, 129, 24 }, Configuratie = Configuratie.Basis.Met(5).Met(10) };
+        var c228 = BaanVerkenner.GrensWisselsVooraf(k228, e228a, e228b, Configuratie.Basis, e228b.Configuratie, out var u228);
+        Eis(c228.Bevat(5) && !c228.Bevat(10), "navigatie (#228): wissel 5 (splitsing na melder 14) wordt al tijdens 13 -> 14 afbuigend gezet, wissel 10 nog niet (nu " + c228 + ")");
+        var c228b = BaanVerkenner.GrensWisselsVooraf(k228, e228a, new Etappe { Van = 14, Naar = 13, Richting = Richting.Achteruit, Pad = new List<int> { 14, 13 }, Configuratie = Configuratie.Basis.Met(5) }, Configuratie.Basis, Configuratie.Basis.Met(5), out _);
+        Eis(!c228b.Bevat(5), "navigatie (#228): bij een kering op melder 14 wordt niets vooraf gezet");
+        var c229 = BaanVerkenner.StartmelderWisselsVooraf(k228, e228b, Configuratie.Basis.Met(5).Met(10), Configuratie.Basis.Met(5).Met(6), out var u229);
+        Eis(c229.Bevat(10), "navigatie (#229): wissel 10 blijft afbuigend (oplossing kortsluitpunt #1) en wordt niet vooraf rechtdoor gezet voor startmelder 24 (nu " + c229 + "; " + u229 + ")");
         // BUG #226: automatische tussenstand
         var map226 = Path.Combine(Path.GetTempPath(), "autotussenstand_test_" + Guid.NewGuid().ToString("N"));
         var nu226 = new DateTime(2026, 10, 18, 12, 31, 0);

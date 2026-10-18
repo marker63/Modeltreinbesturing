@@ -2505,6 +2505,23 @@ public partial class BaanVerkenner
         // BUG #169: wissels die van de samengevoegde kant bereden worden helpen niet (overslaan); wissels die van een tak richting de samenvoeging bereden worden gaan voorop.
         var (achterKlem, kopKlem) = WisselRollen(_kaart, start, r, null);
         kandidaten = kandidaten.Where(a => !kopKlem.Contains(a) || achterKlem.Contains(a)).OrderByDescending(a => achterKlem.Contains(a)).ThenBy(a => a).ToList();
+        // BUG #230 (autolog 18-10 13:31:23-13:33:52): wissel 5 werd net omgezet terwijl de loc op melder 14 stond (de neus bij de tong), en direct daarna zat de loc klem. De routine
+        // probeerde 2 minuten lang alle andere wissels (elk met een kortsluiting) en sloeg juist wissel 5 over. Is de laatste wissel kort geleden omgezet terwijl de loc op dezelfde melders
+        // stond, dan gaat eerst die terug naar de vorige stand (daarin stond de loc er zonder kortsluiting). Gaat het alarm weg, dan wordt de stap afgebroken en later opnieuw gereden.
+        if (_laatsteWisselCommando is { } lw && !Kruis.IsMotor(lw.Adres) && (_klok.Nu - lw.Tijd).TotalSeconds <= 15 && lw.Bezet.Count > 0 && lw.Bezet.ToHashSet().SetEquals(bezet))
+        {
+            _log.Waarschuwing($"Wissel {lw.Adres} is {(_klok.Nu - lw.Tijd).TotalSeconds:0.0} s geleden naar {(lw.Afbuigend ? "afbuigend" : "rechtdoor")} gezet terwijl de loc al op melder {Lijst(bezet)} stond; daarvoor stond hij er zonder kortsluiting. Wissel {lw.Adres} gaat eerst terug (BUG #230).");
+            await ZetWissel(lw.Adres, !lw.Afbuigend, forceer: true);
+            var eindT = _klok.Nu + TimeSpan.FromSeconds(3);
+            while (HuidigeAlarmBlokken().Count > 0 && _klok.Nu < eindT) await Wacht(TimeSpan.FromMilliseconds(200));
+            if (HuidigeAlarmBlokken().Count == 0)
+            {
+                _kortsluitingGemeld = false;
+                _statischeKortsluiting = false;
+                throw new NavigatieFout($"De loc zat klem bij melder {start} doordat wissel {lw.Adres} werd omgezet terwijl de loc er al stond; de wissel staat weer terug. De stap ({stap}) wordt later opnieuw gereden.");
+            }
+            _log.Info($"Na het terugzetten van wissel {lw.Adres} is de kortsluiting er nog; de andere wissels worden geprobeerd.");
+        }
         if (kandidaten.Count == 0) return false;
         _klemProbeActief = true;
         try
