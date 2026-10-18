@@ -427,7 +427,11 @@ public class Baankaart
         for (int ronde = 0; ronde < 5; ronde++)
         {
             bool veranderd = false;
-            foreach (var o in Oplossingen(r).Where(o => (o.Start == start || BereiktMelder(start, o.NaMelder, r, c)) && !o.K.Bevat(o.Adres)))
+            // BUG #246 (autolog 18-10 15:58-16:00): de proeven van opdracht #4 (vanaf 14, stand 5 + proefadres) reden elk opnieuw in kortsluitpunt #1 na melder 24, hoewel de oplossing
+            // (wissel 10 afbuigend) bekend was: de weg 14 -> 129 -> 24 was alleen met stand '5' gereden, nooit met '1, 5' of '3, 5'. Zit de stand van de oplossing in de proefstand,
+            // dan telt ook de weg die met de stand van de oplossing gereden is (zoals bij een opdracht die op de startmelder van de oplossing begint).
+            foreach (var o in Oplossingen(r).Where(o => (o.Start == start || BereiktMelder(start, o.NaMelder, r, c)
+                                                          || (o.K.Afbuigend.All(c.Bevat) && BereiktMelder(start, o.NaMelder, r, o.K))) && !o.K.Bevat(o.Adres)))
             {
                 // BUG #236 (autolog 18-10 14:18:28-14:19:58): een eerder gevonden oplossing (wissel 1 bij wissel 2 afbuigend) hoort bij de ingang 12 -> 5 (overloop); de proef
                 // reed vanaf 13 via de hele ring en kwam vanaf 16 op melder 5: kortsluiting ondanks de 'oplossing'. Weet de kaart via welke melder de loc op die melder aankomt

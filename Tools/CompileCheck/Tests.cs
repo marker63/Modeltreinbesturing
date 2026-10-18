@@ -2488,6 +2488,12 @@ public static class Tests
         Eis(VerkenLog.MetBaanstand("Adres 16: afbuigend", om235) == "Adres 16: afbuigend" && VerkenLog.MetBaanstand("Wissel 6 gevonden", om235) == "Wissel 6 gevonden" && VerkenLog.MetBaanstand("Rijstand: afbuigend: 5, 6, 10", om235).Contains("omgekeerd"), "omgekeerd (#235): adres 16 of een melding zonder stand blijft gewoon; 'afbuigend: 5, 6' wel");
         var k235 = Laad("baankaart_2026-10-18_1349.json"); k235.OmgekeerdeWissels = new List<int> { 6 };
         Eis(Rapport.AlsTekst(k235).Contains("OMGEKEERD AANGESLOTEN") && Rapport.AlsHtml(k235).Contains("Omgekeerd aangesloten: wissel 6"), "omgekeerd (#235): rapport (tekst en html) noemt het");
+        // BUG #246: proef vanaf 14 met stand 1+5 krijgt de oplossing van kortsluitpunt #1 (na 24, stand 5: wissel 10 afbuigend)
+        var k246 = Laad("baankaart_2026-10-18_1600.json");
+        var c246 = k246.MetBekendeOplossingenVoorStart(14, Richting.Vooruit, new Configuratie(new[] { 1, 5 }), out _);
+        Eis(c246.Bevat(10), "proefstand (#246): vanaf 14 met wissel 1 en 5 afbuigend komt wissel 10 afbuigend erbij (nu " + c246 + ")");
+        var d246 = k246.MetBekendeOplossingenVoorStart(14, Richting.Vooruit, new Configuratie(new[] { 1 }), out _);
+        Eis(!d246.Bevat(10), "proefstand (#246): zonder wissel 5 afbuigend geldt de oplossing niet (nu " + d246 + ")");
         // BUG #244: hervatten neemt 'omgekeerd aangesloten' (en de uitgevoerde eenmalige aanpassingen) uit het scherm over
         var vast244 = new VerkenInstellingen { Verkensnelheid = 12 }; var scherm244 = new VerkenInstellingen { OmgekeerdAangesloten = "6", Verkensnelheid = 20 };
         scherm244.UitgevoerdeAanpassingen.Add("239-wissel6-omgekeerd");

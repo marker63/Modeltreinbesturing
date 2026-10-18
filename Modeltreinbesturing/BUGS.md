@@ -2591,3 +2591,10 @@ terugzette niet nog eens om. Test: KeerlusTest (de simulatie komt precies in dez
 blokfase niet meer mee: daar rijdt de loc na de keerlus nog verkeerd (open punt #234).
 Let op (open): de simulatie laat een wissel onder de loc gewoon omzetten zonder ontsporing, dus dit soort fouten valt in de simulatie niet op. Een algemene regel in ZetConfiguratie
 (nooit een wissel met een kortsluitoplossing bij de bezette melder omzetten) brak de keerlus-simulatie en is daarom niet ingevoerd.
+
+## BUG #246 – OPGELOST (nog niet getest op de baan): elke proef van opdracht #4 reed opnieuw in een bekende kortsluiting (autolog 18-10 15:58-16:00)
+Opdracht #4 (vanaf melder 14 vooruit, wissel 5 afbuigend): kortsluitpunt #1 na melder 24 is opgelost door wissel 10 afbuigend (bevestigd). Toch reed elke proef (adres 1, 3, 4, ...)
+met wissel 10 rechtdoor ("Rijstand hersteld voor de proef: wissel 10 ... moet rechtdoor") en kreeg bij 24 dezelfde kortsluiting, waarna het herstel wissel 10 weer afbuigend zette.
+Oorzaak: MetBekendeOplossingenVoorStart past een oplossing toe als de opdracht op de startmelder van de oplossing begint (bij opdracht #3: 13) of als de kaart de weg naar de
+kortsluitmelder kent met de proefstand. Kortsluitpunt #1 begon op 13 en de weg 14 -> 129 -> 24 was alleen met stand '5' gereden, nooit met '1, 5'. Nu telt ook de weg die met de stand
+van de oplossing gereden is, als die stand in de proefstand zit. Test: proefstand (#246) op baankaart 1600.
