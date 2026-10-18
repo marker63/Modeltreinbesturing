@@ -511,6 +511,7 @@ public partial class MainWindow : Window
         vast.ExtraMeldersNaAfwijking = scherm.ExtraMeldersNaAfwijking;
         vast.BasisritHerhalen = scherm.BasisritHerhalen;
         vast.AutoSnelheid = scherm.AutoSnelheid;
+        VerkenInstellingen.NeemMeldingInstellingenOver(vast, scherm);   // BUG #244: o.a. wissel 6 omgekeerd aangesloten
         if (vast.LocStappen <= 28 && (vast.Verkensnelheid > vast.LocStappen || vast.Kruipsnelheid > vast.LocStappen))
         {
             MessageBox.Show(this, $"De onderbroken verkenning gebruikt {vast.LocStappen} rijstappen; de snelheden mogen daar niet boven komen.", "Controleer de instellingen", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -584,6 +585,7 @@ public partial class MainWindow : Window
         vast.ExtraMeldersNaAfwijking = scherm.ExtraMeldersNaAfwijking;
         vast.BasisritHerhalen = scherm.BasisritHerhalen;
         vast.AutoSnelheid = scherm.AutoSnelheid;
+        VerkenInstellingen.NeemMeldingInstellingenOver(vast, scherm);   // BUG #244: o.a. wissel 6 omgekeerd aangesloten
         vast.StapVoorStap = scherm.StapVoorStap;
         vast.Rondrit = scherm.Rondrit;
         vast.StapAanloop = scherm.StapAanloop;

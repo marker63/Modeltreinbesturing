@@ -37,6 +37,15 @@ public class VerkenInstellingen
     /// <summary>BUG #239: sleutels van eenmalige aanpassingen (<see cref="EenmaligeAanpassingen"/>) die op deze instellingen al zijn uitgevoerd.</summary>
     public List<string> UitgevoerdeAanpassingen { get; set; } = new();
 
+    /// <summary>BUG #244 (autolog 18-10 15:25-15:35): bij het hervatten gebruikt de verkenner de instellingen van de onderbroken verkenning (<paramref name="vast"/>). Wissel 6
+    /// 'omgekeerd aangesloten' (eenmalige aanpassing #239, in het scherm gezet) kwam daardoor niet in de hervatte verkenning: geen uitleg bij 'Adres 6: afbuigend'. Instellingen die
+    /// alleen de meldingen betreffen, komen daarom uit het scherm (<paramref name="scherm"/>).</summary>
+    public static void NeemMeldingInstellingenOver(VerkenInstellingen vast, VerkenInstellingen scherm)
+    {
+        vast.OmgekeerdAangesloten = scherm.OmgekeerdAangesloten;
+        foreach (var s in scherm.UitgevoerdeAanpassingen) if (!vast.UitgevoerdeAanpassingen.Contains(s)) vast.UitgevoerdeAanpassingen.Add(s);
+    }
+
     /// <summary>BUG #235: de adressen uit <see cref="OmgekeerdAangesloten"/>.</summary>
     public HashSet<int> OmgekeerdeWissels()
         => OmgekeerdAangesloten.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries).Select(x => int.TryParse(x.Trim(), out var a) ? a : 0).Where(a => a > 0).ToHashSet();

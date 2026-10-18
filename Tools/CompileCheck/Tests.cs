@@ -2486,6 +2486,11 @@ public static class Tests
         Eis(VerkenLog.MetBaanstand("Adres 16: afbuigend", om235) == "Adres 16: afbuigend" && VerkenLog.MetBaanstand("Wissel 6 gevonden", om235) == "Wissel 6 gevonden" && VerkenLog.MetBaanstand("Rijstand: afbuigend: 5, 6, 10", om235).Contains("omgekeerd"), "omgekeerd (#235): adres 16 of een melding zonder stand blijft gewoon; 'afbuigend: 5, 6' wel");
         var k235 = Laad("baankaart_2026-10-18_1349.json"); k235.OmgekeerdeWissels = new List<int> { 6 };
         Eis(Rapport.AlsTekst(k235).Contains("OMGEKEERD AANGESLOTEN") && Rapport.AlsHtml(k235).Contains("Omgekeerd aangesloten: wissel 6"), "omgekeerd (#235): rapport (tekst en html) noemt het");
+        // BUG #244: hervatten neemt 'omgekeerd aangesloten' (en de uitgevoerde eenmalige aanpassingen) uit het scherm over
+        var vast244 = new VerkenInstellingen { Verkensnelheid = 12 }; var scherm244 = new VerkenInstellingen { OmgekeerdAangesloten = "6", Verkensnelheid = 20 };
+        scherm244.UitgevoerdeAanpassingen.Add("239-wissel6-omgekeerd");
+        VerkenInstellingen.NeemMeldingInstellingenOver(vast244, scherm244);
+        Eis(vast244.OmgekeerdeWissels().SetEquals(new[] { 6 }) && vast244.UitgevoerdeAanpassingen.Contains("239-wissel6-omgekeerd") && vast244.Verkensnelheid == 12, "hervatten (#244): wissel 6 omgekeerd komt uit het scherm, de rest blijft");
         // BUG #236: eerder gevonden oplossing (1 bij 2) geldt alleen voor haar eigen ingang
         var k236 = Laad("baankaart_2026-10-18_1424.json");
         k236.BekendeKortsluitOplossingen.Add(new KortsluitOplossing { NaMelder = 5, Via = 12, Richting = Richting.Vooruit, Stand = "2", Start = 13, Adres = 1, Afbuigend = true, Bron = "test" });

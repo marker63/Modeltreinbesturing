@@ -2574,3 +2574,8 @@ overschreven). De voorzorg is daar nodig, dus de regel blijft zoals hij is.
 voordat de vondst ("niet van 17 naar 8 met wissel 14 afbuigend") werd vastgelegd: dat gebeurde pas na de terugrit. Na het hervatten (15:11) reed de verkenner dezelfde proef opnieuw
 en kreeg om 15:15:27 dezelfde kortsluiting. Oplossing: wordt er tijdens de terugrit gestopt, dan wordt de vondst eerst vastgelegd (Vergelijk + partner), het adres staat dan als
 gevonden in de bewaarde voortgang en wordt na het hervatten niet opnieuw geprobeerd. Test: StopTijdensTerugritTest (Miniworld-simulatie, stoppen direct na zo'n proef; faalt zonder de fix).
+
+## BUG #244 – OPGELOST (nog niet getest op de baan): eenmalige aanpassing 'wissel 6 omgekeerd' kwam niet in een hervatte verkenning (autolog 18-10 15:25-15:35)
+Marco hervatte met bug241, maar het logboek had geen regel "Omgekeerd aangesloten: wissel 6" en de kaart had OmgekeerdeWissels leeg. Oorzaak: bij hervatten gebruikt de verkenner de
+instellingen van de onderbroken verkenning; alleen snelheden en tijden kwamen uit het scherm. Nu komen ook 'Omgekeerd aangesloten' en de uitgevoerde eenmalige aanpassingen uit het
+scherm (hervatten en controle). Test: hervatten (#244).
