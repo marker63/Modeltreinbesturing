@@ -1352,8 +1352,13 @@ public partial class BaanVerkenner
 
     /// <summary>BUG #121: maakt de werkelijke wisselstand gelijk aan <paramref name="rijstand"/> (behalve het adres dat de proef zelf omzet). Wissels die bij een nu
     /// bezette melder liggen blijven zoals ze staan; kan een kruiswisselmotor niet omgezet worden omdat de loc op de kruiswissel staat, dan false.</summary>
+    /// <summary>BUG #208: wissels die bij de laatste <see cref="HerstelRijstand"/> niet naar de rijstand teruggezet konden worden (de loc stond erbij of de stand was een klemoplossing).
+    /// Een proefrit met zo'n afwijkende stand mag geen kortsluiting aan het proefadres toeschrijven.</summary>
+    private readonly HashSet<int> _proefAfwijkend = new();
+
     private async Task<bool> HerstelRijstand(Configuratie rijstand, int proefAdres)
     {
+        _proefAfwijkend.Clear();
         var bijBezet = WisselsBijBezet(_kaart, _monitor.Bezet);
         var teDoen = new List<(int Adres, bool Afb)>();
         foreach (var adres in _ins.WisselAdressen())
@@ -1364,8 +1369,8 @@ public partial class BaanVerkenner
             if (nu == wens) continue;
             if (Kruis.IsMotor(adres) && Kruis.OpKruis(_monitor.Bezet)) return false;
             // BUG #194: een stand die net het alarm wegnam (wissel 1 bij wissel 2) niet terugzetten zolang de loc nog op die melders staat
-            if (!wens && nu && _klemOplossing.TryGetValue(adres, out var ko) && _monitor.Bezet.Any(ko.Melders.Contains) && (_klok.Nu - ko.Tijd).TotalMinutes < 10) continue;
-            if (bijBezet.Contains(adres)) continue;   // ligt bij de melder waar de loc staat: niet onder de loc omzetten (de staartwissels regelt de rit zelf, #107)
+            if (!wens && nu && _klemOplossing.TryGetValue(adres, out var ko) && _monitor.Bezet.Any(ko.Melders.Contains) && (_klok.Nu - ko.Tijd).TotalMinutes < 10) { _proefAfwijkend.Add(adres); continue; }
+            if (bijBezet.Contains(adres)) { _proefAfwijkend.Add(adres); continue; }   // ligt bij de melder waar de loc staat: niet onder de loc omzetten (de staartwissels regelt de rit zelf, #107)
             teDoen.Add((adres, wens));
         }
         foreach (var (adres, afb) in teDoen)
@@ -1826,6 +1831,17 @@ public partial class BaanVerkenner
 
     private void Vergelijk(Opdracht o, RitResultaat basis, RitResultaat proef, int a)
     {
+        // BUG #208 (Marco 18-10 08:31: "wissel 11 kan ik fysiek niet vinden"; log 17-10 19:06-19:08): wissel 5 stond nog afbuigend (klemoplossing van 19:02) terwijl wissel 11 getest werd; 24 -> 14
+        // met wissel 5 afbuigend geeft kortsluiting, en dat werd aan wissel 11 toegeschreven (het alarm ging weg toen wissel 5 rechtdoor ging, niet 11). Staat bij een proef met kortsluiting
+        // een andere wissel dan de rijstand (niet terug te zetten), dan zegt de proef niets over het proefadres.
+        if (proef.Einde == RitEinde.Kortsluiting && _proefAfwijkend.Count > 0)
+        {
+            string afwTekst = $"Proef met adres {a}: kortsluiting, maar wissel {string.Join(", ", _proefAfwijkend.OrderBy(x => x))} stond niet in de rijstand (kon niet teruggezet worden). De kortsluiting wordt daarom niet aan adres {a} toegeschreven; het adres wordt later opnieuw getest.";
+            _log.Waarschuwing(afwTekst);
+            _proefAfwijkend.Clear();
+            return;
+        }
+        _proefAfwijkend.Clear();
         var b = basis.Reeks;
         var t = proef.Reeks;
         int i = 0;
