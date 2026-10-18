@@ -437,6 +437,7 @@ public static class Tests
     }
 
     // BUG #104: "Voltooide baan nogmaals checken": de bestaande kaart blijft onaangeroerd, de baan wordt opnieuw gereden en vergeleken
+    static List<WisselstraatVoorstel> Wisselstraten_Bereken(Baankaart k) => WisselstraatVoorstel.Bereken(k);
     static void ControleRondeTest()
     {
         var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = false, LocAdres = 5408 };
@@ -2385,6 +2386,25 @@ public static class Tests
         var kp204c = new Kortsluitpunt { Id = 9, NaMelder = 99, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis.Met(2), Opgelost = true, OpgelostDoorAdres = 3, OpgelostMetAfbuigend = true, Voorlopig = true };
         k204.Kortsluitpunten.Add(kp204c); k204.ToetsVoorlopigeOplossingen();
         Eis(kp204c.Opgelost && kp204c.Voorlopig, "voorlopig (#204): zonder ritten over de overgang blijft een voorlopige oplossing staan (geen bewijs en geen weerlegging)");
+        // BUG #202: wisselstanden gelden in beide richtingen
+        var k202 = Laad("baankaart_2026-10-18_1146.json"); k202.HerstelStrijdigeOplossingen();
+        var v202 = Wisselstraten_Bereken(k202);
+        int verschil202 = 0;
+        foreach (var w202 in v202)
+        {
+            var tg = v202.Where(x => x.VanMelder == w202.NaarMelder && x.NaarMelder == w202.VanMelder && x.Richting == w202.Richting.Om()).ToList();
+            if (tg.Count != 1 || v202.Count(x => x.VanMelder == w202.VanMelder && x.NaarMelder == w202.NaarMelder && x.Richting == w202.Richting) != 1) continue;
+            string S(WisselstraatVoorstel w) => string.Join(",", w.Eisen.Where(e => e.Bron != EisBron.Aangenomen).OrderBy(e => e.Adres).Select(e => $"{e.Adres}{(e.Afbuigend ? 'A' : 'R')}"));
+            if (S(w202) != S(tg[0])) { verschil202++; Console.WriteLine($"  #202 {w202.VanMelder}>{w202.NaarMelder} {w202.Richting}: {w202.EisenTekst} || {tg[0].EisenTekst}"); }
+        }
+        Eis(verschil202 == 0, "wisselstraten (#202): bewezen eisen zijn per overgang in beide richtingen gelijk (verschillen: " + verschil202 + ")");
+        // BUG #207: doorgang toont alleen de minimale rijstanden
+        Eis(Rapport.DoorgangStanden(new[] { "5,10", "5,10,14", "5,10,14,2" }) == Configuratie.VanSleutel("5,10").ToString(), "rapport (#207): alleen de kleinste rijstand van een doorgang wordt getoond (nu " + Rapport.DoorgangStanden(new[] { "5,10", "5,10,14", "5,10,14,2" }) + ")");
+        Eis(Rapport.DoorgangStanden(new[] { "", "3,4" }) == "geen wissel van invloed gezien", "rapport (#207): reed de doorgang ook zonder afbuigende wissels, dan staat er 'geen wissel van invloed gezien'");
+        // BUG #212: een opgelost kortsluitpunt krijgt een waarneming bij het oplossingswissel
+        var k212 = Laad("baankaart_2026-10-18_1146.json");
+        k212.HerstelStrijdigeOplossingen(); k212.LosKortsluitpuntenOpUitRitten(); k212.VulOntbrekendeOplossingWaarnemingen();
+        Eis(k212.Kortsluitpunten.Where(x => x.Opgelost && x.OpgelostDoorAdres is int).All(x => k212.Wissel(x.OpgelostDoorAdres!.Value).Waarnemingen.Any(w => w.Soort == WaarnemingSoort.LostKortsluitingOp && w.NaMelder == x.NaMelder && w.Richting == x.Richting)), "kaartcontrole (#212): elk opgelost kortsluitpunt heeft een waarneming bij zijn oplossingswissel");
         // BUG #160: voltooide kaart van 12:42 - ingangen afgeleid, kruismotor 10 blijft staan bij de aankomst op melder 129
         var k160 = Laad("baankaart_2026-10-15_1242.json");
         int? ViaVan(int adres, int na) => k160.Wissel(adres).Waarnemingen.FirstOrDefault(x => x.Soort == WaarnemingSoort.KortsluitingBijOmzetten && x.NaMelder == na)?.Via;

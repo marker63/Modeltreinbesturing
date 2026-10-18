@@ -111,7 +111,32 @@ public class WisselstraatVoorstel
                 if (gezien.Add(v.Sleutel)) res.Add(v);
             }
         }
+        MaakSymmetrisch(res);
         return res;
+    }
+
+    /// <summary>BUG #202 (Marco 17-10): wisselstanden gelden in beide richtingen. Hoort bij A -> B precies één voorstel en bij B -> A (omgekeerde richting)
+    /// precies één voorstel, dan krijgen beide dezelfde bewezen eisen (splitsing, kortsluiting, overloop). Een aangenomen eis die de andere richting niet
+    /// kent, of die de bewezen eis tegenspreekt, vervalt (niet bewezen). Bij meerdere alternatieven blijft alles zoals het is (niet te beslissen).</summary>
+    internal static void MaakSymmetrisch(List<WisselstraatVoorstel> res)
+    {
+        var groepen = res.GroupBy(v => (v.VanMelder, v.NaarMelder, v.Richting)).ToDictionary(g => g.Key, g => g.ToList());
+        var nieuw = new Dictionary<WisselstraatVoorstel, List<WisselEis>>();
+        foreach (var v in res)
+        {
+            if (groepen[(v.VanMelder, v.NaarMelder, v.Richting)].Count != 1) continue;
+            if (!groepen.TryGetValue((v.NaarMelder, v.VanMelder, v.Richting.Om()), out var tegen) || tegen.Count != 1) continue;
+            var t = tegen[0];
+            var bewezen = new List<WisselEis>();
+            foreach (var e in v.Eisen.Concat(t.Eisen).Where(e => e.Bron != EisBron.Aangenomen).OrderBy(e => e.Bron == EisBron.Kortsluiting ? 0 : e.Bron == EisBron.Splitsing ? 1 : 2))
+                if (!bewezen.Any(b => b.Adres == e.Adres)) bewezen.Add(e);
+            var eisen = bewezen.Select(e => new WisselEis { Adres = e.Adres, Afbuigend = e.Afbuigend, Bron = e.Bron }).ToList();
+            foreach (var e in v.Eisen.Where(e => e.Bron == EisBron.Aangenomen))
+                if (t.Eisen.Any(x => x.Adres == e.Adres && x.Afbuigend == e.Afbuigend) && !eisen.Any(x => x.Adres == e.Adres))
+                    eisen.Add(new WisselEis { Adres = e.Adres, Afbuigend = e.Afbuigend, Bron = e.Bron });
+            nieuw[v] = eisen.OrderBy(e => e.Adres).ToList();
+        }
+        foreach (var (v, eisen) in nieuw) v.Eisen = eisen;
     }
 
     /// <summary>BUG #116: staan in <paramref name="eisen"/> alle wissels van een bewezen kortsluitstand afbuigend en gaat de stap langs de melder van dat

@@ -921,6 +921,28 @@ public class Baankaart
         return res;
     }
 
+    /// <summary>BUG #212: elk opgelost kortsluitpunt met een oplossingsadres hoort bij dat wissel een waarneming "lost kortsluiting op" te hebben (anders ontbreekt het wissel in de wisselslijst
+    /// terwijl de kaart het adres wel als oplossing kent). Voegt de ontbrekende waarneming toe en geeft een melding per toevoeging. Nog niet getest op de baan.</summary>
+    public List<string> VulOntbrekendeOplossingWaarnemingen()
+    {
+        var res = new List<string>();
+        foreach (var k in Kortsluitpunten.Where(k => k.Opgelost && k.OpgelostDoorAdres is int && !k.Voorlopig))
+        {
+            int adres = k.OpgelostDoorAdres!.Value;
+            var w = Wissel(adres);
+            if (w.Waarnemingen.Any(x => x.Soort == WaarnemingSoort.LostKortsluitingOp && x.NaMelder == k.NaMelder && x.Richting == k.Richting)) continue;
+            int via = k.Route.Count > 0 && k.Route[^1].Pad.Count > 1 && k.Route[^1].Pad[^1] == k.NaMelder ? k.Route[^1].Pad[^2] : (k.TweedeMelders.Count == 1 ? k.TweedeMelders[0] : 0);
+            w.Waarnemingen.Add(new WisselWaarneming
+            {
+                Soort = WaarnemingSoort.LostKortsluitingOp, NaMelder = k.NaMelder, Via = via == 0 ? null : via, Richting = k.Richting, VolgendeBijAfbuigend = null,
+                Configuratie = k.Configuratie.ToString(),
+                Toelichting = $"Aangevuld (BUG #212): kortsluitpunt #{k.Id} is opgelost met adres {adres} {(k.OpgelostMetAfbuigend == true ? "afbuigend" : "rechtdoor")}."
+            });
+            res.Add($"waarneming voor wissel {adres} aangevuld (kortsluitpunt #{k.Id})");
+        }
+        return res;
+    }
+
     /// <summary>BUG #204/#211/#217: een voorlopige oplossing (alleen uit het alarm afgeleid) wordt getoetst aan de gereden ritten over dezelfde overgang (ook omgekeerd). Rijdt een rit
     /// zonder kortsluiting over de overgang met de stand van het punt plus extra wissels, en bevat de doorsnede van die extra wissels het adres van de oplossing, dan is zij bewezen. Bevat die
     /// doorsnede het adres niet, dan was zij ruis: bij precies één ander adres wordt zij daardoor vervangen, anders is het punt weer open. Geeft een melding per wijziging.</summary>

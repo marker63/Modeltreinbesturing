@@ -38,6 +38,16 @@ public static class Rapport
         return res;
     }
 
+    /// <summary>BUG #207: van alle rijstanden waarmee een doorgang is gereden alleen de minimale tonen (een stand die een uitbreiding van een andere is, voegt niets toe:
+    /// de extra wissels liggen daar niet en hadden geen invloed). Is de kleinste stand de basisstand, dan staat er "geen wissel van invloed gezien".</summary>
+    internal static string DoorgangStanden(IEnumerable<string> sleutels)
+    {
+        var configs = sleutels.Select(Configuratie.VanSleutel).Distinct().ToList();
+        if (configs.Count == 0) return "geen wissel van invloed gezien";
+        var minimaal = configs.Where(c => !configs.Any(d => !d.Equals(c) && d.Afbuigend.All(c.Bevat))).OrderBy(c => c.Afbuigend.Length).ThenBy(c => c.Sleutel, StringComparer.Ordinal).ToList();
+        return string.Join(" / ", minimaal.Select(c => c.Afbuigend.Length == 0 ? "geen wissel van invloed gezien" : c.ToString()));
+    }
+
     /// <summary>Welke wissel (adres + stand) hoort bij de overgang van melder a naar b in
     /// richting r, voor zover bekend.</summary>
     public static List<string> WisselsTussen(Baankaart k, int a, int b, Richting r)
@@ -241,7 +251,7 @@ ul{margin:6px 0 0 18px;padding:0}
             sb.Append("<table><tr><th>Melder</th><th>Richting</th><th>Vanaf melder</th><th>Vervolg</th><th>Wisselstand</th><th>Keer</th></tr>");
             foreach (var g in opvallend)
                 foreach (var d in g.OrderBy(x => x.Richting).ThenBy(x => x.Via).ThenBy(x => x.Volgende))
-                    sb.Append($"<tr><td class=\"num\">{d.Melder}</td><td>{d.Richting.Tekst()}</td><td>{d.Via}</td><td>{d.Volgende}</td><td>{E(string.Join(" / ", d.Configuraties.Select(c => Configuratie.VanSleutel(c).ToString())))}</td><td>{d.AantalKeer}</td></tr>");
+                    sb.Append($"<tr><td class=\"num\">{d.Melder}</td><td>{d.Richting.Tekst()}</td><td>{d.Via}</td><td>{d.Volgende}</td><td>{E(DoorgangStanden(d.Configuraties))}</td><td>{d.AantalKeer}</td></tr>");
             sb.Append("</table>");
         }
 
@@ -377,7 +387,7 @@ ul{margin:6px 0 0 18px;padding:0}
             Kop("DOORGANGEN (INGANGSKANT)");
             foreach (var g in opvallendT)
                 foreach (var d in g.OrderBy(x => x.Richting).ThenBy(x => x.Via).ThenBy(x => x.Volgende))
-                    sb.AppendLine($"  melder {d.Melder} ({d.Richting.Tekst()}): vanaf {d.Via} → {d.Volgende}   [{string.Join(" / ", d.Configuraties.Select(c => Configuratie.VanSleutel(c).ToString()))}]  {d.AantalKeer}x");
+                    sb.AppendLine($"  melder {d.Melder} ({d.Richting.Tekst()}): vanaf {d.Via} → {d.Volgende}   [{DoorgangStanden(d.Configuraties)}]  {d.AantalKeer}x");
         }
 
         if (k.KruisReferentie) { Kop("KRUISWISSEL MELDER 24 (REFERENTIE)"); sb.Append(KruiswisselReferentie.AlsTekst(k)); }

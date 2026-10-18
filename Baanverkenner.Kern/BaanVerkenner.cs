@@ -1222,7 +1222,9 @@ public partial class BaanVerkenner
                 // BUG #121 (log 18:11:57): na een terugweg kan de stand afwijken van de rijstand (motor 13 stond rechtdoor terwijl de opdracht hem afbuigend
                 // vraagt); de proefrit heette 'afbuigend: 6, 13, 14' maar reed met 13 rechtdoor en leverde valse vondsten op (wissel 6, 7, 8 en 9 'splitsen').
                 // Voor elke proef wordt de stand dus eerst weer gelijk gemaakt aan de rijstand; kan dat niet veilig, dan wordt dit adres niet getest.
-                if (!await HerstelRijstand(rijstand, a))
+                // BUG #216: de proef rijdt met de bekende oplossing van een kortsluitpunt erbij (bijv. wissel 14); die stand alvast als doel nemen, anders zet het herstel hem eerst terug en de proef meteen weer om.
+                ProefStandMetOplossing(_kaart, _ins.WisselAdressen(), o.Start, o.Richting, rijstand, a, out var voorExtra, Kruis);
+                if (!await HerstelRijstand(rijstand, a, voorExtra))
                 {
                     _log.Waarschuwing($"Adres {a} wordt in opdracht #{o.Id} nu niet getest: de wisselstand kon niet veilig gelijk gemaakt worden aan de rijstand ({rijstand}); een proef met een andere stand zou valse vondsten geven.");
                     continue;
@@ -1237,7 +1239,7 @@ public partial class BaanVerkenner
                     {
                         _log.Info($"Adres {a}: wissel {afwLijst} kon niet naar de rijstand terug; de loc wordt eerst op melder {o.Start} gezet en daarna wordt de stand opnieuw hersteld.");
                         await Nastellen(o.Start, o.Richting);
-                        if (!await HerstelRijstand(rijstand, a)) { _log.Waarschuwing($"Adres {a} wordt in opdracht #{o.Id} nu niet getest: de wisselstand kon niet veilig gelijk gemaakt worden aan de rijstand ({rijstand})."); continue; }
+                        if (!await HerstelRijstand(rijstand, a, voorExtra)) { _log.Waarschuwing($"Adres {a} wordt in opdracht #{o.Id} nu niet getest: de wisselstand kon niet veilig gelijk gemaakt worden aan de rijstand ({rijstand})."); continue; }
                     }
                     if (_klemAfwijkend.Count > 0)
                         _log.Waarschuwing($"Adres {a}: wissel {afwLijst} staat nog anders dan de rijstand ({rijstand}) en kan niet omgezet worden; de proef gaat door, maar een kortsluiting wordt niet aan adres {a} toegeschreven (#208).");
@@ -1393,7 +1395,7 @@ public partial class BaanVerkenner
             && (g.Reeks.SequenceEqual(reeks) || g.Reeks.SequenceEqual(omgekeerd)));
     }
 
-    private async Task<bool> HerstelRijstand(Configuratie rijstand, int proefAdres)
+    private async Task<bool> HerstelRijstand(Configuratie rijstand, int proefAdres, List<(int Adres, bool Afbuigend)>? extra = null)
     {
         _proefAfwijkend.Clear();
         _klemAfwijkend.Clear();
@@ -1402,7 +1404,7 @@ public partial class BaanVerkenner
         foreach (var adres in _ins.WisselAdressen())
         {
             if (adres == proefAdres) continue;
-            bool wens = rijstand.Bevat(adres);
+            bool wens = extra is not null && extra.Any(e => e.Adres == adres) ? extra.First(e => e.Adres == adres).Afbuigend : rijstand.Bevat(adres);
             bool nu = _wisselStand.TryGetValue(adres, out var st) && st;
             if (nu == wens) continue;
             if (Kruis.IsMotor(adres) && Kruis.OpKruis(_monitor.Bezet)) return false;
@@ -2686,6 +2688,7 @@ public partial class BaanVerkenner
         foreach (var t in _kaart.ToetsVoorlopigeOplossingen()) _log.Vondst("Voorlopige oplossing getoetst (BUG #204): " + t);
         foreach (var t in _kaart.HerstelStrijdigeOplossingen()) { _log.Waarschuwing("Kaart hersteld (BUG #217): " + t); _kaart.Waarschuwingen.Add(t); }
         foreach (var t in _kaart.LosKortsluitpuntenOpUitRitten()) _log.Vondst("Kortsluitpunt afgeleid (BUG #214): " + t);
+        foreach (var t in _kaart.VulOntbrekendeOplossingWaarnemingen()) _log.Info("Kaartcontrole (BUG #212): " + t);
         BerekenAdressenZonderEffect();
         _kaart.VoorgesteldeBlokken = BlokVoorstel.Bereken(_kaart);
         _kaart.Wisselstraatvoorstellen = WisselstraatVoorstel.Bereken(_kaart);
