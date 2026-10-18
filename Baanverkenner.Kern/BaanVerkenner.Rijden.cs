@@ -436,9 +436,19 @@ public partial class BaanVerkenner
             _kaartVoorUitval = null;
             if (oud is null) return;
             var waarsch = _kaart.Waarschuwingen.ToList();
+            // BUG #206: melders (en hun Dinamo-blok) volgen uit de bezetmeldingen, niet uit wisselcommando's; die blijven behouden zodat ze niet opnieuw ontdekt hoeven te worden.
+            var meldersNu = _kaart.Melders.Select(m => (m.Nummer, m.DinamoBlok)).ToList();
             foreach (var p in typeof(Baankaart).GetProperties().Where(p => p.CanRead && p.CanWrite))
                 p.SetValue(_kaart, p.GetValue(oud));
             _kaart.Waarschuwingen = waarsch;
+            int behouden = 0;
+            foreach (var (nr, blok) in meldersNu)
+            {
+                var m = _kaart.Melders.FirstOrDefault(x => x.Nummer == nr);
+                if (m is null) { _kaart.Melders.Add(new MelderInfo { Nummer = nr, DinamoBlok = blok }); behouden++; }
+                else if (m.DinamoBlok is null && blok is not null) { m.DinamoBlok = blok; behouden++; }
+            }
+            if (behouden > 0) _log.Info($"Na de Dinamo-uitval zijn {behouden} melder(s)/blokgegevens behouden: die komen uit de bezetmeldingen en niet uit wisselcommando's (BUG #206).");
             var tekst = $"Dinamo-uitval ({reden}): alle bevindingen sinds de eerste ontbrekende terugmelding zijn uit de kaart gehaald omdat ze niet betrouwbaar zijn.";
             _kaart.Waarschuwingen.Add(tekst);
             _log.Waarschuwing(tekst);
@@ -1095,6 +1105,8 @@ public partial class BaanVerkenner
 
     /// <summary>BUG #55: langste tijd (s) die de loc nodig had om vanuit stilstand een nieuwe melder te halen.</summary>
     private double _langsteVertrekSeconden;
+    /// <summary>BUG #200: melders waar de loc bij het neerzetten doorschoot.</summary>
+    private readonly HashSet<int> _doorschietMelders = new();
 
     private int RefSnelheid => _kaart.RefSnelheid > 0 ? _kaart.RefSnelheid : _ins.Verkensnelheid;
     private int _startVerkensnelheid;
@@ -1583,6 +1595,7 @@ public partial class BaanVerkenner
         DateTime? leegSinds = null;
         int? afwijkingIndex = null;
         bool doelInzicht = false;
+        bool kruipVoorDoel = false;
         bool blokGecontroleerd = false;
         bool wachttijdVerlengd = false;   // BUG #55: eenmalige bevestigingsronde voordat "doodlopend" geconcludeerd wordt
         bool vervolgHerhaald = false;     // BUG #64: bij een bekend vervolg eenmalig het rijcommando herhalen
@@ -1688,6 +1701,8 @@ public partial class BaanVerkenner
                     // terugkruipen in plaats van alarm slaan.
                     await StopLoc();
                     _log.Rijden($"  melder {m} bezet: doorgeschoten, terug naar melder {doel.DoelMelder}.");
+                    if (_doorschietMelders.Add(doel.DoelMelder!.Value))
+                        _log.Info($"Melder {doel.DoelMelder} onthouden als melder waar de loc doorschiet: een volgende rit hiernaartoe gaat al op de melder ervoor op kruipsnelheid (BUG #200).");
                     await Nastellen(doel.DoelMelder!.Value, r, voor: m);
                     res.Einde = RitEinde.DoelBereikt;
                     return res;
@@ -1794,6 +1809,13 @@ public partial class BaanVerkenner
                     {
                         await StopLoc();
                         throw new NavigatieFout($"De loc bereikte melder {doel.DoelMelder} niet na {res.Reeks.Count} melders (hij rijdt rondjes); de rit is gestopt op melder {m}.");
+                    }
+                    // BUG #200 (Marco 17-10: loc schiet bij het neerzetten op melder 24 door naar 21): op een melder waar de loc eerder doorschoot gaat hij al op de melder ervoor naar kruipsnelheid.
+                    if (!doelInzicht && !kruipVoorDoel && doel.VerwachtPad is { Count: >= 2 } vp200 && vp200[^1] == doel.DoelMelder && m == vp200[^2] && _doorschietMelders.Contains(doel.DoelMelder!.Value))
+                    {
+                        kruipVoorDoel = true;
+                        _log.Rijden($"  melder {m}: de laatste melder voor melder {doel.DoelMelder}, waar de loc eerder doorschoot; nu op kruipsnelheid.");
+                        await StuurSnelheid(r, _ins.Kruipsnelheid);
                     }
                     if (m == doel.DoelMelder && !doelInzicht)
                     {
