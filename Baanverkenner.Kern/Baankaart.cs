@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Baanverkenner.Kern;
@@ -821,6 +821,38 @@ public class Baankaart
                                                               && t.AantalKeer >= 3 * Math.Max(1, o.AantalKeer))).ToList();
         foreach (var o in weg) Overgangen.Remove(o);
         return weg.Select(o => $"{o.Van} -> {o.Naar} ({o.Richting.Tekst()}, {o.AantalKeer}x, stand {string.Join("/", o.GezienBijConfiguraties.Select(x => x == "" ? "alle rechtdoor" : x))})").ToList();
+    }
+
+    /// <summary>BUG #227 (log 18-10 13:17:18): bij het vertrek achteruit vanaf melder 21 meldde melder 29 (de andere kant, 21 -> 29 is vooruit 12x gereden) 0,8 s 'bezet'. De rit telde
+    /// 21 -> 29 -> 24 -> 129 (achteruit) en de proef gaf een valse splitsing 'wissel 10 na melder 21 (achteruit): rechtdoor 24, afbuigend 29'. Daardoor eiste de kaart wissel 10 rechtdoor
+    /// voor 129 -> 24 -> 21 (13:21:33, kortsluiting) en zette de basisrit wissel 10 afbuigend bij melder 21 (13:24:38). Deze opruiming haalt weg: (1) een overgang X -> Y (r) waarvan
+    /// X -> Y in de andere richting minstens 3 keer zo vaak gereden is; (2) de stap daarna Y -> Z (r) als Z een bekende opvolger van X in r is en die stap niet vaker en niet met andere
+    /// standen gereden is; (3) splitsingen en doorgangen die op zo'n overgang steunen. Geeft per onderdeel een melding.</summary>
+    public List<string> VerwijderAchterkantOvergangen()
+    {
+        var res = new List<string>();
+        var vals = Overgangen.Where(o => Overgangen.Any(t => t.Van == o.Van && t.Naar == o.Naar && t.Richting == o.Richting.Om() && t.AantalKeer >= 3 * Math.Max(1, o.AantalKeer))).ToList();
+        foreach (var o in vals)
+        {
+            Overgangen.Remove(o);
+            res.Add($"overgang {o.Van} -> {o.Naar} ({o.Richting.Tekst()}, {o.AantalKeer}x): {o.Van} -> {o.Naar} is {o.Richting.Om().Tekst()} veel vaker gereden; melder {o.Naar} lag aan de andere kant van de loc");
+            var echt = BekendeVolgende(o.Van, o.Richting);
+            foreach (var na in Overgangen.Where(t => t.Van == o.Naar && t.Richting == o.Richting && echt.Contains(t.Naar) && t.AantalKeer <= o.AantalKeer
+                                                    && t.GezienBijConfiguraties.All(o.GezienBijConfiguraties.Contains)).ToList())
+            {
+                Overgangen.Remove(na);
+                res.Add($"overgang {na.Van} -> {na.Naar} ({na.Richting.Tekst()}, {na.AantalKeer}x): volgde op de valse overgang {o.Van} -> {o.Naar}");
+            }
+            foreach (var w in Wissels)
+            {
+                int n = w.Waarnemingen.RemoveAll(x => x.Soort == WaarnemingSoort.Splitsing && x.NaMelder == o.Van && x.Richting == o.Richting
+                                                      && (x.VolgendeBijRechtdoor == o.Naar || x.VolgendeBijAfbuigend == o.Naar));
+                if (n > 0) res.Add($"splitsing van wissel {w.Adres} na melder {o.Van} ({o.Richting.Tekst()}) met een tak naar melder {o.Naar}");
+            }
+            int d = Doorgangen.RemoveAll(x => x.Richting == o.Richting && ((x.Melder == o.Van && x.Volgende == o.Naar) || (x.Via == o.Van && x.Melder == o.Naar)));
+            if (d > 0) res.Add($"{d} doorgang(en) via {o.Van} -> {o.Naar} ({o.Richting.Tekst()})");
+        }
+        return res;
     }
 
     public void RegistreerKopspoor(int melder, Richting r, Configuratie c)

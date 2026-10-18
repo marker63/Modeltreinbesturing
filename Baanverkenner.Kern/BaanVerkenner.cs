@@ -282,6 +282,8 @@ public partial class BaanVerkenner
             // BUG #98: overgangen uit ritten met de loc andersom (spiegelbeeld van een veel vaker gereden overgang) uit de kaart halen.
             foreach (var t in _kaart.VerwijderSpiegelOvergangen())
                 _log.Waarschuwing($"Overgang {t} is verwijderd: de omgekeerde overgang in dezelfde richting is veel vaker gereden (waarschijnlijk met de loc andersom).");
+            foreach (var t in _kaart.VerwijderAchterkantOvergangen())   // BUG #227
+                _log.Waarschuwing($"Uit de kaart verwijderd (BUG #227): {t}.");
             if (Voorkennis is { AantalMetingen: > 0 } lp) _log.Info($"Leerprofiel: {lp.Overgangen.Count} overgangen uit eerdere verkenningen (tijden worden omgerekend naar verkensnelheid {_ins.Verkensnelheid}).");
             _log.Info($"Hardware: {_hw.Naam}. Testloc adres {_ins.LocAdres} ({_ins.LocStappen} stappen), verkensnelheid {_ins.Verkensnelheid}, kruipsnelheid {_ins.Kruipsnelheid}.");
             _log.Info($"Wisseladressen {_kaart.WisselAdresVan} t/m {_kaart.WisselAdresTot}." + (BlokVereist ? $" Dinamo-blokken: {_ins.DinamoBlokken}." : ""));

@@ -1599,6 +1599,16 @@ public partial class BaanVerkenner
         return uitkomst;
     }
 
+    /// <summary>BUG #227: ligt <paramref name="m"/> volgens de kaart aan de andere kant van <paramref name="start"/> (start -> m minstens 3 keer in de andere richting gereden en
+    /// nooit vaker in richting <paramref name="r"/>)?</summary>
+    internal static bool IsAchterkantMelder(Baankaart kaart, int start, Richting r, int m)
+    {
+        int Telling(Richting rr) => kaart.Overgangen.Where(o => o.Van == start && o.Naar == m && o.Richting == rr).Sum(o => o.AantalKeer)
+                                   + kaart.Overgangen.Where(o => o.Van == m && o.Naar == start && o.Richting == rr.Om()).Sum(o => o.AantalKeer);
+        int anders = Telling(r.Om()), zelfde = Telling(r);
+        return anders >= 3 && zelfde * 3 <= anders;
+    }
+
     /// <summary>BUG #97: de eerste stap <paramref name="start"/> -> <paramref name="m"/> volgt de basisrit niet, is in deze richting met deze wisselstand
     /// nooit gezien, maar hoort wel bij de tegengestelde richting terwijl de basisrit wel bekend is: de loc staat andersom.</summary>
     internal static bool IsLocAndersom(Baankaart kaart, int start, Richting r, int m, List<int> basis, Configuratie cfg)
@@ -1690,6 +1700,7 @@ public partial class BaanVerkenner
         // Een alarm dat nog loopt blijft dus gelden.
         _kortsluitingGemeld = HuidigeAlarmBlokken().Count > 0;
 
+        int? achterkantGenegeerd = null;   // BUG #227
         DateTime? stapStopTot = null;   // BUG #175: tot wanneer de loc na de laatste melder van een stap-rit nog doorrijdt
         while (true)
         {
@@ -1780,6 +1791,23 @@ public partial class BaanVerkenner
                     _log.Waarschuwing($"Melder {m} werd weer bezet terwijl de loc {r.Tekst()} reed - rolt de loc terug of rijdt hij de verkeerde kant op?");
                     continue;
                 }
+                // BUG #227 (log 18-10 13:17:18): de eerste melder na het vertrek ligt volgens de kaart aan de ANDERE kant van de startmelder (21 -> 29 is vooruit 12x gereden, de rit gaat
+                // achteruit): een staart- of flikkermelding (melder 29 was 0,8 s bezet). Niet als gereden melder tellen. Volgt daarna een melder die verder aan die kant ligt, dan staat de loc andersom.
+                if (res.Reeks.Count == 1 && achterkantGenegeerd is null && IsAchterkantMelder(_kaart, res.Reeks[0], r, m))
+                {
+                    achterkantGenegeerd = m;
+                    _log.Waarschuwing($"Melder {m} werd bezet bij het vertrek {r.Tekst()} vanaf melder {res.Reeks[0]}, maar die ligt volgens de kaart aan de andere kant ({res.Reeks[0]} -> {m} is {r.Om().Tekst()} gereden): staart van de loc of een flikkering, telt niet als gereden melder (BUG #227).");
+                    continue;
+                }
+                if (res.Reeks.Count == 1 && achterkantGenegeerd is int ag && _kaart.BekendeVolgende(ag, r.Om()).Contains(m) && m != res.Reeks[0])
+                {
+                    await StopLoc();
+                    string t227 = $"Na melder {ag} werd melder {m} bezet: de loc rijdt vanaf melder {res.Reeks[0]} de kant van {r.Om().Tekst()} op, dus hij staat andersom (neus de verkeerde kant op). De rit is gestopt, er is niets vastgelegd (BUG #227).";
+                    _kaart.Waarschuwingen.Add(t227);
+                    _log.Waarschuwing(t227);
+                    throw new NavigatieFout(t227) { LaatsteGoed = res.Reeks[0], Onverwacht = m, LocAndersom = true };
+                }
+
                 if (doel.IsNavigatie && doelInzicht && res.Reeks[^1] == doel.DoelMelder)
                 {
                     // Doel wel bereikt maar net doorgeschoten naar de volgende melder:

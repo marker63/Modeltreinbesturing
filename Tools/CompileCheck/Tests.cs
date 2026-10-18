@@ -2422,6 +2422,16 @@ public static class Tests
         Eis(!kp223.Opgelost && kp223.NaMelder == 24, "kortsluitpunt #1 (#223): staat in de kaart van 12:21 nog open");
         Eis(BaanVerkenner.AlarmOplossingPastBij(kp223, new[] { 24, 129 }, new[] { 8, 9 }) && !BaanVerkenner.AlarmOplossingPastBij(kp223, new[] { 5, 16 }, new[] { 3, 4 }), "kortsluitpunt #1 (#223): de oplossing van 12:08 (loc op 24/129, blok 8/9) hoort erbij, die bij 5/16 niet");
         Eis(k223.RegistreerHandmatigeOplossing(kp223, 10, true) && kp223.OpgelostDoorAdres == 10, "kortsluitpunt #1 (#223): wissel 10 afbuigend wordt geaccepteerd als oplossing");
+        // BUG #227: melder aan de andere kant bij het vertrek (autolog 18-10 13:25)
+        var k227 = Laad("baankaart_2026-10-18_1325.json");
+        Eis(BaanVerkenner.IsAchterkantMelder(k227, 21, Richting.Achteruit, 29) && !BaanVerkenner.IsAchterkantMelder(k227, 21, Richting.Achteruit, 24) && !BaanVerkenner.IsAchterkantMelder(k227, 21, Richting.Vooruit, 29), "vertrek (#227): achteruit vanaf 21 ligt melder 29 aan de andere kant, 24 niet; vooruit is 29 gewoon de volgende");
+        Eis(k227.WisselEisenVoorStap(24, 21, Richting.Vooruit).Contains((10, false)), "kaart 13:25 (#227): de valse splitsing eist wissel 10 rechtdoor voor 24 -> 21 (ook vanaf 129)");
+        var t227 = k227.VerwijderAchterkantOvergangen();
+        Console.WriteLine("    opgeruimd (#227): " + string.Join(" | ", t227));
+        Eis(!k227.Overgangen.Any(o => o.Van == 21 && o.Naar == 29 && o.Richting == Richting.Achteruit) && !k227.Overgangen.Any(o => o.Van == 29 && o.Naar == 24 && o.Richting == Richting.Achteruit), "kaart 13:25 (#227): de valse overgangen 21 -> 29 en 29 -> 24 (achteruit) zijn weg");
+        Eis(!k227.Wissel(10).Waarnemingen.Any(o => o.Soort == WaarnemingSoort.Splitsing && o.NaMelder == 21) && k227.Wissel(10).Waarnemingen.Any(o => o.Soort == WaarnemingSoort.KortsluitingBijOmzetten && o.NaMelder == 24), "kaart 13:25 (#227): de valse splitsing van wissel 10 na melder 21 is weg, de echte waarneming bij 24 blijft");
+        Eis(!k227.WisselEisenVoorStap(24, 21, Richting.Vooruit).Contains((10, false)) && k227.Overgangen.Any(o => o.Van == 21 && o.Naar == 29 && o.Richting == Richting.Vooruit), "kaart 13:25 (#227): geen eis 'wissel 10 rechtdoor' meer voor 24 -> 21; 21 -> 29 vooruit blijft");
+        Eis(Baankaart.VanJson(k227.AlsJson()) is not null && Laad("baankaart_2026-10-18_1221.json").VerwijderAchterkantOvergangen().Count == 0, "kaart (#227): de opgeruimde kaart laadt; de kaart van 12:21 heeft niets op te ruimen");
         // BUG #226: automatische tussenstand
         var map226 = Path.Combine(Path.GetTempPath(), "autotussenstand_test_" + Guid.NewGuid().ToString("N"));
         var nu226 = new DateTime(2026, 10, 18, 12, 31, 0);
