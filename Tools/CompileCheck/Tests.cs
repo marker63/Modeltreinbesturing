@@ -2516,6 +2516,8 @@ public static class Tests
         Eis(ins239b.OmgekeerdeWissels().SetEquals(new[] { 3, 6 }), "eenmalig (#239): een al ingevulde wissel blijft staan, 6 komt erbij");
         var js239 = System.Text.Json.JsonSerializer.Serialize(ins239);
         Eis(System.Text.Json.JsonSerializer.Deserialize<VerkenInstellingen>(js239)!.UitgevoerdeAanpassingen.Contains("239-wissel6-omgekeerd"), "eenmalig (#239): het bewaren en laden van de instellingen onthoudt dat het gedaan is");
+        // BUG #240: klemmelders inclusief de melder van de kortsluiting (melder 24 viel tijdens de kortsluiting weg)
+        Eis(!BaanVerkenner.KlemNogOnderLoc(new[] { 129 }, new[] { 24, 129 }, false) && BaanVerkenner.KlemNogOnderLoc(new[] { 24, 129 }, new[] { 24, 129 }, false), "klem (#240): alleen 129 als klemmelder liet wissel 10 los zodra 24 weer bezet meldde; met 24 erbij blijft hij staan");
         // BUG #226: automatische tussenstand
         var map226 = Path.Combine(Path.GetTempPath(), "autotussenstand_test_" + Guid.NewGuid().ToString("N"));
         var nu226 = new DateTime(2026, 10, 18, 12, 31, 0);

@@ -780,6 +780,20 @@ public partial class BaanVerkenner
         }
     }
 
+    /// <summary>BUG #240 (autolog 18-10 14:53:16): tijdens de kortsluiting meldde melder 24 'vrij' (geen stroom), dus de klemoplossing van wissel 10 werd alleen aan melder 129
+    /// gekoppeld. Toen de stroom terugkwam stond de loc weer op 24 en 129; dat was 'niet alleen op de klemmelders' en wissel 10 ging 16 ms later rechtdoor: opnieuw kortsluiting en een
+    /// minuut zoeken. De melders van een klemoplossing zijn nu ook de melder van de kortsluiting en de melders die toen bezet waren.</summary>
+    private HashSet<int> KlemMelders(IEnumerable<int> bezet)
+    {
+        var res = bezet.ToHashSet();
+        if ((_klok.Nu - _laatsteKortsluitingOm).TotalMinutes < 5)
+        {
+            if (_laatsteKortsluitContext is { } ctx) res.Add(ctx.Melder);
+            foreach (var m in _laatsteKortsluitMelders) res.Add(m);
+        }
+        return res;
+    }
+
     /// <summary>BUG #219: hoort een losgemaakte proefwissel bij de kortsluiting op <paramref name="bezetNu"/>? Alleen als de loc toen op (een deel van) dezelfde melders stond.</summary>
     internal static bool PartnerHoortBijPlek(IReadOnlyCollection<int> losBij, IReadOnlyCollection<int> bezetNu)
         => losBij.Count == 0 || losBij.Any(bezetNu.Contains);
@@ -1362,7 +1376,7 @@ public partial class BaanVerkenner
                 // De proefwissel gaat dus terug naar afbuigend (blijft het alarm weg), en de stand blijft staan zolang de loc nog op deze melders staat.
                 if (!oud)
                 {
-                    _klemOplossing[a] = (bezet.ToHashSet(), _klok.Nu);
+                    _klemOplossing[a] = (KlemMelders(bezet), _klok.Nu);   // BUG #240
                     foreach (var (pw, losBij) in _losgemaakteProefWissels.ToList())
                     {
                         if (pw == a || !(_wisselStand.TryGetValue(pw, out var pst) && !pst)) continue;
@@ -1379,7 +1393,7 @@ public partial class BaanVerkenner
                         if (HuidigeAlarmBlokken().Count == 0)
                         {
                             _log.Vondst($"Wissel {pw} staat weer op afbuigend samen met wissel {a}: het alarm blijft weg. Samen vormen ze de oplossing en ze blijven zo staan tot de loc de melder verlaten heeft (nog niet getest op de baan).");
-                            _klemOplossing[pw] = (bezet.ToHashSet(), _klok.Nu);
+                            _klemOplossing[pw] = (KlemMelders(bezet), _klok.Nu);   // BUG #240
                             _alarmStand[pw] = true;
                         }
                         else
