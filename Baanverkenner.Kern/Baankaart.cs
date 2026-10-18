@@ -271,6 +271,15 @@ public class Baankaart
     public int WisselAdresVan { get; set; }
     /// <summary>BUG #235: wissels die omgekeerd zijn aangesloten (Dinamo 'afbuigend' = op de baan rechtdoor); alleen voor het rapport.</summary>
     public List<int> OmgekeerdeWissels { get; set; } = new();
+
+    /// <summary>BUG #247 (Marco 18-10 16:07: "je zet in het blokkenschema dat wissel 5 afbuigend en wissel 6 niet afbuigend moet staan om van 14 naar 129 te gaan, maar ze moeten
+    /// beide afbuigend staan"): de verkenner rekent met de Dinamo-commando's; bij een omgekeerd aangesloten wissel is dat op de baan andersom. Schema's en rapport tonen voor zo'n
+    /// wissel de stand OP DE BAAN, met de Dinamo-stand erbij. Kort: "afb."/"rd." (normaal) of "rd. (baan)"/"afb. (baan)" (omgekeerd).</summary>
+    public string StandKort(int adres, bool dinamoAfbuigend)
+        => OmgekeerdeWissels.Contains(adres) ? (dinamoAfbuigend ? "rd." : "afb.") + " (baan)" : (dinamoAfbuigend ? "afb." : "rd.");
+    /// <summary>BUG #247: lange vorm, bijv. "afbuigend" of "afbuigend op de baan (Dinamo rechtdoor)".</summary>
+    public string StandLang(int adres, bool dinamoAfbuigend)
+        => OmgekeerdeWissels.Contains(adres) ? $"{(dinamoAfbuigend ? "rechtdoor" : "afbuigend")} op de baan (Dinamo {(dinamoAfbuigend ? "afbuigend" : "rechtdoor")})" : (dinamoAfbuigend ? "afbuigend" : "rechtdoor");
     public int WisselAdresTot { get; set; }
 
     public List<MelderInfo> Melders { get; set; } = new();

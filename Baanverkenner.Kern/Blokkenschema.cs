@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text;
 
 namespace Baanverkenner.Kern;
@@ -119,7 +119,7 @@ public class SchemaTekening
                 var hier = w.Waarnemingen.Where(o => b.Melders.Contains(o.NaMelder)).ToList();
                 if (hier.Count == 0) continue;
                 bool rd = hier.Any(o => o.VolgendeBijRechtdoor is not null), afb = hier.Any(o => o.VolgendeBijAfbuigend is not null);
-                string stand = rd && afb ? "rd+afb" : afb ? "afb" : rd ? "rd" : "";
+                string stand = rd && afb ? "rd+afb" : afb ? k.StandKort(w.Adres, true).Replace(".", "") : rd ? k.StandKort(w.Adres, false).Replace(".", "") : "";   // BUG #247: stand op de baan
                 v.Wissels.Add(new SchemaWissel { Adres = w.Adres, Tekst = $"W{w.Adres}" + (stand.Length > 0 ? " " + stand : ""),
                     Uitleg = $"wissel {w.Adres} gezien bij melder {string.Join(", ", hier.Select(o => o.NaMelder).Distinct().OrderBy(x => x))}" });
             }
@@ -406,8 +406,8 @@ public class SchemaTekening
             foreach (var obs in w.Waarnemingen)
             {
                 if (obs.NaMelder != a) continue;
-                if (obs.VolgendeBijAfbuigend == b) res.Add($"wissel {w.Adres} afbuigend");
-                else if (obs.VolgendeBijRechtdoor == b) res.Add($"wissel {w.Adres} rechtdoor");
+                if (obs.VolgendeBijAfbuigend == b) res.Add($"wissel {w.Adres} {k.StandLang(w.Adres, true)}");   // BUG #247
+                else if (obs.VolgendeBijRechtdoor == b) res.Add($"wissel {w.Adres} {k.StandLang(w.Adres, false)}");
             }
         return res.Distinct();
     }

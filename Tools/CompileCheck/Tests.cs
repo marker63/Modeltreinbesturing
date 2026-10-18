@@ -2488,6 +2488,15 @@ public static class Tests
         Eis(VerkenLog.MetBaanstand("Adres 16: afbuigend", om235) == "Adres 16: afbuigend" && VerkenLog.MetBaanstand("Wissel 6 gevonden", om235) == "Wissel 6 gevonden" && VerkenLog.MetBaanstand("Rijstand: afbuigend: 5, 6, 10", om235).Contains("omgekeerd"), "omgekeerd (#235): adres 16 of een melding zonder stand blijft gewoon; 'afbuigend: 5, 6' wel");
         var k235 = Laad("baankaart_2026-10-18_1349.json"); k235.OmgekeerdeWissels = new List<int> { 6 };
         Eis(Rapport.AlsTekst(k235).Contains("OMGEKEERD AANGESLOTEN") && Rapport.AlsHtml(k235).Contains("Omgekeerd aangesloten: wissel 6"), "omgekeerd (#235): rapport (tekst en html) noemt het");
+        // BUG #247: schema's tonen bij een omgekeerd aangesloten wissel de stand op de baan (Marco 16:07: wissel 6 'niet afbuigend' voor 14 -> 129, op de baan moet hij afbuigend)
+        var k247 = Laad("baankaart_2026-10-18_1600.json");
+        k247.Wissel(6).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.KortsluitingBijOmzetten, NaMelder = 129, Via = 14, Richting = Richting.Vooruit, VolgendeBijRechtdoor = 24 });
+        var lab247 = Melderschema.Maak(k247).Randen.SelectMany(r => r.Labels).ToList();
+        Eis(lab247.Contains("W6 niet rd. (baan) (kortsl.)") && lab247.Contains("W5 afb."), "baanstand (#247): melderschema zegt bij wissel 6 'niet rechtdoor (baan)', wissel 5 gewoon 'afb.' (nu " + string.Join(" | ", lab247) + ")");
+        Eis(k247.StandLang(6, false) == "afbuigend op de baan (Dinamo rechtdoor)" && k247.StandLang(5, true) == "afbuigend", "baanstand (#247): lange vorm");
+        Eis(Rapport.MetBaanstand(k247, "wissel 5 afbuigend (uit splitsing), wissel 6 rechtdoor (anders kortsluiting)") == "wissel 5 afbuigend (uit splitsing), wissel 6 afbuigend op de baan (Dinamo rechtdoor) (anders kortsluiting)", "baanstand (#247): wisselstraat-tekst");
+        k247.OmgekeerdeWissels.Clear();
+        Eis(Melderschema.Maak(k247).Randen.SelectMany(r => r.Labels).Contains("W6 niet afb. (kortsl.)"), "baanstand (#247): zonder omgekeerde wissel blijft het 'niet afb.'");
         // BUG #246: proef vanaf 14 met stand 1+5 krijgt de oplossing van kortsluitpunt #1 (na 24, stand 5: wissel 10 afbuigend)
         var k246 = Laad("baankaart_2026-10-18_1600.json");
         var c246 = k246.MetBekendeOplossingenVoorStart(14, Richting.Vooruit, new Configuratie(new[] { 1, 5 }), out _);

@@ -59,18 +59,23 @@ public static class Rapport
             {
                 if (obs.NaMelder == a && obs.Richting == r)
                 {
-                    if (obs.VolgendeBijRechtdoor == b && gehad.Add(w.Adres)) res.Add($"W{w.Adres} rechtdoor");
-                    else if (obs.VolgendeBijAfbuigend == b && gehad.Add(w.Adres)) res.Add($"W{w.Adres} afbuigend");
+                    if (obs.VolgendeBijRechtdoor == b && gehad.Add(w.Adres)) res.Add($"W{w.Adres} {k.StandLang(w.Adres, false)}");   // BUG #247
+                    else if (obs.VolgendeBijAfbuigend == b && gehad.Add(w.Adres)) res.Add($"W{w.Adres} {k.StandLang(w.Adres, true)}");
                 }
                 // Dezelfde wissel andersom bereden (van achteren)
                 if (obs.NaMelder == b && obs.Richting == r.Om() && obs.Soort == WaarnemingSoort.Splitsing)
                 {
-                    if (obs.VolgendeBijRechtdoor == a && gehad.Add(w.Adres)) res.Add($"W{w.Adres} rechtdoor (achterkant)");
-                    else if (obs.VolgendeBijAfbuigend == a && gehad.Add(w.Adres)) res.Add($"W{w.Adres} afbuigend (achterkant)");
+                    if (obs.VolgendeBijRechtdoor == a && gehad.Add(w.Adres)) res.Add($"W{w.Adres} {k.StandLang(w.Adres, false)} (achterkant)");
+                    else if (obs.VolgendeBijAfbuigend == a && gehad.Add(w.Adres)) res.Add($"W{w.Adres} {k.StandLang(w.Adres, true)} (achterkant)");
                 }
             }
         return res.Distinct().ToList();
     }
+
+    /// <summary>BUG #247: "wissel 6 afbuigend" in een tekst wordt voor een omgekeerd aangesloten wissel "wissel 6 rechtdoor op de baan (Dinamo afbuigend)".</summary>
+    public static string MetBaanstand(Baankaart k, string tekst)
+        => k.OmgekeerdeWissels.Count == 0 ? tekst : System.Text.RegularExpressions.Regex.Replace(tekst, @"\bwissel (\d+) (afbuigend|rechtdoor)\b(?! op de baan)",
+            m => int.TryParse(m.Groups[1].Value, out var a) && k.OmgekeerdeWissels.Contains(a) ? $"wissel {a} {k.StandLang(a, m.Groups[2].Value == "afbuigend")}" : m.Value);
 
     /// <summary>BUG #156: de melders van een rit gegroepeerd per blok: "3: 5, 13, 14 → 4: 8, 15, 16".</summary>
     public static string BlokMelderTekst(Baankaart k, List<int> reeks)
@@ -199,14 +204,14 @@ ul{margin:6px 0 0 18px;padding:0}
         // Wissels
         sb.Append("<h2>Wissels</h2>");
         if (k.OmgekeerdeWissels.Count > 0)
-            sb.Append($"<p class=\"uitleg\">Standen zijn de Dinamo-commando's. <b>Omgekeerd aangesloten: wissel {string.Join(", ", k.OmgekeerdeWissels.OrderBy(a => a))}</b>; daar is 'afbuigend' op de baan rechtdoor en andersom (BUG #235).</p>");
+            sb.Append($"<p class=\"uitleg\"><b>Omgekeerd aangesloten: wissel {string.Join(", ", k.OmgekeerdeWissels.OrderBy(a => a))}</b>: Dinamo 'afbuigend' is op de baan rechtdoor en andersom. Bij die wissel staat overal de stand op de baan, met het Dinamo-commando erbij (BUG #235/#247); de ritten-lijst ('wissels afbuigend: ...') toont de Dinamo-commando's.</p>");
         var wr = WisselRegels(k);
         if (wr.Count == 0) sb.Append("<p>Geen wissels gevonden.</p>");
         else
         {
             sb.Append("<table><tr><th>Adres</th><th>Ligging</th><th>Rechtdoor</th><th>Afbuigend</th><th>Toelichting</th></tr>");
             foreach (var r in wr)
-                sb.Append($"<tr><td class=\"num\">{r.Adres}</td><td>{E(r.Ligging)}</td><td>{E(r.Rechtdoor)}</td><td>{E(r.Afbuigend)}</td><td>{E(r.Opmerking)}</td></tr>");
+                sb.Append($"<tr><td class=\"num\">{r.Adres}</td><td>{E(r.Ligging)}</td><td>{E(r.Rechtdoor)}{(k.OmgekeerdeWissels.Contains(r.Adres) ? "<br><small>(Dinamo rechtdoor = op de baan afbuigend)</small>" : "")}</td><td>{E(r.Afbuigend)}{(k.OmgekeerdeWissels.Contains(r.Adres) ? "<br><small>(Dinamo afbuigend = op de baan rechtdoor)</small>" : "")}</td><td>{E(r.Opmerking)}</td></tr>");
             sb.Append("</table>");
         }
 
@@ -265,7 +270,7 @@ ul{margin:6px 0 0 18px;padding:0}
         {
             sb.Append("<table><tr><th>Van Dinamo-blok</th><th>Naar Dinamo-blok</th><th>Richting</th><th>Melders</th><th>Wissels</th><th>Keer gereden</th></tr>");
             foreach (var g in straten.GroupBy(v => (v.VanLabel, v.NaarLabel, v.Richting, v.EisenTekst)).OrderBy(g => g.Key.VanLabel, StringComparer.Ordinal).ThenBy(g => g.Key.NaarLabel, StringComparer.Ordinal))
-                sb.Append($"<tr><td class=\"num\">{E(g.First().VanLabel)}</td><td class=\"num\">{E(g.First().NaarLabel)}</td><td>{g.Key.Richting.Tekst()}</td><td>{E(string.Join(", ", g.Select(v => $"{v.VanMelder}→{v.NaarMelder}")))}</td><td>{E(g.Key.EisenTekst)}</td><td>{g.Sum(v => v.AantalKeer)}</td></tr>");
+                sb.Append($"<tr><td class=\"num\">{E(g.First().VanLabel)}</td><td class=\"num\">{E(g.First().NaarLabel)}</td><td>{g.Key.Richting.Tekst()}</td><td>{E(string.Join(", ", g.Select(v => $"{v.VanMelder}→{v.NaarMelder}")))}</td><td>{E(MetBaanstand(k, g.Key.EisenTekst))}</td><td>{g.Sum(v => v.AantalKeer)}</td></tr>");
             sb.Append("</table>");
         }
 
@@ -361,9 +366,9 @@ ul{margin:6px 0 0 18px;padding:0}
 
         Kop("WISSELS");
         if (k.OmgekeerdeWissels.Count > 0)
-            sb.AppendLine($"  (Standen zijn de Dinamo-commando's. Omgekeerd aangesloten: wissel {string.Join(", ", k.OmgekeerdeWissels.OrderBy(a => a))}; daar is 'afbuigend' op de baan rechtdoor en andersom.)");
+            sb.AppendLine($"  (Omgekeerd aangesloten: wissel {string.Join(", ", k.OmgekeerdeWissels.OrderBy(a => a))}: Dinamo 'afbuigend' is op de baan rechtdoor en andersom. Bij die wissel staat de stand op de baan erbij; de ritten-lijst toont de Dinamo-commando's.)");
         foreach (var r in WisselRegels(k))
-            sb.AppendLine($"  Adres {r.Adres,-4} {r.Ligging}{(k.OmgekeerdeWissels.Contains(r.Adres) ? "   [OMGEKEERD AANGESLOTEN: op de baan andersom]" : "")}\n             rechtdoor: {r.Rechtdoor}   afbuigend: {r.Afbuigend}");
+            sb.AppendLine($"  Adres {r.Adres,-4} {r.Ligging}{(k.OmgekeerdeWissels.Contains(r.Adres) ? "   [OMGEKEERD AANGESLOTEN: op de baan andersom]" : "")}\n             {(k.OmgekeerdeWissels.Contains(r.Adres) ? $"Dinamo rechtdoor (op de baan afbuigend): {r.Rechtdoor}   Dinamo afbuigend (op de baan rechtdoor): {r.Afbuigend}" : $"rechtdoor: {r.Rechtdoor}   afbuigend: {r.Afbuigend}")}");
         if (k.Wissels.Count == 0) sb.AppendLine("  (geen)");
 
         if (k.Ritten.Count > 0)
@@ -406,7 +411,7 @@ ul{margin:6px 0 0 18px;padding:0}
         Kop("WISSELSTRATEN (VOORSTEL, NOG NIET GETEST OP DE BAAN)");
         var stratenT = WisselstraatVoorstel.Bereken(k);
         foreach (var g in stratenT.GroupBy(v => (v.VanLabel, v.NaarLabel, v.Richting, v.EisenTekst)).OrderBy(g => g.Key.VanLabel, StringComparer.Ordinal).ThenBy(g => g.Key.NaarLabel, StringComparer.Ordinal))
-            sb.AppendLine($"  Dinamo-blok {g.Key.VanLabel} → Dinamo-blok {g.Key.NaarLabel} ({g.Key.Richting.Tekst()}, melders {string.Join(", ", g.Select(v => $"{v.VanMelder}→{v.NaarMelder}"))}): {g.Key.EisenTekst}");
+            sb.AppendLine($"  Dinamo-blok {g.Key.VanLabel} → Dinamo-blok {g.Key.NaarLabel} ({g.Key.Richting.Tekst()}, melders {string.Join(", ", g.Select(v => $"{v.VanMelder}→{v.NaarMelder}"))}): {MetBaanstand(k, g.Key.EisenTekst)}");
         if (stratenT.Count == 0) sb.AppendLine("  (geen)");
 
         Kop("DOODLOPENDE EINDEN");

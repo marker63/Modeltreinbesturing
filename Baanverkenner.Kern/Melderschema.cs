@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text;
 
 namespace Baanverkenner.Kern;
@@ -65,14 +65,14 @@ public class Melderschema
                 switch (o.Soort)
                 {
                     case WaarnemingSoort.Splitsing:
-                        if (o.VolgendeBijRechtdoor is int rd && o.VolgendeBijRechtdoor != o.VolgendeBijAfbuigend) Label(o.NaMelder, rd, $"W{w.Adres} rd.");
-                        if (o.VolgendeBijAfbuigend is int af && o.VolgendeBijRechtdoor != o.VolgendeBijAfbuigend) Label(o.NaMelder, af, $"W{w.Adres} afb.");
+                        if (o.VolgendeBijRechtdoor is int rd && o.VolgendeBijRechtdoor != o.VolgendeBijAfbuigend) Label(o.NaMelder, rd, $"W{w.Adres} {k.StandKort(w.Adres, false)}");   // BUG #247: stand op de baan
+                        if (o.VolgendeBijAfbuigend is int af && o.VolgendeBijRechtdoor != o.VolgendeBijAfbuigend) Label(o.NaMelder, af, $"W{w.Adres} {k.StandKort(w.Adres, true)}");
                         break;
                     case WaarnemingSoort.KortsluitingBijOmzetten:
-                        if (o.Via is int via) Label(via, o.NaMelder, $"W{w.Adres} niet afb. (kortsl.)");
+                        if (o.Via is int via) Label(via, o.NaMelder, $"W{w.Adres} niet {k.StandKort(w.Adres, true)} (kortsl.)");
                         break;
                     case WaarnemingSoort.LostKortsluitingOp:
-                        if (o.VolgendeBijAfbuigend is int af2) Label(o.NaMelder, af2, $"W{w.Adres} afb.");
+                        if (o.VolgendeBijAfbuigend is int af2) Label(o.NaMelder, af2, $"W{w.Adres} {k.StandKort(w.Adres, true)}");
                         break;
                 }
             }

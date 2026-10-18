@@ -2598,3 +2598,10 @@ met wissel 10 rechtdoor ("Rijstand hersteld voor de proef: wissel 10 ... moet re
 Oorzaak: MetBekendeOplossingenVoorStart past een oplossing toe als de opdracht op de startmelder van de oplossing begint (bij opdracht #3: 13) of als de kaart de weg naar de
 kortsluitmelder kent met de proefstand. Kortsluitpunt #1 begon op 13 en de weg 14 -> 129 -> 24 was alleen met stand '5' gereden, nooit met '1, 5'. Nu telt ook de weg die met de stand
 van de oplossing gereden is, als die stand in de proefstand zit. Test: proefstand (#246) op baankaart 1600.
+
+## BUG #247 – OPGELOST (nog niet getest op de baan): schema's toonden wissel 6 in Dinamo-standen, niet zoals hij op de baan ligt (Marco 18-10 16:07)
+Marco: "je zet in het blokkenschema dat wissel 5 afbuigend en wissel 6 niet afbuigend moet staan om van 14 naar 129 te gaan, maar ze moeten beide afbuigend staan". De kennis klopte:
+Dinamo 'afbuigend' voor wissel 6 gaf op 14 -> 129 kortsluiting, en Dinamo 'rechtdoor' is bij wissel 6 op de baan afbuigend (omgekeerd aangesloten). Maar melderschema, blokkenschema en
+de wisselstraten in het rapport lieten de Dinamo-stand zien zonder omrekening (alleen logboek en rapportkop hadden de uitleg). Nu tonen ze bij een omgekeerd aangesloten wissel de
+stand op de baan: "W6 niet rd. (baan) (kortsl.)", "wissel 6 afbuigend op de baan (Dinamo rechtdoor)"; de wisseltabel noemt beide. Intern blijft alles Dinamo-commando's
+(nodig voor de aansturing en de export). Test: baanstand (#247).
