@@ -2681,3 +2681,10 @@ eerste. Samen met #260 (vooraf rechtdoor) komt de loc daar niet meer in. Test: v
 Aanvulling (autolog 20-10 18:45:10, 18:47:58, 18:50:23, bug259, 3x dezelfde fout): de kortsluiting werd gemeld vóór de terugweg (24 achteruit), terwijl de stap die hem gaf 14 -> 24 vooruit was;
 daardoor herkende #261 de bekende ingang niet en duurde het herstel telkens ~1,5 minuut (alle wissels langs, wissel 10 pas als laatste). Nu kijkt #261 ook naar de laatste gereden rit met zijn
 eigen richting. #260 voorkomt de kortsluiting zelf: op melder 13 gaat wissel 10 al naar rechtdoor.
+
+## BUG #262 – OPGELOST (nog niet getest op de baan): melder 137 en 138 "gevonden" terwijl ze volgens het melderblokkenschema niet bestaan (Marco 20-10 18:58)
+Dinamo meldt melder 137 en 138 echt (hardwarelog 18-10 14:52:38, 20-10 18:43:34 en 18:56:29), maar alleen terwijl de loc stilstaat of kruipt op 129/10, en ze knipperen elke ~0,6 s aan en uit.
+Ze kwamen niet in de kaart, maar wel in de lijst van bezette melders ("nu bezet: 129, 10, 138, 137") en konden daardoor beslissingen beïnvloeden (neerzetten, 'loc staat op één melder').
+Oplossing (MelderMonitor): een melder die de kaart nog niet kent en binnen 6 s minstens 6 keer van stand wisselt, is geen sectiemelder; hij telt niet meer als bezet en het logboek meldt
+dat één keer. Bekende melders vallen hier nooit onder. Wat 137/138 op de baan zijn is niet bekend (geen reden om ze hard uit te sluiten). Test: knippermelder (#262).
+Verder in deze set (bug261): #260 werkt (18:57:23 en 18:58:25 "wissel 10 gaat naar rechtdoor voordat de loc er is", geen kortsluiting meer bij 24).

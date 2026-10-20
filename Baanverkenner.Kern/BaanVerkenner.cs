@@ -197,7 +197,11 @@ public partial class BaanVerkenner
         _vraag = vraag;
         _status = hervatVan ?? new VerkenStatus { Instellingen = ins };
         _ins = _status.Instellingen;
-        _monitor = new MelderMonitor(klok, () => _ins.OntdenderMs);
+        _monitor = new MelderMonitor(klok, () => _ins.OntdenderMs, m => _kaart.Melders.Any(x => x.Nummer == m))
+        {
+            // BUG #262: melder 137/138 (Dinamo meldt ze, ze knipperen alleen als de loc op 129/10 staat) zijn geen sectiemelders
+            FlikkeraarGevonden = m => _log.Waarschuwing($"Melder {m} knippert ({MelderMonitor.FlikkerWissels} keer aan/uit binnen {MelderMonitor.FlikkerVenster.TotalSeconds:0} s) en is nog nooit in een rit bereikt: dat is geen bezetmelder van een sectie. Melder {m} wordt verder genegeerd (BUG #262).")
+        };
     }
 
     /// <summary>Snelheden aanpassen terwijl de verkenning loopt. Geldt vanaf het

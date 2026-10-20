@@ -2537,6 +2537,25 @@ public static class Tests
             var bk261b = (List<int>)typeof(BaanVerkenner).GetMethod("BekendeVerbodenVoorLaatsteStap", bf261)!.Invoke(v261, null)!;
             Eis(bk261b.Contains(10), "verboden laatste stap (#261): ook via de laatste rit als de melding van de terugweg kwam (nu " + string.Join(",", bk261b) + ")");
         }
+        // BUG #262: een onbekende melder die knippert (137/138 bij 129) telt niet als bezet; een bekende melder wel
+        {
+            var klok262 = new VirtueleKlok();
+            var mon262 = new MelderMonitor(klok262, () => 100, m => m == 129);
+            int? gevonden262 = null; mon262.FlikkeraarGevonden = m => gevonden262 ??= m;
+            for (int i = 0; i < 8; i++)
+            {
+                mon262.Ontvang(137, i % 2 == 0); mon262.Ontvang(129, i % 2 == 0);
+                klok262.Wacht(TimeSpan.FromMilliseconds(600), CancellationToken.None).GetAwaiter().GetResult(); mon262.Bijwerken();
+            }
+            mon262.Ontvang(129, true); mon262.Ontvang(137, true);
+            klok262.Wacht(TimeSpan.FromMilliseconds(300), CancellationToken.None).GetAwaiter().GetResult(); mon262.Bijwerken();
+            Eis(gevonden262 == 137 && !mon262.Bezet.Contains(137) && mon262.Bezet.Contains(129), "knippermelder (#262): 137 wordt genegeerd, 129 (bekend) niet (bezet: " + string.Join(",", mon262.Bezet) + ")");
+            var mon262b = new MelderMonitor(klok262, () => 100, _ => false);
+            mon262b.Ontvang(31, true); klok262.Wacht(TimeSpan.FromSeconds(4), CancellationToken.None).GetAwaiter().GetResult(); mon262b.Ontvang(31, false);
+            klok262.Wacht(TimeSpan.FromMilliseconds(300), CancellationToken.None).GetAwaiter().GetResult(); mon262b.Bijwerken(); mon262b.Ontvang(31, true);
+            klok262.Wacht(TimeSpan.FromMilliseconds(300), CancellationToken.None).GetAwaiter().GetResult(); mon262b.Bijwerken();
+            Eis(mon262b.Bezet.Contains(31) && mon262b.Flikkeraars.Count == 0, "knippermelder (#262): een nieuwe melder die gewoon bezet raakt (een paar wissels) telt wel");
+        }
         // BUG #258: voor 14 -> 129 (vooruit) zijn wissel 5 afbuigend en wissel 6 niet-afbuigend (Dinamo) bewezen; die worden bij een kortsluiting daar niet omgezet
         var k258 = Laad("baankaart_2026-10-20_1800.json");
         var b258 = BaanVerkenner.BewezenStandenBijLoc(k258, new[] { 13, 14, 129 }, Richting.Vooruit, new[] { 14, 129 });
