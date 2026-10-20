@@ -2572,7 +2572,8 @@ public partial class BaanVerkenner
         // stond, dan gaat eerst die terug naar de vorige stand (daarin stond de loc er zonder kortsluiting). Gaat het alarm weg, dan wordt de stap afgebroken en later opnieuw gereden.
         // BUG #245 (autolog 18-10 15:39:23-15:39:37): de terugzetting door deze regel zelf (wissel 1 terug naar afbuigend) werd bij de volgende klem weer als 'laatst omgezette wissel'
         // gezien en ging opnieuw om, met de loc erop: heen en weer onder de loc. Een wissel die deze regel net zelf terugzette, gaat niet nog eens om.
-        if (_laatsteWisselCommando is { } lw && !Kruis.IsMotor(lw.Adres) && (_klok.Nu - lw.Tijd).TotalSeconds <= 15 && lw.Bezet.Count > 0 && lw.Bezet.ToHashSet().SetEquals(bezet)
+        // BUG #255 (log 20-10 16:35:39): wissel 2 (bij melder 5/12/13) werd als 'laatst omgezet' teruggezet terwijl de loc op melder 129 en 10 stond: 3 melderstappen verder, dus geen verdachte.
+        if (_laatsteWisselCommando is { } lw && !Kruis.IsMotor(lw.Adres) && (_klok.Nu - lw.Tijd).TotalSeconds <= 15 && lw.Bezet.Count > 0 && lw.Bezet.ToHashSet().SetEquals(bezet) && _kaart.LigtNabij(lw.Adres, bezet)
             && !(_teruggezet230 is { } tz && tz.Adres == lw.Adres && lw.Tijd >= tz.Tijd && (_klok.Nu - tz.Tijd).TotalMinutes < 5))
         {
             _log.Waarschuwing($"Wissel {lw.Adres} is {(_klok.Nu - lw.Tijd).TotalSeconds:0.0} s geleden naar {(lw.Afbuigend ? "afbuigend" : "rechtdoor")} gezet terwijl de loc al op melder {Lijst(bezet)} stond; daarvoor stond hij er zonder kortsluiting. Wissel {lw.Adres} gaat eerst terug (BUG #230).");

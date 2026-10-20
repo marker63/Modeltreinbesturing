@@ -999,6 +999,14 @@ public static class Tests
         Eis(k254.OverloopPartnersVan(new[] { 2 }).SetEquals(new[] { 1 }), "overloop (#254): wissel 1 is partner van gespaarde wissel 2");
         Eis(k254.OverloopPartnersVan(new[] { 1 }).SetEquals(new[] { 2 }), "overloop (#254): wissel 2 is partner van gespaarde wissel 1");
         Eis(k254.OverloopPartnersVan(new[] { 7 }).Count == 0, "overloop (#254): niet-verwante wissel geeft geen partners");
+        // BUG #255: wissel 2 (melders 5, 12, 13, 16) ligt niet nabij de bezette melders 129 en 10
+        var k255 = new Baankaart();
+        foreach (var (v, nn) in new[] { (13, 14), (14, 129), (129, 10), (13, 5), (5, 12), (5, 16) }) { k255.Overgangen.Add(new Overgang { Van = v, Naar = nn, Richting = Richting.Vooruit, AantalKeer = 2 }); }
+        k255.Wissel(2).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.Splitsing, NaMelder = 5, Richting = Richting.Achteruit, VolgendeBijRechtdoor = 16, VolgendeBijAfbuigend = 12 });
+        k255.Wissel(5).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.Splitsing, NaMelder = 14, Richting = Richting.Vooruit, VolgendeBijRechtdoor = 24, VolgendeBijAfbuigend = 129 });
+        Eis(!k255.LigtNabij(2, new[] { 129, 10 }), "nabij (#255): wissel 2 ligt niet bij melder 129 en 10");
+        Eis(k255.LigtNabij(5, new[] { 129, 10 }), "nabij (#255): wissel 5 (afbuigend naar 129) ligt wel bij melder 129");
+        Eis(k255.LigtNabij(9, new[] { 129 }), "nabij (#255): een nog onbekende wissel telt als mogelijk nabij");
         k254.Kortsluitpunten[0].Voorlopig = true;
         Eis(k254.OverloopPartnersVan(new[] { 2 }).Count == 0, "overloop (#254): een voorlopige oplossing telt niet");
     }

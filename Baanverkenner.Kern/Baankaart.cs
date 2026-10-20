@@ -349,6 +349,17 @@ public class Baankaart
         return res;
     }
 
+    /// <summary>BUG #255 (log 20-10 16:35:39): ligt wissel <paramref name="adres"/> hoogstens <paramref name="maxStappen"/> melderstappen van een van de bezette melders? Een wissel zonder enige
+    /// waarneming is nog onbekend en telt als 'misschien nabij'.</summary>
+    public bool LigtNabij(int adres, IEnumerable<int> bezet, int maxStappen = 1)
+    {
+        var w = Wissels.FirstOrDefault(x => x.Adres == adres);
+        if (w is null || w.Waarnemingen.Count == 0) return true;
+        foreach (var m in bezet)
+            if (WisselAfstanden(m, maxStappen).TryGetValue(adres, out var d) && d <= maxStappen) return true;
+        return false;
+    }
+
     /// <summary>BUG #254 (Marco 20-10, log 15:28:43): een opgelost kortsluitpunt zegt "wissel W afbuigend alleen geeft kortsluiting, met wissel P erbij niet". Wissel P en W horen dan bij
     /// elkaar: kan W niet omgezet worden (de loc staat erop), dan mag P ook niet omgezet worden, anders ontstaat precies de stand die de kortsluiting gaf (2 afbuigend zonder 1).
     /// Geeft de partners P van de wissels in <paramref name="vast"/>. Alleen bewezen oplossingen (niet voorlopig).</summary>
