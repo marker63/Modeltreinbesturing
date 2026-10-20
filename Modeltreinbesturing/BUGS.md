@@ -2647,3 +2647,8 @@ Verder uit dit log (alleen vastgelegd): de keerlus 129 - 4 - 11 - 12 - 1 - 9 - 1
 rijden (17:56:17 naar 4 in plaats van 24). Oplossing: moet voor een navigatiestap een wissel om die bij een bezette melder ligt, dan rijdt de loc eerst met de huidige stand terug naar
 de vorige melder (bekende, eenduidige overgang), tot de melder vrij is; dan pas omzetten en verder (TerugNaarHuis, TerugNaar, doorrijden, navigatie, zelf terugrijden).
 Test: keerlus-simulatie (3x toegepast, alle 23 melders, ALLES OK).
+
+## BUG #257 – OPGELOST (nog niet getest op de baan): oude tussenstanden bleven in C:\Marco staan (Marco 20-10 18:08/18:11)
+Marco: opgehaalde sets mogen weg. Claude kan op afstand niet wissen, dus de Baanverkenner ruimt nu zelf op: na elke automatische tussenstand blijven alleen de nieuwste 3 sets staan
+(baanrapport, baanverkenner-log, hardwarelog, baankaart met dezelfde datum_tijd); oudere sets worden verwijderd. Andere bestanden (zips, baan.json, mappen) blijven altijd staan.
+Test: opruimen (#257).

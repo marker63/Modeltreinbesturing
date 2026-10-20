@@ -2570,6 +2570,16 @@ public static class Tests
         var nu226 = new DateTime(2026, 10, 18, 12, 31, 0);
         var b226 = AutoTussenstand.Schrijf(map226, k223, "log", "hw", nu226, "test", out var f226);
         Eis(f226 is null && b226.Count == 5 && File.Exists(Path.Combine(map226, "baanrapport_2026-10-18_1231.txt")) && File.ReadAllText(Path.Combine(map226, "LAATSTE.txt")).Contains("hardwarelog_2026-10-18_1231.txt"), "tussenstand (#226): rapport, html, kaart, logboek en hardwarelog + LAATSTE.txt geschreven (nu " + b226.Count + (f226 ?? "") + ")");
+        // BUG #257: alleen de nieuwste 3 sets blijven staan, andere bestanden niet aangeraakt
+        var map257 = Path.Combine(Path.GetTempPath(), "bv257_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(map257);
+        File.WriteAllText(Path.Combine(map257, "modeltreinbesturing_bug255.zip"), "x");
+        File.WriteAllText(Path.Combine(map257, "baan.json"), "x");
+        for (int i = 0; i < 5; i++) AutoTussenstand.Schrijf(map257, k223, "log", "hw", new DateTime(2026, 10, 20, 17, 0, 0).AddMinutes(10 * i), "test", out _);
+        var over257 = Directory.GetFiles(map257).Select(Path.GetFileName).OrderBy(x => x).ToList();
+        Eis(over257.Count(x => x!.StartsWith("hardwarelog_")) == 3 && over257.Contains("hardwarelog_2026-10-20_1740.txt") && !over257.Contains("hardwarelog_2026-10-20_1710.txt")
+            && over257.Contains("modeltreinbesturing_bug255.zip") && over257.Contains("baan.json") && over257.Contains("LAATSTE.txt"), "opruimen (#257): 3 nieuwste sets blijven, de rest weg, zip/baan.json blijven (nu " + string.Join(", ", over257) + ")");
+        try { Directory.Delete(map257, true); } catch { }
         Eis(AutoTussenstand.IsTijd(nu226.AddMinutes(-10), nu226, 10) && !AutoTussenstand.IsTijd(nu226.AddMinutes(-9), nu226, 10) && !AutoTussenstand.IsTijd(null, nu226, 0), "tussenstand (#226): elke 10 minuten, 0 = uit");
         try { Directory.Delete(map226, true); } catch { }
         k223.Wisselstraatvoorstellen = WisselstraatVoorstel.Bereken(k223);

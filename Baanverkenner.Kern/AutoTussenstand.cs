@@ -19,6 +19,29 @@ public static class AutoTussenstand
         return m;
     }
 
+    /// <summary>BUG #257 (Marco 20-10 18:08/18:11: "als je de set hebt opgehaald mag je hem gelijk verwijderen" - wissen kan Claude niet vanaf afstand): na het schrijven blijven alleen de
+    /// nieuwste <see cref="BewaarSets"/> sets staan (ruim genoeg voor de controle die elke 10 minuten ophaalt); oudere sets met dezelfde vier namen worden verwijderd. Andere bestanden
+    /// (zips, baan.json, ...) blijven altijd staan.</summary>
+    public const int BewaarSets = 3;
+    private static readonly string[] SetVoorvoegsels = { "baanrapport_", "baanverkenner-log_", "hardwarelog_", "baankaart_" };
+
+    /// <summary>BUG #257: verwijdert alle tussenstand-sets behalve de nieuwste <paramref name="bewaar"/>. Geeft het aantal verwijderde bestanden.</summary>
+    public static int Opruimen(string map, int bewaar)
+    {
+        int n = 0;
+        try
+        {
+            var re = new System.Text.RegularExpressions.Regex(@"^(baanrapport|baanverkenner-log|hardwarelog|baankaart)_(\d{4}-\d{2}-\d{2}_\d{4})\.(txt|html|json)$");
+            var bestanden = Directory.GetFiles(map).Select(f => (Pad: f, M: re.Match(Path.GetFileName(f)))).Where(x => x.M.Success).ToList();
+            var stempels = bestanden.Select(x => x.M.Groups[2].Value).Distinct().OrderByDescending(s => s, StringComparer.Ordinal).ToList();
+            var weg = stempels.Skip(Math.Max(1, bewaar)).ToHashSet();
+            foreach (var (pad, m) in bestanden.Where(x => weg.Contains(x.M.Groups[2].Value)))
+                try { File.Delete(pad); n++; } catch { /* in gebruik: volgende keer */ }
+        }
+        catch { /* opruimen mag nooit storen */ }
+        return n;
+    }
+
     /// <summary>Is het tijd voor een nieuwe tussenstand?</summary>
     public static bool IsTijd(DateTime? vorige, DateTime nu, int minuten)
         => minuten > 0 && (vorige is null || (nu - vorige.Value).TotalMinutes >= minuten);
@@ -51,6 +74,7 @@ public static class AutoTussenstand
             sb.AppendLine($"Laatste automatische tussenstand: {nu:yyyy-MM-dd HH:mm:ss} ({reden})");
             foreach (var r in res) sb.AppendLine(r);
             File.WriteAllText(Path.Combine(map, "LAATSTE.txt"), sb.ToString(), Encoding.UTF8);
+            Opruimen(map, BewaarSets);
         }
         catch (Exception ex) { fout = ex.Message; }
         return res;
