@@ -2673,3 +2673,8 @@ Opdracht #10 (afbuigende tak van wissel 1 na melder 12) had stand 1, 9, 10: 9 en
 wissel 10 nog afbuigend: kortsluiting na 24 (nieuw kortsluitpunt #4), terwijl de kaart al wist dat 14 -> 24 met wissel 10 afbuigend kortsluiting geeft. Oplossing: tijdens een verkenningsrit
 gaat een wissel die voor de komende stap (of de eenduidig bekende stap daarna) een bekende verboden ingang is naar rechtdoor voordat de loc er is, ook als de stand van de opdracht hem
 afbuigend heeft; het geteste adres zelf blijft. Test: verboden vooruit (#260) op baankaart 20-10 18:00.
+
+## BUG #261 – OPGELOST (nog niet getest op de baan): na een kortsluiting op een bekende verboden ingang werden eerst andere wissels teruggezet (Marco 20-10 18:46)
+Marco: "je weet heel goed waar wissel 10 ligt en je rijdt vol in een kortsluitmelding die je niet direct kon oplossen". Autolog 18:24:59: na 14 -> 24 met 1, 9, 10 afbuigend gingen alle drie
+terug. Nu: is voor de laatste stap van de kortsluitrit een afbuigende wissel een bekende verboden ingang, dan gaat (bij het losmaken) alleen die terug, en probeert het herstel die als
+eerste. Samen met #260 (vooraf rechtdoor) komt de loc daar niet meer in. Test: verboden laatste stap (#261).

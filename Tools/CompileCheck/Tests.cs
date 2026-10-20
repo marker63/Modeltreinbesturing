@@ -2515,6 +2515,21 @@ public static class Tests
         var v260 = BaanVerkenner.VerbodenVooruit(k260, 13, Richting.Vooruit, a => a == 1 || a == 9 || a == 10);
         Eis(v260.Contains(10) && !v260.Contains(1), "verboden vooruit (#260): op 13 vooruit met 1, 9, 10 afbuigend moet wissel 10 rechtdoor (nu " + string.Join(",", v260) + ")");
         Eis(BaanVerkenner.VerbodenVooruit(k260, 13, Richting.Vooruit, a => a == 1).Count == 0, "verboden vooruit (#260): zonder wissel 10 afbuigend niets");
+        // BUG #261: na de kortsluiting 14 -> 24 met wissel 1, 9, 10 afbuigend is alleen wissel 10 een bekende verboden ingang
+        {
+            var bf261 = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var sim261 = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = false, LocAdres = 5408 };
+            sim261.VerbindenAsync("SIM").GetAwaiter().GetResult();
+            var klok261 = new VirtueleKlok();
+            var ins261 = new VerkenInstellingen { LocAdres = 5408, WisselAdresVan = 1, WisselAdresTot = 14 };
+            var v261 = new BaanVerkenner(sim261, ins261, klok261, new VerkenLog(klok261), (_, _) => Task.FromResult(true), new VerkenStatus { Instellingen = ins261, Kaart = Laad("baankaart_2026-10-20_1800.json") });
+            var st261 = (Dictionary<int, bool>)typeof(BaanVerkenner).GetField("_wisselStand", bf261)!.GetValue(v261)!;
+            st261[1] = true; st261[9] = true; st261[10] = true;
+            typeof(BaanVerkenner).GetField("_laatsteKortsluitReeks", bf261)!.SetValue(v261, new List<int> { 12, 5, 13, 14, 24 });
+            typeof(BaanVerkenner).GetField("_laatsteKortsluitContext", bf261)!.SetValue(v261, ((int, Richting, Configuratie)?)(24, Richting.Vooruit, Configuratie.Basis));
+            var bk261 = (List<int>)typeof(BaanVerkenner).GetMethod("BekendeVerbodenVoorLaatsteStap", bf261)!.Invoke(v261, null)!;
+            Eis(bk261.SequenceEqual(new[] { 10 }), "verboden laatste stap (#261): alleen wissel 10 (nu " + string.Join(",", bk261) + ")");
+        }
         // BUG #258: voor 14 -> 129 (vooruit) zijn wissel 5 afbuigend en wissel 6 niet-afbuigend (Dinamo) bewezen; die worden bij een kortsluiting daar niet omgezet
         var k258 = Laad("baankaart_2026-10-20_1800.json");
         var b258 = BaanVerkenner.BewezenStandenBijLoc(k258, new[] { 13, 14, 129 }, Richting.Vooruit, new[] { 14, 129 });

@@ -1448,6 +1448,12 @@ public partial class BaanVerkenner
 
         // BUG #198 (log 17-10 19:52-19:56): een kortsluiting bij de bezette melders 24 en 129 werd met wissels 1, 2 en 14 'opgelost' (alle in numerieke volgorde geprobeerd, de kortsluiting verdween
         // steeds vanzelf of tijdelijk), terwijl kortsluitpunt #3 al bewees dat wissel 5 afbuigend de oplossing is. Eerst de oplossing die de kaart zelf voor deze bezette melders kent.
+        // BUG #261: eerst een wissel die voor de laatste stap een bekende verboden ingang is (ook als hij bij de loc ligt: hij is open gereden, terugzetten is het herstel, BUG #169)
+        foreach (var a in BekendeVerbodenVoorLaatsteStap().Where(alle.Contains))
+        {
+            _log.Info($"Eerst wissel {a}: de kaart weet dat de laatste stap met wissel {a} afbuigend kortsluiting geeft (BUG #261).");
+            if (await Probeer(a, " (bekende verboden ingang)")) return true;
+        }
         var stNu = new Configuratie(_wisselStand.Where(w => w.Value).Select(w => w.Key).ToArray());
         foreach (var kpOpl in _kaart.Kortsluitpunten.Where(k => k.Opgelost && k.OpgelostMetAfbuigend == true && k.OpgelostDoorAdres is int && !Kruis.IsMotor(k.OpgelostDoorAdres!.Value)
                                                                 && (bezet.Contains(k.NaMelder) || k.TweedeMelders.Any(bezet.Contains)) && k.Configuratie.Afbuigend.All(stNu.Bevat)).OrderBy(k => k.Id).ToList())
@@ -1560,6 +1566,17 @@ public partial class BaanVerkenner
         Richting? r = _laatsteKortsluitContext?.Richting ?? _kaart.Ritten.LastOrDefault()?.Richting;
         if (reeks.Count < 2 || r is not Richting rr) return new Dictionary<int, bool>();
         return BewezenStandenBijLoc(_kaart, reeks, rr, bezet).Where(kv => _wisselStand.TryGetValue(kv.Key, out var st) && st == kv.Value).ToDictionary(kv => kv.Key, kv => kv.Value);
+    }
+
+    /// <summary>BUG #261: wissels die nu afbuigend staan en voor de laatste stap van de kortsluitrit een bekende verboden ingang zijn (via -> na, richting).</summary>
+    private List<int> BekendeVerbodenVoorLaatsteStap()
+    {
+        var reeks = _laatsteKortsluitReeks;
+        Richting? r = _laatsteKortsluitContext?.Richting;
+        if (reeks.Count < 2 || r is not Richting rr) return new List<int>();
+        int u = reeks[^2], x = reeks[^1];
+        return _kaart.VerbodenIngangen().Where(v => v.Via == u && v.Na == x && v.R == rr && _wisselStand.TryGetValue(v.Adres, out var st) && st && !IsVolger(v.Adres))
+                     .Select(v => v.Adres).Distinct().OrderBy(a => a).ToList();
     }
 
     /// <summary>BUG #231: de laatste gereden melderreeks die eindigt op een melder waar de loc nu staat (eerst die van de laatste kortsluiting, anders de laatste rit).</summary>
@@ -2866,6 +2883,15 @@ public partial class BaanVerkenner
                 kandidaten = kandidaten.Except(bewLos).ToList();
                 _log.Info($"Wissel {Lijst(bewLos)} wordt niet losgemaakt: afbuigend is voor deze stap al bewezen (BUG #258).");
             }
+        }
+        // BUG #261 (Marco 20-10 18:46: "je weet heel goed waar wissel 10 ligt en je rijdt vol in een kortsluitmelding die je niet direct kon oplossen"; autolog 18:24:59-18:25:09): bij de
+        // kortsluiting na 14 -> 24 met wissel 1, 9 en 10 afbuigend gingen alle drie terug, terwijl de kaart wist dat 14 -> 24 met wissel 10 afbuigend kortsluiting geeft. Is een van de
+        // verdachten een bekende verboden ingang voor de laatste stap, dan gaat alleen die terug.
+        var bekend261 = BekendeVerbodenVoorLaatsteStap().Where(kandidaten.Contains).ToList();
+        if (bekend261.Count > 0 && bekend261.Count < kandidaten.Count)
+        {
+            _log.Info($"Alleen wissel {Lijst(bekend261)} gaat terug: de kaart weet dat de laatste stap ({_laatsteKortsluitReeks[^2]} -> {_laatsteKortsluitReeks[^1]}) met die wissel afbuigend kortsluiting geeft (BUG #261).");
+            kandidaten = bekend261;
         }
         if (PuntzijdeProefNu() is int pz && kandidaten.Remove(pz))
             _log.Info($"Wissel {pz} wordt niet losgemaakt: de loc nam bij die wissel de afbuigende tak en reed daarna verder ({Lijst(_laatsteKortsluitReeks)}), dus hij is van de puntzijde bereden; omzetten helpt dan niet (BUG #169) en de loc heeft die stand nodig om terug te rijden.");
