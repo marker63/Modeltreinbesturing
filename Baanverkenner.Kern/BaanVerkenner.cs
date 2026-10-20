@@ -1601,11 +1601,13 @@ public partial class BaanVerkenner
 
     private static List<int> PartnerVolgordeIntern(Baankaart kaart, IEnumerable<int> alle, int a, int x, Configuratie c, int max, IReadOnlyCollection<int> kruisMotoren)
     {
-        bool BijMelder(int b) => kaart.Wissels.Any(w => w.Adres == b && w.Waarnemingen.Any(o => o.NaMelder == x || o.VolgendeBijRechtdoor == x || o.VolgendeBijAfbuigend == x));
+        // BUG #252: eerst de wissels die bij deze melder zijn waargenomen, dan die in de aanliggende secties (1 en 2 melderstappen), dan de kruismotoren, dan de rest op afstand van het adres.
+        var nabij = kaart.WisselAfstanden(x);
+        int Rang(int b) => nabij.TryGetValue(b, out var d) ? d : kruisMotoren.Contains(b) ? 3 : 4;
         // BUG #150: de motoren van de Engelse wissel (door de gebruiker opgegeven) zijn verreweg de meest voorkomende partners (kruiswissel-referentie, 14-10: 24 vooruit met wissel 5 afbuigend
         // vroeg wissel 10): die gaan vóór de rest op afstand, ook als de kruiswissel-melder nog niet ontdekt is. Zonder opgegeven motoren verandert er niets.
         return alle.Where(b => b != a && !c.Bevat(b))
-            .OrderBy(b => BijMelder(b) ? 0 : kruisMotoren.Contains(b) ? 1 : 2).ThenBy(b => Math.Abs(b - a)).ThenBy(b => b)
+            .OrderBy(Rang).ThenBy(b => Math.Abs(b - a)).ThenBy(b => b)
             .Take(Math.Max(0, max)).ToList();
     }
 
@@ -2187,9 +2189,10 @@ public partial class BaanVerkenner
             // andere wissels één voor één ook op afbuigend gezet (overloopwissels: twee wissels
             // achter elkaar, beide afbuigend). Dichtstbijzijnde adres eerst.
             int anker = k.Configuratie.Afbuigend.Length > 0 ? k.Configuratie.Afbuigend.Max() : 0;
+            var nabijK = _kaart.WisselAfstanden(k.NaMelder);
             var partners = k.Configuratie.Afbuigend.Length == 0 ? new List<int>() : _ins.WisselAdressen()
                 .Where(b => !k.Configuratie.Bevat(b) && !k.GeprobeerdeAdressen.Contains(b) && !kandidaten.Any(kd => kd.Adres == b))
-                .OrderBy(b => Math.Abs(b - anker)).ThenBy(b => b)
+                .OrderBy(b => nabijK.TryGetValue(b, out var dk) ? dk : 3).ThenBy(b => Math.Abs(b - anker)).ThenBy(b => b)   // BUG #252: eerst de wissels in de aanliggende secties
                 .Take(Math.Max(0, _ins.MaxPartnerProeven)).ToList();
             var partnerSet = partners.ToHashSet();
             foreach (var b in partners) kandidaten.Add((b, true));

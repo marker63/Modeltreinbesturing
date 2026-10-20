@@ -180,6 +180,12 @@ public static class Tests
         Eis(v.Skip(1).SequenceEqual(new[] { 12, 14, 11, 15, 9, 16, 8 }) || v.Skip(1).First() == 12, "partnervolgorde: daarna op afstand van het geteste adres");
         var v2 = BaanVerkenner.PartnerVolgorde(k, alle, 13, 24, new Configuratie(new[] { 10 }), 3);
         Eis(!v2.Contains(10) && v2.Count == 3, "partnervolgorde: een al afbuigend wissel wordt niet nog eens geprobeerd");
+        // BUG #252: een wissel in de aanliggende sectie (melder 14, direct naast 24) gaat vóór een wissel met een dichter bij liggend adresnummer maar zonder ligging bij 24
+        var k2 = new Baankaart();
+        k2.Overgangen.Add(new Overgang { Van = 24, Naar = 14, Richting = Richting.Vooruit, AantalKeer = 3 });
+        k2.Wissel(17).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.Splitsing, NaMelder = 14, Richting = Richting.Vooruit, VolgendeBijRechtdoor = 24, VolgendeBijAfbuigend = 129 });
+        var v3 = BaanVerkenner.PartnerVolgorde(k2, Enumerable.Range(1, 20).ToList(), 13, 24, Configuratie.Basis, 3);
+        Eis(v3[0] == 17, "partnervolgorde (#252): wissel 17 uit de aanliggende sectie gaat vóór de adressen 12 en 14 (nu " + string.Join(",", v3) + ")");
     }
 
 

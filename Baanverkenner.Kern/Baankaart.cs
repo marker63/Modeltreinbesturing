@@ -578,6 +578,32 @@ public class Baankaart
         return kandidaten.OrderBy(Verschil).ThenBy(k => k.Sleutel, StringComparer.Ordinal).First();
     }
 
+    /// <summary>BUG #252 (Marco 20-10: "de aanliggende sectie heb je al 20 keer gevonden en je weet nog niet welke wissel je moet schakelen"): hoe ver (in melderstappen)
+    /// ligt elk al waargenomen wissel van <paramref name="melder"/>? 0 = de wissel is bij die melder zelf waargenomen (als splitsing na die melder of als
+    /// vervolg ervan); 1 = bij een aanliggende melder (een overgang in een van beide richtingen), enzovoort tot <paramref name="maxStappen"/>.
+    /// Wissels die niet voorkomen liggen verder weg of zijn nog onbekend. Zo kiest de zoeker de wissels in de aanliggende sectie, niet op adresnummer.</summary>
+    public Dictionary<int, int> WisselAfstanden(int melder, int maxStappen = 2)
+    {
+        var afstand = new Dictionary<int, int> { [melder] = 0 };
+        var rij = new Queue<int>(); rij.Enqueue(melder);
+        while (rij.Count > 0)
+        {
+            int m = rij.Dequeue();
+            if (afstand[m] >= maxStappen) continue;
+            foreach (var o in Overgangen)
+            {
+                int buur = o.Van == m ? o.Naar : o.Naar == m ? o.Van : 0;
+                if (buur != 0 && !afstand.ContainsKey(buur)) { afstand[buur] = afstand[m] + 1; rij.Enqueue(buur); }
+            }
+        }
+        var res = new Dictionary<int, int>();
+        foreach (var w in Wissels)
+            foreach (var o in w.Waarnemingen)
+                foreach (var m in new[] { (int?)o.NaMelder, o.VolgendeBijRechtdoor, o.VolgendeBijAfbuigend })
+                    if (m is int mm && afstand.TryGetValue(mm, out var d) && (!res.TryGetValue(w.Adres, out var oud) || d < oud)) res[w.Adres] = d;
+        return res;
+    }
+
     /// <summary>BUG #75: bij een kortsluiting na <paramref name="naMelder"/> was ook <paramref name="tweede"/> bezet. Is de overgang tussen die
     /// twee melders (in welke richting ook) eerder bij een andere wisselstand gereden, dan zijn de wissels die in die stand anders staan dan in
     /// <paramref name="kortsluitStand"/> de eerste verdachten: (adres, afbuigend) = de stand die de kortsluiting zou kunnen oplossen.</summary>
