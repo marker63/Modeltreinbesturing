@@ -744,7 +744,7 @@ public partial class BaanVerkenner
         // BUG #181: is er GEEN alarm, dan blijven ook wissels die de kaart bij een bezette melder noemt staan zolang de loc daar staat (sim: wissel 5 en 9 werden na een onverwachte
         // melder 129 rechtgezet terwijl de loc op die tongen stond: kortsluiting). Bij een alarm kan juist zo'n wissel de oplossing zijn (BUG #169).
         if (spaarOnderLoc && _monitor.Bezet.Count > 0 && HuidigeAlarmBlokken().Count == 0)
-            foreach (var a in WisselsBijBezet(_kaart, _monitor.Bezet).Where(x => !Kruis.IsMotor(x)))
+            foreach (var a in WisselsBijBezet(_kaart, _monitor.Bezet).Where(x => !Kruis.IsMotor(x) || Kruis.Middens.Count == 0))   // BUG #250: zolang de kruiswissel niet bekend is (optie 6) is motor 13/10 een gewone wissel en wordt hij ook niet onder de loc omgezet
                 onder.TryAdd(a, _monitor.Bezet.OrderBy(x => x).First());
         foreach (var a in _ins.WisselAdressen())
         {

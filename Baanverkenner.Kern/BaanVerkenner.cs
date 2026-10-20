@@ -2761,7 +2761,8 @@ public partial class BaanVerkenner
         c = KruisStandBijTerugweg(pad, rit.Richting.Om(), start, c, cOpdracht);
         await ControleerGeenAlarmVoorStap($"terugweg naar melder {start}");
         c = MetAlarmStand(c);
-        await ZetConfiguratie(c);
+        // BUG #250 (autolog 20-10 08:51:12): de terugweg na een klem zette wissel 13 weer rechtdoor terwijl de loc er nog op 24 stond: direct weer kortsluiting en ruim 3 minuten zoeken. Wissels bij de plek waar de loc staat blijven staan.
+        await ZetConfiguratie(c, spaarOnderLoc: true);
         var terug = await Rit(vanaf, rit.Richting.Om(), new RitDoel { Configuratie = c, DoelMelder = start, VerwachtPad = pad });
         // BUG #73 (log 17:48 en 17:54): kreeg de loc op de terugweg kortsluiting, dan was hij NIET terug op de startmelder. Het resultaat werd
         // genegeerd, de volgende proefrit begon vanaf een verkeerd aangenomen plek en de loc werd steeds opnieuw handmatig verplaatst.
