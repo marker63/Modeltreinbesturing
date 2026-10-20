@@ -43,7 +43,26 @@ public class VerkenInstellingen
     public static void NeemMeldingInstellingenOver(VerkenInstellingen vast, VerkenInstellingen scherm)
     {
         vast.OmgekeerdAangesloten = scherm.OmgekeerdAangesloten;
+        vast.GekoppeldeWissels = scherm.GekoppeldeWissels;   // BUG #259
         foreach (var s in scherm.UitgevoerdeAanpassingen) if (!vast.UitgevoerdeAanpassingen.Contains(s)) vast.UitgevoerdeAanpassingen.Add(s);
+    }
+
+    /// <summary>BUG #259 (Marco 20-10 18:23-18:33: "5 en 6 vormen een overloopwisselset", "altijd samen", "denk vooral aan het omgekeerd aansturen van wissel 6"): paren wissels die op de baan
+    /// altijd dezelfde stand hebben, bijv. "5+6". De eerste is de meester: wordt die gezet, dan gaat de tweede mee naar dezelfde stand OP DE BAAN (bij een omgekeerd aangesloten wissel is dat
+    /// het tegenovergestelde Dinamo-commando). De tweede wordt nooit los gezet of getest. Leeg = geen.</summary>
+    public string GekoppeldeWissels { get; set; } = "";
+
+    /// <summary>BUG #259: (meester, volger) uit <see cref="GekoppeldeWissels"/>.</summary>
+    public List<(int Meester, int Volger)> GekoppeldeParen()
+    {
+        var res = new List<(int, int)>();
+        foreach (var deel in GekoppeldeWissels.Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var ab = deel.Split('+');
+            if (ab.Length == 2 && int.TryParse(ab[0].Trim(), out var m) && int.TryParse(ab[1].Trim(), out var v) && m > 0 && v > 0 && m != v
+                && !res.Any(x => x.Item1 == v || x.Item2 == v || x.Item2 == m)) res.Add((m, v));
+        }
+        return res;
     }
 
     /// <summary>BUG #235: de adressen uit <see cref="OmgekeerdAangesloten"/>.</summary>

@@ -104,6 +104,7 @@
                             <RowDefinition/>
                             <RowDefinition/>
                             <RowDefinition/>
+                            <RowDefinition/>
                         </Grid.RowDefinitions>
                         <TextBlock Style="{StaticResource Label}" Text="Blokken"/>
                         <TextBox x:Name="DinamoBlokkenBox" Grid.Column="1" ToolTip="Bijv. 1-16 of 1-8,12,20-24"/>
@@ -113,7 +114,9 @@
                         <TextBox x:Name="KruisMotorenBox" Grid.Row="2" Grid.Column="1" ToolTip="Per Engelse wissel de motoren, bijv. 13+10 (één Engelse wissel met motor 13 en 10) of 13+10, 3+4 voor twee. Leeg = geen. Optioneel met de melder van de kruiswissel: 13+10@24."/>
                         <TextBlock Grid.Row="3" Style="{StaticResource Label}" Text="Omgekeerd aangesloten"/>
                         <TextBox x:Name="OmgekeerdBox" Grid.Row="3" Grid.Column="1" ToolTip="BUG #235: wissels waarvan 'afbuigend' op de baan rechtdoor is (motor andersom aangesloten), bijv. 6. Alleen voor de meldingen in logboek en rapport. Leeg = geen."/>
-                        <TextBlock Grid.Row="4" Grid.ColumnSpan="2" Style="{StaticResource Uitleg}"
+                        <TextBlock Grid.Row="4" Style="{StaticResource Label}" Text="Gekoppelde wissels"/>
+                        <TextBox x:Name="GekoppeldBox" Grid.Row="4" Grid.Column="1" ToolTip="BUG #259: overloopsets die op de baan altijd dezelfde stand hebben, bijv. 5+6 (wissel 6 schakelt mee met wissel 5; een omgekeerd aangesloten wissel krijgt dan het tegenovergestelde Dinamo-commando). Leeg = geen."/>
+                        <TextBlock Grid.Row="5" Grid.ColumnSpan="2" Style="{StaticResource Uitleg}"
                                    Text="Engelse wissels: geef per Engelse wissel de motoren op, bijv. 13+10 (de twee motoren van één Engelse wissel), meerdere gescheiden door een komma. Leeg = geen. De melder van de kruiswissel wordt zelf ontdekt, of geef hem op als 13+10@24.&#x0a;Bij Dinamo gaat een rijcommando via een blok. De verkenner zoekt per sectie zelf uit welk blok de loc van rijstroom voorziet door de blokken één voor één te proberen."/>
                     </Grid>
                 </GroupBox>

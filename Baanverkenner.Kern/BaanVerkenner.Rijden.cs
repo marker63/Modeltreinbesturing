@@ -404,7 +404,32 @@ public partial class BaanVerkenner
     /// <summary>BUG #80: het laatst gestuurde wisselcommando, met de tijd en de toen bezette melders (voor de oorzaak van een ontsporing).</summary>
     private (int Adres, bool Afbuigend, DateTime Tijd, List<int> Bezet)? _laatsteWisselCommando;
 
+    /// <summary>BUG #259: is dit adres de tweede wissel van een overloopset (schakelt alleen mee met zijn meester)?</summary>
+    private bool IsVolger(int adres) => _ins.GekoppeldeParen().Any(p => p.Volger == adres);
+    private bool _volgerBezig;
+
+    /// <summary>BUG #259 (Marco 20-10 18:23-18:33): wissel 5 en 6 zijn een overloopset en staan op de baan altijd hetzelfde; wissel 6 is omgekeerd aangesloten. Een volger wordt nooit los
+    /// gezet; zet de verkenner de meester, dan gaat de volger mee naar dezelfde stand op de baan (Dinamo-commando omgedraaid als één van beide omgekeerd is aangesloten).</summary>
     private async Task ZetWissel(int adres, bool afbuigend, bool forceer = false)
+    {
+        var paren = _ins.GekoppeldeParen();
+        if (!_volgerBezig && paren.Any(p => p.Volger == adres)) return;
+        await ZetWisselKern(adres, afbuigend, forceer);
+        if (_volgerBezig) return;
+        var omg = _ins.OmgekeerdeWissels();
+        foreach (var p in paren.Where(p => p.Meester == adres))
+        {
+            bool baanAfb = afbuigend ^ omg.Contains(adres);
+            bool dv = baanAfb ^ omg.Contains(p.Volger);
+            if (!forceer && _wisselStand.TryGetValue(p.Volger, out var st) && st == dv) continue;
+            _log.Info($"Wissel {p.Volger} schakelt mee met wissel {adres} (overloopset): op de baan beide {(baanAfb ? "afbuigend" : "rechtdoor")}, Dinamo-commando voor wissel {p.Volger}: {(dv ? "afbuigend" : "rechtdoor")} (BUG #259).");
+            _volgerBezig = true;
+            try { await ZetWisselKern(p.Volger, dv, forceer: true); }
+            finally { _volgerBezig = false; }
+        }
+    }
+
+    private async Task ZetWisselKern(int adres, bool afbuigend, bool forceer)
     {
         if (!forceer && _wisselStand.TryGetValue(adres, out var huidig) && huidig == afbuigend) return;
         if (!forceer) await VrijRijdenVoorWissel(adres);   // BUG #181
@@ -419,7 +444,7 @@ public partial class BaanVerkenner
             Kennis.Leg("wissel-onder-loc", $"{adres}@{bij}", afbuigend ? "afbuigend" : "rechtdoor", $"navigatie zet wissel {adres} om terwijl melder {bij} bezet zijn (de loc staat dus op een grens)");
         }
         _wisselStand[adres] = afbuigend;
-        _laatsteWisselCommando = (adres, afbuigend, _klok.Nu, _monitor.Bezet.OrderBy(x => x).ToList());
+        if (!_volgerBezig) _laatsteWisselCommando = (adres, afbuigend, _klok.Nu, _monitor.Bezet.OrderBy(x => x).ToList());   // BUG #259: de meester telt, niet de volger
         // BUG #65: meten is weten - hoeveel wisselcommando's zijn er sinds het verbinden verstuurd? Valt de Dinamo ooit
         // weer uit (wissels bewegen niet meer), dan is in het log te zien na hoeveel commando's dat gebeurde.
         _wisselCommandos++;
@@ -752,6 +777,7 @@ public partial class BaanVerkenner
             if (_ins.WisselAdressen().Contains(pa)) onder.TryAdd(pa, onder.Values.First());
         foreach (var a in _ins.WisselAdressen())
         {
+            if (IsVolger(a)) continue;   // BUG #259: gaat mee met zijn meester
             bool wens = c.Bevat(a);
             if (onder.TryGetValue(a, out var m) && !(_wisselStand.TryGetValue(a, out var nu) && nu == wens))
             {
@@ -1336,7 +1362,7 @@ public partial class BaanVerkenner
         // BUG #109 (Marco 12:03: "wissel 9 werd geschakeld terwijl de loc er bovenop stond"): wissels die bij een bezette melder liggen (de kaart
         // noemt die melder bij die wissel) worden nooit zonder toestemming geprobeerd: de loc staat er met een deel op of tegen de tong aan.
         var bijLoc = WisselsBijBezet(_kaart, bezet);
-        var alle = _ins.WisselAdressen().Where(a => !Kruis.IsMotor(a)).ToList();
+        var alle = _ins.WisselAdressen().Where(a => !Kruis.IsMotor(a) && !IsVolger(a)).ToList();   // BUG #259
 
         // BUG #169 (Marco 16-10 18:35): een wissel die van de SAMENGEVOEGDE kant (puntzijde) bereden wordt, kan een kortsluiting niet met zijn stand
         // veroorzaken en omzetten helpt dus niet; een wissel die vanaf een van de GESPLITSTE takken richting de samenvoeging bereden wordt, kan dat
@@ -2598,7 +2624,7 @@ public partial class BaanVerkenner
         var bezet = _monitor.Bezet.ToHashSet();
         var bijLoc = WisselsBijBezet(_kaart, bezet);
         var nodig = doel.Configuratie.Afbuigend.ToHashSet();
-        var kandidaten = _ins.WisselAdressen().Where(a => !Kruis.IsMotor(a) && !bijLoc.Contains(a) && !nodig.Contains(a)).ToList();
+        var kandidaten = _ins.WisselAdressen().Where(a => !Kruis.IsMotor(a) && !IsVolger(a) && !bijLoc.Contains(a) && !nodig.Contains(a)).ToList();
         // BUG #169: wissels die van de samengevoegde kant bereden worden helpen niet (overslaan); wissels die van een tak richting de samenvoeging bereden worden gaan voorop.
         var (achterKlem, kopKlem) = WisselRollen(_kaart, start, r, null);
         kandidaten = kandidaten.Where(a => !kopKlem.Contains(a) || achterKlem.Contains(a)).OrderByDescending(a => achterKlem.Contains(a)).ThenBy(a => a).ToList();
@@ -2802,7 +2828,7 @@ public partial class BaanVerkenner
         // Verdacht: de proefwissel van de rit, of (zonder proef) de afbuigende wissels van de rijstand van deze rit.
         var kandidaten = _ritDoel?.ProefAdres is int p0 ? new List<int> { p0 }
             : (_ritDoel?.Configuratie.Afbuigend.ToList() ?? new List<int>());
-        kandidaten = kandidaten.Where(a => _wisselStand.TryGetValue(a, out var afb) && afb).ToList();
+        kandidaten = kandidaten.Where(a => !IsVolger(a) && _wisselStand.TryGetValue(a, out var afb) && afb).ToList();   // BUG #259
         // BUG #258: zonder proefwissel geen wissel losmaken waarvan de kaart de afbuigende stand voor deze stap al bewezen heeft (wissel 5 bij 14 -> 129)
         if (_ritDoel?.ProefAdres is null)
         {

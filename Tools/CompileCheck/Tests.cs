@@ -2562,13 +2562,34 @@ public static class Tests
         // BUG #239: eenmalige aanpassing wissel 6 omgekeerd
         var ins239 = new VerkenInstellingen();
         var g239 = EenmaligeAanpassingen.PasToe(ins239);
-        Eis(g239.Count == 1 && ins239.OmgekeerdeWissels().SetEquals(new[] { 6 }) && ins239.UitgevoerdeAanpassingen.Contains("239-wissel6-omgekeerd"), "eenmalig (#239): wissel 6 wordt één keer bij 'Omgekeerd aangesloten' gezet");
+        Eis(g239.Count == 2 && ins239.OmgekeerdeWissels().SetEquals(new[] { 6 }) && ins239.UitgevoerdeAanpassingen.Contains("239-wissel6-omgekeerd"), "eenmalig (#239): wissel 6 wordt één keer bij 'Omgekeerd aangesloten' gezet");
         ins239.OmgekeerdAangesloten = "";
         Eis(EenmaligeAanpassingen.PasToe(ins239).Count == 0 && ins239.OmgekeerdeWissels().Count == 0 && !EenmaligeAanpassingen.Open(ins239), "eenmalig (#239): haalt Marco hem weg, dan komt hij niet terug");
         var ins239b = new VerkenInstellingen { OmgekeerdAangesloten = "3" }; EenmaligeAanpassingen.PasToe(ins239b);
         Eis(ins239b.OmgekeerdeWissels().SetEquals(new[] { 3, 6 }), "eenmalig (#239): een al ingevulde wissel blijft staan, 6 komt erbij");
         var js239 = System.Text.Json.JsonSerializer.Serialize(ins239);
         Eis(System.Text.Json.JsonSerializer.Deserialize<VerkenInstellingen>(js239)!.UitgevoerdeAanpassingen.Contains("239-wissel6-omgekeerd"), "eenmalig (#239): het bewaren en laden van de instellingen onthoudt dat het gedaan is");
+        // BUG #259: overloopset 5+6 als eenmalige aanpassing, en wissel 6 schakelt mee met dezelfde stand OP DE BAAN (6 is omgekeerd aangesloten)
+        Eis(ins239.GekoppeldeParen().SequenceEqual(new[] { (5, 6) }) && ins239.UitgevoerdeAanpassingen.Contains("259-overloop-5-6"), "overloop (#259): eenmalig 5+6 bij 'Gekoppelde wissels'");
+        {
+            var bf259 = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var sim259 = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = false, LocAdres = 5408 };
+            sim259.NieuweSectie(13, 100, 3);
+            sim259.VerbindenAsync("SIM").GetAwaiter().GetResult();
+            var klok259 = new VirtueleKlok(); klok259.Getikt += sim259.Tik;
+            var log259 = new VerkenLog(klok259);
+            var ins259 = new VerkenInstellingen { LocAdres = 5408, WisselAdresVan = 1, WisselAdresTot = 14, GekoppeldeWissels = "5+6", OmgekeerdAangesloten = "6" };
+            var v259 = new BaanVerkenner(sim259, ins259, klok259, log259, (_, _) => Task.FromResult(true));
+            void Zet259(int a, bool afb) => ((Task)typeof(BaanVerkenner).GetMethod("ZetWissel", bf259)!.Invoke(v259, new object[] { a, afb, false })!).GetAwaiter().GetResult();
+            var stand259 = (Dictionary<int, bool>)typeof(BaanVerkenner).GetField("_wisselStand", bf259)!.GetValue(v259)!;
+            Zet259(5, true);
+            Eis(stand259[5] && stand259.TryGetValue(6, out var s6a) && !s6a, "overloop (#259): wissel 5 afbuigend -> wissel 6 Dinamo rechtdoor (= op de baan afbuigend)");
+            Zet259(5, false);
+            Eis(!stand259[5] && stand259[6], "overloop (#259): wissel 5 rechtdoor -> wissel 6 Dinamo afbuigend (= op de baan rechtdoor)");
+            Zet259(6, false);
+            Eis(stand259[6], "overloop (#259): wissel 6 los zetten wordt genegeerd (volgt wissel 5)");
+            Eis(log259.Regels.Any(r => r.Tekst.Contains("schakelt mee met wissel 5")), "overloop (#259): het logboek zegt dat wissel 6 meeschakelt");
+        }
         // BUG #240: klemmelders inclusief de melder van de kortsluiting (melder 24 viel tijdens de kortsluiting weg)
         Eis(!BaanVerkenner.KlemNogOnderLoc(new[] { 129 }, new[] { 24, 129 }, false) && BaanVerkenner.KlemNogOnderLoc(new[] { 24, 129 }, new[] { 24, 129 }, false), "klem (#240): alleen 129 als klemmelder liet wissel 10 los zodra 24 weer bezet meldde; met 24 erbij blijft hij staan");
         // BUG #226: automatische tussenstand

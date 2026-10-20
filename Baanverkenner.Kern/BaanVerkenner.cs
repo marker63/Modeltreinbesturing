@@ -287,6 +287,7 @@ public partial class BaanVerkenner
             if (Voorkennis is { AantalMetingen: > 0 } lp) _log.Info($"Leerprofiel: {lp.Overgangen.Count} overgangen uit eerdere verkenningen (tijden worden omgerekend naar verkensnelheid {_ins.Verkensnelheid}).");
             _log.OmgekeerdeWissels = _ins.OmgekeerdeWissels();   // BUG #235
             _kaart.OmgekeerdeWissels = _log.OmgekeerdeWissels.OrderBy(a => a).ToList();
+            if (_ins.GekoppeldeParen().Count > 0) _log.Info($"Gekoppelde wissels (overloopset): {string.Join(", ", _ins.GekoppeldeParen().Select(p => $"{p.Meester}+{p.Volger}"))}; de tweede schakelt mee met de eerste, op de baan altijd dezelfde stand (BUG #259).");
             if (_log.OmgekeerdeWissels.Count > 0) _log.Info($"Omgekeerd aangesloten: wissel {string.Join(", ", _log.OmgekeerdeWissels.OrderBy(a => a))} (Dinamo 'afbuigend' = op de baan rechtdoor). De meldingen over die wissel krijgen dat erbij.");
             _log.Info($"Hardware: {_hw.Naam}. Testloc adres {_ins.LocAdres} ({_ins.LocStappen} stappen), verkensnelheid {_ins.Verkensnelheid}, kruipsnelheid {_ins.Kruipsnelheid}.");
             _log.Info($"Wisseladressen {_kaart.WisselAdresVan} t/m {_kaart.WisselAdresTot}." + (BlokVereist ? $" Dinamo-blokken: {_ins.DinamoBlokken}." : ""));
@@ -1181,6 +1182,7 @@ public partial class BaanVerkenner
                 // BUG #193 (Marco 17-10 16:28: "zet wisselmotoren 10 en 13 gewoon om tijdens de testrun, dan ontdek je snel de kruiswissel"): zolang de kruiswissel nog niet bekend is,
                 // gaan de motoren gewoon mee in de adrestest; de rit laat zien waar ze geschakeld werden (andere melder, kortsluiting) en daaruit volgt de kruiswissel.
                 if (Stap && Kruis.IsMotor(a)) continue;
+                if (IsVolger(a)) continue;   // BUG #259: tweede wissel van een overloopset, wordt met zijn meester mee getest
                 await PauzeMoment();
                 _bezig = $"opdracht #{o.Id}: adres {a} testen";
                 MeldVoortgang();
@@ -1446,7 +1448,7 @@ public partial class BaanVerkenner
         var teDoen = new List<(int Adres, bool Afb)>();
         foreach (var adres in _ins.WisselAdressen())
         {
-            if (adres == proefAdres) continue;
+            if (adres == proefAdres || IsVolger(adres)) continue;   // BUG #259
             bool wens = extra is not null && extra.Any(e => e.Adres == adres) ? extra.First(e => e.Adres == adres).Afbuigend : rijstand.Bevat(adres);
             bool nu = _wisselStand.TryGetValue(adres, out var st) && st;
             if (nu == wens) continue;

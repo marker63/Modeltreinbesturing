@@ -1,4 +1,4 @@
-namespace Baanverkenner.Kern;
+﻿namespace Baanverkenner.Kern;
 
 /// <summary>BUG #239 (Marco 18-10 15:01: "waarom heb je er niet zelf even een omzetting voor 6 ingezet die 1 malig werd uitgevoerd, en bij een volgende versie er weer uithalen"):
 /// instellingen die Claude op grond van de logs en Marco's waarnemingen één keer zelf aanpast, zodat Marco ze niet hoeft in te vullen. Elke aanpassing heeft een vaste sleutel en
@@ -18,6 +18,13 @@ public static class EenmaligeAanpassingen
             if (set.Contains(6)) return false;
             set.Add(6);
             ins.OmgekeerdAangesloten = string.Join(", ", set.OrderBy(a => a));
+            return true;
+        }),
+        // Marco 20-10 18:23/18:32: wissel 5 en 6 zijn een overloopset en staan op de baan altijd hetzelfde (beide rechtdoor of beide afbuigend).
+        new("259-overloop-5-6", "Wissel 5 en 6 staan nu bij 'Gekoppelde wissels' (5+6, overloopset): wissel 6 schakelt automatisch mee met wissel 5, op de baan altijd dezelfde stand.", ins =>
+        {
+            if (ins.GekoppeldeParen().Any(p => p.Meester == 5 || p.Volger == 5 || p.Meester == 6 || p.Volger == 6)) return false;
+            ins.GekoppeldeWissels = string.Join(", ", ins.GekoppeldeParen().Select(p => $"{p.Meester}+{p.Volger}").Append("5+6"));
             return true;
         }),
     };

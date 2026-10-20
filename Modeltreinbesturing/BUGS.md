@@ -2659,3 +2659,11 @@ Autolog 18:08:17: kortsluiting op 14/129, LosMakenProefWissel zette wissel 5 (en
 (BUG #231-verdachte). De kaart wist voor de stap 14 -> 129 al: wissel 5 afbuigend (splitsing) en wissel 6 Dinamo rechtdoor = op de baan afbuigend (kortsluiting vanaf ingang 14).
 Oplossing: BewezenStandenBijLoc geeft de standen die de kaart voor de stappen rond de bezette melders bewezen heeft (splitsingen en verboden ingangen). Staat zo'n wissel goed, dan
 wordt hij bij een kortsluiting niet losgemaakt (zonder proefwissel) en niet geprobeerd, ook niet met toestemming. Test: bewezen (#258) op baankaart 20-10 18:00.
+
+## BUG #259 – OPGELOST (nog niet getest op de baan): wissel 5 en 6 (overloopset) stonden op de baan verschillend (Marco 20-10 18:23-18:36)
+Marco: "weer staat wissel 5 verkeerd, 6 staat fysiek afbuigend en 5 fysiek rechtdoor"; 5 en 6 zijn een overloopset en moeten op de baan altijd dezelfde stand hebben ("ja, altijd samen");
+"denk vooral aan het omgekeerd aansturen van wissel 6" / "fysiek anders dan softwarematig". Oorzaak: de verkenner zette 5 en 6 los van elkaar in Dinamo-commando's; 'alle wissels rechtdoor'
+(Dinamo) is bij wissel 6 op de baan afbuigend, dus 5 rechtdoor + 6 op de baan afbuigend. Oplossing: nieuwe instelling 'Gekoppelde wissels' (bijv. 5+6), als eenmalige aanpassing
+"259-overloop-5-6" ingevuld (in het scherm terug te draaien). De tweede wissel wordt nooit los gezet, getest of geprobeerd bij een kortsluiting; zet de verkenner de eerste, dan gaat de
+tweede mee naar dezelfde stand OP DE BAAN: Dinamo-commando omgedraaid als één van beide omgekeerd is aangesloten (5 afbuigend -> 6 Dinamo rechtdoor, 5 rechtdoor -> 6 Dinamo afbuigend).
+Test: overloop (#259). De simulatie gebruikt de koppeling niet (staat standaard leeg).
