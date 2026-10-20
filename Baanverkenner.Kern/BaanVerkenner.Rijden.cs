@@ -2727,6 +2727,39 @@ public partial class BaanVerkenner
     /// <summary>BUG #241: wissels die <see cref="LosMakenProefWissel"/> bij dit herstel terugzette (om achteraf te melden of het vermoeden klopte).</summary>
     private readonly List<int> _zojuistLosgemaakt = new();
 
+    /// <summary>BUG #256 (autolog 20-10 17:53:45 en 17:59:17): na een proef of opdracht zette de terugweg een wissel om die bij de melder ligt waar de loc stilstond (wissel 9 met de loc op
+    /// melder 129, wissel 13 met de loc op 24); de loc is langer dan zo'n melder en stond op de tong: direct kortsluiting ("de loc kan niet weg"), en bij het zelf terugrijden daarna gebeurde
+    /// hetzelfde nog eens. Niet omzetten (de spaarregels) laat de loc de verkeerde kant op rijden (17:56:17: naar 4 in plaats van 24). Wat een mens doet: eerst een stukje terug, van de wissel
+    /// af, dan omzetten en weer vooruit. Moet voor deze stap een wissel om die bij een bezette melder ligt, dan rijdt de loc eerst met de huidige stand terug naar de vorige melder (een bekende,
+    /// eenduidige overgang met deze stand), tot de huidige melder vrij is. Geeft de nieuwe start en het verlengde pad, of null als dat niet nodig of niet mogelijk is. Nog niet getest op de baan.</summary>
+    private async Task<(int Van, List<int> Pad)?> UitwijkenVoorWissels(int van, Richting r, List<int> pad, Configuratie cfg)
+    {
+        _monitor.Bijwerken();
+        var bezet = _monitor.Bezet.ToHashSet();
+        if (bezet.Count == 0 || !bezet.Contains(van) || HuidigeAlarmBlokken().Count > 0) return null;
+        var teOm = WisselsBijBezet(_kaart, bezet).Where(a => !Kruis.IsMotor(a) && _ins.WisselAdressen().Contains(a)
+            && _wisselStand.TryGetValue(a, out var st) && st != cfg.Bevat(a)).OrderBy(a => a).ToList();
+        if (teOm.Count == 0) return null;
+        var nu = new Configuratie(_wisselStand.Where(kv => kv.Value).Select(kv => kv.Key).ToArray());
+        var terug = _kaart.BekendeVolgende(van, r.Om(), nu).Where(x => !pad.Contains(x)).ToList();
+        if (terug.Count != 1)
+        {
+            _log.Info($"Wissel {Lijst(teOm)} moet om voor de stap vanaf melder {van}, maar ligt bij de melder waar de loc staat; er is geen eenduidige melder om eerst naar terug te rijden.");
+            return null;
+        }
+        int p = terug[0];
+        if (WisselsBijBezet(_kaart, new[] { p }).Intersect(teOm).Any()) return null;   // de wissel ligt dan tussen p en van: daar staat de loc er na het terugrijden nog op
+        _log.Info($"Wissel {Lijst(teOm)} moet om voor de stap vanaf melder {van}, maar ligt bij de melder waar de loc staat (de loc kan op de tong staan). Eerst terug naar melder {p} met de huidige stand, dan omzetten (BUG #256, nog niet getest op de baan).");
+        await Rit(van, r.Om(), new RitDoel { Configuratie = nu, DoelMelder = p, VerwachtPad = new List<int> { van, p } });
+        _monitor.Bijwerken();
+        if (_monitor.Bezet.Contains(van)) await Nastellen(p, r.Om(), achter: van);
+        _monitor.Bijwerken();
+        if (_monitor.Bezet.Contains(van) || !_monitor.Bezet.Contains(p)) return null;
+        var nieuwPad = new List<int> { p };
+        nieuwPad.AddRange(pad[0] == van ? pad : new List<int> { van }.Concat(pad));
+        return (p, nieuwPad);
+    }
+
     private async Task<bool> LosMakenProefWissel()
     {
         // BUG #150: blijft het alarm ook na de stop aan (Dinamo meldt niet opnieuw), dan telt dat ook als vastzittende loc.
@@ -2988,6 +3021,7 @@ public partial class BaanVerkenner
                     while (k < weg.Count && weg[k].Richting == r && weg[k].Cfg.Sleutel == stapCfg.Sleutel) { pad.Add(weg[k].Naar); k++; }
                     var cfg = MetEisen(pad, r, KiesBijIngang(pad[0], r, pad, stapCfg));
                     await ControleerGeenAlarmVoorStap($"terugweg {pad[0]} -> {pad[^1]}");
+                    if (await UitwijkenVoorWissels(pad[0], r, pad, cfg) is { } uw) { pad = uw.Pad; cfg = MetEisen(pad, r, cfg); }   // BUG #256
                     await ZetConfiguratie(cfg);
                     var terug = await Rit(pad[0], r, new RitDoel { Configuratie = cfg, DoelMelder = pad[^1], VerwachtPad = pad });
                     if (terug.Einde == RitEinde.Kortsluiting) throw new NavigatieFout($"Op de terugweg naar melder {pad[^1]} volgde een kortsluiting.");

@@ -2485,8 +2485,10 @@ public partial class BaanVerkenner
             }
             await ControleerGeenAlarmVoorStap($"navigatie {e.Van} -> {e.Naar}");
             cfg = MetAlarmStand(cfg);
+            int vanN = e.Van; var padN = e.Pad;
+            if (await UitwijkenVoorWissels(e.Van, e.Richting, e.Pad, cfg) is { } uwN) { vanN = uwN.Van; padN = uwN.Pad; cfg = MetAlarmStand(MetEisen(padN, e.Richting, cfg)); }   // BUG #256
             await ZetConfiguratie(cfg);
-            await Rit(e.Van, e.Richting, new RitDoel { Configuratie = cfg, DoelMelder = e.Naar, VerwachtPad = e.Pad });
+            await Rit(vanN, e.Richting, new RitDoel { Configuratie = cfg, DoelMelder = e.Naar, VerwachtPad = padN });
         }
     }
 
@@ -2613,8 +2615,10 @@ public partial class BaanVerkenner
             cfg = MetEisen(pad, e.Richting.Om(), KiesBijIngang(e.Naar, e.Richting.Om(), pad, cfg));
             await ControleerGeenAlarmVoorStap($"terugweg {e.Naar} -> {e.Van}");
             cfg = MetAlarmStand(cfg);
+            int vanT = e.Naar;
+            if (await UitwijkenVoorWissels(e.Naar, e.Richting.Om(), pad, cfg) is { } uwT) { vanT = uwT.Van; pad = uwT.Pad; cfg = MetAlarmStand(MetEisen(pad, e.Richting.Om(), cfg)); }   // BUG #256
             await ZetConfiguratie(cfg);
-            await Rit(e.Naar, e.Richting.Om(), new RitDoel { Configuratie = cfg, DoelMelder = e.Van, VerwachtPad = pad });
+            await Rit(vanT, e.Richting.Om(), new RitDoel { Configuratie = cfg, DoelMelder = e.Van, VerwachtPad = pad });
         }
         await ZetConfiguratie(Configuratie.Basis);
     }
@@ -2741,6 +2745,7 @@ public partial class BaanVerkenner
             cDoor = KruisStandBijTerugweg(door, rit.Richting, start, cDoor, c);
             await ControleerGeenAlarmVoorStap($"doorrijden naar melder {start}");
             cDoor = MetAlarmStand(cDoor);
+            if (await UitwijkenVoorWissels(door[0], rit.Richting, door, cDoor) is { } uwD) { door = uwD.Pad; cDoor = MetAlarmStand(MetEisen(door, rit.Richting, cDoor)); }   // BUG #256
             await ZetConfiguratie(cDoor);
             var klaar = await Rit(door[0], rit.Richting, new RitDoel { Configuratie = cDoor, DoelMelder = start, VerwachtPad = door });
             if (klaar.Einde == RitEinde.Kortsluiting)
