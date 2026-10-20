@@ -1454,7 +1454,15 @@ public partial class BaanVerkenner
                 .SelectMany(o => new[] { (int?)o.NaMelder, o.Via, o.VolgendeBijRechtdoor, o.VolgendeBijAfbuigend }).Where(x => x is not null).Select(x => x!.Value).ToList();
             return wm.Count == 0 ? 1 : wm.Any(dichtbij.Contains) ? 0 : 2;
         }
-        foreach (var a in alle.Where(a => !bijLoc.Contains(a) && !achter.Contains(a) && !kopAdressen.Contains(a)).OrderBy(Afstand).ThenBy(a => a))
+        // BUG #253 (Marco 20-10 15:20: "je hebt de aanliggende sectie al 20 keer gevonden en weet nog niet welke wissel je moet schakelen"; log 15:21-15:24): de bekende oplossing van het
+        // kortsluitpunt voor deze bezette melders (wissel 1 met wissel 2 afbuigend, kortsluitpunt #3) stond al; het alarm bleef toch. Dan ligt het niet aan een wissel in een andere sectie:
+        // de routine zette 2 minuten lang alle 14 wissels om (42 wisselcommando's), twee keer achter elkaar. Staat de bekende oplossing al, dan komen alleen nog wissels in de
+        // aanliggende sectie (Afstand 0) aan de beurt en geen blinde rondgang langs de rest.
+        bool bekendeOplossingStaat = _kaart.Kortsluitpunten.Any(k => k.Opgelost && !k.Voorlopig && k.OpgelostMetAfbuigend == true && k.OpgelostDoorAdres is int oa2 && stNu.Bevat(oa2)
+                                                                      && (bezet.Contains(k.NaMelder) || k.TweedeMelders.Any(bezet.Contains)) && k.Configuratie.Afbuigend.All(stNu.Bevat));
+        if (bekendeOplossingStaat)
+            _log.Info("De bekende oplossing van een kortsluitpunt bij deze melders staat al, maar het alarm blijft: alleen nog wissels in de aanliggende sectie worden geprobeerd, geen blinde rondgang langs alle wissels (BUG #253). Controleer op de baan of er iets op de melder(s) staat of ligt.");
+        foreach (var a in alle.Where(a => !bijLoc.Contains(a) && !achter.Contains(a) && !kopAdressen.Contains(a) && (!bekendeOplossingStaat || Afstand(a) == 0)).OrderBy(Afstand).ThenBy(a => a))
             if (await Probeer(a, "")) return true;
 
         // BUG #147 (Marco 18:41: "nu weer wissel 14"; ook wissel 2 bij melder 5 om 17:27): de wissel die de kortsluiting veroorzaakt ligt bijna altijd bij de
