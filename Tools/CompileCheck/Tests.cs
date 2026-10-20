@@ -2510,6 +2510,12 @@ public static class Tests
         Eis(VerkenLog.MetBaanstand("Adres 16: afbuigend", om235) == "Adres 16: afbuigend" && VerkenLog.MetBaanstand("Wissel 6 gevonden", om235) == "Wissel 6 gevonden" && VerkenLog.MetBaanstand("Rijstand: afbuigend: 5, 6, 10", om235).Contains("omgekeerd"), "omgekeerd (#235): adres 16 of een melding zonder stand blijft gewoon; 'afbuigend: 5, 6' wel");
         var k235 = Laad("baankaart_2026-10-18_1349.json"); k235.OmgekeerdeWissels = new List<int> { 6 };
         Eis(Rapport.AlsTekst(k235).Contains("OMGEKEERD AANGESLOTEN") && Rapport.AlsHtml(k235).Contains("Omgekeerd aangesloten: wissel 6"), "omgekeerd (#235): rapport (tekst en html) noemt het");
+        // BUG #258: voor 14 -> 129 (vooruit) zijn wissel 5 afbuigend en wissel 6 niet-afbuigend (Dinamo) bewezen; die worden bij een kortsluiting daar niet omgezet
+        var k258 = Laad("baankaart_2026-10-20_1800.json");
+        var b258 = BaanVerkenner.BewezenStandenBijLoc(k258, new[] { 13, 14, 129 }, Richting.Vooruit, new[] { 14, 129 });
+        Eis(b258.TryGetValue(5, out var w5) && w5 && b258.TryGetValue(6, out var w6) && !w6, "bewezen (#258): 14 -> 129 vooruit: wissel 5 afbuigend, wissel 6 Dinamo rechtdoor (nu " + string.Join(", ", b258.Select(kv => kv.Key + (kv.Value ? "A" : "R"))) + ")");
+        var b258b = BaanVerkenner.BewezenStandenBijLoc(k258, new[] { 21, 29 }, Richting.Vooruit, new[] { 14, 129 });
+        Eis(b258b.Count == 0, "bewezen (#258): stappen ver van de loc tellen niet mee");
         // BUG #247: schema's tonen bij een omgekeerd aangesloten wissel de stand op de baan (Marco 16:07: wissel 6 'niet afbuigend' voor 14 -> 129, op de baan moet hij afbuigend)
         var k247 = Laad("baankaart_2026-10-18_1600.json");
         k247.Wissel(6).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.KortsluitingBijOmzetten, NaMelder = 129, Via = 14, Richting = Richting.Vooruit, VolgendeBijRechtdoor = 24 });

@@ -2652,3 +2652,10 @@ Test: keerlus-simulatie (3x toegepast, alle 23 melders, ALLES OK).
 Marco: opgehaalde sets mogen weg. Claude kan op afstand niet wissen, dus de Baanverkenner ruimt nu zelf op: na elke automatische tussenstand blijven alleen de nieuwste 3 sets staan
 (baanrapport, baanverkenner-log, hardwarelog, baankaart met dezelfde datum_tijd); oudere sets worden verwijderd. Andere bestanden (zips, baan.json, mappen) blijven altijd staan.
 Test: opruimen (#257).
+
+## BUG #258 – OPGELOST (nog niet getest op de baan): herstel zette wissel 5 terug en probeerde wissel 6 eerst, terwijl de stand voor 14 <-> 129 al bewezen was (Marco 20-10 18:23)
+Marco: "nu zet je wissel 5 verkeerd en laat je wissel 6 als eerste schakelen; je wist al hoe je van 129 naar 14 moest rijden, zowel 5 als 6 moesten afbuigend staan (overloopwisselset)".
+Autolog 18:08:17: kortsluiting op 14/129, LosMakenProefWissel zette wissel 5 (en 10) rechtdoor ("waarschijnlijk klem"), daarna probeerde ProbeerAlarmWegTeKrijgen wissel 6 als eerste
+(BUG #231-verdachte). De kaart wist voor de stap 14 -> 129 al: wissel 5 afbuigend (splitsing) en wissel 6 Dinamo rechtdoor = op de baan afbuigend (kortsluiting vanaf ingang 14).
+Oplossing: BewezenStandenBijLoc geeft de standen die de kaart voor de stappen rond de bezette melders bewezen heeft (splitsingen en verboden ingangen). Staat zo'n wissel goed, dan
+wordt hij bij een kortsluiting niet losgemaakt (zonder proefwissel) en niet geprobeerd, ook niet met toestemming. Test: bewezen (#258) op baankaart 20-10 18:00.

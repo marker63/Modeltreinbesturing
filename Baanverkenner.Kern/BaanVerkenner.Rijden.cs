@@ -1364,8 +1364,14 @@ public partial class BaanVerkenner
         var alarmBlokkenVoor = HuidigeAlarmBlokken();   // BUG #174: de oplossing hoort alleen bij een kortsluitpunt met hetzelfde alarmblok
         _log.Waarschuwing($"Kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())} blijft terwijl de loc stilstaat ({stap}). De verkenner probeert zelf wissels om te zetten, behalve die bij een bezette melder ({string.Join(" en ", bezet.OrderBy(m => m))}).");
 
+        // BUG #258: standen die de kaart voor deze stap al bewezen heeft blijven staan (wissel 5 en 6 bij 14 -> 129)
+        var bewezen = BewezenStandenNu(bezet);
+        if (bewezen.Count > 0)
+            _log.Info($"Wissel {string.Join(", ", bewezen.Keys.OrderBy(a => a).Select(a => $"{a} ({(bewezen[a] ? "afbuigend" : "rechtdoor")})"))} wordt niet geprobeerd: die stand is voor deze stap al bewezen (BUG #258).");
+
         async Task<bool> Probeer(int a, string toelichting)
         {
+            if (bewezen.ContainsKey(a)) return false;   // BUG #258
             bool oud = _wisselStand.TryGetValue(a, out var nu) && nu;
             await ZetWissel(a, !oud, forceer: true);
             var eind = _klok.Nu + TimeSpan.FromSeconds(2.5);
@@ -1431,7 +1437,7 @@ public partial class BaanVerkenner
             if (await Probeer(a, " (van een tak richting de samenvoeging bereden)")) return true;
 
         // stap 2: de wissels die van achteren bereden worden en bij de loc liggen, plus de kruismotoren als de loc op de kruiswissel staat: met toestemming
-        var verdachtEerst = achter.Where(bijLoc.Contains).ToList();
+        var verdachtEerst = achter.Where(a => bijLoc.Contains(a) && !bewezen.ContainsKey(a)).ToList();   // BUG #258
         if (Kruis.OpKruis(bezet))
             foreach (var m in KruisMotorenVolgorde(bezet)) if (!verdachtEerst.Contains(m)) verdachtEerst.Add(m);
         var gevraagd = new HashSet<int>();
@@ -1499,6 +1505,35 @@ public partial class BaanVerkenner
         }
         _log.Waarschuwing("Geen enkele wissel haalde de kortsluiting weg.");
         return false;
+    }
+
+    /// <summary>BUG #258 (Marco 20-10 18:23: "nu zet je wissel 5 verkeerd en laat je wissel 6 als eerste schakelen; je wist al hoe je van 129 naar 14 moest rijden, zowel 5 als 6 moesten
+    /// afbuigend staan (overloopwisselset)"; autolog 18:08:17-18:08:41 en 18:10:28): bij een kortsluiting op 14/129 zette het herstel wissel 5 terug naar rechtdoor en probeerde het wissel 6
+    /// als eerste, terwijl de kaart voor de stap 14 -> 129 al weet: wissel 5 afbuigend (splitsing) en wissel 6 niet Dinamo-afbuigend (kortsluiting, ingang 14). Dit zijn de standen die de
+    /// kaart voor de stappen van <paramref name="reeks"/> rond de bezette melders bewezen heeft (adres -> Dinamo-stand afbuigend). Tegenstrijdige adressen vallen weg.</summary>
+    internal static Dictionary<int, bool> BewezenStandenBijLoc(Baankaart kaart, IReadOnlyList<int> reeks, Richting r, IReadOnlyCollection<int> bezet)
+    {
+        var res = new Dictionary<int, bool>(); var strijdig = new HashSet<int>();
+        void Voeg(int a, bool afb) { if (res.TryGetValue(a, out var b) && b != afb) strijdig.Add(a); res[a] = afb; }
+        var verboden = kaart.VerbodenIngangen();
+        for (int i = 0; i + 1 < reeks.Count; i++)
+        {
+            int x = reeks[i], y = reeks[i + 1];
+            if (!bezet.Contains(x) && !bezet.Contains(y)) continue;
+            foreach (var e in kaart.WisselEisenVoorStapDetail(x, y, r)) Voeg(e.Adres, e.Afbuigend);
+            foreach (var v in verboden.Where(v => v.Via == x && v.Na == y && v.R == r)) Voeg(v.Adres, false);
+        }
+        foreach (var a in strijdig) res.Remove(a);
+        return res;
+    }
+
+    /// <summary>BUG #258: de bewezen standen (zie <see cref="BewezenStandenBijLoc"/>) die nu ook zo staan; die worden bij een kortsluiting niet omgezet.</summary>
+    private Dictionary<int, bool> BewezenStandenNu(IReadOnlyCollection<int> bezet)
+    {
+        var reeks = LaatsteReeksBijLoc(bezet);
+        Richting? r = _laatsteKortsluitContext?.Richting ?? _kaart.Ritten.LastOrDefault()?.Richting;
+        if (reeks.Count < 2 || r is not Richting rr) return new Dictionary<int, bool>();
+        return BewezenStandenBijLoc(_kaart, reeks, rr, bezet).Where(kv => _wisselStand.TryGetValue(kv.Key, out var st) && st == kv.Value).ToDictionary(kv => kv.Key, kv => kv.Value);
     }
 
     /// <summary>BUG #231: de laatste gereden melderreeks die eindigt op een melder waar de loc nu staat (eerst die van de laatste kortsluiting, anders de laatste rit).</summary>
@@ -2768,6 +2803,18 @@ public partial class BaanVerkenner
         var kandidaten = _ritDoel?.ProefAdres is int p0 ? new List<int> { p0 }
             : (_ritDoel?.Configuratie.Afbuigend.ToList() ?? new List<int>());
         kandidaten = kandidaten.Where(a => _wisselStand.TryGetValue(a, out var afb) && afb).ToList();
+        // BUG #258: zonder proefwissel geen wissel losmaken waarvan de kaart de afbuigende stand voor deze stap al bewezen heeft (wissel 5 bij 14 -> 129)
+        if (_ritDoel?.ProefAdres is null)
+        {
+            _monitor.Bijwerken();
+            var bew = BewezenStandenNu(_monitor.Bezet);
+            var bewLos = kandidaten.Where(a => bew.TryGetValue(a, out var b) && b).ToList();
+            if (bewLos.Count > 0)
+            {
+                kandidaten = kandidaten.Except(bewLos).ToList();
+                _log.Info($"Wissel {Lijst(bewLos)} wordt niet losgemaakt: afbuigend is voor deze stap al bewezen (BUG #258).");
+            }
+        }
         if (PuntzijdeProefNu() is int pz && kandidaten.Remove(pz))
             _log.Info($"Wissel {pz} wordt niet losgemaakt: de loc nam bij die wissel de afbuigende tak en reed daarna verder ({Lijst(_laatsteKortsluitReeks)}), dus hij is van de puntzijde bereden; omzetten helpt dan niet (BUG #169) en de loc heeft die stand nodig om terug te rijden.");
         if (kandidaten.Count == 0) return false;
