@@ -349,6 +349,22 @@ public class Baankaart
         return res;
     }
 
+    /// <summary>BUG #254 (Marco 20-10, log 15:28:43): een opgelost kortsluitpunt zegt "wissel W afbuigend alleen geeft kortsluiting, met wissel P erbij niet". Wissel P en W horen dan bij
+    /// elkaar: kan W niet omgezet worden (de loc staat erop), dan mag P ook niet omgezet worden, anders ontstaat precies de stand die de kortsluiting gaf (2 afbuigend zonder 1).
+    /// Geeft de partners P van de wissels in <paramref name="vast"/>. Alleen bewezen oplossingen (niet voorlopig).</summary>
+    public HashSet<int> OverloopPartnersVan(IEnumerable<int> vast)
+    {
+        var v = vast.ToHashSet(); var res = new HashSet<int>();
+        if (v.Count == 0) return res;
+        foreach (var k in Kortsluitpunten.Where(k => k.Soort == KortsluitpuntSoort.Kortsluiting && k.Opgelost && !k.Voorlopig && k.OpgelostMetAfbuigend == true && k.OpgelostDoorAdres is int))
+        {
+            int p = k.OpgelostDoorAdres!.Value;
+            if (k.Configuratie.Afbuigend.Any(v.Contains) && !v.Contains(p)) res.Add(p);
+            if (v.Contains(p)) foreach (var w in k.Configuratie.Afbuigend) if (!v.Contains(w)) res.Add(w);
+        }
+        return res;
+    }
+
     /// <summary>BUG #146 (Marco 17:50, kortsluitpunt #2): wissel 2 afbuigend alleen gaf kortsluiting na melder 12 (achteruit), terwijl dezelfde combinatie
     /// (2 met 1) na melder 5 (vooruit) al als overloop bewezen was. Een overloop-paar geldt in beide richtingen: is voor wissel <c>w</c> bewezen dat wissel
     /// <c>p</c> er afbuigend bij moet (een gereden oplossing van wissel <c>p</c>, of oplossingen in beide richtingen), dan krijgt een rit met <c>w</c>

@@ -746,6 +746,10 @@ public partial class BaanVerkenner
         if (spaarOnderLoc && _monitor.Bezet.Count > 0 && HuidigeAlarmBlokken().Count == 0)
             foreach (var a in WisselsBijBezet(_kaart, _monitor.Bezet).Where(x => !Kruis.IsMotor(x) || Kruis.Middens.Count == 0))   // BUG #250: zolang de kruiswissel niet bekend is (optie 6) is motor 13/10 een gewone wissel en wordt hij ook niet onder de loc omgezet
                 onder.TryAdd(a, _monitor.Bezet.OrderBy(x => x).First());
+        // BUG #254 (log 20-10 15:28:43): wissel 2 werd gespaard (loc op melder 12), maar zijn bewezen partner wissel 1 ging wel naar rechtdoor: precies de stand die de kortsluiting gaf
+        // (kortsluitpunt #3), de blokproef voor melder 12 kon daardoor niet draaien. Een partner van een gespaarde wissel wordt ook gespaard.
+        foreach (var pa in _kaart.OverloopPartnersVan(onder.Keys).ToList())
+            if (_ins.WisselAdressen().Contains(pa)) onder.TryAdd(pa, onder.Values.First());
         foreach (var a in _ins.WisselAdressen())
         {
             bool wens = c.Bevat(a);

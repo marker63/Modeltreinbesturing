@@ -2511,6 +2511,13 @@ public partial class BaanVerkenner
             cfg = cfg.MetStand(w.Adres, cVolg.Bevat(w.Adres));
             gezet.Add($"{w.Adres} {(cVolg.Bevat(w.Adres) ? "afbuigend" : "rechtdoor")}");
         }
+        // BUG #254: de bewezen partner van een vooraf gezette wissel (wissel 1 bij wissel 2) gaat mee; die heeft zelf geen splitsing bij deze melder, maar 2 afbuigend zonder 1 geeft kortsluiting.
+        foreach (var pa in kaart.OverloopPartnersVan(gezet.Select(g => int.Parse(g.Split(' ')[0])).Where(a => cVolg.Bevat(a))))
+            if (!kruis.IsMotor(pa) && !eigen.Contains(pa) && cVolg.Bevat(pa) && !cfg.Bevat(pa))
+            {
+                cfg = cfg.MetStand(pa, true);
+                gezet.Add($"{pa} afbuigend");
+            }
         if (gezet.Count > 0) uitleg = $"Wissel {string.Join(", ", gezet)} ligt direct na melder {e.Naar} en is nodig voor de volgende etappe ({string.Join("-", volg.Pad)}): die wordt al gezet voordat de loc op melder {e.Naar} aankomt (BUG #228, nog niet getest op de baan).";
         return cfg;
     }

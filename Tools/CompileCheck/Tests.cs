@@ -993,6 +993,14 @@ public static class Tests
         Eis(r.Bevat(1) && r.Bevat(2) && wijz.Count == 1, "overloop: rit met wissel 2 afbuigend krijgt wissel 1 erbij (beide richtingen)");
         Eis(!kaart.MetOverloopPartners(Configuratie.Basis.Met(2), 1, null, out _).Bevat(1), "overloop: de opdracht die wissel 1 zelf test, krijgt hem niet automatisch erbij");
         Eis(!kaart.MetOverloopPartners(Configuratie.Basis, null, null, out _).Bevat(1), "overloop: zonder wissel 2 afbuigend verandert er niets");
+        // BUG #254: partner van een gespaarde wissel wordt ook gespaard; alleen bewezen (niet voorlopige) oplossingen
+        var k254 = new Baankaart();
+        k254.Kortsluitpunten.Add(new Kortsluitpunt { Id = 3, NaMelder = 12, Richting = Richting.Achteruit, Soort = KortsluitpuntSoort.Kortsluiting, Configuratie = Configuratie.Basis.Met(2), Opgelost = true, OpgelostDoorAdres = 1, OpgelostMetAfbuigend = true });
+        Eis(k254.OverloopPartnersVan(new[] { 2 }).SetEquals(new[] { 1 }), "overloop (#254): wissel 1 is partner van gespaarde wissel 2");
+        Eis(k254.OverloopPartnersVan(new[] { 1 }).SetEquals(new[] { 2 }), "overloop (#254): wissel 2 is partner van gespaarde wissel 1");
+        Eis(k254.OverloopPartnersVan(new[] { 7 }).Count == 0, "overloop (#254): niet-verwante wissel geeft geen partners");
+        k254.Kortsluitpunten[0].Voorlopig = true;
+        Eis(k254.OverloopPartnersVan(new[] { 2 }).Count == 0, "overloop (#254): een voorlopige oplossing telt niet");
     }
 
     // BUG #147: het alarm blijft en alleen de wissel bij de bezette melder lost het op -> vragen en dan proberen
