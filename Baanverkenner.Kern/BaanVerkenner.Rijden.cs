@@ -1571,12 +1571,17 @@ public partial class BaanVerkenner
     /// <summary>BUG #261: wissels die nu afbuigend staan en voor de laatste stap van de kortsluitrit een bekende verboden ingang zijn (via -> na, richting).</summary>
     private List<int> BekendeVerbodenVoorLaatsteStap()
     {
-        var reeks = _laatsteKortsluitReeks;
-        Richting? r = _laatsteKortsluitContext?.Richting;
-        if (reeks.Count < 2 || r is not Richting rr) return new List<int>();
-        int u = reeks[^2], x = reeks[^1];
-        return _kaart.VerbodenIngangen().Where(v => v.Via == u && v.Na == x && v.R == rr && _wisselStand.TryGetValue(v.Adres, out var st) && st && !IsVolger(v.Adres))
-                     .Select(v => v.Adres).Distinct().OrderBy(a => a).ToList();
+        // BUG #261 (autolog 20-10 18:45:10, 18:47:58, 18:50:23): de kortsluiting werd gemeld vóór de terugweg (context 24 achteruit), terwijl de stap die hem veroorzaakte 14 -> 24 vooruit
+        // was (de laatste rit). Daarom ook de laatste gereden rit die op een bezette melder eindigt, met zijn eigen richting.
+        _monitor.Bijwerken();
+        var bezet = _monitor.Bezet;
+        var stappen = new List<(int U, int X, Richting R)>();
+        if (_laatsteKortsluitReeks.Count >= 2 && _laatsteKortsluitContext?.Richting is Richting rk) stappen.Add((_laatsteKortsluitReeks[^2], _laatsteKortsluitReeks[^1], rk));
+        if (_kaart.Ritten.LastOrDefault() is { } rit && rit.Reeks.Count >= 2 && (bezet.Count == 0 || bezet.Contains(rit.Reeks[^1]))) stappen.Add((rit.Reeks[^2], rit.Reeks[^1], rit.Richting));
+        var verboden = _kaart.VerbodenIngangen();
+        return stappen.SelectMany(st => verboden.Where(v => v.Via == st.U && v.Na == st.X && v.R == st.R))
+                      .Where(v => _wisselStand.TryGetValue(v.Adres, out var w) && w && !IsVolger(v.Adres))
+                      .Select(v => v.Adres).Distinct().OrderBy(x => x).ToList();
     }
 
     /// <summary>BUG #231: de laatste gereden melderreeks die eindigt op een melder waar de loc nu staat (eerst die van de laatste kortsluiting, anders de laatste rit).</summary>

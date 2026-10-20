@@ -2529,6 +2529,13 @@ public static class Tests
             typeof(BaanVerkenner).GetField("_laatsteKortsluitContext", bf261)!.SetValue(v261, ((int, Richting, Configuratie)?)(24, Richting.Vooruit, Configuratie.Basis));
             var bk261 = (List<int>)typeof(BaanVerkenner).GetMethod("BekendeVerbodenVoorLaatsteStap", bf261)!.Invoke(v261, null)!;
             Eis(bk261.SequenceEqual(new[] { 10 }), "verboden laatste stap (#261): alleen wissel 10 (nu " + string.Join(",", bk261) + ")");
+            // de kortsluiting werd gemeld vóór de terugweg (context 24 achteruit): dan telt de laatste rit (14 -> 24 vooruit)
+            typeof(BaanVerkenner).GetField("_laatsteKortsluitContext", bf261)!.SetValue(v261, ((int, Richting, Configuratie)?)(24, Richting.Achteruit, Configuratie.Basis));
+            typeof(BaanVerkenner).GetField("_laatsteKortsluitReeks", bf261)!.SetValue(v261, new List<int>());
+            var kaart261 = (VerkenStatus)typeof(BaanVerkenner).GetField("_status", bf261)!.GetValue(v261)!;
+            kaart261.Kaart.Ritten.Add(new GeredenRit { Reeks = new List<int> { 12, 5, 13, 14, 24 }, Richting = Richting.Vooruit, Start = 12 });
+            var bk261b = (List<int>)typeof(BaanVerkenner).GetMethod("BekendeVerbodenVoorLaatsteStap", bf261)!.Invoke(v261, null)!;
+            Eis(bk261b.Contains(10), "verboden laatste stap (#261): ook via de laatste rit als de melding van de terugweg kwam (nu " + string.Join(",", bk261b) + ")");
         }
         // BUG #258: voor 14 -> 129 (vooruit) zijn wissel 5 afbuigend en wissel 6 niet-afbuigend (Dinamo) bewezen; die worden bij een kortsluiting daar niet omgezet
         var k258 = Laad("baankaart_2026-10-20_1800.json");

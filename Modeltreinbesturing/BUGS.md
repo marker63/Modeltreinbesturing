@@ -2678,3 +2678,6 @@ afbuigend heeft; het geteste adres zelf blijft. Test: verboden vooruit (#260) op
 Marco: "je weet heel goed waar wissel 10 ligt en je rijdt vol in een kortsluitmelding die je niet direct kon oplossen". Autolog 18:24:59: na 14 -> 24 met 1, 9, 10 afbuigend gingen alle drie
 terug. Nu: is voor de laatste stap van de kortsluitrit een afbuigende wissel een bekende verboden ingang, dan gaat (bij het losmaken) alleen die terug, en probeert het herstel die als
 eerste. Samen met #260 (vooraf rechtdoor) komt de loc daar niet meer in. Test: verboden laatste stap (#261).
+Aanvulling (autolog 20-10 18:45:10, 18:47:58, 18:50:23, bug259, 3x dezelfde fout): de kortsluiting werd gemeld vóór de terugweg (24 achteruit), terwijl de stap die hem gaf 14 -> 24 vooruit was;
+daardoor herkende #261 de bekende ingang niet en duurde het herstel telkens ~1,5 minuut (alle wissels langs, wissel 10 pas als laatste). Nu kijkt #261 ook naar de laatste gereden rit met zijn
+eigen richting. #260 voorkomt de kortsluiting zelf: op melder 13 gaat wissel 10 al naar rechtdoor.
