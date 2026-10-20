@@ -2510,6 +2510,11 @@ public static class Tests
         Eis(VerkenLog.MetBaanstand("Adres 16: afbuigend", om235) == "Adres 16: afbuigend" && VerkenLog.MetBaanstand("Wissel 6 gevonden", om235) == "Wissel 6 gevonden" && VerkenLog.MetBaanstand("Rijstand: afbuigend: 5, 6, 10", om235).Contains("omgekeerd"), "omgekeerd (#235): adres 16 of een melding zonder stand blijft gewoon; 'afbuigend: 5, 6' wel");
         var k235 = Laad("baankaart_2026-10-18_1349.json"); k235.OmgekeerdeWissels = new List<int> { 6 };
         Eis(Rapport.AlsTekst(k235).Contains("OMGEKEERD AANGESLOTEN") && Rapport.AlsHtml(k235).Contains("Omgekeerd aangesloten: wissel 6"), "omgekeerd (#235): rapport (tekst en html) noemt het");
+        // BUG #260: vanaf 13 (vooruit, wissel 5 rechtdoor) komt de loc via 14 op 24; met wissel 10 afbuigend is dat een bekende kortsluiting
+        var k260 = Laad("baankaart_2026-10-20_1800.json");
+        var v260 = BaanVerkenner.VerbodenVooruit(k260, 13, Richting.Vooruit, a => a == 1 || a == 9 || a == 10);
+        Eis(v260.Contains(10) && !v260.Contains(1), "verboden vooruit (#260): op 13 vooruit met 1, 9, 10 afbuigend moet wissel 10 rechtdoor (nu " + string.Join(",", v260) + ")");
+        Eis(BaanVerkenner.VerbodenVooruit(k260, 13, Richting.Vooruit, a => a == 1).Count == 0, "verboden vooruit (#260): zonder wissel 10 afbuigend niets");
         // BUG #258: voor 14 -> 129 (vooruit) zijn wissel 5 afbuigend en wissel 6 niet-afbuigend (Dinamo) bewezen; die worden bij een kortsluiting daar niet omgezet
         var k258 = Laad("baankaart_2026-10-20_1800.json");
         var b258 = BaanVerkenner.BewezenStandenBijLoc(k258, new[] { 13, 14, 129 }, Richting.Vooruit, new[] { 14, 129 });

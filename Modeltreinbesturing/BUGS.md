@@ -2667,3 +2667,9 @@ Marco: "weer staat wissel 5 verkeerd, 6 staat fysiek afbuigend en 5 fysiek recht
 "259-overloop-5-6" ingevuld (in het scherm terug te draaien). De tweede wissel wordt nooit los gezet, getest of geprobeerd bij een kortsluiting; zet de verkenner de eerste, dan gaat de
 tweede mee naar dezelfde stand OP DE BAAN: Dinamo-commando omgedraaid als één van beide omgekeerd is aangesloten (5 afbuigend -> 6 Dinamo rechtdoor, 5 rechtdoor -> 6 Dinamo afbuigend).
 Test: overloop (#259). De simulatie gebruikt de koppeling niet (staat standaard leeg).
+
+## BUG #260 – OPGELOST (nog niet getest op de baan): verkenningsrit reed met wissel 10 afbuigend 14 -> 24 in, een bekende kortsluiting (autolog 20-10 18:24:26-18:24:50, 18:34:53)
+Opdracht #10 (afbuigende tak van wissel 1 na melder 12) had stand 1, 9, 10: 9 en 10 waren nodig om via de keerlus bij 12 te komen. De basisrit ging daarna 12 -> 5 -> 13 -> 14 -> 24 met
+wissel 10 nog afbuigend: kortsluiting na 24 (nieuw kortsluitpunt #4), terwijl de kaart al wist dat 14 -> 24 met wissel 10 afbuigend kortsluiting geeft. Oplossing: tijdens een verkenningsrit
+gaat een wissel die voor de komende stap (of de eenduidig bekende stap daarna) een bekende verboden ingang is naar rechtdoor voordat de loc er is, ook als de stand van de opdracht hem
+afbuigend heeft; het geteste adres zelf blijft. Test: verboden vooruit (#260) op baankaart 20-10 18:00.

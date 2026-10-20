@@ -2478,6 +2478,24 @@ public partial class BaanVerkenner
         return wens.Where(kv => !strijdig.Contains(kv.Key)).OrderBy(kv => kv.Key).Select(kv => (kv.Key, kv.Value)).ToList();
     }
 
+    /// <summary>BUG #260 (autolog 20-10 18:24:26-18:24:50 en 18:34:53): opdracht #10 (afbuigende tak van wissel 1 na melder 12) reed met stand 1, 9, 10 (9 en 10 waren nodig om via de keerlus
+    /// bij melder 12 te komen) en ging daarna 12 -> 5 -> 13 -> 14 -> 24 met wissel 10 afbuigend: kortsluiting, terwijl de kaart al wist dat 14 -> 24 met wissel 10 afbuigend kortsluiting geeft
+    /// (bekende ingang). Wissels die voor de komende stap (of de stap daarna, als die eenduidig bekend is) een bekende verboden ingang zijn, met de huidige stand afbuigend.</summary>
+    internal static List<int> VerbodenVooruit(Baankaart kaart, int melder, Richting r, Func<int, bool> stand)
+    {
+        var res = new HashSet<int>();
+        var verboden = kaart.VerbodenIngangen().Where(v => v.R == r).ToList();
+        var volgende = VerwachteVolgende(kaart, melder, r, stand);
+        foreach (var y in volgende)
+        {
+            foreach (var v in verboden.Where(v => v.Via == melder && v.Na == y && stand(v.Adres))) res.Add(v.Adres);
+            var zs = VerwachteVolgende(kaart, y, r, stand);
+            if (volgende.Count == 1 && zs.Count == 1)
+                foreach (var v in verboden.Where(v => v.Via == y && v.Na == zs[0] && stand(v.Adres))) res.Add(v.Adres);
+        }
+        return res.OrderBy(a => a).ToList();
+    }
+
     /// <summary>BUG #108: de melders waar de loc vanaf <paramref name="melder"/> in richting <paramref name="r"/> naartoe kan: bij een bekende
     /// splitsing met de kop op deze melder bepaalt de stand van die wissel (zoals bekend in <paramref name="stand"/>; onbekend = rechtdoor) de tak,
     /// anders de bekende overgangen.</summary>
@@ -2524,6 +2542,14 @@ public partial class BaanVerkenner
             _log.Info($"Melder {melder}: de loc rijdt {r.Tekst()} van achteren op wissel {adres} af (de kaart kent die splitsing); wissel {adres} gaat nu naar {(afb ? "afbuigend" : "rechtdoor")} voordat de loc er is.");
             await ZetWissel(adres, afb);
             cfg = cfg.MetStand(adres, afb);
+        }
+        // BUG #260: een bekende verboden ingang vlak voor de loc gaat altijd naar rechtdoor (ook als de stand van de opdracht hem afbuigend heeft), behalve het geteste adres zelf
+        foreach (var a in VerbodenVooruit(_kaart, melder, r, x => _wisselStand.TryGetValue(x, out var st) && st))
+        {
+            if (doel.ProefAdres == a || Kruis.IsMotor(a) || IsVolger(a) || !_ins.WisselAdressen().Contains(a)) continue;
+            _log.Info($"Melder {melder}: wissel {a} gaat naar rechtdoor voordat de loc er is: de kaart weet dat de loc daar verderop met wissel {a} afbuigend kortsluiting krijgt (bekende ingang, BUG #260).");
+            await ZetWissel(a, false);
+            cfg = cfg.MetStand(a, false);
         }
         return cfg;
     }
