@@ -2216,7 +2216,7 @@ public partial class BaanVerkenner
                 try
                 {
                     _stapDoel = k.NaMelder;
-                    await NaarStartVan(k.Route);
+                    await NaarStartVan(k.Route, c);   // BUG #251: wissels bij de startmelder (bijv. 5 na melder 14) vooraf zetten, niet onder de loc
                     await ZetConfiguratie(c);
                     var rit = await Rit(k.NaMelder, k.Richting, new RitDoel { Configuratie = c, Basis = new List<int> { k.NaMelder }, ExtraNaAfwijking = 0 });
                     // BUG #72 (log 16:48): de uitkomst van de proef wordt EERST vastgelegd, daarna pas gaat de loc terug. Mislukte de weg terug
