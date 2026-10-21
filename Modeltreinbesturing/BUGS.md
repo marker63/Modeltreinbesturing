@@ -2839,5 +2839,5 @@ Marco 16:52: pendelbaan-blokken kloppen (132, 139, 140 = 10; 133 = 11; 136, 143,
 
 ## BUG #290 – OPGELOST (nog niet getest op de baan): klem 'opgelost' door adres 3, dat nooit effect heeft (autolog 21-10 16:55:06)
 "De loc reed weer zonder kortsluiting nadat wissel 3 naar afbuigend is geschakeld": wissel 3 bestaat op de baan niet en adres 3 stond in deze verkenning bij de adressen zonder effect.
-De korte proefrit zelf maakte de loc los. Een adres zonder gevonden effect wordt nu nooit als oplossing van een klem of alarm vastgelegd; het gaat terug en er komt een waarschuwing.
+De korte proefrit zelf maakte de loc los. Een adres zonder gevonden effect (en zonder enige waarneming in de kaart) wordt nu nooit als oplossing van een klem vastgelegd; het gaat terug en er komt een waarschuwing. (Dezelfde regel voor het opheffen van een alarm brak 10 simulaties en is niet gedaan.)
 Niets hard gecodeerd: het volgt uit 'adressen zonder effect' van de kaart zelf.
