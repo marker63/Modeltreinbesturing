@@ -451,6 +451,20 @@ public partial class MainWindow : Window
             "Verkenning starten", MessageBoxButton.YesNo, MessageBoxImage.Question);
         if (ok != MessageBoxResult.Yes) return;
 
+        // BUG #263 (21-10 07:55): een nieuwe verkenning overschreef de voortgang van een onderbroken verkenning (12 opdrachten) zonder kopie. Eerst een kopie, ook in de map van de tussenstanden.
+        if (vorige is not null)
+        {
+            try
+            {
+                var naam = $"voortgang_voor_nieuwe_verkenning_{DateTime.Now:yyyyMMdd_HHmm}.json";
+                File.Copy(VoortgangPad, Path.Combine(Map, naam), true);
+                var autoMap = AutoTussenstand.Map(ins.AutoTussenstandMap);
+                Directory.CreateDirectory(autoMap);
+                File.Copy(VoortgangPad, Path.Combine(autoMap, naam), true);
+            }
+            catch { /* een mislukte kopie houdt de start niet tegen */ }
+        }
+
         await VoerVerkenningUit(ins, null);
     }
 
@@ -626,6 +640,15 @@ public partial class MainWindow : Window
     {
         if (_hw is null) return;
         var hw = _hw;
+        // BUG #263 (21-10 07:50-07:57): na een nacht aan stond de poort dicht ("Access to the path is denied", "The port is closed"); hervatten en starten gingen toch door en zagen geen
+        // enkele melder. Niet starten met een dode verbinding.
+        if (_sim is null && (!hw.Verbonden || (hw is IVerbindingsBron vb && vb.SecondenSindsLaatsteOntvangst is double stil && stil > 10)))
+        {
+            MessageBox.Show(this, "De verbinding met de centrale is weg (de poort is dicht of er komt al langer dan 10 seconden niets binnen, ook geen keepalive).\n\n" +
+                "Sluit de Baanverkenner af, controleer dat de centrale aan staat en de USB-kabel erin zit, start de Baanverkenner opnieuw en maak verbinding. Daarna kun je hervatten; er is niets verloren.",
+                "Geen verbinding met de centrale", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
 
         IKlok klok;
         if (_sim is not null)

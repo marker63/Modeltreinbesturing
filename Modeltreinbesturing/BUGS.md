@@ -2688,3 +2688,10 @@ Ze kwamen niet in de kaart, maar wel in de lijst van bezette melders ("nu bezet:
 Oplossing (MelderMonitor): een melder die de kaart nog niet kent en binnen 6 s minstens 6 keer van stand wisselt, is geen sectiemelder; hij telt niet meer als bezet en het logboek meldt
 dat één keer. Bekende melders vallen hier nooit onder. Wat 137/138 op de baan zijn is niet bekend (geen reden om ze hard uit te sluiten). Test: knippermelder (#262).
 Verder in deze set (bug261): #260 werkt (18:57:23 en 18:58:25 "wissel 10 gaat naar rechtdoor voordat de loc er is", geen kortsluiting meer bij 24).
+
+## BUG #263 – OPGELOST (nog niet getest op de baan): starten en hervatten met een dode verbinding; nieuwe verkenning overschreef de voortgang zonder kopie (autolog 21-10 07:50-07:57)
+De Baanverkenner stond 's nachts aan. Om 07:50 gaf de poort "Access to the path is denied" en daarna "The port is closed" (Marco 08:00: "Exception thrown: System.InvalidOperationException in
+System.IO.Ports.dll"), maar Verbonden bleef true. Hervatten (07:51) zag geen enkele melder ("melder 13 meldt zich niet bezet"), daarna startte een nieuwe verkenning (07:55) die de voortgang van
+gisteren (12 opdrachten) overschreef; de kaart staat nog in C:\Marco\baankaart_2026-10-21_0753.json. Oplossing: DinamoHardware.Verbonden is false bij een gesloten of kapotte poort; starten en
+hervatten weigeren bij geen verbinding of >10 s stilte (ook geen keepalive) met uitleg; vóór een nieuwe verkenning komt er een kopie van de voortgang
+(voortgang_voor_nieuwe_verkenning_<datum>.json) in de instellingenmap én in C:\Marco. Test: CompileCheck (het scherm zelf kan hier niet gecompileerd worden).

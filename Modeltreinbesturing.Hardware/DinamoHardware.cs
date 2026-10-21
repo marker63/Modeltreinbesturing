@@ -1,4 +1,4 @@
-using System.IO.Ports;
+﻿using System.IO.Ports;
 
 namespace Modeltreinbesturing.Hardware;
 
@@ -245,7 +245,12 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
     private int _faultBitResterendeCycli;
     private bool _dinamoMeldeFoutVorigeKeer; // voor het loggen van alleen de OVERGANG (aan/uit), niet elke 200ms opnieuw
 
-    public bool Verbonden { get; private set; }
+    /// <summary>BUG #263 (autolog 21-10 07:50-07:57): de Baanverkenner stond 's nachts aan; om 07:50 gaf de poort "Access to the path is denied" en daarna "The port is closed", maar
+    /// Verbonden bleef true. Hervatten en een nieuwe verkenning startten met een dode verbinding ("melder 13 meldt zich niet bezet", geen enkele melder). Nu telt een kapotte of gesloten
+    /// poort als niet verbonden.</summary>
+    public bool Verbonden { get => _verbonden && !_poortKapot && _poort is { IsOpen: true }; private set { _verbonden = value; if (value) _poortKapot = false; } }
+    private bool _verbonden;
+    private volatile bool _poortKapot;
     public string Naam => "VPEB Dinamo";
 
     /// <summary>Zie IHardwareInterface: Dinamo stuurt DCC-commando's altijd via een blok.</summary>
@@ -915,6 +920,7 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
         catch (Exception ex)
         {
             _schrijfFouten++;
+            if (ex is UnauthorizedAccessException or InvalidOperationException or System.IO.IOException) _poortKapot = true;   // BUG #263
             HardwareCommunicatieLog.Log("Info", $"[Dinamo] SCHRIJFFOUT naar de poort (#{_schrijfFouten}): {ex.GetType().Name}: {ex.Message}");
             StatusBericht?.Invoke($"Fout bij versturen naar Dinamo: {ex.Message}");
         }
