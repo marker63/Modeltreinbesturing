@@ -3234,6 +3234,18 @@ public partial class BaanVerkenner
             _log.Info($"Op verzoek van de gebruiker staat wissel {a} verkeerd en wordt naar {(afbuigend ? "afbuigend" : "rechtdoor")} geschakeld (tegenovergestelde stand).");
             await ZetWissel(a, afbuigend, forceer: true);
             geschakeld = true;
+            // BUG #277 (autolog 21-10 12:44:08-12:44:20): wissel 14 werd op verzoek omgezet en meteen vastgelegd als oplossing van kortsluitpunt #2, maar Dinamo bleef kortsluiting in blok 4 melden.
+            // Blijft het alarm na het omzetten (3 s), dan is dit geen oplossing en wordt er niets vastgelegd.
+            if (_hw is IBlokAlarmBron)
+            {
+                var eind277 = _klok.Nu + TimeSpan.FromSeconds(3);
+                while (HuidigeAlarmBlokken().Count > 0 && _klok.Nu < eind277) await Wacht(TimeSpan.FromMilliseconds(300));
+                if (HuidigeAlarmBlokken().Count > 0)
+                {
+                    _log.Waarschuwing($"Wissel {a} is op verzoek naar {(afbuigend ? "afbuigend" : "rechtdoor")} gezet, maar Dinamo meldt nog steeds kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())}: dit wordt niet als oplossing van de kortsluiting vastgelegd (BUG #277).");
+                    continue;
+                }
+            }
             // BUG #87 (Marco 13:01: "telkens zet ik wissel 1 in de juiste stand en dan is de kortsluiting weg, waarom wordt dit niet vastgehouden?"):
             // dat de gebruiker deze wissel na een kortsluiting corrigeerde is de oplossing van dat kortsluitpunt, en wordt voortaan toegepast.
             // BUG #132 (kaart 14-10 13:23): de oplossing hoort bij het kortsluitpunt van de lopende kortsluiting (zelfde melder en richting), niet bij het

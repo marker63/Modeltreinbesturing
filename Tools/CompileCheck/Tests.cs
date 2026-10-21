@@ -2586,6 +2586,11 @@ public static class Tests
             var bk261b = (List<int>)typeof(BaanVerkenner).GetMethod("BekendeVerbodenVoorLaatsteStap", bf261)!.Invoke(v261, null)!;
             Eis(bk261b.Contains(10), "verboden laatste stap (#261): ook via de laatste rit als de melding van de terugweg kwam (nu " + string.Join(",", bk261b) + ")");
         }
+        // BUG #276: wissel 5 ligt bij 14/24/129 en kan de stap 8 -> 15 niet oplossen; wissel 13 (kruiswissel bij 24/8) wel
+        var k276 = Laad("baankaart_2026-10-21_1302.json");
+        Eis(BaanVerkenner.LigtNietBijStap(k276, 5, 8, 15) is { Count: > 0 }, "plek van de wissel (#276): wissel 5 ligt niet bij 8 -> 15");
+        Eis(BaanVerkenner.LigtNietBijStap(k276, 13, 8, 15) is null, "plek van de wissel (#276): wissel 13 kan bij 8 liggen");
+        Eis(BaanVerkenner.LigtNietBijStap(k276, 14, 8, 15) is null, "plek van de wissel (#276): wissel 14 (plek niet uit een splitsing bekend) telt niet als 'elders'");
         // BUG #274: kortsluitpunt #2 (na 8 vooruit) mag wissel 14 afbuigend niet proberen: na 8 vooruit (vanaf 17) gaf dat al kortsluiting
         var k274 = Laad("baankaart_2026-10-21_1242.json");
         Eis(BaanVerkenner.BekendeKortsluitingNa(k274, 14, 8, Richting.Vooruit) is not null, "bekende kortsluiting (#274): wissel 14 afbuigend na melder 8 vooruit is bekend");

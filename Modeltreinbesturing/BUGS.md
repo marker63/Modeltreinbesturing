@@ -2767,3 +2767,13 @@ ingang ook. Test: bekende kortsluiting (#274).
 ## BUG #275 – OPGELOST (nog niet getest op de baan): na de terugweg gingen alle wissels naar rechtdoor terwijl de loc op 14 en 129 stond: wissel 5 (+6) onder de loc (autolog 21-10 12:38:36)
 Na de klem op wissel 10 bleef de loc op 14 (deels 129) staan; het einde van de terugweg zette de basisstand zonder te sparen, wissel 5 en 6 gingen onder de loc om en Dinamo meldde
 kortsluiting in blok 3 die ruim anderhalve minuut bleef. De basisstand na een rit spaart nu altijd de wissels bij de loc; ze gaan om zodra de loc weg is (#271). Test: sparen (#275).
+
+## BUG #276 – OPGELOST (nog niet getest op de baan): valse vondst "kortsluitpunt #2 opgelost: adres 5 op afbuigend -> melder 15" (autolog 21-10 12:46:50-12:48:50)
+Na de oplossing van de gebruiker (wissel 14) gingen de proeven voor kortsluitpunt #2 door met adres 5. In de proefrit 8 -> 15 (vooruit) stond wissel 14 rechtdoor (hardwarelog 12:48:33) en
+13 afbuigend; de rit lukte en werd aan wissel 5 toegeschreven, terwijl wissel 5 volgens zijn splitsing tussen 14, 24 en 129 ligt. Nu: (1) is een kortsluitpunt intussen opgelost, dan
+stoppen de proeven; (2) lukt een proef met een wissel die volgens de kaart niet bij die stap ligt, dan is de oplossing alleen voorlopig, met een waarschuwing. Test: plek van de wissel (#276).
+
+## BUG #277 – OPGELOST (nog niet getest op de baan): oplossing van de gebruiker vastgelegd terwijl de kortsluiting bleef (autolog 21-10 12:44:08-12:44:20)
+Wissel 14 werd op verzoek omgezet en meteen vastgelegd als oplossing van kortsluitpunt #2; 10 s later meldde Dinamo nog steeds kortsluiting in blok 4. Blijft het alarm 3 s na het omzetten,
+dan wordt het niet meer als oplossing vastgelegd.
+Waarneming (nog niet verwerkt, voor Marco): 8 -> 15 vooruit lukte met 13 afbuigend en 14 rechtdoor; 8 -> 24 achteruit met 14 afbuigend kwam op 17 uit (12:49:21).

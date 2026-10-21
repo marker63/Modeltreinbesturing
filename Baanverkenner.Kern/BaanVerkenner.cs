@@ -2214,6 +2214,13 @@ public partial class BaanVerkenner
             foreach (var (adres, afb) in kandidaten)
             {
                 if (k.AantalKortsluitingen >= _ins.MaxKortsluitingenPerPlek) break;
+                // BUG #276 (autolog 21-10 12:44:10-12:48:50): de gebruiker gaf wissel 14 afbuigend als oplossing van kortsluitpunt #2, maar de proeven gingen door met adres 5. De route kreeg
+                // 14 afbuigend erbij (de nieuwe oplossing) en de proef 'loste het op met adres 5' (wissel 5 ligt bij 14/129, ver van melder 8). Is het punt intussen opgelost, dan stoppen de proeven.
+                if (k.Opgelost)
+                {
+                    _log.Info($"Kortsluitpunt #{k.Id} is intussen opgelost (wissel {k.OpgelostDoorAdres} {(k.OpgelostMetAfbuigend == true ? "afbuigend" : "rechtdoor")}): geen verdere proeven (BUG #276).");
+                    break;
+                }
                 // BUG #159: geen proef waarvan de route een verboden ingang met dit adres afbuigend neemt.
                 if (afb && _kaart.IngangVerboden(k.Route, adres))
                 {
@@ -2264,6 +2271,13 @@ public partial class BaanVerkenner
                         k.Opgelost = true;
                         k.OpgelostDoorAdres = adres;
                         k.OpgelostMetAfbuigend = afb;
+                        // BUG #276: 'kortsluitpunt #2 (na 8 vooruit) opgelost met adres 5', terwijl wissel 5 volgens zijn splitsing tussen 14, 24 en 129 ligt: hij kan de stap 8 -> 15 niet
+                        // beïnvloeden. Zo'n oplossing is voorlopig (een volgende rit over dezelfde overgang toetst haar), niet bewezen.
+                        if (BaanVerkenner.LigtNietBijStap(_kaart, adres, k.NaMelder, rit.Reeks[1]) is { } elders)
+                        {
+                            k.Voorlopig = true;
+                            _log.Waarschuwing($"Kortsluitpunt #{k.Id}: de rit lukte met adres {adres} op {(afb ? "afbuigend" : "rechtdoor")}, maar wissel {adres} ligt volgens de kaart bij melder {Lijst(elders)}, niet bij de stap {k.NaMelder} -> {rit.Reeks[1]}. Waarschijnlijk deed een andere wissel het verschil; de oplossing is alleen voorlopig (BUG #276).");
+                        }
                         _kaart.Wissel(adres).Waarnemingen.Add(new WisselWaarneming
                         {
                             Soort = WaarnemingSoort.LostKortsluitingOp,
@@ -2456,6 +2470,16 @@ public partial class BaanVerkenner
         }
         stukken.Add(huidig);
         return stukken;
+    }
+
+    /// <summary>BUG #276: de melders waar <paramref name="adres"/> volgens zijn splitsingen ligt, als die de stap <paramref name="van"/> -> <paramref name="naar"/> niet raken; null als de
+    /// wissel er wel bij kan liggen of als zijn plek niet bekend is.</summary>
+    internal static List<int>? LigtNietBijStap(Baankaart kaart, int adres, int van, int naar)
+    {
+        var plek = kaart.Wissels.Where(w => w.Adres == adres).SelectMany(w => w.Waarnemingen).Where(o => o.Soort == WaarnemingSoort.Splitsing)
+                        .SelectMany(o => new[] { (int?)o.NaMelder, o.VolgendeBijRechtdoor, o.VolgendeBijAfbuigend }).OfType<int>().Distinct().OrderBy(m => m).ToList();
+        if (plek.Count == 0 || plek.Contains(van) || plek.Contains(naar)) return null;
+        return plek;
     }
 
     /// <summary>BUG #274: de toelichting van een bekende kortsluiting (KortsluitingBijOmzetten) van <paramref name="adres"/> afbuigend na <paramref name="melder"/> in richting
