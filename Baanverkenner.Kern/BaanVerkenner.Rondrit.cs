@@ -65,7 +65,7 @@ public partial class BaanVerkenner
             {
                 mislukt++;
                 _log.Waarschuwing($"Blok zoeken voor melder {doel} lukte niet: {ex.Message}");
-                // BUG #282 (autolog 21-10 15:32:47-15:33:45): de loc stond op 24 en 8 (langer dan melder 8); elke navigatie zag de andere van die twee meteen als 'onverwacht' en binnen
+                // BUG #282 (autolog 21-10 15:32:47-15:33:45): de loc stond op de grens van 24 en 8; elke navigatie zag de andere van die twee meteen als 'onverwacht' en binnen
                 // een minuut waren 9 melders opgegeven ("Geen Dinamo-blok gevonden voor melder 4, 17, 20, 25, 26, 27, 28, 29, 30"). Was de 'onverwachte' melder al bezet vóór de rit, dan
                 // zegt dat niets over de weg: die poging telt niet (hoogstens 3 keer per melder).
                 if (ex.Onverwacht is int ov && bezetVoor.Contains(ov) && herkansing.GetValueOrDefault(doel) < 3)

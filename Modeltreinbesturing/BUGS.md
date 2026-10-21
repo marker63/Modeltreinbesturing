@@ -2642,7 +2642,7 @@ Op de keerlus (loc op melder 129 en 10) gaf Dinamo kortsluiting in blok 1. Regel
 Verder uit dit log (alleen vastgelegd): de keerlus 129 - 4 - 11 - 12 - 1 - 9 - 10 - 129 is nu in één verkenning gevonden (rit #66, wissel 5 en 9 afbuigend); het alarm 'blok 1' hoort bij het stuk 1 - 9 - 10; de blokfase (optie 6) is nog niet begonnen, dus alle blokken staan nog op onbekend. Kortsluitpunt #3 staat nog voorlopig op wissel 1 tot een rit het bevestigt.
 
 ## BUG #256 – OPGELOST (nog niet getest op de baan): terugweg zet een wissel om terwijl de loc op die wissel staat (autolog 20-10 17:53:45 en 17:59:17)
-17:53:45 zette de terugweg na opdracht #9 wissel 9 rechtdoor met de loc stil op melder 129 (de loc is langer dan 129 en staat op wissel 6 en 9); 17:59:17 hetzelfde met wissel 13 en de loc op
+17:53:45 zette de terugweg na opdracht #9 wissel 9 rechtdoor met de loc stil op melder 129 (de loc stond op de grens van melder 129 en wissel 6/9; correctie Marco 21-10 17:17: de loc is NIET langer dan een melder); 17:59:17 hetzelfde met wissel 13 en de loc op
 24. Telkens direct "de loc kan niet weg", #230 zette de wissel terug, en het zelf terugrijden zette hem daarna meteen opnieuw om. Niet omzetten (sparen) laat de loc de verkeerde kant op
 rijden (17:56:17 naar 4 in plaats van 24). Oplossing: moet voor een navigatiestap een wissel om die bij een bezette melder ligt, dan rijdt de loc eerst met de huidige stand terug naar
 de vorige melder (bekende, eenduidige overgang), tot de melder vrij is; dan pas omzetten en verder (TerugNaarHuis, TerugNaar, doorrijden, navigatie, zelf terugrijden).
@@ -2711,7 +2711,7 @@ Alleen het deel van de melding dat iets zegt wordt nog getoond.
 ## BUG #266 – ONDERZOCHT (open): na de kortsluiting op 4/129 rijdt de terugweg 'vooruit van 4' toch naar 129 en daarna 'achteruit van 129 naar 4' (autolog 21-10 11:10:31-11:12:43)
 De loc stond na de kortsluiting (4 -> 129 achteruit, wissel 9 nog rechtdoor; opgelost door 9 afbuigend, kortsluitpunt #3) op 4 én 129. De terugweg 'vooruit van 4 naar 13' kwam op 129 uit
 ("onverwacht melder 129"), en het zelf terugrijden koos daarna het pad 129, 4, 129, 14, 13 met '129 -> 4 achteruit', wat het register als overschreven rijrichting meldt (129>4 vooruit ->
-achteruit en terug). Oorzaak: de loc is langer dan melder 129 en staat op de grens 4/129; welke melder 'de' startmelder is, is dan niet eenduidig. Het programma herstelde zich binnen 2 minuten
+achteruit en terug). Oorzaak: de loc staat op de grens 4/129 (niet langer dan een melder, Marco 21-10 17:17); welke melder 'de' startmelder is, is dan niet eenduidig. Het programma herstelde zich binnen 2 minuten
 zonder hulp (loc weer op 13). Nog te doen: bij een loc op twee melders de rijrichting van de stap bepalen uit de laatst gereden overgang, niet uit de melder waar de loc 'op' staat.
 
 ## BUG #267 – OPGELOST (nog niet getest op de baan): opnieuw kortsluiting 4 -> 129 achteruit met wissel 9 rechtdoor, terwijl dat al bewezen was (autolog 21-10 11:20:44-11:21:47)
@@ -2798,7 +2798,7 @@ Wissel 14 moest om met de loc op melder 8; vanaf 8 vooruit is alleen 15 bekend, 
 dan geldt nu een vervolg dat bij elke stand het enige is (#256 rijdt dan eerst naar 15, zet 14 om en rijdt terug).
 
 ## BUG #282 – OPGELOST (nog niet getest op de baan): blokfase gaf 9 melders in één minuut op (autolog 21-10 15:32:47-15:33:45)
-De loc stond op 24 en 8 (langer dan melder 8); elke navigatie zag de andere van die twee meteen als 'onverwacht' en elke melder telde twee mislukte pogingen: "Geen Dinamo-blok gevonden
+De loc stond op de grens van 24 en 8; elke navigatie zag de andere van die twee meteen als 'onverwacht' en elke melder telde twee mislukte pogingen: "Geen Dinamo-blok gevonden
 voor melder 4, 17, 20, 25, 26, 27, 28, 29, 30". Een poging waarbij de 'onverwachte' melder al vóór de rit bezet was, telt niet mee (hoogstens 3 keer per melder). In de keerlus-simulatie
 wordt de verkenning nu voltooid (elke melder een Dinamo-blok; eerder open punt #234). Test: keerlus BUG #281/#282.
 
@@ -2841,3 +2841,8 @@ Marco 16:52: pendelbaan-blokken kloppen (132, 139, 140 = 10; 133 = 11; 136, 143,
 "De loc reed weer zonder kortsluiting nadat wissel 3 naar afbuigend is geschakeld": wissel 3 bestaat op de baan niet en adres 3 stond in deze verkenning bij de adressen zonder effect.
 De korte proefrit zelf maakte de loc los. Een adres zonder gevonden effect (en zonder enige waarneming in de kaart) wordt nu nooit als oplossing van een klem vastgelegd; het gaat terug en er komt een waarschuwing. (Dezelfde regel voor het opheffen van een alarm brak 10 simulaties en is niet gedaan.)
 Niets hard gecodeerd: het volgt uit 'adressen zonder effect' van de kaart zelf.
+
+## Correctie (Marco 21-10 17:17): de loc is NIET langer dan een melder
+In mijn analyses (#245, #256, #264, #266, #282 en de statusnotities) stond "de loc is langer dan melder 129/8". Dat klopt niet. Twee melders tegelijk bezet betekent: de loc staat op de grens
+van twee secties (vaak met een draaistel over een wissel). De logmelding "(de loc is langer dan één melder)" is vervangen door "(de loc staat op de grens van twee melders)". De
+oplossingen zelf (niet omzetten met de loc op of bij de wissel, eerst uitwijken) blijven geldig.

@@ -3247,7 +3247,7 @@ public partial class BaanVerkenner
             if (nuBezet.Contains(melder) && nuBezet.Count > 1 && HuidigeAlarmBlokken().Count == 0
                 && nuBezet.All(m => m == melder || _laatsteKortsluitMelders.Contains(m)))
             {
-                _log.Info($"Loc staat nog op melder {melder} en deels op melder {string.Join(" en ", nuBezet.Where(m => m != melder).OrderBy(m => m))} (de loc is langer dan één melder) en het alarm is weg: hij blijft staan waar hij staat.");
+                _log.Info($"Loc staat nog op melder {melder} en deels op melder {string.Join(" en ", nuBezet.Where(m => m != melder).OrderBy(m => m))} (de loc staat op de grens van twee melders) en het alarm is weg: hij blijft staan waar hij staat.");
                 return;
             }
             // BUG #150: staat de loc al precies op de melder (alleen die bezet) en is het alarm weg, dan blijft hij staan; terugrijden zou hem
