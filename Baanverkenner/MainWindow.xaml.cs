@@ -498,7 +498,7 @@ public partial class MainWindow : Window
             var keuze2 = MessageBox.Show(this,
                 $"De bewaarde verkenning is nog niet af ({st.Kaart.Melders.Count} melders, {st.Kaart.Wissels.Count} wissels, startmelder {st.Kaart.StartMelder}).\n\n" +
                 $"Ja = verder op dit traject: de loc moet op startmelder {st.Kaart.StartMelder} staan.\n" +
-                "Nee = een tweede, los traject verkennen (bijvoorbeeld een pendelbaan): alles wat al gevonden is blijft staan en de melder waar de loc nu op staat wordt de nieuwe startmelder" +
+                "Nee = een ander, los traject (een nieuw traject, bijvoorbeeld een pendelbaan, of terug naar een eerder verkend traject): alles wat al gevonden is blijft staan en de melder waar de loc nu op staat wordt de startmelder" +
                 (open > 0 ? $" ({open} opdracht(en) van het eerste traject in de wachtrij vervallen)" : "") + ".\n" +
                 "Annuleren = niets doen.",
                 "Hervatten of tweede traject?", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);

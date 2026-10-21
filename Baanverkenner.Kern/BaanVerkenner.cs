@@ -536,7 +536,12 @@ public partial class BaanVerkenner
     private async Task ControleerUitbreiding(int nieuw)
     {
         if (!_status.Uitbreiden) return;
-        if (_kaart.Melders.Any(m => m.Nummer == nieuw))
+        // BUG #289 (Marco 21-10 16:42-16:52): na de pendelbaan (startmelder 133) moeten de blokken van traject 1 nog. De loc staat dan op een bekende melder van een ANDER traject dan de
+        // huidige startmelder: dat is de bedoeling, geen vergissing, dus geen vraag.
+        bool anderTraject = _kaart.StartMelder != 0 && _kaart.Melders.Any(m => m.Nummer == nieuw) && !BaanVerkenner.Afstanden(_kaart, _kaart.StartMelder).ContainsKey(nieuw);
+        if (anderTraject)
+            _log.Info($"Melder {nieuw} hoort bij een ander, al bekend traject dan startmelder {_kaart.StartMelder}: de verkenning gaat daar verder (BUG #289).");
+        else if (_kaart.Melders.Any(m => m.Nummer == nieuw))
         {
             _log.Waarschuwing($"Melder {nieuw} is al bekend uit de vorige verkenning.");
             bool door = await _vraag("Melder al bekend",

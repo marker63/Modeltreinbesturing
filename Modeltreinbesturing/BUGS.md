@@ -2831,3 +2831,8 @@ op het traject waar de loc nu rijdt"). Test: los traject (#287).
 De blokproef voor melder 139 (doodlopend einde in de richting vooruit) begon vooruit: elk van de 12 blokken kreeg 30 s een rijcommando op verkensnelheid, pas daarna "nu de andere richting".
 Is een melder in een richting een bekend doodlopend einde, dan begint de blokproef nu in de andere richting. Test: blokproef (#288).
 Resultaat pendelbaan (21-10 16:37): 132, 139, 140 = blok 10; 133 = blok 11; 136, 143, 144 = blok 12.
+
+## BUG #289 – OPGELOST (deels scherm, niet te compileren hier; nog niet getest op de baan): terug naar een eerder traject (Marco 21-10 16:42-16:52)
+Na de pendelbaan (startmelder 133) moeten de blokken van traject 1 (4, 17, 20, 25-30) nog. Kies bij Hervatten 'Nee' (ander traject) met de loc op traject 1: staat de loc op een bekende
+melder van een ander traject dan de startmelder, dan gaat de verkenning daar verder zonder de vraag "melder al bekend, toch doorgaan?". De tekst bij Hervatten noemt die mogelijkheid nu.
+Marco 16:52: pendelbaan-blokken kloppen (132, 139, 140 = 10; 133 = 11; 136, 143, 144 = 12) en het melderschema (#286) is goed.
