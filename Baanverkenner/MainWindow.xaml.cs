@@ -490,6 +490,21 @@ public partial class MainWindow : Window
             if (keuze != MessageBoxResult.Yes) return;
             uitbreiden = true;
         }
+        // BUG #283 (Marco 21-10 15:43: "je gaat er nu ineens van uit dat de loc altijd op melder 13 moet komen, maar ik wil het 2e traject gaan rijden"): de verkenning was gestopt met nog
+        // melders zonder Dinamo-blok (niet 'voltooid'), en dan bood Hervatten alleen 'verder vanaf startmelder 13'. Nu kan ook dan gekozen worden voor een tweede, los traject.
+        else if (!st.Controle && st.Kaart.Melders.Count > 0)
+        {
+            int open = st.Wachtrij.Count;
+            var keuze2 = MessageBox.Show(this,
+                $"De bewaarde verkenning is nog niet af ({st.Kaart.Melders.Count} melders, {st.Kaart.Wissels.Count} wissels, startmelder {st.Kaart.StartMelder}).\n\n" +
+                $"Ja = verder op dit traject: de loc moet op startmelder {st.Kaart.StartMelder} staan.\n" +
+                "Nee = een tweede, los traject verkennen (bijvoorbeeld een pendelbaan): alles wat al gevonden is blijft staan en de melder waar de loc nu op staat wordt de nieuwe startmelder" +
+                (open > 0 ? $" ({open} opdracht(en) van het eerste traject in de wachtrij vervallen)" : "") + ".\n" +
+                "Annuleren = niets doen.",
+                "Hervatten of tweede traject?", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+            if (keuze2 == MessageBoxResult.Cancel) return;
+            uitbreiden = keuze2 == MessageBoxResult.No;
+        }
         if (_hw is null || !_hw.Verbonden)
         {
             MessageBox.Show(this, uitbreiden ? "Maak eerst verbinding met dezelfde centrale als bij de vorige verkenning." : "Maak eerst verbinding met dezelfde centrale als bij de onderbroken verkenning.", "Niet verbonden", MessageBoxButton.OK, MessageBoxImage.Information);

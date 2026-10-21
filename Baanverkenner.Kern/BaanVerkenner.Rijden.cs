@@ -3065,6 +3065,13 @@ public partial class BaanVerkenner
         if (teOm.Count == 0) return null;
         var nu = new Configuratie(_wisselStand.Where(kv => kv.Value).Select(kv => kv.Key).ToArray());
         var terug = _kaart.BekendeVolgende(van, r.Om(), nu).Where(x => !pad.Contains(x)).ToList();
+        // BUG #281 (autolog 21-10 15:31:28-15:33:45): "Wissel 14 moet om voor de stap vanaf melder 8 ... er is geen eenduidige melder om eerst naar terug te rijden", terwijl vanaf 8 vooruit
+        // alleen 15 bekend is. De overgang 8 -> 15 was nooit met precies deze wisselstand gereden. Is er bij deze stand niets bekend, dan geldt een vervolg dat bij elke stand het enige is.
+        if (terug.Count == 0)
+        {
+            var alle = _kaart.BekendeVolgende(van, r.Om()).Where(x => !pad.Contains(x)).ToList();
+            if (alle.Count == 1) terug = alle;
+        }
         if (terug.Count != 1)
         {
             _log.Info($"Wissel {Lijst(teOm)} moet om voor de stap vanaf melder {van}, maar ligt bij de melder waar de loc staat; er is geen eenduidige melder om eerst naar terug te rijden.");

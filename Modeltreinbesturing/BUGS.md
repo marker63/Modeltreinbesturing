@@ -2792,3 +2792,17 @@ Test: bewezen bij de loc (#279).
 ## BUG #280 – OPGELOST (nog niet getest op de baan): navigaties zetten de bewezen oplossing (#267) en de verboden ingang (#260) niet onderweg (autolog 21-10 14:51:25-14:52:15)
 Dezelfde navigatie vraagt wissel 9 rechtdoor bij 24 -> 129 en afbuigend bij 4 -> 129 (de loc schiet bij 4 door naar 129). Navigaties gebruikten de staartwisselregel niet, dus wissel 9 bleef
 rechtdoor: kortsluiting. Beide regels gelden nu ook tijdens een navigatie, behalve voor wissels bij de loc. Test: vooruitregels (#280).
+
+## BUG #281 – OPGELOST (nog niet getest op de baan): "geen eenduidige melder om eerst naar terug te rijden" terwijl die er wel was (autolog 21-10 15:31:28-15:33:45)
+Wissel 14 moest om met de loc op melder 8; vanaf 8 vooruit is alleen 15 bekend, maar die overgang was nooit met precies de huidige wisselstand gereden. Is er bij de huidige stand niets bekend,
+dan geldt nu een vervolg dat bij elke stand het enige is (#256 rijdt dan eerst naar 15, zet 14 om en rijdt terug).
+
+## BUG #282 – OPGELOST (nog niet getest op de baan): blokfase gaf 9 melders in één minuut op (autolog 21-10 15:32:47-15:33:45)
+De loc stond op 24 en 8 (langer dan melder 8); elke navigatie zag de andere van die twee meteen als 'onverwacht' en elke melder telde twee mislukte pogingen: "Geen Dinamo-blok gevonden
+voor melder 4, 17, 20, 25, 26, 27, 28, 29, 30". Een poging waarbij de 'onverwachte' melder al vóór de rit bezet was, telt niet mee (hoogstens 3 keer per melder). In de keerlus-simulatie
+wordt de verkenning nu voltooid (elke melder een Dinamo-blok; eerder open punt #234). Test: keerlus BUG #281/#282.
+
+## BUG #283 – OPGELOST (scherm, niet te compileren hier; nog niet getest op de baan): tweede traject kon niet worden gestart (Marco 21-10 15:43)
+"Je gaat er nu ineens van uit dat de loc altijd op melder 13 moet komen, maar ik wil het 2e traject gaan rijden." Uitbreiden met een tweede traject (#74) werd alleen aangeboden bij een
+voltooide verkenning; deze was gestopt met melders zonder Dinamo-blok. Hervatten vraagt nu bij een niet-voltooide verkenning: Ja = verder op dit traject (startmelder), Nee = tweede, los
+traject vanaf de melder waar de loc nu staat (alles wat gevonden is blijft), Annuleren.

@@ -1,4 +1,4 @@
-using Modeltreinbesturing.Hardware;
+﻿using Modeltreinbesturing.Hardware;
 
 namespace Baanverkenner.Kern;
 
@@ -14,6 +14,7 @@ public partial class BaanVerkenner
         _fase = "Blokken zoeken";
         MeldVoortgang();
         int mislukt = 0;
+        var herkansing = new Dictionary<int, int>();   // BUG #282
         while (true)
         {
             var open = _kaart.Melders.Where(m => m.DinamoBlok is null && ProefMogelijk(m.Nummer)).Select(m => m.Nummer).ToList();
@@ -25,6 +26,8 @@ public partial class BaanVerkenner
             _bezig = $"blok zoeken voor melder {doel}";
             MeldVoortgang();
             _proefPogingen[doel] = _proefPogingen.GetValueOrDefault(doel) + 1;
+            _monitor.Bijwerken();
+            var bezetVoor = _monitor.Bezet.ToHashSet();
             try
             {
                 var r = _kaart.Overgangen.Where(o => o.Naar == doel && o.AantalKeer > 0).Select(o => (Richting?)o.Richting).FirstOrDefault()
@@ -46,6 +49,15 @@ public partial class BaanVerkenner
             {
                 mislukt++;
                 _log.Waarschuwing($"Blok zoeken voor melder {doel} lukte niet: {ex.Message}");
+                // BUG #282 (autolog 21-10 15:32:47-15:33:45): de loc stond op 24 en 8 (langer dan melder 8); elke navigatie zag de andere van die twee meteen als 'onverwacht' en binnen
+                // een minuut waren 9 melders opgegeven ("Geen Dinamo-blok gevonden voor melder 4, 17, 20, 25, 26, 27, 28, 29, 30"). Was de 'onverwachte' melder al bezet vóór de rit, dan
+                // zegt dat niets over de weg: die poging telt niet (hoogstens 3 keer per melder).
+                if (ex.Onverwacht is int ov && bezetVoor.Contains(ov) && herkansing.GetValueOrDefault(doel) < 3)
+                {
+                    herkansing[doel] = herkansing.GetValueOrDefault(doel) + 1;
+                    _proefPogingen[doel] = Math.Max(0, _proefPogingen.GetValueOrDefault(doel) - 1);
+                    _log.Info($"Melder {ov} was al bezet voordat de rit begon (de loc staat op {Lijst(bezetVoor)}): deze poging voor melder {doel} telt niet mee (BUG #282).");
+                }
             }
             BewaarNu();
         }

@@ -975,6 +975,7 @@ public static class Tests
                 Console.WriteLine($"  keerlus start {start}: #270 {regels.Count(x => x.Contains("BUG #270"))}x, #271 {regels.Count(x => x.Contains("BUG #271"))}x, rondjes {regels.Count(x => x.Contains("rijdt rondjes"))}x");
                 Eis(k.Melders.Count == 23, $"keerlus (start {start}): alle 23 melders (met 1 en 9) gevonden (nu {k.Melders.Count})");
                 Eis(naar10 == 0, $"keerlus (start {start}): de terugweg 129 -> 14 gaat niet steeds naar 10 (nu {naar10}x)");
+                Eis(k.Voltooid && k.Melders.All(m => m.DinamoBlok is not null), $"keerlus (start {start}) BUG #281/#282: de blokfase wordt afgemaakt, elke melder heeft een Dinamo-blok (zonder: {string.Join(",", k.Melders.Where(m => m.DinamoBlok is null).Select(m => m.Nummer))})");
                 if (start == 13)
                 {
                     // BUG #268: zelfde keerlus, maar Dinamo meldt bij elke kortsluiting even melder 137 en 138 (zoals op de baan 21-10 11:21:55)
