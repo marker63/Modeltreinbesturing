@@ -223,6 +223,42 @@ public static class Tests
     }
 
     // BUG #71 (log 16:48): navigatie begint vanaf een aangenomen melder terwijl de loc ergens anders staat. Dan geen valse overgang vastleggen.
+    // BUG #268: tijdens een navigatie 1 -> 2 -> 3 meldt Dinamo even melder 137 (0,8 s, onbekend in de kaart): geen navigatiefout; blijft hij bezet, dan wel
+    static void NavigatieEchoTest(bool blijft)
+    {
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
+        var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+        var s1 = sim.NieuweSectie(1, 80, 1); var s2 = sim.NieuweSectie(2, 80, 2); var s3 = sim.NieuweSectie(3, 80, 3);
+        sim.Verbind(s1, B, s2, A); sim.Verbind(s2, B, s3, A);
+        sim.PlaatsLoc(s1, 40, +1);
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 1, DinamoBlokken = "1-3" };
+        var status = new VerkenStatus { Instellingen = ins };
+        status.Kaart.StartMelder = 1; status.Kaart.Hardware = "Simulatie"; status.Kaart.RefSnelheid = 12;
+        foreach (var n in new[] { 1, 2, 3 }) status.Kaart.Melders.Add(new MelderInfo { Nummer = n });
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var log = new VerkenLog(klok);
+        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true), status);
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var monitor = (MelderMonitor)typeof(BaanVerkenner).GetField("_monitor", bf)!.GetValue(v)!;
+        sim.BezetmeldingGewijzigd += monitor.Ontvang;
+        foreach (var mm in new[] { 1, 2, 3 }) sim.VraagMelderStatusOp(mm);
+        klok.Wacht(TimeSpan.FromSeconds(1)).GetAwaiter().GetResult();
+        sim.KortsluitEchoMelders = new[] { 137 }; sim.EchoElkeSeconden = 2.5;
+        if (blijft) { klok.Getikt += _ => { if (sim.KortsluitEchosGemeld > 0) { sim.EchoElkeSeconden = 0; sim.KortsluitEchoMelders = Array.Empty<int>(); } }; }
+        var rit = typeof(BaanVerkenner).GetMethod("Rit", bf)!;
+        bool fout = false; RitResultaat? res = null;
+        try { res = ((Task<RitResultaat>)rit.Invoke(v, new object[] { 1, Richting.Vooruit, new RitDoel { DoelMelder = 3, VerwachtPad = new List<int> { 1, 2, 3 } } })!).GetAwaiter().GetResult(); }
+        catch (NavigatieFout nf) { fout = nf.Onverwacht == 137; }
+        var regels = log.Regels.Select(x => x.Tekst).ToList();
+        if (Environment.GetEnvironmentVariable("ECHO_LOG") == "1") foreach (var x in log.Regels) Console.WriteLine("    | " + x.Tijd.ToString("HH:mm:ss.fff") + " " + x.Tekst);
+        if (!blijft)
+            Eis(!fout && res?.Einde == RitEinde.DoelBereikt && sim.KortsluitEchosGemeld > 0 && regels.Any(x => x.Contains("melder 137 (onbekend in de kaart) was maar even bezet")),
+                $"navigatie-echo (#268): melder 137 even bezet ({sim.KortsluitEchosGemeld}x) -> genegeerd, doel 3 bereikt ({res?.Einde}, fout {fout})");
+        else
+            Eis(fout, "navigatie-echo (#268): blijft melder 137 bezet, dan is het wel een onverwachte melder");
+    }
+
     static void NavigatieOnjuisteStartTest()
     {
         var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
@@ -907,6 +943,18 @@ public static class Tests
                 if (Environment.GetEnvironmentVariable("KEERLUS_LOG") == "1") Console.WriteLine(r.Log.AlsTekst());
                 Eis(k.Melders.Count == 23, $"keerlus (start {start}): alle 23 melders (met 1 en 9) gevonden (nu {k.Melders.Count})");
                 Eis(naar10 == 0, $"keerlus (start {start}): de terugweg 129 -> 14 gaat niet steeds naar 10 (nu {naar10}x)");
+                if (start == 13)
+                {
+                    // BUG #268: zelfde keerlus, maar Dinamo meldt bij elke kortsluiting even melder 137 en 138 (zoals op de baan 21-10 11:21:55)
+                    Baanverkenner.Kern.Simulatie.SimulatieBaan? sim268 = null;
+                    var r268 = MiniworldRit(start, 10, simAanpassing: s => { s.KortsluitEchoMelders = new[] { 137, 138 }; sim268 = s; }, insAanpassing: i => { i.Rondrit = true; i.StapVoorStap = false; });
+                    var reg268 = r268.Log.Regels.Select(x => x.Tekst).ToList();
+                    Console.WriteLine($"  keerlus met kortsluitecho: {r268.Kortsluitingen} kortsluiting(en), {sim268!.KortsluitEchosGemeld} echo's, melders {r268.V.Kaart.Melders.Count}");
+                    Eis(sim268.KortsluitEchosGemeld > 0, "kortsluitecho (#268): de simulatie meldde 137/138 rond een kortsluiting");
+                    Eis(!r268.V.Kaart.Melders.Any(m => m.Nummer is 137 or 138), "kortsluitecho (#268): 137 en 138 komen niet in de kaart");
+                    Eis(!reg268.Any(x => x.Contains("onverwacht melder 137") || x.Contains("onverwacht melder 138")), "kortsluitecho (#268): geen 'onverwacht melder 137/138' (" + reg268.FirstOrDefault(x => x.Contains("onverwacht melder 13")) + ")");
+                    Eis(r268.V.Kaart.Melders.Count == 23, $"kortsluitecho (#268): nog steeds alle 23 melders (nu {r268.V.Kaart.Melders.Count})");
+                }
                 // Nog open (#234): in deze simulatie lukt de blokfase daarna niet voor 15 melders (de loc rijdt na de keerlus de verkeerde kant op); daarom geen eis op 'voltooid'.
             }
         }
@@ -3142,6 +3190,7 @@ public static class Tests
         PartnerVolgordeTest();
         BlokgrensTest();
         NavigatieOnjuisteStartTest();
+        NavigatieEchoTest(false); NavigatieEchoTest(true);
         BlokkenschemaTest();
         OverdrachtTest();
         DoorgangTest();

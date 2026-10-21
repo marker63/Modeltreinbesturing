@@ -2720,3 +2720,11 @@ Opdracht #5 (stand: wissel 10) reed achteruit door de keerlus 11 -> 4 -> 129 met
 Oplossing: de staartwisselregel kijkt nu ook naar bewezen (niet voorlopige) oplossingen van kortsluitpunten in dezelfde richting, los van de stand van de opdracht. Is de laatste stap van
 de route van zo'n kortsluitpunt de komende stap (of de eenduidig bekende stap daarna), en staat de oplossingswissel nu verkeerd, dan gaat hij vóór de loc er is om (niet de proefwissel,
 geen kruiswisselmotor, geen volger, niet als de volger onder de loc ligt). Tegenstrijdige oplossingen voor één wissel worden genegeerd. Test: oplossing vooruit (#267) op baankaart 21-10 11:28.
+
+## BUG #268 – OPGELOST (nog niet getest op de baan): navigatiefout "onverwacht melder 137" rond een kortsluiting (autolog 21-10 11:22:05, hardwarelog 11:21:55.588)
+Na kortsluitpunt #7 reed de loc vooruit van 4 terug naar 21. Dinamo meldde melder 137 en 138 bezet, 0,4 s vóór 'KORTSLUITING in blok 9' en 0,8 s later weer vrij (137 en 138 bestaan op de
+baan niet; zelfde patroon als 18-10 en 20-10, #262). De navigatie zag 'onverwacht melder 137', weerlegde daarmee voorkennis (#238) en meldde "Staat er een wissel niet goed?".
+Oplossing: tijdens een navigatie (die alleen bekende melders hoort te zien) telt een melder die de kaart niet kent pas als hij 1,5 s bezet blijft. Komt er in die tijd een kortsluiting, dan
+behandelt de kortsluitregel het; wordt hij weer vrij, dan wordt hij genegeerd (logregel "was maar even bezet ... BUG #268"). Blijft hij bezet, dan is het wel een onverwachte melder.
+Verkenningsritten (waar nieuwe melders juist gevonden moeten worden) blijven ongewijzigd; een algemene langere ontdendertijd voor onbekende melders brak 10 simulaties en is niet gedaan.
+Niets is hard gecodeerd voor 137/138. Simulatie: SimulatieBaan.KortsluitEchoMelders / EchoElkeSeconden. Tests: navigatie-echo (#268), kortsluitecho (#268) in de keerlus-simulatie.

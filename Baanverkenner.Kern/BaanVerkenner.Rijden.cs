@@ -313,7 +313,7 @@ public partial class BaanVerkenner
         if (!BlokVereist)
         {
             _hw.ZetLocSnelheid(_ins.LocAdres, 0, true, 0, _ins.LocStappen);
-            await Wacht(TimeSpan.FromMilliseconds(600));
+            await Wacht(TimeSpan.FromMilliseconds(1500));
             return;
         }
         var blokken = BlokkenVoorHuidigePlek();
@@ -561,7 +561,7 @@ public partial class BaanVerkenner
                 _hw.ZetWissel(adres, wens);
                 await Wacht(TimeSpan.FromMilliseconds(Math.Max(100, _ins.WisselPauzeMs)));
                 for (int i = 0; i < 40 && !_hw.KlaarVoorVolgendeWisselCommando; i++) await Wacht(DinamoCyclus);
-                await Wacht(TimeSpan.FromMilliseconds(1000));
+                await Wacht(TimeSpan.FromMilliseconds(1500));
             }
             _wisselStand[adres] = stand;
             if (bron.AantalWisselBevestigingen - begin >= 2)
@@ -1861,6 +1861,7 @@ public partial class BaanVerkenner
         _kortsluitingGemeld = HuidigeAlarmBlokken().Count > 0;
 
         int? achterkantGenegeerd = null;   // BUG #227
+        var uitgesteld268 = new List<MelderMonitor.Wijziging>();   // BUG #268
         DateTime? stapStopTot = null;   // BUG #175: tot wanneer de loc na de laatste melder van een stap-rit nog doorrijdt
         while (true)
         {
@@ -1930,9 +1931,26 @@ public partial class BaanVerkenner
             // melder VRIJ terwijl precies één andere, nog niet bekende melder bezet blijft, dan staat
             // de loc daar duidelijk in: behandel die als zojuist bezet geworden.
             var nieuweBezetten = wijzigingen.Where(w => w.Bezet).ToList();
+            // BUG #268 (hardwarelog 21-10 11:21:55.588): Dinamo meldde melder 137 en 138 bezet 0,4 s vóór 'KORTSLUITING in blok 9' en 0,8 s later weer vrij. De navigatie zag 'onverwacht melder 137',
+            // weerlegde daarmee voorkennis en meldde "Staat er een wissel niet goed?". Een melder die de kaart niet kent, tijdens een navigatie (die alleen bekende melders hoort te zien), telt
+            // pas na 1,5 s (0,8 s echo + ontdendertijd): komt er in die tijd een kortsluiting, dan behandelt de kortsluitregel het (bovenaan de lus); is hij weer vrij, dan was het een echo en telt hij niet.
+            if (doel.IsNavigatie)
+            {
+                foreach (var w in uitgesteld268.Where(u => _klok.Nu - u.Tijd >= TimeSpan.FromMilliseconds(1500) || wijzigingen.Any(x => x.Melder == u.Melder && !x.Bezet)).ToList())
+                {
+                    uitgesteld268.Remove(w);
+                    if (bezet.Contains(w.Melder) && !wijzigingen.Any(x => x.Melder == w.Melder && !x.Bezet)) nieuweBezetten.Add(w);
+                    else _log.Info($"  melder {w.Melder} (onbekend in de kaart) was maar even bezet: geen sectie die de loc bereikte, telt niet (BUG #268).");
+                }
+                foreach (var w in nieuweBezetten.Where(n => _klok.Nu - n.Tijd < TimeSpan.FromMilliseconds(1500) && !_kaart.Melders.Any(x => x.Nummer == n.Melder)).ToList())
+                {
+                    nieuweBezetten.Remove(w);
+                    if (uitgesteld268.All(u => u.Melder != w.Melder)) uitgesteld268.Add(w);
+                }
+            }
             if (bezet.Count > 0 && (wijzigingen.Any(w => !w.Bezet && w.Melder == res.Reeks[^1]) || !bezet.Contains(res.Reeks[^1])))
             {
-                var verborgen = bezet.Where(x => !res.Reeks.Contains(x) && nieuweBezetten.All(n => n.Melder != x)).ToList();
+                var verborgen = bezet.Where(x => !res.Reeks.Contains(x) && nieuweBezetten.All(n => n.Melder != x) && uitgesteld268.All(u => u.Melder != x)).ToList();
                 if (verborgen.Count == 1)
                 {
                     _log.Info($"Melder {res.Reeks[^1]} is vrij maar melder {verborgen[0]} was al bezet (de loc stond met een deel al in die melder): melder {verborgen[0]} telt als bereikt.");

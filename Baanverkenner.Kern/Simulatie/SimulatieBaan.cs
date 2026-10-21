@@ -1,4 +1,4 @@
-using Modeltreinbesturing.Hardware;
+﻿using Modeltreinbesturing.Hardware;
 
 namespace Baanverkenner.Kern.Simulatie;
 
@@ -265,9 +265,21 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
     private DateTime? _stilSinds;
     private DateTime? _meldKortOp;
     private int _meldKortBlok;
+    /// <summary>BUG #268: melders die Dinamo kort bezet meldt rond een kortsluiting (op de baan 137 en 138: 0,4 s vóór de kortsluitmelding bezet, 0,4 s erna weer vrij). 0 = uit.</summary>
+    public int[] KortsluitEchoMelders { get; set; } = Array.Empty<int>();
+    public int KortsluitEchosGemeld { get; private set; }
+    private DateTime? _echoAanOp, _echoUitOp;
+    /// <summary>BUG #268 (test): elke zoveel seconden meldt de simulatie de <see cref="KortsluitEchoMelders"/> 0,8 s bezet, ook zonder kortsluiting. 0 = uit.</summary>
+    public double EchoElkeSeconden { get; set; }
+    private DateTime _volgendeEcho = DateTime.MinValue;
     private void MeldKortsluitingStraks(int blok, DateTime nu)
     {
         _meldKortBlok = blok;
+        if (KortsluitEchoMelders.Length > 0 && _echoUitOp is null)
+        {
+            _echoAanOp = nu + TimeSpan.FromSeconds(Math.Max(0, KortsluitMeldVertraging - 0.4));
+            _echoUitOp = nu + TimeSpan.FromSeconds(KortsluitMeldVertraging + 0.4);
+        }
         if (KortsluitMeldVertraging <= 0) { AlarmAan(blok); if (MeldtKortsluiting) KortsluitingStatusGewijzigd?.Invoke(true); }
         else _meldKortOp = nu + TimeSpan.FromSeconds(KortsluitMeldVertraging);
     }
@@ -414,6 +426,13 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
             }
         }
 
+        if (EchoElkeSeconden > 0 && _echoUitOp is null)
+        {
+            if (_volgendeEcho == DateTime.MinValue) _volgendeEcho = nu + TimeSpan.FromSeconds(EchoElkeSeconden);
+            else if (nu >= _volgendeEcho) { _volgendeEcho = nu + TimeSpan.FromSeconds(EchoElkeSeconden); _echoAanOp = nu; _echoUitOp = nu + TimeSpan.FromSeconds(0.8); }
+        }
+        if (_echoAanOp is DateTime ea && nu >= ea) { _echoAanOp = null; KortsluitEchosGemeld++; foreach (var m in KortsluitEchoMelders) BezetmeldingGewijzigd?.Invoke(m, true); }
+        if (_echoUitOp is DateTime eu && nu >= eu && _echoAanOp is null) { _echoUitOp = null; foreach (var m in KortsluitEchoMelders) BezetmeldingGewijzigd?.Invoke(m, false); }
         if (_meldKortOp is DateTime mk && nu >= mk)
         {
             _meldKortOp = null;
