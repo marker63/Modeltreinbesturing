@@ -259,6 +259,37 @@ public static class Tests
             Eis(fout, "navigatie-echo (#268): blijft melder 137 bezet, dan is het wel een onverwachte melder");
     }
 
+    // BUG #278: de loc staat andersom op melder 2 (neus naar 1); 'vooruit naar 3' rijdt naar 1, terwijl 2 -> 1 altijd achteruit gereden is: stoppen met 'loc andersom', geen overgang vastleggen
+    static void LocAndersom278Test()
+    {
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
+        var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+        var s1 = sim.NieuweSectie(1, 80, 1); var s2 = sim.NieuweSectie(2, 80, 2); var s3 = sim.NieuweSectie(3, 80, 3);
+        sim.Verbind(s1, B, s2, A); sim.Verbind(s2, B, s3, A);
+        sim.PlaatsLoc(s2, 40, -1);
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 1, DinamoBlokken = "1-3" };
+        var status = new VerkenStatus { Instellingen = ins };
+        status.Kaart.StartMelder = 2; status.Kaart.Hardware = "Simulatie"; status.Kaart.RefSnelheid = 12;
+        foreach (var n in new[] { 1, 2, 3 }) status.Kaart.Melders.Add(new MelderInfo { Nummer = n });
+        status.Kaart.Overgangen.Add(new Overgang { Van = 2, Naar = 3, Richting = Richting.Vooruit, AantalKeer = 5 });
+        status.Kaart.Overgangen.Add(new Overgang { Van = 2, Naar = 1, Richting = Richting.Achteruit, AantalKeer = 5 });
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var log = new VerkenLog(klok);
+        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true), status);
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var monitor = (MelderMonitor)typeof(BaanVerkenner).GetField("_monitor", bf)!.GetValue(v)!;
+        sim.BezetmeldingGewijzigd += monitor.Ontvang;
+        foreach (var mm in new[] { 1, 2, 3 }) sim.VraagMelderStatusOp(mm);
+        klok.Wacht(TimeSpan.FromSeconds(1)).GetAwaiter().GetResult();
+        var rit = typeof(BaanVerkenner).GetMethod("Rit", bf)!;
+        NavigatieFout? fout = null;
+        try { ((Task<RitResultaat>)rit.Invoke(v, new object[] { 2, Richting.Vooruit, new RitDoel { DoelMelder = 3, VerwachtPad = new List<int> { 2, 3 } } })!).GetAwaiter().GetResult(); }
+        catch (NavigatieFout nf) { fout = nf; }
+        var ov = status.Kaart.Overgangen.Where(o => o.Van == 2 && o.Naar == 1 && o.Richting == Richting.Vooruit).Sum(o => o.AantalKeer);
+        Eis(fout is { LocAndersom: true, Onverwacht: 1 } && ov == 0, $"loc andersom (#278): melder 1 achter de loc -> 'loc andersom', geen overgang 2 -> 1 vooruit (fout: {fout?.Message}, andersom {fout?.LocAndersom}, overgang {ov})");
+    }
+
     static void NavigatieOnjuisteStartTest()
     {
         var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
@@ -3224,6 +3255,7 @@ public static class Tests
         BlokgrensTest();
         NavigatieOnjuisteStartTest();
         NavigatieEchoTest(false); NavigatieEchoTest(true);
+        LocAndersom278Test();
         BlokkenschemaTest();
         OverdrachtTest();
         DoorgangTest();

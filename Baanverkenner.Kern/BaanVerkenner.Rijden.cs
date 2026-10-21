@@ -1994,9 +1994,20 @@ public partial class BaanVerkenner
                     if (uitgesteld268.All(u => u.Melder != w.Melder)) uitgesteld268.Add(w);
                 }
             }
+            // BUG #278 (autolog 21-10 13:55:33-14:15:35, twintig minuten): elke rit 'vooruit vanaf 13' kwam op melder 5 (13 -> 5 is achteruit gereden): de loc stond andersom. #227 zag melder 5
+            // als staart, maar zodra melder 13 vrij werd telde de regel hieronder (#54) melder 5 toch als bereikt; daarna 'onverwacht melder 5', een overschreven rijrichting (5 > 13) en steeds
+            // opnieuw neerzetten. Wordt de startmelder vrij terwijl de loc op die achterkantmelder staat, dan rijdt de loc de verkeerde kant op: stoppen en melden dat hij andersom staat.
+            if (res.Reeks.Count == 1 && achterkantGenegeerd is int ag278 && bezet.Contains(ag278) && !bezet.Contains(res.Reeks[0]))
+            {
+                await StopLoc();
+                string t278 = $"De loc rijdt vanaf melder {res.Reeks[0]} {r.Tekst()} naar melder {ag278}, maar {res.Reeks[0]} -> {ag278} is {r.Om().Tekst()} gereden: de loc staat andersom (neus de verkeerde kant op). De rit is gestopt, er is niets vastgelegd. Draai de loc om (of zet hem andersom neer) (BUG #278).";
+                _kaart.Waarschuwingen.Add(t278);
+                _log.Waarschuwing(t278);
+                throw new NavigatieFout(t278) { LaatsteGoed = res.Reeks[0], Onverwacht = ag278, LocAndersom = true };
+            }
             if (bezet.Count > 0 && (wijzigingen.Any(w => !w.Bezet && w.Melder == res.Reeks[^1]) || !bezet.Contains(res.Reeks[^1])))
             {
-                var verborgen = bezet.Where(x => !res.Reeks.Contains(x) && nieuweBezetten.All(n => n.Melder != x) && uitgesteld268.All(u => u.Melder != x)).ToList();
+                var verborgen = bezet.Where(x => !res.Reeks.Contains(x) && nieuweBezetten.All(n => n.Melder != x) && uitgesteld268.All(u => u.Melder != x) && x != achterkantGenegeerd).ToList();
                 if (verborgen.Count == 1)
                 {
                     _log.Info($"Melder {res.Reeks[^1]} is vrij maar melder {verborgen[0]} was al bezet (de loc stond met een deel al in die melder): melder {verborgen[0]} telt als bereikt.");

@@ -2777,3 +2777,9 @@ stoppen de proeven; (2) lukt een proef met een wissel die volgens de kaart niet 
 Wissel 14 werd op verzoek omgezet en meteen vastgelegd als oplossing van kortsluitpunt #2; 10 s later meldde Dinamo nog steeds kortsluiting in blok 4. Blijft het alarm 3 s na het omzetten,
 dan wordt het niet meer als oplossing vastgelegd.
 Waarneming (nog niet verwerkt, voor Marco): 8 -> 15 vooruit lukte met 13 afbuigend en 14 rechtdoor; 8 -> 24 achteruit met 14 afbuigend kwam op 17 uit (12:49:21).
+
+## BUG #278 – OPGELOST (nog niet getest op de baan): loc stond andersom, twintig minuten zinloze ritten (autolog 21-10 13:55:33-14:15:35)
+Na het hervatten om 13:54 kwam elke rit 'vooruit vanaf 13' op melder 5 uit, terwijl 13 -> 5 altijd achteruit gereden is: de loc stond andersom. #227 zag melder 5 als staart, maar zodra
+melder 13 vrij werd telde de regel van #54 ('melder 13 vrij, melder 5 was al bezet') melder 5 toch als bereikt. Gevolg: 'onverwacht melder 5', een overschreven rijrichting (5 > 13), elke
+keer opnieuw neerzetten op 13, kortsluitpunt #5 opgegeven, en om 14:15 bleef de loc op 24/129 steken. Nu: wordt de startmelder vrij terwijl de loc op zo'n achterkantmelder staat, dan
+stopt de rit met de melding dat de loc andersom staat (niets vastgelegd), en telt die melder niet meer als bereikt. Test: loc andersom (#278).
