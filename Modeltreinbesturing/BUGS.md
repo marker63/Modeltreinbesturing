@@ -2836,3 +2836,8 @@ Resultaat pendelbaan (21-10 16:37): 132, 139, 140 = blok 10; 133 = blok 11; 136,
 Na de pendelbaan (startmelder 133) moeten de blokken van traject 1 (4, 17, 20, 25-30) nog. Kies bij Hervatten 'Nee' (ander traject) met de loc op traject 1: staat de loc op een bekende
 melder van een ander traject dan de startmelder, dan gaat de verkenning daar verder zonder de vraag "melder al bekend, toch doorgaan?". De tekst bij Hervatten noemt die mogelijkheid nu.
 Marco 16:52: pendelbaan-blokken kloppen (132, 139, 140 = 10; 133 = 11; 136, 143, 144 = 12) en het melderschema (#286) is goed.
+
+## BUG #290 – OPGELOST (nog niet getest op de baan): klem 'opgelost' door adres 3, dat nooit effect heeft (autolog 21-10 16:55:06)
+"De loc reed weer zonder kortsluiting nadat wissel 3 naar afbuigend is geschakeld": wissel 3 bestaat op de baan niet en adres 3 stond in deze verkenning bij de adressen zonder effect.
+De korte proefrit zelf maakte de loc los. Een adres zonder gevonden effect wordt nu nooit als oplossing van een klem of alarm vastgelegd; het gaat terug en er komt een waarschuwing.
+Niets hard gecodeerd: het volgt uit 'adressen zonder effect' van de kaart zelf.

@@ -1481,6 +1481,14 @@ public partial class BaanVerkenner
             await ZetWissel(a, !oud, forceer: true);
             var eind = _klok.Nu + TimeSpan.FromSeconds(2.5);
             while (HuidigeAlarmBlokken().Count > 0 && _klok.Nu < eind) await Wacht(TimeSpan.FromMilliseconds(300));
+            if (HuidigeAlarmBlokken().Count == 0 && _kaart.AdressenZonderEffect.Contains(a))
+            {
+                // BUG #290: een adres dat in deze verkenning nooit effect had (wissel 3, 4, 7, 8, 11, 12 bestaan op de baan niet) kan het alarm niet hebben opgeheven
+                _log.Waarschuwing($"De kortsluiting is weg na het omzetten van adres {a}, maar dat adres heeft in deze verkenning nooit effect gehad: Dinamo zette het alarm waarschijnlijk zelf uit. Niet vastgelegd; adres {a} gaat terug (BUG #290).");
+                _kortsluitingGemeld = false;
+                await ZetWissel(a, oud, forceer: true);
+                return true;
+            }
             if (HuidigeAlarmBlokken().Count == 0 && _uitvalHersteldOm != herstelVoor)
             {
                 // BUG #273: tussendoor zijn alle wissels opnieuw gestuurd (Dinamo-herstel): het wegvallen van het alarm zegt niets over deze wissel
@@ -2977,6 +2985,16 @@ public partial class BaanVerkenner
                     await ZetWissel(a, oud, forceer: true);
                     _kortsluitingGemeld = false;
                     _statischeKortsluiting = false;
+                    return true;
+                }
+                if (vrij && _kaart.AdressenZonderEffect.Contains(a))
+                {
+                    // BUG #290 (autolog 21-10 16:55:06): "de loc reed weer zonder kortsluiting nadat wissel 3 naar afbuigend is geschakeld"; adres 3 had in deze verkenning nog nooit enig
+                    // effect (op de baan bestaat wissel 3 niet). De korte proefrit zelf maakte de loc los. Dat wordt niet aan het adres toegeschreven; het adres gaat terug.
+                    _log.Waarschuwing($"De loc reed weer zonder kortsluiting, maar adres {a} heeft in deze verkenning nooit effect gehad: de proefrit zelf maakte de loc waarschijnlijk los. Dit wordt niet als oplossing vastgelegd en adres {a} gaat terug (BUG #290).");
+                    _kortsluitingGemeld = false;
+                    _statischeKortsluiting = false;
+                    await ZetWissel(a, oud, forceer: true);
                     return true;
                 }
                 if (vrij)
