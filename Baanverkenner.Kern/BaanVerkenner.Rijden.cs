@@ -3128,6 +3128,13 @@ public partial class BaanVerkenner
             var alle = _kaart.BekendeVolgende(van, r.Om()).Where(x => !pad.Contains(x)).ToList();
             if (alle.Count == 1) terug = alle;
         }
+        // BUG #291 (simulatie keerlus 14:31:44 en baan 21-10 15:20:18): vanaf 129 zijn achteruit 4, 10 en 14 bekend; welke de loc neemt, hangt af van de huidige stand van wissel 5/6/9.
+        // Met de vervolgen die bij de huidige stand passen (#269) is er vaak toch één.
+        if (terug.Count != 1)
+        {
+            var bijStand = VerwachteVolgende(_kaart, van, r.Om(), a => _wisselStand.TryGetValue(a, out var st2) && st2).Where(x => !pad.Contains(x)).ToList();
+            if (bijStand.Count == 1) terug = bijStand;
+        }
         if (terug.Count != 1)
         {
             _log.Info($"Wissel {Lijst(teOm)} moet om voor de stap vanaf melder {van}, maar ligt bij de melder waar de loc staat; er is geen eenduidige melder om eerst naar terug te rijden.");

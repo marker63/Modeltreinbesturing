@@ -18,9 +18,25 @@ public partial class BaanVerkenner
         MeldVoortgang();
         int mislukt = 0;
         var herkansing = new Dictionary<int, int>();   // BUG #282
+        bool laatsteRonde = false;                     // BUG #292
         while (true)
         {
             var open = _kaart.Melders.Where(m => m.DinamoBlok is null && ProefMogelijk(m.Nummer)).Select(m => m.Nummer).ToList();
+            // BUG #292 (simulatie keerlus 21-10): melder 8 lukte vijf keer niet via 129 -> 8 en werd opgegeven, terwijl hij eerder via 24 -> 8 wel bereikbaar was. Zijn alle pogingen op, dan
+            // krijgen de melders van dit traject zonder blok één laatste ronde vanaf de plek waar de loc nu staat (vaak een andere weg).
+            if (open.Count == 0 && !laatsteRonde)
+            {
+                laatsteRonde = true;
+                var hier = HuidigePlek();
+                var bereik = hier is int h0 ? Afstanden(_kaart, h0) : new Dictionary<int, int>();
+                var nogmaals = _kaart.Melders.Where(m => m.DinamoBlok is null && (bereik.Count <= 1 || bereik.ContainsKey(m.Nummer))).Select(m => m.Nummer).ToList();
+                if (nogmaals.Count > 0)
+                {
+                    foreach (var m in nogmaals) { _proefPogingen[m] = MaxProefPogingen - 1; herkansing[m] = 3; }
+                    _log.Info($"Nog geen blok voor melder {Lijst(nogmaals)}: nog één ronde vanaf melder {hier} (BUG #292).");
+                    continue;
+                }
+            }
             if (open.Count == 0) break;
             var nu = HuidigePlek();
             var afstand = nu is int n ? Afstanden(_kaart, n) : new Dictionary<int, int>();

@@ -2846,3 +2846,11 @@ Niets hard gecodeerd: het volgt uit 'adressen zonder effect' van de kaart zelf.
 In mijn analyses (#245, #256, #264, #266, #282 en de statusnotities) stond "de loc is langer dan melder 129/8". Dat klopt niet. Twee melders tegelijk bezet betekent: de loc staat op de grens
 van twee secties (vaak met een draaistel over een wissel). De logmelding "(de loc is langer dan één melder)" is vervangen door "(de loc staat op de grens van twee melders)". De
 oplossingen zelf (niet omzetten met de loc op of bij de wissel, eerst uitwijken) blijven geldig.
+
+## BUG #291 – OPGELOST (nog niet getest op de baan): uitwijken lukte niet bij meer bekende vervolgen (simulatie keerlus 14:31:44, baan 21-10 15:20:18)
+"Wissel 5, 6, 9, 10 moet om voor de stap vanaf melder 129 ... er is geen eenduidige melder om eerst naar terug te rijden": vanaf 129 zijn achteruit 4, 10 en 14 bekend. Welke de loc neemt,
+hangt af van de huidige stand van 5/6/9; met de vervolgen die bij de huidige stand passen (#269) is er nu vaak toch één, en dan wijkt de loc eerst uit voordat de wissels omgaan.
+
+## BUG #292 – OPGELOST (nog niet getest op de baan): blokfase gaf een melder op terwijl hij via een andere weg bereikbaar was (simulatie keerlus 21-10)
+Melder 8 mislukte vijf keer via 129 -> 8 en werd opgegeven. Zijn alle pogingen op, dan krijgen de melders van dit traject zonder blok één laatste ronde vanaf de plek waar de loc dan staat.
+Test: keerlus BUG #281/#282 (voltooid, elke melder een blok).
