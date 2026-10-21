@@ -2695,3 +2695,9 @@ System.IO.Ports.dll"), maar Verbonden bleef true. Hervatten (07:51) zag geen enk
 gisteren (12 opdrachten) overschreef; de kaart staat nog in C:\Marco\baankaart_2026-10-21_0753.json. Oplossing: DinamoHardware.Verbonden is false bij een gesloten of kapotte poort; starten en
 hervatten weigeren bij geen verbinding of >10 s stilte (ook geen keepalive) met uitleg; vóór een nieuwe verkenning komt er een kopie van de voortgang
 (voortgang_voor_nieuwe_verkenning_<datum>.json) in de instellingenmap én in C:\Marco. Test: CompileCheck (het scherm zelf kan hier niet gecompileerd worden).
+
+## BUG #264 – ONDERZOCHT (nog open): wissel 5 (+6) pas op melder 129 omgezet, kortsluiting met de loc op 4/129 (autolog 21-10 08:46:18-08:46:39)
+Nieuwe verkenning vanaf nul, opdracht #3 (13 achteruit, wissel 2+1 afbuigend): de loc reed de binnenring 12 -> 11 -> 4 -> 129. Pas op melder 129 zag de staartwisselregel (#107) dat 129 -> 14
+achteruit van achteren over wissel 5 gaat (afbuigend); wissel 6 (overloopset, #259) ging mee en ligt bij 129 onder de loc: 4,3 s later kortsluiting in blok 9. Daarna wachtte de verkenner
+20 minuten op het antwoord op "Wissel bij de loc proberen?". De overgang 4 -> 129 was in deze verkenning nog niet gereden, dus op melder 4 kon de regel 'de stap daarna' (#108) het nog niet
+voorzien; na deze rit kent de kaart 4 -> 129 en zet de staartwisselregel 5+6 al op melder 4. Nog te doen: bij een eerste rit (onbekende vervolgmelder) met een overloopset rekening houden.
