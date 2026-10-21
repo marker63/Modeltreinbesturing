@@ -2783,3 +2783,12 @@ Na het hervatten om 13:54 kwam elke rit 'vooruit vanaf 13' op melder 5 uit, terw
 melder 13 vrij werd telde de regel van #54 ('melder 13 vrij, melder 5 was al bezet') melder 5 toch als bereikt. Gevolg: 'onverwacht melder 5', een overschreven rijrichting (5 > 13), elke
 keer opnieuw neerzetten op 13, kortsluitpunt #5 opgegeven, en om 14:15 bleef de loc op 24/129 steken. Nu: wordt de startmelder vrij terwijl de loc op zo'n achterkantmelder staat, dan
 stopt de rit met de melding dat de loc andersom staat (niets vastgelegd), en telt die melder niet meer als bereikt. Test: loc andersom (#278).
+
+## BUG #279 – OPGELOST (nog niet getest op de baan): wissel 9 'bewezen rechtdoor' terwijl afbuigend de oplossing was (autolog 21-10 14:52:30)
+Na de navigatie 29, 21, 24, 129, 10, 9, 1, 12, 11, 4 (achteruit) kreeg de loc op 4/129 kortsluiting. "Wissel 9 (rechtdoor) wordt niet geprobeerd: die stand is voor deze stap al bewezen
+(BUG #258)": die stand hoorde bij de stap 24 -> 129 aan het begin van de rit (129 was weer bezet). Alleen de laatste stappen tellen nog (vanaf het eind, zolang de aankomstmelder bezet is).
+Test: bewezen bij de loc (#279).
+
+## BUG #280 – OPGELOST (nog niet getest op de baan): navigaties zetten de bewezen oplossing (#267) en de verboden ingang (#260) niet onderweg (autolog 21-10 14:51:25-14:52:15)
+Dezelfde navigatie vraagt wissel 9 rechtdoor bij 24 -> 129 en afbuigend bij 4 -> 129 (de loc schiet bij 4 door naar 129). Navigaties gebruikten de staartwisselregel niet, dus wissel 9 bleef
+rechtdoor: kortsluiting. Beide regels gelden nu ook tijdens een navigatie, behalve voor wissels bij de loc. Test: vooruitregels (#280).

@@ -1613,10 +1613,13 @@ public partial class BaanVerkenner
         var res = new Dictionary<int, bool>(); var strijdig = new HashSet<int>();
         void Voeg(int a, bool afb) { if (res.TryGetValue(a, out var b) && b != afb) strijdig.Add(a); res[a] = afb; }
         var verboden = kaart.VerbodenIngangen();
-        for (int i = 0; i + 1 < reeks.Count; i++)
+        // BUG #279 (autolog 21-10 14:52:30): na 29, 21, 24, 129, 10, 9, 1, 12, 11, 4 (achteruit) stond de loc op 4 en 129; de stap 24 -> 129 van het BEGIN van de rit (wissel 9 rechtdoor) gold
+        // als bewezen voor de plek van de loc, en wissel 9 (de oplossing, afbuigend voor 4 -> 129) werd niet geprobeerd. Alleen de laatste stappen tellen: vanaf het eind zolang de
+        // aankomstmelder van de stap bezet is.
+        for (int i = reeks.Count - 2; i >= 0; i--)
         {
             int x = reeks[i], y = reeks[i + 1];
-            if (!bezet.Contains(x) && !bezet.Contains(y)) continue;
+            if (!bezet.Contains(y)) break;
             foreach (var e in kaart.WisselEisenVoorStapDetail(x, y, r)) Voeg(e.Adres, e.Afbuigend);
             foreach (var v in verboden.Where(v => v.Via == x && v.Na == y && v.R == r)) Voeg(v.Adres, false);
         }
@@ -2227,6 +2230,7 @@ public partial class BaanVerkenner
                 await ZetUitgesteldeWissels();   // BUG #271
                 // BUG #107: de rit gaat door; ligt voor de loc een wissel waar hij van achteren op af rijdt, dan nu goed zetten.
                 if (doel.StaartWissels) cfgNu = await ZetStaartWissels(m, r, cfgNu, doel);
+                else if (doel.IsNavigatie) cfgNu = await ZetVooruitRegels(m, r, cfgNu, doel);   // BUG #280
                 if (!doel.IsNavigatie && !doel.GeenKruisVooraf) cfgNu = await ZetKruisVooraf(m, r, cfgNu, doel);   // BUG #135
             }
 
@@ -2731,6 +2735,33 @@ public partial class BaanVerkenner
     internal static bool StaartWisselToegestaan(Baankaart kaart, int adres, bool afb, Richting r, Configuratie cfg, KruisKennis kruis)
         => !(afb && kruis.Motoren.Any(cfg.Bevat) && kaart.VerbodenIngangen().Any(v => v.Adres == adres && v.R == r));
 
+    /// <summary>BUG #280 (autolog 21-10 14:51:25-14:52:15): de navigatie 29 -> 21 -> 24 -> 129 -> 10 -> 9 -> 1 -> 12 -> 11 -> 4 (achteruit) zette geen wissels onderweg: wissel 9 moest bij 24 -> 129
+    /// rechtdoor (#260) en bij 4 -> 129 afbuigend (#267), maar navigaties gebruiken de staartwisselregel niet. Bij 4 schoot de loc door naar 129 met wissel 9 rechtdoor: kortsluiting. Deze twee
+    /// regels (bewezen oplossing en verboden ingang vlak voor de loc) gelden nu ook tijdens een navigatie.</summary>
+    private async Task<Configuratie> ZetVooruitRegels(int melder, Richting r, Configuratie cfg, RitDoel doel)
+    {
+        // BUG #267: een bewezen kortsluitoplossing voor de komende stap (wissel 9 afbuigend voor 4 -> 129) gaat nu al om, ook als hij bij een andere stand van de opdracht gevonden is
+        foreach (var (a, afb) in OplossingenVooruit(_kaart, melder, r, x => _wisselStand.TryGetValue(x, out var st) && st))
+        {
+            if (doel.ProefAdres == a || Kruis.IsMotor(a) || IsVolger(a) || !_ins.WisselAdressen().Contains(a)) continue;
+            if (doel.IsNavigatie && WisselsBijBezet(_kaart, _monitor.Bezet).Contains(a)) continue;   // #280: niet bij de loc
+            if (VolgerOnderLoc(a) is not null) continue;   // #264
+            _log.Info($"Melder {melder}: wissel {a} gaat naar {(afb ? "afbuigend" : "rechtdoor")} voordat de loc er is: een eerder opgelost kortsluitpunt bewees dat de komende stap die stand vraagt (BUG #267).");
+            await ZetWissel(a, afb);
+            cfg = cfg.MetStand(a, afb);
+        }
+        // BUG #260: een bekende verboden ingang vlak voor de loc gaat altijd naar rechtdoor (ook als de stand van de opdracht hem afbuigend heeft), behalve het geteste adres zelf
+        foreach (var a in VerbodenVooruit(_kaart, melder, r, x => _wisselStand.TryGetValue(x, out var st) && st))
+        {
+            if (doel.ProefAdres == a || Kruis.IsMotor(a) || IsVolger(a) || !_ins.WisselAdressen().Contains(a)) continue;
+            if (doel.IsNavigatie && WisselsBijBezet(_kaart, _monitor.Bezet).Contains(a)) continue;   // #280: niet bij de loc
+            _log.Info($"Melder {melder}: wissel {a} gaat naar rechtdoor voordat de loc er is: de kaart weet dat de loc daar verderop met wissel {a} afbuigend kortsluiting krijgt (bekende ingang, BUG #260).");
+            await ZetWissel(a, false);
+            cfg = cfg.MetStand(a, false);
+        }
+        return cfg;
+    }
+
     private async Task<Configuratie> ZetStaartWissels(int melder, Richting r, Configuratie cfg, RitDoel doel)
     {
         foreach (var (adres, afb) in StaartWissels(_kaart, melder, r, a => _wisselStand.TryGetValue(a, out var st) ? st : cfg.Bevat(a)))
@@ -2755,23 +2786,7 @@ public partial class BaanVerkenner
             await ZetWissel(adres, afb);
             cfg = cfg.MetStand(adres, afb);
         }
-        // BUG #267: een bewezen kortsluitoplossing voor de komende stap (wissel 9 afbuigend voor 4 -> 129) gaat nu al om, ook als hij bij een andere stand van de opdracht gevonden is
-        foreach (var (a, afb) in OplossingenVooruit(_kaart, melder, r, x => _wisselStand.TryGetValue(x, out var st) && st))
-        {
-            if (doel.ProefAdres == a || Kruis.IsMotor(a) || IsVolger(a) || !_ins.WisselAdressen().Contains(a)) continue;
-            if (VolgerOnderLoc(a) is not null) continue;   // #264
-            _log.Info($"Melder {melder}: wissel {a} gaat naar {(afb ? "afbuigend" : "rechtdoor")} voordat de loc er is: een eerder opgelost kortsluitpunt bewees dat de komende stap die stand vraagt (BUG #267).");
-            await ZetWissel(a, afb);
-            cfg = cfg.MetStand(a, afb);
-        }
-        // BUG #260: een bekende verboden ingang vlak voor de loc gaat altijd naar rechtdoor (ook als de stand van de opdracht hem afbuigend heeft), behalve het geteste adres zelf
-        foreach (var a in VerbodenVooruit(_kaart, melder, r, x => _wisselStand.TryGetValue(x, out var st) && st))
-        {
-            if (doel.ProefAdres == a || Kruis.IsMotor(a) || IsVolger(a) || !_ins.WisselAdressen().Contains(a)) continue;
-            _log.Info($"Melder {melder}: wissel {a} gaat naar rechtdoor voordat de loc er is: de kaart weet dat de loc daar verderop met wissel {a} afbuigend kortsluiting krijgt (bekende ingang, BUG #260).");
-            await ZetWissel(a, false);
-            cfg = cfg.MetStand(a, false);
-        }
+        cfg = await ZetVooruitRegels(melder, r, cfg, doel);
         return cfg;
     }
 

@@ -2617,6 +2617,12 @@ public static class Tests
             var bk261b = (List<int>)typeof(BaanVerkenner).GetMethod("BekendeVerbodenVoorLaatsteStap", bf261)!.Invoke(v261, null)!;
             Eis(bk261b.Contains(10), "verboden laatste stap (#261): ook via de laatste rit als de melding van de terugweg kwam (nu " + string.Join(",", bk261b) + ")");
         }
+        // BUG #279: na de navigatie 29 .. 24, 129 .. 11, 4 (achteruit) met de loc op 4 en 129 is wissel 9 rechtdoor (van 24 -> 129 aan het begin) niet 'bewezen' voor de plek van de loc
+        var k279 = Laad("baankaart_2026-10-21_1455.json");
+        var b279 = BaanVerkenner.BewezenStandenBijLoc(k279, new[] { 29, 21, 24, 129, 10, 9, 1, 12, 11, 4 }, Richting.Achteruit, new[] { 4, 129 });
+        Eis(!b279.ContainsKey(9), "bewezen bij de loc (#279): wissel 9 telt niet als bewezen door de stap 24 -> 129 aan het begin van de rit (nu " + string.Join(",", b279.Select(kv => kv.Key + (kv.Value ? "A" : "R"))) + ")");
+        var o280 = BaanVerkenner.OplossingenVooruit(k279, 11, Richting.Achteruit, a => a is 6 or 10);
+        Eis(o280.Contains((9, true)), "vooruitregels (#280): op 11 achteruit (ook in een navigatie) gaat wissel 9 afbuigend (nu " + string.Join(",", o280.Select(x => x.Adres + (x.Afbuigend ? "A" : "R"))) + ")");
         // BUG #276: wissel 5 ligt bij 14/24/129 en kan de stap 8 -> 15 niet oplossen; wissel 13 (kruiswissel bij 24/8) wel
         var k276 = Laad("baankaart_2026-10-21_1302.json");
         Eis(BaanVerkenner.LigtNietBijStap(k276, 5, 8, 15) is { Count: > 0 }, "plek van de wissel (#276): wissel 5 ligt niet bij 8 -> 15");
