@@ -922,6 +922,15 @@ public partial class BaanVerkenner
         MeldVoortgang();
     }
 
+    /// <summary>BUG #288 (autolog 21-10 16:28:45-16:35:21): de blokproef voor melder 139 (doodlopend einde, vooruit) probeerde eerst vooruit, tegen het stootjuk: 12 blokken x 30 s op
+    /// verkensnelheid, ruim 6 minuten, voordat 'nu de andere richting' volgde. Is de melder in een richting een bekend doodlopend einde, dan begint de proef in de andere richting.</summary>
+    internal static Richting[] BlokproefRichtingen(Baankaart kaart, int melder)
+    {
+        bool vooruitDood = kaart.Kopsporen.Any(k => k.Melder == melder && k.Richting == Richting.Vooruit);
+        bool achteruitDood = kaart.Kopsporen.Any(k => k.Melder == melder && k.Richting == Richting.Achteruit);
+        return vooruitDood && !achteruitDood ? new[] { Richting.Achteruit, Richting.Vooruit } : new[] { Richting.Vooruit, Richting.Achteruit };
+    }
+
     /// <summary>Bij de start: de loc staat ergens binnen melder <paramref name="melder"/>
     /// (positie onbekend). Elk blok krijgt om beurten een rijcommando; het blok waarbij
     /// binnen BlokproefLangSeconden een melder verandert, is het goede.</summary>
@@ -930,7 +939,7 @@ public partial class BaanVerkenner
         _log.Stap($"Blokproef voor melder {melder}: elk Dinamo-blok krijgt om beurten een rijcommando.");
         _monitor.Bijwerken();
         var bezetVoorProef = _monitor.Bezet.ToList();   // BUG #176: een melder die erbij komt ligt vóór de loc in de proefrichting
-        foreach (var r in new[] { Richting.Vooruit, Richting.Achteruit })
+        foreach (var r in BlokproefRichtingen(_kaart, melder))
         {
             foreach (var blok in BlokKandidaten(null, melder))
             {

@@ -2826,3 +2826,8 @@ Test: melderschema (#286).
 "Je wil naar melder 4 rijden maar die zit totaal niet op dit traject. Je had dit kunnen herkennen als separaat traject omdat geen enkele van de eerdere melders al voorkwam." De blokfase
 koos uit alle melders zonder blok. Nu komen alleen melders aan de beurt die vanaf de plek van de loc via bekende overgangen bereikbaar zijn; de andere worden één keer gemeld ("ligt niet
 op het traject waar de loc nu rijdt"). Test: los traject (#287).
+
+## BUG #288 – OPGELOST (nog niet getest op de baan): blokproef duwde ruim 6 minuten tegen het stootjuk van melder 139 (autolog 21-10 16:28:45-16:35:21)
+De blokproef voor melder 139 (doodlopend einde in de richting vooruit) begon vooruit: elk van de 12 blokken kreeg 30 s een rijcommando op verkensnelheid, pas daarna "nu de andere richting".
+Is een melder in een richting een bekend doodlopend einde, dan begint de blokproef nu in de andere richting. Test: blokproef (#288).
+Resultaat pendelbaan (21-10 16:37): 132, 139, 140 = blok 10; 133 = blok 11; 136, 143, 144 = blok 12.
