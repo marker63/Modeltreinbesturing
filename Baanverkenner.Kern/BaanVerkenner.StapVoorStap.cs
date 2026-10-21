@@ -1,4 +1,4 @@
-namespace Baanverkenner.Kern;
+﻿namespace Baanverkenner.Kern;
 
 /// <summary>
 /// BUG #172 (Marco 16-10 20:23, na 200 testversies): werkwijze "Stap voor stap". In plaats van elke opdracht vanaf de startmelder te beginnen
@@ -522,7 +522,7 @@ public partial class BaanVerkenner
         _bezig = $"blokproef voor melder {o.Start}";
         MeldVoortgang();
         await NaarPlekMelder(o.Start, Configuratie.Basis);
-        await ZetConfiguratie(Configuratie.Basis);
+        await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);   // BUG #275: niet onder de loc (wissel 5 bij 14/129, 12:38:36)
         await Nastellen(o.Start, o.Richting);
         _proefPogingen[o.Start] = _proefPogingen.GetValueOrDefault(o.Start) + 1;
         await BlokZoekenBijStart(o.Start);

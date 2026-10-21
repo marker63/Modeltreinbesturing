@@ -2736,3 +2736,34 @@ gaat de loc 129 -> 10; alleen met 5+6 afbuigend gaat hij naar 14. De kaart heeft
 bij de huidige stand van de wissels die ze van elkaar onderscheiden (uit de standen waarbij elke overgang gereden is; Dinamo-stand, dus wissel 6 omgekeerd klopt vanzelf). Blijft er niets
 over, dan gelden alle vervolgen zoals voorheen. Ook gecontroleerd: de nieuwe vondst van 12:02 (24 -> 129 achteruit met wissel 9 afbuigend = kortsluiting) zet wissel 9 voortaan vooraf
 rechtdoor (#260). Test: vervolg bij stand (#269) op baankaart 21-10 12:07.
+
+## BUG #270 – OPGELOST (nog niet getest op de baan): terugweg na de lus van opdracht #8 reed op 24 naar 129 in plaats van 14: kortsluiting (autolog 21-10 12:18:16-12:19:41 en 12:27:50-12:29:13)
+De terugweg 5 -> ... -> 21 -> 24 -> 14 -> ... -> 10 (achteruit) reed met de stand van de opdracht (9 en 10 afbuigend). Met wissel 10 afbuigend ging de loc op 24 naar 129, en met wissel 9
+afbuigend is 24 -> 129 de verboden ingang van 12:02: kortsluiting (twee keer, ook met bug269). Bij 24 is van wissel 10 geen splitsing bekend, wel de overgangen: 24 -> 14 (achteruit) altijd met
+10 rechtdoor, 24 -> 129 altijd met 10 afbuigend. Oplossing: elk pad krijgt nu ook de stand van de wissels die de vervolgen van een melder onderscheiden (uit de gereden overgangen, eerst die in
+dezelfde rijrichting). Vragen twee stappen van een terugweg iets anders over dezelfde wissel, dan rijdt de loc in stukken met per stuk de juiste stand. Test: overgang-eisen (#270).
+
+## BUG #271 – OPGELOST (nog niet getest op de baan): gespaarde wissel ging niet alsnog om toen de loc weg was: rondjes in de keerlus (autolog 21-10 12:11:21-12:12:11)
+"Wissel 9 wordt nu NIET omgezet: de loc staat op melder 129 ... Hij wordt omgezet zodra de loc daar weg is." Dat gebeurde niet: de terugweg 4 -> ... -> 10 -> 129 -> 24 reed met wissel 9
+afbuigend 129 -> 4 -> 11 en de rondjescontrole stopte de rit. Gespaarde wissels worden nu onthouden en tijdens de rit omgezet zodra de loc niet meer bij die wissel (of zijn overlooppartner)
+staat. Een nieuwe wisselstand of een bewust gezette wissel vervangt de uitgestelde.
+
+## BUG #272 – OPGELOST (nog niet getest op de baan): wissel 5 'losgemaakt' terwijl volger 6 onder de loc lag; proef van kortsluitpunt #1 met volger 6 (autolog 21-10 12:30:57-12:31:55)
+Marco 12:41: "het probleem lag volgens mij bij wissel 5". Met de loc op 24 en 129 zette de klemroutine wissel 5 naar rechtdoor; wissel 6 (overloopset) ligt bij 129 en ging mee onder de loc.
+Een meester waarvan de volger bij een bezette melder ligt, wordt niet meer losgemaakt. Ook: kortsluitpunt #1 werd 'geprobeerd met adres 6', maar een volger schakelt niet los (de proef deed
+niets en kostte een kortsluiting); volgers doen niet meer mee als kandidaat.
+
+## BUG #273 – OPGELOST (nog niet getest op de baan): valse vondst "de kortsluiting ging weg nadat wissel 2 ... is geschakeld" (autolog 21-10 12:39:32-12:40:10)
+Marco 12:41: "dat was absoluut niet zo, de loc stond meer dan 1 meter van wissel 2 af". Tijdens het zoeken naar een wissel die de blijvende kortsluiting in blok 3 opheft, bleven
+terugmeldingen weg (Dinamo zet bij een kortsluiting de stroom steeds even terug); dat telde als Dinamo-uitval. De levensteken-routine schakelde 25 s willekeurige wissels en stuurde daarna alle
+wissels opnieuw; het alarm was daarna weg en werd aan wissel 2 toegeschreven. Nu: tijdens dat zoeken telt een ontbrekende terugmelding niet als uitval, en is er tussendoor toch een
+Dinamo-herstel geweest, dan wordt het wegvallen van het alarm aan geen enkele wissel toegeschreven en niets vastgelegd.
+
+## BUG #274 – OPGELOST (nog niet getest op de baan): kortsluitpunt #2 (na melder 8 vooruit) probeerde wissel 14 afbuigend terwijl dat al kortsluiting gaf (autolog 21-10 12:40:55-12:41:49)
+Marco 12:43: "weer een probleem bij wissel 14, dat blijft een lastig punt". De kaart wist al: na melder 8 (vooruit, vanaf 17) met wissel 14 afbuigend kortsluiting, rechtdoor gaat het naar 15.
+De partnerzoektocht ('overloopwissel?') probeerde het toch vanaf 24. Nu: geen proef met een wissel afbuigend waarvan de kaart na die melder in die richting al kortsluiting kent, vanaf welke
+ingang ook. Test: bekende kortsluiting (#274).
+
+## BUG #275 – OPGELOST (nog niet getest op de baan): na de terugweg gingen alle wissels naar rechtdoor terwijl de loc op 14 en 129 stond: wissel 5 (+6) onder de loc (autolog 21-10 12:38:36)
+Na de klem op wissel 10 bleef de loc op 14 (deels 129) staan; het einde van de terugweg zette de basisstand zonder te sparen, wissel 5 en 6 gingen onder de loc om en Dinamo meldde
+kortsluiting in blok 3 die ruim anderhalve minuut bleef. De basisstand na een rit spaart nu altijd de wissels bij de loc; ze gaan om zodra de loc weg is (#271). Test: sparen (#275).

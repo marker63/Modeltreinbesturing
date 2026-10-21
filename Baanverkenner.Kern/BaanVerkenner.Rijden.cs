@@ -429,6 +429,7 @@ public partial class BaanVerkenner
     {
         var paren = _ins.GekoppeldeParen();
         if (!_volgerBezig && paren.Any(p => p.Volger == adres)) return;
+        if (!_volgerBezig) _uitgesteldeWissels.Remove(adres);   // BUG #271: een bewuste stand vervangt een uitgestelde
         await ZetWisselKern(adres, afbuigend, forceer);
         if (_volgerBezig) return;
         var omg = _ins.OmgekeerdeWissels();
@@ -498,7 +499,12 @@ public partial class BaanVerkenner
     }
 
     /// <summary>BUG #223: is er nu een blokalarm, of was er in de laatste 10 s een kortsluiting? Dan kan een terugmelding van Dinamo uitblijven of laat komen.</summary>
-    private bool AlarmRondWisselCommando() => HuidigeAlarmBlokken().Count > 0 || (_klok.Nu - _laatsteKortsluitingOm).TotalSeconds < 10;
+    /// <summary>BUG #273 (autolog 21-10 12:39:32-12:40:10): tijdens het zoeken naar een wissel die een blijvende kortsluiting opheft (de loc staat stil, Dinamo zet de stroom steeds even terug)
+    /// bleven terugmeldingen van wissel 6, 2 en 1 weg; dat telde als Dinamo-uitval. De 'levensteken'-routine schakelde 25 s willekeurige wissels en stuurde daarna alle wissels opnieuw;
+    /// het alarm was daarna weg en de verkenner schreef dat toe aan wissel 2 (Marco 12:41: "de loc stond meer dan 1 meter van wissel 2 af"). Zolang dat zoeken loopt, telt een
+    /// ontbrekende terugmelding niet als uitval.</summary>
+    private int _alarmZoekenBezig;
+    private bool AlarmRondWisselCommando() => _alarmZoekenBezig > 0 || HuidigeAlarmBlokken().Count > 0 || (_klok.Nu - _laatsteKortsluitingOm).TotalSeconds < 10;
 
     /// <summary>BUG #157: JSON van de kaart vóór de eerste ontbrekende terugmelding (null zolang de terugmeldingen binnenkomen).</summary>
     private string? _kaartVoorUitval;
@@ -778,8 +784,32 @@ public partial class BaanVerkenner
         finally { _vrijRijdenBezig = false; }
     }
 
+    /// <summary>BUG #271 (autolog 21-10 12:11:21-12:12:11): na opdracht #5 (loc op 4 en 129) moest wissel 9 voor de terugweg 4 -> ... -> 10 -> 129 -> 24 -> 21 (vooruit) rechtdoor, maar
+    /// lag onder de loc en bleef afbuigend ("Hij wordt omgezet zodra de loc daar weg is"). Dat gebeurde niet: de loc reed 10 -> 129 -> 4 -> 11 de keerlus rond tot de rondjescontrole.
+    /// Gespaarde wissels worden nu onthouden en tijdens de rit omgezet zodra de loc niet meer bij die wissel staat. Een nieuwe ZetConfiguratie vervangt de lijst.</summary>
+    private readonly Dictionary<int, bool> _uitgesteldeWissels = new();
+
+    private async Task ZetUitgesteldeWissels()
+    {
+        if (_uitgesteldeWissels.Count == 0) return;
+        var bezet = _monitor.Bezet;
+        if (bezet.Count == 0 || HuidigeAlarmBlokken().Count > 0) return;
+        var onder = WisselsOnderLoc();
+        foreach (var a in WisselsBijBezet(_kaart, bezet)) onder.TryAdd(a, 0);
+        foreach (var pa in _kaart.OverloopPartnersVan(onder.Keys).ToList()) onder.TryAdd(pa, 0);
+        foreach (var (a, wens) in _uitgesteldeWissels.ToList())
+        {
+            if (onder.ContainsKey(a) || (Kruis.IsMotor(a) && Kruis.OpKruis(bezet))) continue;
+            _uitgesteldeWissels.Remove(a);
+            if (_wisselStand.TryGetValue(a, out var nu) && nu == wens) continue;
+            _log.Info($"Wissel {a} gaat nu alsnog naar {(wens ? "afbuigend" : "rechtdoor")}: de loc staat er niet meer bij (bezet: {Lijst(bezet)}) (BUG #271, nog niet getest op de baan).");
+            await ZetWissel(a, wens);
+        }
+    }
+
     private async Task ZetConfiguratie(Configuratie c, bool spaarOnderLoc = false)
     {
+        _uitgesteldeWissels.Clear();   // BUG #271
         var onder = spaarOnderLoc ? WisselsOnderLoc() : new Dictionary<int, int>();
         // BUG #181: is er GEEN alarm, dan blijven ook wissels die de kaart bij een bezette melder noemt staan zolang de loc daar staat (sim: wissel 5 en 9 werden na een onverwachte
         // melder 129 rechtgezet terwijl de loc op die tongen stond: kortsluiting). Bij een alarm kan juist zo'n wissel de oplossing zijn (BUG #169).
@@ -797,6 +827,7 @@ public partial class BaanVerkenner
             if (onder.TryGetValue(a, out var m) && !(_wisselStand.TryGetValue(a, out var nu) && nu == wens))
             {
                 _log.Waarschuwing($"Wissel {a} wordt nu NIET omgezet: de loc staat op melder {m} waar die wissel ligt (omzetten met de loc erop laat hem ontsporen). Hij wordt omgezet zodra de loc daar weg is.");
+                _uitgesteldeWissels[a] = wens;   // BUG #271
                 continue;
             }
             // BUG #133: motor 10 of 13 omzetten terwijl de loc op de kruiswissel staat geeft altijd kortsluiting (#96). VoerOpdrachtUit controleert dat vooraf, maar
@@ -1373,6 +1404,13 @@ public partial class BaanVerkenner
     /// Helpt het niet, dan gaat de wissel terug naar zijn oude stand. Geeft true als het alarm weg is.</summary>
     private async Task<bool> ProbeerAlarmWegTeKrijgen(string stap)
     {
+        _alarmZoekenBezig++;   // BUG #273
+        try { return await ProbeerAlarmWegTeKrijgenKern(stap); }
+        finally { _alarmZoekenBezig--; }
+    }
+
+    private async Task<bool> ProbeerAlarmWegTeKrijgenKern(string stap)
+    {
         var bezet = _monitor.Bezet.ToHashSet();
         // BUG #109 (Marco 12:03: "wissel 9 werd geschakeld terwijl de loc er bovenop stond"): wissels die bij een bezette melder liggen (de kaart
         // noemt die melder bij die wissel) worden nooit zonder toestemming geprobeerd: de loc staat er met een deel op of tegen de tong aan.
@@ -1418,9 +1456,17 @@ public partial class BaanVerkenner
         {
             if (bewezen.ContainsKey(a)) return false;   // BUG #258
             bool oud = _wisselStand.TryGetValue(a, out var nu) && nu;
+            var herstelVoor = _uitvalHersteldOm;
             await ZetWissel(a, !oud, forceer: true);
             var eind = _klok.Nu + TimeSpan.FromSeconds(2.5);
             while (HuidigeAlarmBlokken().Count > 0 && _klok.Nu < eind) await Wacht(TimeSpan.FromMilliseconds(300));
+            if (HuidigeAlarmBlokken().Count == 0 && _uitvalHersteldOm != herstelVoor)
+            {
+                // BUG #273: tussendoor zijn alle wissels opnieuw gestuurd (Dinamo-herstel): het wegvallen van het alarm zegt niets over deze wissel
+                _log.Waarschuwing($"De kortsluiting is weg, maar tijdens het omzetten van wissel {a} was er een Dinamo-herstel (andere wissels geschakeld en alle wissels opnieuw gestuurd). Dat wordt niet aan wissel {a} toegeschreven en niet vastgelegd (BUG #273).");
+                _kortsluitingGemeld = false;
+                return true;
+            }
             if (HuidigeAlarmBlokken().Count == 0)
             {
                 _log.Vondst($"De kortsluiting ging weg nadat wissel {a}{toelichting} naar {(oud ? "rechtdoor" : "afbuigend")} is geschakeld ({stap}). De wissel blijft zo staan. Let op: dit is nog geen bewijs, Dinamo zet het alarm ook zelf soms even uit; een rit zonder kortsluiting over dezelfde overgang bevestigt het (BUG #249).");
@@ -2167,6 +2213,7 @@ public partial class BaanVerkenner
                     res.Einde = RitEinde.StapKlaar;
                     return res;
                 }
+                await ZetUitgesteldeWissels();   // BUG #271
                 // BUG #107: de rit gaat door; ligt voor de loc een wissel waar hij van achteren op af rijdt, dan nu goed zetten.
                 if (doel.StaartWissels) cfgNu = await ZetStaartWissels(m, r, cfgNu, doel);
                 if (!doel.IsNavigatie && !doel.GeenKruisVooraf) cfgNu = await ZetKruisVooraf(m, r, cfgNu, doel);   // BUG #135
@@ -2610,17 +2657,36 @@ public partial class BaanVerkenner
     /// tussen de vervolgen verschilt). Blijft er niets over, dan gelden alle vervolgen (zoals voorheen).</summary>
     internal static List<int> VolgendeBijStand(Baankaart kaart, int melder, Richting r, List<int> bekend, Func<int, bool> stand)
     {
-        var standen = new Dictionary<int, List<HashSet<int>>>();
+        var (vast, onderscheid) = Onderscheid(kaart, melder, r, bekend);
+        if (onderscheid.Count == 0) return bekend;
+        var res = bekend.Where(y => !vast.ContainsKey(y) || onderscheid.All(a => vast[y][a] == stand(a))).ToList();
+        return res.Count > 0 ? res : bekend;
+    }
+
+    /// <summary>BUG #269/#270: per bekend vervolg van <paramref name="melder"/> de wissels die bij elke rit naar dat vervolg dezelfde stand hadden, en de wissels die de vervolgen van
+    /// elkaar onderscheiden. Per vervolg tellen de standen van de overgang in deze rijrichting; alleen als die er niet is de omgekeerde overgang (die kan in een andere stand gereden zijn,
+    /// zoals 14 -> 24 vooruit met wissel 10 afbuigend: dat was de verboden ingang).</summary>
+    internal static (Dictionary<int, Dictionary<int, bool>> Vast, List<int> Onderscheid) Onderscheid(Baankaart kaart, int melder, Richting r, List<int> bekend)
+    {
+        var vooruit = new Dictionary<int, List<HashSet<int>>>(); var terug = new Dictionary<int, List<HashSet<int>>>();
         foreach (var o in kaart.Overgangen)
         {
-            int? y = o.Van == melder && o.Richting == r ? o.Naar : o.Naar == melder && o.Richting == r.Om() ? o.Van : null;
+            bool heen = o.Van == melder && o.Richting == r;
+            int? y = heen ? o.Naar : o.Naar == melder && o.Richting == r.Om() ? o.Van : null;
             if (y is not int yy || !bekend.Contains(yy)) continue;
-            if (!standen.TryGetValue(yy, out var l)) standen[yy] = l = new List<HashSet<int>>();
+            var doel = heen ? vooruit : terug;
+            if (!doel.TryGetValue(yy, out var l)) doel[yy] = l = new List<HashSet<int>>();
             foreach (var s in o.GezienBijConfiguraties) l.Add(Configuratie.VanSleutel(s).Afbuigend.ToHashSet());
         }
-        if (standen.Count < 2 || standen.Values.Any(l => l.Count == 0)) return bekend;
-        var adressen = standen.Values.SelectMany(l => l.SelectMany(x => x)).Distinct().ToList();
+        var standen = new Dictionary<int, List<HashSet<int>>>();
+        foreach (var y in bekend)
+        {
+            if (vooruit.TryGetValue(y, out var l) && l.Count > 0) standen[y] = l;
+            else if (terug.TryGetValue(y, out var t) && t.Count > 0) standen[y] = t;
+        }
         var vast = new Dictionary<int, Dictionary<int, bool>>();   // vervolg -> adres -> vaste stand
+        if (standen.Count < 2 || standen.Count < bekend.Count) return (vast, new List<int>());
+        var adressen = standen.Values.SelectMany(l => l.SelectMany(x => x)).Distinct().ToList();
         foreach (var (y, l) in standen)
         {
             vast[y] = new Dictionary<int, bool>();
@@ -2630,10 +2696,19 @@ public partial class BaanVerkenner
                 if (l.All(x => x.Contains(a) == eerste)) vast[y][a] = eerste;
             }
         }
-        var onderscheid = adressen.Where(a => vast.Values.All(d => d.ContainsKey(a)) && vast.Values.Select(d => d[a]).Distinct().Count() > 1).ToList();
-        if (onderscheid.Count == 0) return bekend;
-        var res = bekend.Where(y => !vast.ContainsKey(y) || onderscheid.All(a => vast[y][a] == stand(a))).ToList();
-        return res.Count > 0 ? res : bekend;
+        var onderscheid = adressen.Where(a => vast.Values.All(d => d.ContainsKey(a)) && vast.Values.Select(d => d[a]).Distinct().Count() > 1).OrderBy(a => a).ToList();
+        return (vast, onderscheid);
+    }
+
+    /// <summary>BUG #270: de standen die de stap <paramref name="van"/> -> <paramref name="naar"/> volgens de gereden overgangen vraagt (alleen de wissels die de vervolgen van
+    /// <paramref name="van"/> onderscheiden).</summary>
+    internal static Dictionary<int, bool> StapEisenUitOvergangen(Baankaart kaart, int van, int naar, Richting r)
+    {
+        var bekend = kaart.BekendeVolgende(van, r);
+        if (bekend.Count < 2 || !bekend.Contains(naar)) return new();
+        var (vast, onderscheid) = Onderscheid(kaart, van, r, bekend);
+        if (!vast.TryGetValue(naar, out var d)) return new();
+        return onderscheid.ToDictionary(a => a, a => d[a]);
     }
 
     /// <summary>BUG #107: zet de wissels uit <see cref="StaartWissels"/> goed voordat de loc erop afrijdt. Overgeslagen worden: het adres dat de
@@ -3011,6 +3086,13 @@ public partial class BaanVerkenner
             _log.Info($"Alleen wissel {Lijst(bekend261)} gaat terug: de kaart weet dat de laatste stap ({_laatsteKortsluitReeks[^2]} -> {_laatsteKortsluitReeks[^1]}) met die wissel afbuigend kortsluiting geeft (BUG #261).");
             kandidaten = bekend261;
         }
+        // BUG #272 (autolog 21-10 12:31:55, Marco 12:41: "het probleem lag bij wissel 5"): met de loc op 24 en 129 ging wissel 5 'los' naar rechtdoor; volger 6 ligt bij 129 en schakelde mee
+        // onder de loc. Een meester waarvan de volger bij een bezette melder ligt, wordt niet losgemaakt.
+        foreach (var vk in kandidaten.Where(a => VolgerOnderLoc(a) is not null).ToList())
+        {
+            kandidaten.Remove(vk);
+            _log.Info($"Wissel {vk} wordt niet losgemaakt: wissel {VolgerOnderLoc(vk)} (overloopset) schakelt mee en ligt bij de melder waar de loc staat ({Lijst(_monitor.Bezet)}) (BUG #272).");
+        }
         if (PuntzijdeProefNu() is int pz && kandidaten.Remove(pz))
             _log.Info($"Wissel {pz} wordt niet losgemaakt: de loc nam bij die wissel de afbuigende tak en reed daarna verder ({Lijst(_laatsteKortsluitReeks)}), dus hij is van de puntzijde bereden; omzetten helpt dan niet (BUG #169) en de loc heeft die stand nodig om terug te rijden.");
         if (kandidaten.Count == 0) return false;
@@ -3276,7 +3358,7 @@ public partial class BaanVerkenner
                 await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);
                 return false;
             }
-            await ZetConfiguratie(Configuratie.Basis);
+            await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);   // BUG #275: niet onder de loc (wissel 5 bij 14/129, 12:38:36)
             await Wacht(TimeSpan.FromSeconds(1));
             _monitor.Bijwerken();
             idx = -1;

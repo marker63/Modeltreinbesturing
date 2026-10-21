@@ -2183,7 +2183,9 @@ public partial class BaanVerkenner
             kandidaten = kandidaten.Distinct()
                 .Where(kd => k.Configuratie.Bevat(kd.Adres) != kd.Afbuigend && !k.GeprobeerdeAdressen.Contains(kd.Adres))
                 .ToList();
-            var hintKandidaten = hints.Where(h => k.Configuratie.Bevat(h.Adres) != h.Afbuigend && !k.GeprobeerdeAdressen.Contains(h.Adres) && _ins.WisselAdressen().Contains(h.Adres)).ToList();
+            // BUG #272 (autolog 21-10 12:30:57): kortsluitpunt #1 werd 'geprobeerd met adres 6', maar wissel 6 is de volger van 5 (overloopset) en schakelt niet los: die proef deed niets.
+            kandidaten = kandidaten.Where(kd => !IsVolger(kd.Adres)).ToList();
+            var hintKandidaten = hints.Where(h => k.Configuratie.Bevat(h.Adres) != h.Afbuigend && !k.GeprobeerdeAdressen.Contains(h.Adres) && _ins.WisselAdressen().Contains(h.Adres) && !IsVolger(h.Adres)).ToList();
             if (hintKandidaten.Count > 0)
             {
                 _log.Info($"Kortsluitpunt #{k.Id}: omdat ook melder {string.Join(" en ", k.TweedeMelders)} bezet was, gaan eerst deze wissels aan de beurt: {string.Join(", ", hintKandidaten.Select(h => $"{h.Adres} {(h.Afbuigend ? "afbuigend" : "rechtdoor")}"))}.");
@@ -2217,6 +2219,15 @@ public partial class BaanVerkenner
                 {
                     k.GeprobeerdeAdressen.Add(adres);
                     _log.Info($"Kortsluitpunt #{k.Id}: adres {adres} op afbuigend wordt niet geprobeerd; de route daarheen neemt een ingang waarvan bekend is dat dat kortsluiting geeft.");
+                    continue;
+                }
+                // BUG #274 (autolog 21-10 12:40:55-12:41:49, Marco 12:43: "weer een probleem bij wissel 14"): kortsluitpunt #2 (na melder 8 vooruit) probeerde wissel 14 afbuigend als
+                // 'overloopwissel?', terwijl de kaart al wist dat de loc na melder 8 (vooruit, vanaf 17) met wissel 14 afbuigend kortsluiting krijgt (rechtdoor gaat het verder naar 15).
+                // Dat geldt na melder 8 ook vanaf een andere ingang: geen proef met een wissel afbuigend waarvan de kaart na deze melder in deze richting al kortsluiting kent.
+                if (afb && BekendeKortsluitingNa(_kaart, adres, k.NaMelder, k.Richting) is { } bekend274)
+                {
+                    k.GeprobeerdeAdressen.Add(adres);
+                    _log.Info($"Kortsluitpunt #{k.Id}: adres {adres} op afbuigend wordt niet geprobeerd: de kaart weet al dat de loc na melder {k.NaMelder} ({k.Richting.Tekst()}) met wissel {adres} afbuigend kortsluiting krijgt ({bekend274}) (BUG #274).");
                     continue;
                 }
                 k.GeprobeerdeAdressen.Add(adres);
@@ -2319,7 +2330,7 @@ public partial class BaanVerkenner
             }
             BewaarNu();
         }
-        await ZetConfiguratie(Configuratie.Basis);
+        await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);   // BUG #275: niet onder de loc (wissel 5 bij 14/129, 12:38:36)
         return nieuwWerk;
     }
 
@@ -2379,6 +2390,13 @@ public partial class BaanVerkenner
         var nieuw = _kaart.MetWisselEisen(pad, r, c, out var wijz);
         if (wijz.Count > 0)
             _log.Info($"Wisselstand voor het pad {string.Join("-", pad)} ({r.Tekst()}) aangepast aan wat over de wissels bekend is: {string.Join(", ", wijz)}. Nieuwe stand: {nieuw}.");
+        // BUG #270: ook wat de gereden overgangen zeggen over een splitsing zonder splitsingswaarneming (kruismotor 10 bij 24 achteruit: 24 -> 14 alleen met 10 rechtdoor, 24 -> 129 alleen met 10 afbuigend)
+        var (metOvergang, wijz5) = MetOvergangEisen(_kaart, pad, r, nieuw);
+        if (wijz5.Count > 0)
+        {
+            _log.Info($"Wisselstand voor het pad {string.Join("-", pad)} ({r.Tekst()}) aangepast aan de standen waarmee elke stap gereden is: {string.Join(", ", wijz5)}. Nieuwe stand: {metOvergang} (BUG #270).");
+            nieuw = metOvergang;
+        }
         // BUG #83: ook wat opgeloste kortsluitpunten al bewezen hebben.
         var metOplossing = _kaart.MetBekendeKortsluitOplossingen(pad, r, nieuw, out var wijz2);
         if (wijz2.Count > 0)
@@ -2394,6 +2412,59 @@ public partial class BaanVerkenner
             _log.Info($"Wisselstand voor het pad {string.Join("-", pad)} ({r.Tekst()}) aangepast aan de kruiswissel-referentie: {string.Join("; ", wijz3)}. Nieuwe stand: {metKruis}.");
         return metKruis;
     }
+
+    /// <summary>BUG #270 (autolog 21-10 12:18:16-12:19:41): na de lus van opdracht #8 (stand 9 en 10 afbuigend) reed de terugweg 5 -> ... -> 21 -> 24 -> 14 -> ... -> 10 achteruit met wissel 10
+    /// nog afbuigend. Op melder 24 ging de loc daardoor naar 129 in plaats van 14, en met wissel 9 afbuigend gaf dat kortsluiting (de verboden ingang van 12:02, die niet op het pad lag).
+    /// Bij melder 24 (kruiswissel) is geen splitsing van wissel 10 bekend, wel de overgangen: 24 -> 14 (achteruit) altijd met 10 rechtdoor, 24 -> 129 altijd met 10 afbuigend. Elke stap
+    /// van het pad krijgt nu de stand van de wissels die zijn vervolgen onderscheiden. Zeggen twee stappen iets anders over dezelfde wissel, dan blijft die wissel zoals hij was
+    /// (<see cref="SplitsOpOvergangEisen"/> deelt zo'n pad in stukken).</summary>
+    internal static (Configuratie Stand, List<string> Wijzigingen) MetOvergangEisen(Baankaart kaart, List<int> pad, Richting r, Configuratie c)
+    {
+        var eisen = new Dictionary<int, bool>(); var strijdig = new HashSet<int>();
+        for (int i = 0; i + 1 < pad.Count; i++)
+            foreach (var (a, afb) in BaanVerkenner.StapEisenUitOvergangen(kaart, pad[i], pad[i + 1], r))
+            {
+                if (eisen.TryGetValue(a, out var b) && b != afb) strijdig.Add(a);
+                eisen[a] = afb;
+            }
+        var wijz = new List<string>();
+        foreach (var (a, afb) in eisen.Where(kv => !strijdig.Contains(kv.Key)).OrderBy(kv => kv.Key))
+        {
+            if (c.Bevat(a) == afb) continue;
+            c = c.MetStand(a, afb);
+            wijz.Add($"{a} {(afb ? "afbuigend" : "rechtdoor")}");
+        }
+        return (c, wijz);
+    }
+
+    /// <summary>BUG #270: deelt een pad in stukken zodat binnen elk stuk geen twee stappen een andere stand van dezelfde wissel vragen (uit de gereden overgangen). Elk stuk begint op de
+    /// melder waar het vorige eindigt.</summary>
+    internal static List<List<int>> SplitsOpOvergangEisen(Baankaart kaart, List<int> pad, Richting r)
+    {
+        var stukken = new List<List<int>>();
+        var huidig = new List<int> { pad[0] }; var eisen = new Dictionary<int, bool>();
+        for (int i = 0; i + 1 < pad.Count; i++)
+        {
+            var stap = BaanVerkenner.StapEisenUitOvergangen(kaart, pad[i], pad[i + 1], r);
+            if (huidig.Count >= 2 && stap.Any(kv => eisen.TryGetValue(kv.Key, out var b) && b != kv.Value))
+            {
+                stukken.Add(huidig);
+                huidig = new List<int> { pad[i] }; eisen = new Dictionary<int, bool>();
+            }
+            foreach (var (a, afb) in stap) eisen[a] = afb;
+            huidig.Add(pad[i + 1]);
+        }
+        stukken.Add(huidig);
+        return stukken;
+    }
+
+    /// <summary>BUG #274: de toelichting van een bekende kortsluiting (KortsluitingBijOmzetten) van <paramref name="adres"/> afbuigend na <paramref name="melder"/> in richting
+    /// <paramref name="r"/>, vanaf welke ingang dan ook; null als die niet bekend is.</summary>
+    internal static string? BekendeKortsluitingNa(Baankaart kaart, int adres, int melder, Richting r)
+        => kaart.Wissels.Where(w => w.Adres == adres).SelectMany(w => w.Waarnemingen)
+                .FirstOrDefault(o => o.Soort == WaarnemingSoort.KortsluitingBijOmzetten && o.NaMelder == melder && o.Richting == r) is { } o
+            ? (o.Via is int v ? $"gezien vanaf melder {v}" : "gezien")
+            : null;
 
     /// <summary>BUG #95 (Marco 15:51: opdracht 24 achteruit met wissel 10 afbuigend gaf elke keer kortsluiting): begint de opdracht op de kruiswissel
     /// (melder 24) en moet daar motor 13 of 10 anders staan dan nu, dan wordt die wissel omgezet terwijl de loc op de kruiswissel staat - kortsluiting.
@@ -2626,7 +2697,7 @@ public partial class BaanVerkenner
             await ZetConfiguratie(cfg);
             await Rit(vanT, e.Richting.Om(), new RitDoel { Configuratie = cfg, DoelMelder = e.Van, VerwachtPad = pad });
         }
-        await ZetConfiguratie(Configuratie.Basis);
+        await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);   // BUG #275: niet onder de loc (wissel 5 bij 14/129, 12:38:36)
     }
 
     /// <summary>Terug naar de start van de opdracht. Gaat de loc op de terugweg een andere
@@ -2774,6 +2845,23 @@ public partial class BaanVerkenner
             // Na het stoppen kan de loc net een melder verder staan (meegenomen in het pad).
             var extra = bezet.FirstOrDefault(m => !pad.Contains(m));
             if (extra != 0) { pad.Insert(0, extra); vanaf = extra; }
+        }
+        // BUG #270: vragen stappen van het terugpad een verschillende stand van dezelfde wissel, dan eerst de stukken ervoor rijden (met daarna de stand voor het volgende stuk)
+        var stukken = SplitsOpOvergangEisen(_kaart, pad, rit.Richting.Om());
+        if (stukken.Count > 1)
+        {
+            _log.Info($"Terugweg naar melder {start} ({Lijst(pad)}): de stappen vragen onderweg een andere stand van dezelfde wissel; de loc rijdt in {stukken.Count} stukken ({string.Join(" | ", stukken.Select(Lijst))}) (BUG #270, nog niet getest op de baan).");
+            foreach (var stuk in stukken.Take(stukken.Count - 1))
+            {
+                var cs = MetAlarmStand(MetEisen(stuk, rit.Richting.Om(), stuk[0] == vanaf ? KiesBijIngang(vanaf, rit.Richting.Om(), stuk, c) : c));
+                await ControleerGeenAlarmVoorStap($"terugweg naar melder {start} (stuk naar {stuk[^1]})");
+                await ZetConfiguratie(cs, spaarOnderLoc: true);
+                var deel = await Rit(stuk[0], rit.Richting.Om(), new RitDoel { Configuratie = cs, DoelMelder = stuk[^1], VerwachtPad = stuk });
+                if (deel.Einde == RitEinde.Kortsluiting)
+                    throw new NavigatieFout($"Op de terugweg naar melder {start} volgde een kortsluiting: de loc staat niet op melder {start}.");
+                c = cs;
+            }
+            pad = stukken[^1]; vanaf = pad[0];
         }
         // BUG #77 (log 18:58): de terugweg 14 -> 129 -> 24 -> 21 werd met wissel 5 rechtdoor gereden terwijl 14 -> 129 alleen met wissel 5
         // afbuigend bestaat: kortsluiting. Voor de terugweg gelden de bekende wisselstanden per stap.

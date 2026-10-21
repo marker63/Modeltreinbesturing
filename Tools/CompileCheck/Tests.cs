@@ -941,6 +941,7 @@ public static class Tests
                 Eis(regels.Count(x => x.Contains("BUG #245")) > 0, $"keerlus (start {start}) BUG #245: wissel 1 (loste de kortsluiting bij melder 12 op) wordt na de proef niet onder de loc omgezet");
                 Console.WriteLine($"  keerlus start {start}: {r.Einde}, {r.Seconden / 60:0} min, {r.Kortsluitingen} kortsluiting(en), melders {k.Melders.Count} ({string.Join(",", k.Melders.Select(m => m.Nummer).OrderBy(x => x))}), voltooid {k.Voltooid}, 129->14-maar-10: {naar10}");
                 if (Environment.GetEnvironmentVariable("KEERLUS_LOG") == "1") Console.WriteLine(r.Log.AlsTekst());
+                Console.WriteLine($"  keerlus start {start}: #270 {regels.Count(x => x.Contains("BUG #270"))}x, #271 {regels.Count(x => x.Contains("BUG #271"))}x, rondjes {regels.Count(x => x.Contains("rijdt rondjes"))}x");
                 Eis(k.Melders.Count == 23, $"keerlus (start {start}): alle 23 melders (met 1 en 9) gevonden (nu {k.Melders.Count})");
                 Eis(naar10 == 0, $"keerlus (start {start}): de terugweg 129 -> 14 gaat niet steeds naar 10 (nu {naar10}x)");
                 if (start == 13)
@@ -2585,6 +2586,24 @@ public static class Tests
             var bk261b = (List<int>)typeof(BaanVerkenner).GetMethod("BekendeVerbodenVoorLaatsteStap", bf261)!.Invoke(v261, null)!;
             Eis(bk261b.Contains(10), "verboden laatste stap (#261): ook via de laatste rit als de melding van de terugweg kwam (nu " + string.Join(",", bk261b) + ")");
         }
+        // BUG #274: kortsluitpunt #2 (na 8 vooruit) mag wissel 14 afbuigend niet proberen: na 8 vooruit (vanaf 17) gaf dat al kortsluiting
+        var k274 = Laad("baankaart_2026-10-21_1242.json");
+        Eis(BaanVerkenner.BekendeKortsluitingNa(k274, 14, 8, Richting.Vooruit) is not null, "bekende kortsluiting (#274): wissel 14 afbuigend na melder 8 vooruit is bekend");
+        Eis(BaanVerkenner.BekendeKortsluitingNa(k274, 14, 8, Richting.Achteruit) is null && BaanVerkenner.BekendeKortsluitingNa(k274, 13, 8, Richting.Vooruit) is null, "bekende kortsluiting (#274): niet voor een andere richting of wissel");
+        var wb275 = BaanVerkenner.WisselsBijBezet(k274, new[] { 14, 129 });
+        Eis(wb275.Contains(5) || wb275.Contains(6), "sparen (#275): met de loc op 14 en 129 ligt wissel 5 of 6 bij de loc, dus ZetConfiguratie(Basis, sparen) laat ze staan (nu " + string.Join(",", wb275.OrderBy(x => x)) + ")");
+        // BUG #270: terugweg na de lus van opdracht #8 (stand 9+10): op 24 achteruit naar 14 moet wissel 10 rechtdoor (24 -> 129 alleen met 10 afbuigend)
+        var k270 = Laad("baankaart_2026-10-21_1221.json");
+        var e270a = BaanVerkenner.StapEisenUitOvergangen(k270, 24, 14, Richting.Achteruit);
+        var e270b = BaanVerkenner.StapEisenUitOvergangen(k270, 24, 129, Richting.Achteruit);
+        Eis(e270a.TryGetValue(10, out var x270a) && !x270a && e270b.TryGetValue(10, out var x270b) && x270b, "overgang-eisen (#270): 24 -> 14 achteruit vraagt 10 rechtdoor, 24 -> 129 vraagt 10 afbuigend (nu " + string.Join(",", e270a.Select(kv => kv.Key + (kv.Value ? "A" : "R"))) + " / " + string.Join(",", e270b.Select(kv => kv.Key + (kv.Value ? "A" : "R"))) + ")");
+        var p270 = new List<int> { 5, 16, 15, 8, 17, 25, 26, 28, 27, 20, 30, 29, 21, 24, 14, 13, 5, 12, 11, 4, 129, 10 };
+        var (c270, w270) = BaanVerkenner.MetOvergangEisen(k270, p270, Richting.Achteruit, new Configuratie(new[] { 9, 10 }));
+        Eis(!c270.Bevat(10), "overgang-eisen (#270): het terugpad van 12:18 krijgt wissel 10 rechtdoor (nu " + c270 + ", " + string.Join(", ", w270) + ")");
+        var s270 = BaanVerkenner.SplitsOpOvergangEisen(k270, new List<int> { 21, 24, 14 }, Richting.Achteruit);
+        Eis(s270.Count == 1, "overgang-eisen (#270): pad zonder tegenstrijdige stappen blijft één stuk");
+        var s270b = BaanVerkenner.SplitsOpOvergangEisen(k270, new List<int> { 13, 14, 24, 129 }, Richting.Vooruit);
+        Console.WriteLine("  #270 splitsing 13-14-24-129 vooruit: " + string.Join(" | ", s270b.Select(x => string.Join(",", x))));
         // BUG #269: op 129 achteruit met 5 rechtdoor en 6 Dinamo afbuigend (baan: beide rechtdoor) gaat de loc naar 10, niet naar 14: geen staartwissel 5
         var k269 = Laad("baankaart_2026-10-21_1207.json");
         Func<int, bool> st269 = a => a is 6 or 10;
