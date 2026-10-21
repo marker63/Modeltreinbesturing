@@ -2806,3 +2806,18 @@ wordt de verkenning nu voltooid (elke melder een Dinamo-blok; eerder open punt #
 "Je gaat er nu ineens van uit dat de loc altijd op melder 13 moet komen, maar ik wil het 2e traject gaan rijden." Uitbreiden met een tweede traject (#74) werd alleen aangeboden bij een
 voltooide verkenning; deze was gestopt met melders zonder Dinamo-blok. Hervatten vraagt nu bij een niet-voltooide verkenning: Ja = verder op dit traject (startmelder), Nee = tweede, los
 traject vanaf de melder waar de loc nu staat (alles wat gevonden is blijft), Annuleren.
+
+## BUG #284 – OPGELOST (nog niet getest op de baan): loc reed op verkensnelheid tegen het stootjuk van de pendelbaan en ontspoorde (Marco 21-10 16:02; autolog 15:50:32-15:51:08 en 16:00:07)
+Na de laatste melder van een nog onbekend stuk reed de loc tot 30-36 s op verkensnelheid door voordat 'doodlopend' volgde. Nu (optie 6): staat de loc helemaal in een melder zonder bekend
+vervolg in deze richting en komt er na anderhalf keer de gewone sectietijd (6-12 s) geen nieuwe melder, dan rijdt hij op kruipsnelheid verder (naar alle blokken). Komt er toch een nieuwe
+melder, dan weer de gewone snelheid. Test: stootjuk (#284).
+
+## BUG #285 – OPGELOST (nog niet getest op de baan): ontsporing aan het einde van het spoor werd 'kortsluitpunt #8 (wissel van achteren)' (autolog 21-10 16:00:14-16:00:33)
+Marco 16:02: "logisch geredeneerd, maar daar was het einde van het pendelspoor". Na melder 143 (achteruit) was de loc op geen enkele melder meer te zien, zonder kortsluitmelding van
+Dinamo. Verdwijnt de loc na een melder zonder bekend vervolg zonder kortsluitmelding, dan wordt dat nu een doodlopend einde (met de terugrit) en een waarschuwing om de loc te
+controleren, geen kortsluitpunt. Geen aparte test (de simulatie laat de loc niet ontsporen).
+
+## BUG #286 – OPGELOST (nog niet getest op de baan): melderschema tekende het tweede traject op nummer (Marco 21-10 16:04/16:12)
+"Volgorde zou moeten zijn: 139, 140, 132, 133, 136, 144, 143; in het schema staan ze gewoon in oplopende nummering." De kaart zelf had de goede volgorde (overgangen 139-140-132-133-
+136-144-143); alleen de tekening zette melders die niet aan de ring vastzitten als één rij op nummer. Nu krijgt elk los traject een eigen rij in de volgorde van het spoor.
+Test: melderschema (#286).

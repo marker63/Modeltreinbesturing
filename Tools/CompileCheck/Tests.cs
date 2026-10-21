@@ -65,7 +65,10 @@ public static class Tests
         Eis(ks2.Log.AlsTekst().Contains("Kortsluiting tijdens de blokproef"), "kortsluiting in de blokproef: ook herkend bij een ander blok en moment");
         // BUG #61 (11:38-rit): loc staat bij het stoppen met een deel in twee secties
         foreach (var fl in new[] { 133, 132, 136 })
-            PendelScenario(new Dictionary<(int, int, bool), int>(), $"pendel (loc op grens, melder {fl} flikkert)", true, flikker: fl, grensRem: true);
+        {
+            var pr = PendelScenario(new Dictionary<(int, int, bool), int>(), $"pendel (loc op grens, melder {fl} flikkert)", true, flikker: fl, grensRem: true);
+            if (Environment.GetEnvironmentVariable("PENDEL_LOG") == fl.ToString()) Console.WriteLine(pr.Log.AlsTekst());
+        }
         foreach (var l in new[] { 50.0, 52.0, 54.0, 56.0, 58.0, 60.0, 62.0, 64.0, 66.0, 68.0, 70.0, 72.0, 75.0, 80.0, 100.0 })
         {
             var gr = PendelScenario(new Dictionary<(int, int, bool), int>(), $"pendel (loc op grens, sectie 136 = {l} cm)", true, lengte136: l, grensRem: true);
@@ -257,6 +260,35 @@ public static class Tests
                 $"navigatie-echo (#268): melder 137 even bezet ({sim.KortsluitEchosGemeld}x) -> genegeerd, doel 3 bereikt ({res?.Einde}, fout {fout})");
         else
             Eis(fout, "navigatie-echo (#268): blijft melder 137 bezet, dan is het wel een onverwachte melder");
+    }
+
+    // BUG #284: optie 6, rit vooruit 1 -> 2 -> 3 op een nog onbekend stuk; na melder 3 komt het stootjuk. Na een gewone sectietijd zonder nieuwe melder gaat de loc op kruipsnelheid
+    static void StootjukTest()
+    {
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
+        var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+        var s1 = sim.NieuweSectie(1, 80, 1); var s2 = sim.NieuweSectie(2, 80, 2); var s3 = sim.NieuweSectie(3, 200, 3);
+        sim.Verbind(s1, B, s2, A); sim.Verbind(s2, B, s3, A);
+        sim.PlaatsLoc(s1, 40, +1);
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 1, DinamoBlokken = "1-3", Rondrit = true };
+        var status = new VerkenStatus { Instellingen = ins };
+        status.Kaart.StartMelder = 1; status.Kaart.Hardware = "Simulatie"; status.Kaart.RefSnelheid = 12;
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var log = new VerkenLog(klok);
+        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true), status);
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var monitor = (MelderMonitor)typeof(BaanVerkenner).GetField("_monitor", bf)!.GetValue(v)!;
+        sim.BezetmeldingGewijzigd += monitor.Ontvang;
+        foreach (var mm in new[] { 1, 2, 3 }) sim.VraagMelderStatusOp(mm);
+        klok.Wacht(TimeSpan.FromSeconds(1)).GetAwaiter().GetResult();
+        var rit = typeof(BaanVerkenner).GetMethod("Rit", bf)!;
+        RitResultaat? res = null; string fout = "";
+        try { res = ((Task<RitResultaat>)rit.Invoke(v, new object[] { 1, Richting.Vooruit, new RitDoel { Basis = new List<int> { 1 } } })!).GetAwaiter().GetResult(); }
+        catch (Exception e) { fout = (e.InnerException ?? e).Message; }
+        var regels = log.Regels.Select(x => x.Tekst).ToList();
+        Eis(regels.Any(x => x.Contains("BUG #284") && x.Contains("melder 3")), $"stootjuk (#284): na melder 3 (onbekend vervolg) gaat de loc op kruipsnelheid (einde {res?.Einde}, reeks {(res is null ? fout : string.Join(",", res.Reeks))})");
+        Eis(res?.Einde == RitEinde.Doodlopend, $"stootjuk (#284): de rit eindigt als doodlopend (nu {res?.Einde})");
     }
 
     // BUG #278: de loc staat andersom op melder 2 (neus naar 1); 'vooruit naar 3' rijdt naar 1, terwijl 2 -> 1 altijd achteruit gereden is: stoppen met 'loc andersom', geen overgang vastleggen
@@ -2624,6 +2656,12 @@ public static class Tests
         Eis(!b279.ContainsKey(9), "bewezen bij de loc (#279): wissel 9 telt niet als bewezen door de stap 24 -> 129 aan het begin van de rit (nu " + string.Join(",", b279.Select(kv => kv.Key + (kv.Value ? "A" : "R"))) + ")");
         var o280 = BaanVerkenner.OplossingenVooruit(k279, 11, Richting.Achteruit, a => a is 6 or 10);
         Eis(o280.Contains((9, true)), "vooruitregels (#280): op 11 achteruit (ook in een navigatie) gaat wissel 9 afbuigend (nu " + string.Join(",", o280.Select(x => x.Adres + (x.Afbuigend ? "A" : "R"))) + ")");
+        // BUG #286: het tweede traject (pendelbaan) staat in het melderschema in de volgorde van het spoor: 139, 140, 132, 133, 136, 144, 143 (of andersom)
+        var k286 = Laad("baankaart_2026-10-21_1609.json");
+        var ms286 = Melderschema.Maak(k286);
+        var p286 = new[] { 139, 140, 132, 133, 136, 144, 143 }.Select(n => ms286.Knopen.First(x => x.Melder == n).X).ToList();
+        bool oplopend286 = p286.Zip(p286.Skip(1)).All(z => z.Second > z.First), aflopend286 = p286.Zip(p286.Skip(1)).All(z => z.Second < z.First);
+        Eis(oplopend286 || aflopend286, "melderschema (#286): pendelbaan in de volgorde van het spoor (x: " + string.Join(",", p286.Select(x => x.ToString("0"))) + ")");
         // BUG #276: wissel 5 ligt bij 14/24/129 en kan de stap 8 -> 15 niet oplossen; wissel 13 (kruiswissel bij 24/8) wel
         var k276 = Laad("baankaart_2026-10-21_1302.json");
         Eis(BaanVerkenner.LigtNietBijStap(k276, 5, 8, 15) is { Count: > 0 }, "plek van de wissel (#276): wissel 5 ligt niet bij 8 -> 15");
@@ -3263,6 +3301,7 @@ public static class Tests
         NavigatieOnjuisteStartTest();
         NavigatieEchoTest(false); NavigatieEchoTest(true);
         LocAndersom278Test();
+        StootjukTest();
         BlokkenschemaTest();
         OverdrachtTest();
         DoorgangTest();

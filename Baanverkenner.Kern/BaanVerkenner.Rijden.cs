@@ -10,6 +10,9 @@ public class RitResultaat
     public Richting Richting { get; set; }
     /// <summary>BUG #64: de rit bleef hangen na een melder waarvan het vervolg (bij deze wisselstand) al bekend is: geen kopspoor.</summary>
     public bool BekendVervolgGemist { get; set; }
+    /// <summary>BUG #285: de loc verdween van de melders na een melder zonder bekend vervolg, zonder dat Dinamo een kortsluiting meldde: waarschijnlijk het einde van het spoor
+    /// (stootjuk, loc ontspoord of zonder stroom voorbij de laatste sectie), geen verkeerd bereden wissel.</summary>
+    public bool EindeVanHetSpoor { get; set; }
 }
 
 /// <summary>Wat een rit moet doen. Zonder DoelMelder is het een verkenningsrit (rijden tot
@@ -1312,6 +1315,15 @@ public partial class BaanVerkenner
         PasSnelhedenAan(nieuw, Math.Min(_ins.Kruipsnelheid, Math.Max(2, nieuw - 2)));
     }
 
+    /// <summary>BUG #284: na hoeveel seconden zonder nieuwe melder de loc op een nog onbekend stuk naar kruipsnelheid gaat: anderhalf keer de gewone (mediane) sectietijd bij
+    /// verkensnelheid, tussen 6 en 12 s.</summary>
+    private double KruipNaarEindeNa()
+    {
+        var tijden = _kaart.Overgangen.Where(o => o.AantalMetingen > 0 && o.GemiddeldeSeconden > 0).Select(o => o.GemiddeldeSeconden * RefSnelheid / Math.Max(1, _ins.Verkensnelheid)).OrderBy(x => x).ToList();
+        double mediaan = tijden.Count == 0 ? 6 : tijden[tijden.Count / 2];
+        return Math.Clamp(mediaan * 1.5, 6, 12);
+    }
+
     private TimeSpan WachttijdTussenMelders()
     {
         double max = _ins.MaxSecondenTussenMelders;
@@ -1910,6 +1922,7 @@ public partial class BaanVerkenner
         _kortsluitingGemeld = HuidigeAlarmBlokken().Count > 0;
 
         int? achterkantGenegeerd = null;   // BUG #227
+        bool kruipNaarEinde = false;       // BUG #284
         var uitgesteld268 = new List<MelderMonitor.Wijziging>();   // BUG #268
         DateTime? stapStopTot = null;   // BUG #175: tot wanneer de loc na de laatste melder van een stap-rit nog doorrijdt
         while (true)
@@ -1967,7 +1980,12 @@ public partial class BaanVerkenner
             {
                 leegSinds ??= _klok.Nu;
                 if (_klok.Nu - leegSinds.Value > TimeSpan.FromSeconds(_ins.LegeMeldersSeconden))
+                {
+                    // BUG #285 (autolog 21-10 16:00:07-16:00:33, Marco 16:02: "daar was het einde van het pendelspoor en reed de loc tegen het stootjuk aan en ontspoorde daar")
+                    if (!doel.IsNavigatie && res.Reeks.Count >= 2 && HuidigeAlarmBlokken().Count == 0 && _kaart.BekendeVolgende(res.Reeks[^1], r).Count == 0)
+                        res.EindeVanHetSpoor = true;
                     return await Kortsluiting(res, $"geen enkele melder meer bezet na melder {res.Reeks[^1]}");
+                }
             }
             else leegSinds = null;
             await VoedOntbrekendeBlokken(bezet, r, doelInzicht ? _ins.Kruipsnelheid : snelheid);
@@ -2112,6 +2130,13 @@ public partial class BaanVerkenner
                 if (ingangVia is int iv && iv != m) _kaart.RegistreerDoorgang(iv, res.Reeks[^1], m, r, cfgWerkelijk);
                 bool herhaling = res.Reeks.Contains(m);
                 res.Reeks.Add(m);
+                if (kruipNaarEinde)
+                {
+                    // BUG #284: er kwam toch een nieuwe melder; de rit gaat weer met de gewone snelheid verder
+                    kruipNaarEinde = false;
+                    snelheid = _ins.Verkensnelheid;
+                    if (!doelInzicht) await StuurSnelheid(r, snelheid);
+                }
                 tijdVorigeMelder = w.Tijd;
                 laatsteWijziging = _klok.Nu;
                 onderbroken = false;
@@ -2326,6 +2351,18 @@ public partial class BaanVerkenner
                 await Nastellen(doel.DoelMelder.Value, r, achter: res.Reeks.Count >= 2 ? res.Reeks[^2] : null);
                 res.Einde = RitEinde.DoelBereikt;
                 return res;
+            }
+
+            // ---- BUG #284 (Marco 21-10 16:02: "daar was het einde van het pendelspoor en reed de loc tegen het stootjuk aan en ontspoorde daar"; autolog 15:50:32-15:51:08): na de laatste
+            // melder van een nog onbekend stuk reed de loc tot 36 s op verkensnelheid door voordat 'doodlopend' volgde. Staat de loc helemaal in een melder waarvan nog geen vervolg in deze
+            // richting bekend is, en komt er na een gewone sectietijd geen nieuwe melder, dan gaat hij op kruipsnelheid verder: een stootjuk wordt dan zacht geraakt.
+            if (Rondrit && !doel.IsNavigatie && !kruipNaarEinde && snelheid > _ins.Kruipsnelheid && res.Reeks.Count >= 1 && bezet.Count == 1 && bezet.Contains(res.Reeks[^1])
+                && _kaart.BekendeVolgende(res.Reeks[^1], r).Count == 0 && (_klok.Nu - laatsteWijziging).TotalSeconds > KruipNaarEindeNa())
+            {
+                kruipNaarEinde = true;
+                snelheid = _ins.Kruipsnelheid;
+                _log.Info($"Na melder {res.Reeks[^1]} ({r.Tekst()}) is nog geen vervolg bekend en na {(_klok.Nu - laatsteWijziging).TotalSeconds:0} s komt er geen nieuwe melder: de loc gaat op kruipsnelheid verder (mogelijk een stootjuk, BUG #284, nog niet getest op de baan).");
+                await StuurSnelheidAlleBlokken(r, snelheid);   // ook het blok van de volgende (nog onbekende) sectie, anders blijft de loc op de blokgrens staan
             }
 
             // ---- Te lang geen nieuwe melder ----

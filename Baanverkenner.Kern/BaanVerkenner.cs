@@ -1755,6 +1755,17 @@ public partial class BaanVerkenner
                 _log.Vondst($"Lus: melder {laatste} werd opnieuw bereikt ({Lijst(rit.Reeks)}).");
                 break;
             case RitEinde.Kortsluiting:
+                // BUG #285: de loc verdween van de melders na een melder zonder bekend vervolg en Dinamo meldde geen kortsluiting: dat is het einde van het spoor (stootjuk), geen wissel.
+                if (rit.EindeVanHetSpoor)
+                {
+                    string t285 = $"Na melder {laatste} ({o.Richting.Tekst()}) was de loc op geen enkele melder meer te zien, zonder kortsluitmelding van Dinamo en zonder bekend vervolg: waarschijnlijk het einde van het spoor (stootjuk). Dit wordt een doodlopend einde, geen kortsluitpunt. Controleer of de loc nog goed op de rails staat (BUG #285).";
+                    _log.Waarschuwing(t285);
+                    _kaart.Waarschuwingen.Add(t285);
+                    _kaart.RegistreerKopspoor(laatste, o.Richting, o.Configuratie);
+                    if (rit.Reeks.Count >= 2)
+                        Plan(new Opdracht { Configuratie = o.Configuratie, Start = laatste, Richting = o.Richting.Om(), Route = RouteMet(o.Route, o.Configuratie, o.Richting, rit.Reeks), Reden = $"terug vanaf het einde bij melder {laatste}" });
+                    break;
+                }
                 RegistreerKortsluitpunt(o, rit.Reeks, o.Configuratie, o.Route, o.Richting);
                 break;
         }

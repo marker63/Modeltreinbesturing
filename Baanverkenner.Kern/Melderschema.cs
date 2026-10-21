@@ -130,7 +130,22 @@ public class Melderschema
                 pos[m] = (mx + ux * 150, my + uy * 150);
                 over.Remove(m);
             }
-        for (int i = 0; i < over.Count; i++) pos[over[i]] = (60 + (i % 10) * 70, Hoogte - 40);
+        // BUG #286 (Marco 21-10 16:04/16:12: "de volgorde zou moeten zijn 139, 140, 132, 133, 136, 144, 143; in het schema staan ze in oplopende nummering"): een los traject (niet verbonden met de
+        // ring) stond als één rij op nummer onderaan. Nu krijgt elk los traject een eigen rij, in de volgorde van het spoor: vanaf een uiteinde langs de buren.
+        int rij = 0;
+        while (over.Count > 0)
+        {
+            var deel = new HashSet<int> { over[0] }; var rijQ = new Queue<int>(); rijQ.Enqueue(over[0]);
+            while (rijQ.Count > 0) foreach (var b in buren[rijQ.Dequeue()].Where(over.Contains)) if (deel.Add(b)) rijQ.Enqueue(b);
+            int begin = deel.OrderBy(m => buren[m].Count(deel.Contains)).ThenBy(m => m).First();
+            var volgorde = new List<int>(); var bezocht = new HashSet<int>();
+            void Loop(int m) { if (!bezocht.Add(m)) return; volgorde.Add(m); foreach (var b in buren[m].Where(deel.Contains).OrderBy(b => buren[b].Count(deel.Contains)).ThenBy(b => b)) Loop(b); }
+            Loop(begin);
+            double stap = Math.Min(90, (Breedte - 120) / Math.Max(1, volgorde.Count - 1));
+            for (int i = 0; i < volgorde.Count; i++) pos[volgorde[i]] = (60 + i * stap, Hoogte - 40 - rij * 70);
+            foreach (var m in volgorde) over.Remove(m);
+            rij++;
+        }
 
         // alleen uit elkaar duwen wat te dicht op elkaar ligt (de ring blijft zo een ring); vast aantal rondes, geen toeval
         var lijst = Knopen.Select(x => x.Melder).ToList();
