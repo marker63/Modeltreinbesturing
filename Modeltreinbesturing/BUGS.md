@@ -2707,3 +2707,9 @@ daarna' (#108) 5 en 6 al op de melder ervoor (4). Test: overloop te laat (#264).
 
 ## BUG #265 – OPGELOST: melding "Eerste stap bij de kortsluiting: wissel - wordt van een tak ..." bij een lege lijst (autolog 21-10 08:15:40)
 Alleen het deel van de melding dat iets zegt wordt nog getoond.
+
+## BUG #266 – ONDERZOCHT (open): na de kortsluiting op 4/129 rijdt de terugweg 'vooruit van 4' toch naar 129 en daarna 'achteruit van 129 naar 4' (autolog 21-10 11:10:31-11:12:43)
+De loc stond na de kortsluiting (4 -> 129 achteruit, wissel 9 nog rechtdoor; opgelost door 9 afbuigend, kortsluitpunt #3) op 4 én 129. De terugweg 'vooruit van 4 naar 13' kwam op 129 uit
+("onverwacht melder 129"), en het zelf terugrijden koos daarna het pad 129, 4, 129, 14, 13 met '129 -> 4 achteruit', wat het register als overschreven rijrichting meldt (129>4 vooruit ->
+achteruit en terug). Oorzaak: de loc is langer dan melder 129 en staat op de grens 4/129; welke melder 'de' startmelder is, is dan niet eenduidig. Het programma herstelde zich binnen 2 minuten
+zonder hulp (loc weer op 13). Nog te doen: bij een loc op twee melders de rijrichting van de stap bepalen uit de laatst gereden overgang, niet uit de melder waar de loc 'op' staat.
