@@ -2662,6 +2662,9 @@ public static class Tests
         var p286 = new[] { 139, 140, 132, 133, 136, 144, 143 }.Select(n => ms286.Knopen.First(x => x.Melder == n).X).ToList();
         bool oplopend286 = p286.Zip(p286.Skip(1)).All(z => z.Second > z.First), aflopend286 = p286.Zip(p286.Skip(1)).All(z => z.Second < z.First);
         Eis(oplopend286 || aflopend286, "melderschema (#286): pendelbaan in de volgorde van het spoor (x: " + string.Join(",", p286.Select(x => x.ToString("0"))) + ")");
+        // BUG #287: vanaf de pendelbaan (133) is melder 4 van het eerste traject niet bereikbaar; 143 wel
+        var a287 = BaanVerkenner.Afstanden(k286, 133);
+        Eis(!a287.ContainsKey(4) && a287.ContainsKey(143) && a287.ContainsKey(139), "los traject (#287): vanaf 133 zijn 139 en 143 bereikbaar, melder 4 niet");
         // BUG #276: wissel 5 ligt bij 14/24/129 en kan de stap 8 -> 15 niet oplossen; wissel 13 (kruiswissel bij 24/8) wel
         var k276 = Laad("baankaart_2026-10-21_1302.json");
         Eis(BaanVerkenner.LigtNietBijStap(k276, 5, 8, 15) is { Count: > 0 }, "plek van de wissel (#276): wissel 5 ligt niet bij 8 -> 15");

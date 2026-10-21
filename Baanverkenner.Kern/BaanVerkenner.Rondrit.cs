@@ -6,8 +6,11 @@ namespace Baanverkenner.Kern;
 /// Tijdens de eerste fase gingen alle snelheids- en richtingscommando's naar alle blokken, zonder bloknummers vast te leggen.</summary>
 public partial class BaanVerkenner
 {
+    private bool _andereTrajectGemeld;   // BUG #287
+
     private async Task RondritBlokkenZoeken()
     {
+        _andereTrajectGemeld = false;
         var zonder = _kaart.Melders.Where(m => m.DinamoBlok is null).Select(m => m.Nummer).OrderBy(x => x).ToList();
         _log.Stap($"Alle melders met hun vervolgen zijn bekend ({_kaart.Melders.Count} melders, {_kaart.Overgangen.Count(o => o.AantalKeer > 0)} overgangen, {_kaart.Wissels.Count} wissels, {_kaart.Kopsporen.Count} doodlopende einden). Nu worden de Dinamo-blokken gezocht voor melder {string.Join(", ", zonder)}.");
         _rondritBlokfase = true;
@@ -21,6 +24,19 @@ public partial class BaanVerkenner
             if (open.Count == 0) break;
             var nu = HuidigePlek();
             var afstand = nu is int n ? Afstanden(_kaart, n) : new Dictionary<int, int>();
+            // BUG #287 (Marco 21-10 16:42: "je wil naar melder 4 rijden maar die zit totaal niet op dit traject"): bij een tweede, los traject (de pendelbaan) wilde de blokfase ook de melders
+            // van het eerste traject bereiken. Alleen melders die vanaf de plek van de loc via bekende overgangen bereikbaar zijn, komen aan de beurt; de rest ligt op een ander traject.
+            if (nu is int && afstand.Count > 1)
+            {
+                var elders = open.Where(m => !afstand.ContainsKey(m)).ToList();
+                if (elders.Count > 0 && !_andereTrajectGemeld)
+                {
+                    _andereTrajectGemeld = true;
+                    _log.Info($"Melder {Lijst(elders)} ligt niet op het traject waar de loc nu rijdt (geen verbinding via bekende overgangen): die blokken worden nu niet gezocht. Zet de loc later op dat traject en hervat (BUG #287).");
+                }
+                open = open.Where(afstand.ContainsKey).ToList();
+                if (open.Count == 0) break;
+            }
             int doel = open.OrderBy(m => afstand.TryGetValue(m, out var d) ? d : 999).ThenBy(m => m).First();
             await PauzeMoment();
             _bezig = $"blok zoeken voor melder {doel}";

@@ -2821,3 +2821,8 @@ controleren, geen kortsluitpunt. Geen aparte test (de simulatie laat de loc niet
 "Volgorde zou moeten zijn: 139, 140, 132, 133, 136, 144, 143; in het schema staan ze gewoon in oplopende nummering." De kaart zelf had de goede volgorde (overgangen 139-140-132-133-
 136-144-143); alleen de tekening zette melders die niet aan de ring vastzitten als één rij op nummer. Nu krijgt elk los traject een eigen rij in de volgorde van het spoor.
 Test: melderschema (#286).
+
+## BUG #287 – OPGELOST (nog niet getest op de baan): blokfase op de pendelbaan wilde naar melder 4 van het eerste traject (Marco 21-10 16:42)
+"Je wil naar melder 4 rijden maar die zit totaal niet op dit traject. Je had dit kunnen herkennen als separaat traject omdat geen enkele van de eerdere melders al voorkwam." De blokfase
+koos uit alle melders zonder blok. Nu komen alleen melders aan de beurt die vanaf de plek van de loc via bekende overgangen bereikbaar zijn; de andere worden één keer gemeld ("ligt niet
+op het traject waar de loc nu rijdt"). Test: los traject (#287).
