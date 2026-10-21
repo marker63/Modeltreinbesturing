@@ -2537,6 +2537,33 @@ public partial class BaanVerkenner
         return res.OrderBy(a => a).ToList();
     }
 
+    /// <summary>BUG #267 (autolog 21-10 11:20:44-11:21:47): opdracht #5 (stand: wissel 10) reed achteruit door de keerlus en kwam 11 -> 4 -> 129; met wissel 9 rechtdoor kortsluiting,
+    /// terwijl kortsluitpunt #3 al bewezen had dat de stap 4 -> 129 (achteruit) wissel 9 afbuigend vraagt. Die oplossing hoorde bij stand '2' (wissel 2+1 van de opdracht toen) en werd
+    /// daardoor niet gebruikt. Hier: bewezen (niet voorlopige) oplossingen van kortsluitpunten waarvan de laatste stap van de route de komende stap is (of de eenduidig bekende stap daarna),
+    /// met de oplossingswissel nu niet in de goede stand.</summary>
+    internal static List<(int Adres, bool Afbuigend)> OplossingenVooruit(Baankaart kaart, int melder, Richting r, Func<int, bool> stand)
+    {
+        var stappen = new HashSet<(int, int)>();
+        var volgende = VerwachteVolgende(kaart, melder, r, stand);
+        foreach (var y in volgende)
+        {
+            stappen.Add((melder, y));
+            var zs = VerwachteVolgende(kaart, y, r, stand);
+            if (volgende.Count == 1 && zs.Count == 1) stappen.Add((y, zs[0]));
+        }
+        var res = new Dictionary<int, bool>(); var strijdig = new HashSet<int>();
+        foreach (var kp in kaart.Kortsluitpunten.Where(k => k.Opgelost && !k.Voorlopig && k.OpgelostDoorAdres is int && k.OpgelostMetAfbuigend is bool && k.Richting == r))
+        {
+            var pad = kp.Route.LastOrDefault()?.Pad;
+            if (pad is null || pad.Count < 2 || !stappen.Contains((pad[^2], pad[^1]))) continue;
+            int a = kp.OpgelostDoorAdres!.Value; bool afb = kp.OpgelostMetAfbuigend!.Value;
+            if (stand(a) == afb) continue;
+            if (res.TryGetValue(a, out var b) && b != afb) strijdig.Add(a);
+            res[a] = afb;
+        }
+        return res.Where(kv => !strijdig.Contains(kv.Key)).OrderBy(kv => kv.Key).Select(kv => (kv.Key, kv.Value)).ToList();
+    }
+
     /// <summary>BUG #108: de melders waar de loc vanaf <paramref name="melder"/> in richting <paramref name="r"/> naartoe kan: bij een bekende
     /// splitsing met de kop op deze melder bepaalt de stand van die wissel (zoals bekend in <paramref name="stand"/>; onbekend = rechtdoor) de tak,
     /// anders de bekende overgangen.</summary>
@@ -2589,6 +2616,15 @@ public partial class BaanVerkenner
             _log.Info($"Melder {melder}: de loc rijdt {r.Tekst()} van achteren op wissel {adres} af (de kaart kent die splitsing); wissel {adres} gaat nu naar {(afb ? "afbuigend" : "rechtdoor")} voordat de loc er is.");
             await ZetWissel(adres, afb);
             cfg = cfg.MetStand(adres, afb);
+        }
+        // BUG #267: een bewezen kortsluitoplossing voor de komende stap (wissel 9 afbuigend voor 4 -> 129) gaat nu al om, ook als hij bij een andere stand van de opdracht gevonden is
+        foreach (var (a, afb) in OplossingenVooruit(_kaart, melder, r, x => _wisselStand.TryGetValue(x, out var st) && st))
+        {
+            if (doel.ProefAdres == a || Kruis.IsMotor(a) || IsVolger(a) || !_ins.WisselAdressen().Contains(a)) continue;
+            if (VolgerOnderLoc(a) is not null) continue;   // #264
+            _log.Info($"Melder {melder}: wissel {a} gaat naar {(afb ? "afbuigend" : "rechtdoor")} voordat de loc er is: een eerder opgelost kortsluitpunt bewees dat de komende stap die stand vraagt (BUG #267).");
+            await ZetWissel(a, afb);
+            cfg = cfg.MetStand(a, afb);
         }
         // BUG #260: een bekende verboden ingang vlak voor de loc gaat altijd naar rechtdoor (ook als de stand van de opdracht hem afbuigend heeft), behalve het geteste adres zelf
         foreach (var a in VerbodenVooruit(_kaart, melder, r, x => _wisselStand.TryGetValue(x, out var st) && st))

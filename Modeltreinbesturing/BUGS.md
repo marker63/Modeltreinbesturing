@@ -2713,3 +2713,10 @@ De loc stond na de kortsluiting (4 -> 129 achteruit, wissel 9 nog rechtdoor; opg
 ("onverwacht melder 129"), en het zelf terugrijden koos daarna het pad 129, 4, 129, 14, 13 met '129 -> 4 achteruit', wat het register als overschreven rijrichting meldt (129>4 vooruit ->
 achteruit en terug). Oorzaak: de loc is langer dan melder 129 en staat op de grens 4/129; welke melder 'de' startmelder is, is dan niet eenduidig. Het programma herstelde zich binnen 2 minuten
 zonder hulp (loc weer op 13). Nog te doen: bij een loc op twee melders de rijrichting van de stap bepalen uit de laatst gereden overgang, niet uit de melder waar de loc 'op' staat.
+
+## BUG #267 – OPGELOST (nog niet getest op de baan): opnieuw kortsluiting 4 -> 129 achteruit met wissel 9 rechtdoor, terwijl dat al bewezen was (autolog 21-10 11:20:44-11:21:47)
+Opdracht #5 (stand: wissel 10) reed achteruit door de keerlus 11 -> 4 -> 129 met wissel 9 rechtdoor: kortsluiting in blok 9 (nieuw kortsluitpunt #7). Kortsluitpunt #3 had al bewezen
+(rit #30) dat de stap 4 -> 129 achteruit wissel 9 afbuigend vraagt, maar die oplossing hoorde bij de stand van een andere opdracht (wissel 2+1) en werd daardoor niet gebruikt.
+Oplossing: de staartwisselregel kijkt nu ook naar bewezen (niet voorlopige) oplossingen van kortsluitpunten in dezelfde richting, los van de stand van de opdracht. Is de laatste stap van
+de route van zo'n kortsluitpunt de komende stap (of de eenduidig bekende stap daarna), en staat de oplossingswissel nu verkeerd, dan gaat hij vóór de loc er is om (niet de proefwissel,
+geen kruiswisselmotor, geen volger, niet als de volger onder de loc ligt). Tegenstrijdige oplossingen voor één wissel worden genegeerd. Test: oplossing vooruit (#267) op baankaart 21-10 11:28.

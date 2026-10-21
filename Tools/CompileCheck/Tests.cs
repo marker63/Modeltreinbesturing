@@ -2537,6 +2537,13 @@ public static class Tests
             var bk261b = (List<int>)typeof(BaanVerkenner).GetMethod("BekendeVerbodenVoorLaatsteStap", bf261)!.Invoke(v261, null)!;
             Eis(bk261b.Contains(10), "verboden laatste stap (#261): ook via de laatste rit als de melding van de terugweg kwam (nu " + string.Join(",", bk261b) + ")");
         }
+        // BUG #267: op melder 11 achteruit (naar 4 en 129) moet wissel 9 afbuigend (kortsluitpunt #3, opgelost met 9), ook als de opdracht een andere stand heeft
+        var k267 = Laad("baankaart_2026-10-21_1128.json");
+        var o267 = BaanVerkenner.OplossingenVooruit(k267, 11, Richting.Achteruit, a => a == 10);
+        Eis(o267.Contains((9, true)), "oplossing vooruit (#267): op 11 achteruit wissel 9 afbuigend (nu " + string.Join(",", o267.Select(x => x.Adres + (x.Afbuigend ? "A" : "R"))) + ")");
+        var o267b = BaanVerkenner.OplossingenVooruit(k267, 11, Richting.Achteruit, a => a == 9);
+        Eis(!o267b.Any(x => x.Adres == 9), "oplossing vooruit (#267): staat 9 al afbuigend, dan niets");
+        Eis(!BaanVerkenner.OplossingenVooruit(k267, 11, Richting.Achteruit, _ => false).Any(x => x.Adres == 10), "oplossing vooruit (#267): voorlopige oplossing (kortsluitpunt #4, wissel 10) telt niet");
         // BUG #264: staartwissel 5 met volger 6 (overloop) niet omzetten als de loc al op de afbuigende tak (129) staat
         {
             var bf264 = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
