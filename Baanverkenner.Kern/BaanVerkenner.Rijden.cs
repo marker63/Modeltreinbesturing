@@ -2599,7 +2599,41 @@ public partial class BaanVerkenner
             }
             if (res.Count > 0) return res.Distinct().ToList();
         }
-        return kaart.BekendeVolgende(melder, r);
+        var bekend = kaart.BekendeVolgende(melder, r);
+        return stand is null || bekend.Count < 2 ? bekend : VolgendeBijStand(kaart, melder, r, bekend, stand);
+    }
+
+    /// <summary>BUG #269 (autolog 21-10 11:50:55-12:07:10, zesmaal): opdracht #5 (21 achteruit, wissel 10 afbuigend) kwam op melder 129 en de staartwisselregel wilde wissel 5 (+6) afbuigend
+    /// zetten "voor de stap 129 -> 14". Maar met 5 en 6 op de baan rechtdoor gaat de loc 129 -> 10; de kaart heeft voor 129 geen splitsing, alleen overgangen naar 4, 10 en 14, en de regel
+    /// rekende met allemaal. Alleen #264 (volger 6 onder de loc) hield het omzetten tegen; anders had de staartwissel de route van de opdracht veranderd. Nu: zijn er meer bekende vervolgen,
+    /// dan blijven de vervolgen over die passen bij de huidige stand van de wissels die de vervolgen van elkaar onderscheiden (een wissel die bij elk vervolg steeds dezelfde stand had en
+    /// tussen de vervolgen verschilt). Blijft er niets over, dan gelden alle vervolgen (zoals voorheen).</summary>
+    internal static List<int> VolgendeBijStand(Baankaart kaart, int melder, Richting r, List<int> bekend, Func<int, bool> stand)
+    {
+        var standen = new Dictionary<int, List<HashSet<int>>>();
+        foreach (var o in kaart.Overgangen)
+        {
+            int? y = o.Van == melder && o.Richting == r ? o.Naar : o.Naar == melder && o.Richting == r.Om() ? o.Van : null;
+            if (y is not int yy || !bekend.Contains(yy)) continue;
+            if (!standen.TryGetValue(yy, out var l)) standen[yy] = l = new List<HashSet<int>>();
+            foreach (var s in o.GezienBijConfiguraties) l.Add(Configuratie.VanSleutel(s).Afbuigend.ToHashSet());
+        }
+        if (standen.Count < 2 || standen.Values.Any(l => l.Count == 0)) return bekend;
+        var adressen = standen.Values.SelectMany(l => l.SelectMany(x => x)).Distinct().ToList();
+        var vast = new Dictionary<int, Dictionary<int, bool>>();   // vervolg -> adres -> vaste stand
+        foreach (var (y, l) in standen)
+        {
+            vast[y] = new Dictionary<int, bool>();
+            foreach (var a in adressen)
+            {
+                bool eerste = l[0].Contains(a);
+                if (l.All(x => x.Contains(a) == eerste)) vast[y][a] = eerste;
+            }
+        }
+        var onderscheid = adressen.Where(a => vast.Values.All(d => d.ContainsKey(a)) && vast.Values.Select(d => d[a]).Distinct().Count() > 1).ToList();
+        if (onderscheid.Count == 0) return bekend;
+        var res = bekend.Where(y => !vast.ContainsKey(y) || onderscheid.All(a => vast[y][a] == stand(a))).ToList();
+        return res.Count > 0 ? res : bekend;
     }
 
     /// <summary>BUG #107: zet de wissels uit <see cref="StaartWissels"/> goed voordat de loc erop afrijdt. Overgeslagen worden: het adres dat de

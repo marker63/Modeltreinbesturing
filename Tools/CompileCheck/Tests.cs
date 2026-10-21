@@ -2585,6 +2585,15 @@ public static class Tests
             var bk261b = (List<int>)typeof(BaanVerkenner).GetMethod("BekendeVerbodenVoorLaatsteStap", bf261)!.Invoke(v261, null)!;
             Eis(bk261b.Contains(10), "verboden laatste stap (#261): ook via de laatste rit als de melding van de terugweg kwam (nu " + string.Join(",", bk261b) + ")");
         }
+        // BUG #269: op 129 achteruit met 5 rechtdoor en 6 Dinamo afbuigend (baan: beide rechtdoor) gaat de loc naar 10, niet naar 14: geen staartwissel 5
+        var k269 = Laad("baankaart_2026-10-21_1207.json");
+        Func<int, bool> st269 = a => a is 6 or 10;
+        var v269 = BaanVerkenner.VerwachteVolgende(k269, 129, Richting.Achteruit, st269);
+        Eis(v269.SequenceEqual(new[] { 10 }), "vervolg bij stand (#269): 129 achteruit met 5/6 op de baan rechtdoor -> alleen 10 (nu " + string.Join(",", v269) + ")");
+        Eis(!BaanVerkenner.StaartWissels(k269, 129, Richting.Achteruit, st269).Any(x => x.Adres == 5), "vervolg bij stand (#269): wissel 5 is dan geen staartwissel");
+        var v269b = BaanVerkenner.VerwachteVolgende(k269, 129, Richting.Achteruit, a => a is 5 or 10);
+        Eis(v269b.Contains(14) && !v269b.Contains(10), "vervolg bij stand (#269): met 5 afbuigend (6 Dinamo rechtdoor) -> 14 (nu " + string.Join(",", v269b) + ")");
+        Eis(BaanVerkenner.VerbodenVooruit(k269, 24, Richting.Achteruit, a => a is 9 or 10).Contains(9), "verboden vooruit (#260/#269): 24 -> 129 achteruit met wissel 9 afbuigend (nieuwe vondst 12:02) gaat vooraf naar rechtdoor");
         // BUG #267: op melder 11 achteruit (naar 4 en 129) moet wissel 9 afbuigend (kortsluitpunt #3, opgelost met 9), ook als de opdracht een andere stand heeft
         var k267 = Laad("baankaart_2026-10-21_1128.json");
         var o267 = BaanVerkenner.OplossingenVooruit(k267, 11, Richting.Achteruit, a => a == 10);

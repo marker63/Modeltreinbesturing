@@ -2728,3 +2728,11 @@ Oplossing: tijdens een navigatie (die alleen bekende melders hoort te zien) telt
 behandelt de kortsluitregel het; wordt hij weer vrij, dan wordt hij genegeerd (logregel "was maar even bezet ... BUG #268"). Blijft hij bezet, dan is het wel een onverwachte melder.
 Verkenningsritten (waar nieuwe melders juist gevonden moeten worden) blijven ongewijzigd; een algemene langere ontdendertijd voor onbekende melders brak 10 simulaties en is niet gedaan.
 Niets is hard gecodeerd voor 137/138. Simulatie: SimulatieBaan.KortsluitEchoMelders / EchoElkeSeconden. Tests: navigatie-echo (#268), kortsluitecho (#268) in de keerlus-simulatie.
+
+## BUG #269 – OPGELOST (nog niet getest op de baan): staartwisselregel wilde op 129 wissel 5 (+6) omzetten terwijl de loc naar 10 rijdt (autolog 21-10 11:50:55-12:07:10, zesmaal)
+Opdracht #5 (21 achteruit, wissel 10 afbuigend) kwam op melder 129 en de melding "wissel 5 zou nu naar afbuigend moeten ..." verscheen bij elke ronde. Met 5 en 6 op de baan rechtdoor
+gaat de loc 129 -> 10; alleen met 5+6 afbuigend gaat hij naar 14. De kaart heeft bij 129 geen splitsing, alleen overgangen naar 4, 10 en 14, en de regel rekende met alle drie. Alleen #264
+(volger 6 onder de loc) hield het omzetten tegen; anders had de staartwissel de route van de opdracht veranderd. Oplossing: bij meer bekende vervolgen blijven de vervolgen over die passen
+bij de huidige stand van de wissels die ze van elkaar onderscheiden (uit de standen waarbij elke overgang gereden is; Dinamo-stand, dus wissel 6 omgekeerd klopt vanzelf). Blijft er niets
+over, dan gelden alle vervolgen zoals voorheen. Ook gecontroleerd: de nieuwe vondst van 12:02 (24 -> 129 achteruit met wissel 9 afbuigend = kortsluiting) zet wissel 9 voortaan vooraf
+rechtdoor (#260). Test: vervolg bij stand (#269) op baankaart 21-10 12:07.
