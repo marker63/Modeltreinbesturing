@@ -2696,8 +2696,14 @@ gisteren (12 opdrachten) overschreef; de kaart staat nog in C:\Marco\baankaart_2
 hervatten weigeren bij geen verbinding of >10 s stilte (ook geen keepalive) met uitleg; vóór een nieuwe verkenning komt er een kopie van de voortgang
 (voortgang_voor_nieuwe_verkenning_<datum>.json) in de instellingenmap én in C:\Marco. Test: CompileCheck (het scherm zelf kan hier niet gecompileerd worden).
 
-## BUG #264 – ONDERZOCHT (nog open): wissel 5 (+6) pas op melder 129 omgezet, kortsluiting met de loc op 4/129 (autolog 21-10 08:46:18-08:46:39)
+## BUG #264 – OPGELOST (nog niet getest op de baan): wissel 5 (+6) pas op melder 129 omgezet, kortsluiting met de loc op 4/129 (autolog 21-10 08:46:18-08:46:39)
 Nieuwe verkenning vanaf nul, opdracht #3 (13 achteruit, wissel 2+1 afbuigend): de loc reed de binnenring 12 -> 11 -> 4 -> 129. Pas op melder 129 zag de staartwisselregel (#107) dat 129 -> 14
 achteruit van achteren over wissel 5 gaat (afbuigend); wissel 6 (overloopset, #259) ging mee en ligt bij 129 onder de loc: 4,3 s later kortsluiting in blok 9. Daarna wachtte de verkenner
 20 minuten op het antwoord op "Wissel bij de loc proberen?". De overgang 4 -> 129 was in deze verkenning nog niet gereden, dus op melder 4 kon de regel 'de stap daarna' (#108) het nog niet
 voorzien; na deze rit kent de kaart 4 -> 129 en zet de staartwisselregel 5+6 al op melder 4. Nog te doen: bij een eerste rit (onbekende vervolgmelder) met een overloopset rekening houden.
+Oplossing: zou de staartwisselregel een wissel omzetten waarvan de volger (overloopset) bij een bezette melder ligt (de afbuigende tak van de meester, of een melder waar de kaart de volger kent),
+dan gebeurt dat niet: de loc rijdt met de huidige stand (5 en 6 op de baan beide rechtdoor, dus geen kortsluiting) verder en de kaart leert die stap. De volgende keer zet de regel 'de stap
+daarna' (#108) 5 en 6 al op de melder ervoor (4). Test: overloop te laat (#264).
+
+## BUG #265 – OPGELOST: melding "Eerste stap bij de kortsluiting: wissel - wordt van een tak ..." bij een lege lijst (autolog 21-10 08:15:40)
+Alleen het deel van de melding dat iets zegt wordt nog getoond.

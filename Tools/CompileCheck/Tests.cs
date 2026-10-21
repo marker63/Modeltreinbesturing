@@ -2537,6 +2537,30 @@ public static class Tests
             var bk261b = (List<int>)typeof(BaanVerkenner).GetMethod("BekendeVerbodenVoorLaatsteStap", bf261)!.Invoke(v261, null)!;
             Eis(bk261b.Contains(10), "verboden laatste stap (#261): ook via de laatste rit als de melding van de terugweg kwam (nu " + string.Join(",", bk261b) + ")");
         }
+        // BUG #264: staartwissel 5 met volger 6 (overloop) niet omzetten als de loc al op de afbuigende tak (129) staat
+        {
+            var bf264 = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var sim264 = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = false, LocAdres = 5408 };
+            sim264.VerbindenAsync("SIM").GetAwaiter().GetResult();
+            var klok264 = new VirtueleKlok(); var log264 = new VerkenLog(klok264);
+            var ins264 = new VerkenInstellingen { LocAdres = 5408, WisselAdresVan = 1, WisselAdresTot = 14, GekoppeldeWissels = "5+6", OmgekeerdAangesloten = "6" };
+            var k264 = new Baankaart();
+            k264.Wissel(5).Waarnemingen.Add(new WisselWaarneming { Soort = WaarnemingSoort.Splitsing, NaMelder = 14, Richting = Richting.Vooruit, VolgendeBijRechtdoor = 24, VolgendeBijAfbuigend = 129 });
+            var v264 = new BaanVerkenner(sim264, ins264, klok264, log264, (_, _) => Task.FromResult(true), new VerkenStatus { Instellingen = ins264, Kaart = k264 });
+            var mon264 = (MelderMonitor)typeof(BaanVerkenner).GetField("_monitor", bf264)!.GetValue(v264)!;
+            mon264.Ontvang(4, true); mon264.Ontvang(129, true);
+            klok264.Wacht(TimeSpan.FromSeconds(1)).GetAwaiter().GetResult(); mon264.Bijwerken();
+            var st264 = (Dictionary<int, bool>)typeof(BaanVerkenner).GetField("_wisselStand", bf264)!.GetValue(v264)!;
+            st264[5] = false; st264[6] = true;
+            var t264 = (Task<Configuratie>)typeof(BaanVerkenner).GetMethod("ZetStaartWissels", bf264)!.Invoke(v264, new object[] { 129, Richting.Achteruit, Configuratie.Basis, new RitDoel { Configuratie = Configuratie.Basis, StaartWissels = true } })!;
+            t264.GetAwaiter().GetResult();
+            Eis(!st264[5] && st264[6] && log264.Regels.Any(x => x.Tekst.Contains("BUG #264")), "overloop te laat (#264): met de loc op 129 gaan 5 en 6 niet om");
+            mon264.Ontvang(129, false); mon264.Ontvang(4, false); mon264.Ontvang(11, true);
+            klok264.Wacht(TimeSpan.FromSeconds(1)).GetAwaiter().GetResult(); mon264.Bijwerken();
+            var t264b = (Task<Configuratie>)typeof(BaanVerkenner).GetMethod("ZetStaartWissels", bf264)!.Invoke(v264, new object[] { 129, Richting.Achteruit, Configuratie.Basis, new RitDoel { Configuratie = Configuratie.Basis, StaartWissels = true } })!;
+            t264b.GetAwaiter().GetResult();
+            Eis(st264[5] && !st264[6], "overloop te laat (#264): staat de loc nog niet bij 129, dan gaan 5 en 6 wel om (6 Dinamo rechtdoor = baan afbuigend)");
+        }
         // BUG #262: een onbekende melder die knippert (137/138 bij 129) telt niet als bezet; een bekende melder wel
         {
             var klok262 = new VirtueleKlok();

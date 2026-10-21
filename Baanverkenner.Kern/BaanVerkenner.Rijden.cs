@@ -404,6 +404,21 @@ public partial class BaanVerkenner
     /// <summary>BUG #80: het laatst gestuurde wisselcommando, met de tijd en de toen bezette melders (voor de oorzaak van een ontsporing).</summary>
     private (int Adres, bool Afbuigend, DateTime Tijd, List<int> Bezet)? _laatsteWisselCommando;
 
+    /// <summary>BUG #264 (autolog 21-10 08:46:18): de eerste rit over de binnenring kwam van 4 op 129 aan; pas toen zag de staartwisselregel dat 129 -> 14 wissel 5 afbuigend vraagt. Wissel 6
+    /// (overloopset) ging mee en ligt bij 129, onder de loc: kortsluiting. Geeft de volger van <paramref name="meester"/> als die volgens de kaart bij een bezette melder ligt: de afbuigende tak
+    /// van de meester (daar sluit de overloop aan) of een melder waar de kaart de volger kent. Anders null.</summary>
+    private int? VolgerOnderLoc(int meester)
+    {
+        var paar = _ins.GekoppeldeParen().FirstOrDefault(p => p.Meester == meester);
+        if (paar.Volger == 0) return null;
+        _monitor.Bijwerken();
+        var bezet = _monitor.Bezet;
+        if (bezet.Count == 0) return null;
+        bool tak = _kaart.Wissels.Where(w => w.Adres == meester).SelectMany(w => w.Waarnemingen)
+                        .Any(o => o.Soort == WaarnemingSoort.Splitsing && o.VolgendeBijAfbuigend is int af && bezet.Contains(af));
+        return tak || WisselsBijBezet(_kaart, bezet).Contains(paar.Volger) ? paar.Volger : null;
+    }
+
     /// <summary>BUG #259: is dit adres de tweede wissel van een overloopset (schakelt alleen mee met zijn meester)?</summary>
     private bool IsVolger(int adres) => _ins.GekoppeldeParen().Any(p => p.Volger == adres);
     private bool _volgerBezig;
@@ -1383,8 +1398,12 @@ public partial class BaanVerkenner
         // BUG #222: de proefwissel die de loc net van de puntzijde nam (wissel 5 bij 14 -> 129) staat nog niet in de kaart, maar hoort ook bij de 'samengevoegde kant'.
         if (PuntzijdeProefNu() is int pzw && alle.Contains(pzw)) { achter.Remove(pzw); kopAdressen.Add(pzw); }
         if (achter.Count > 0 || kopAdressen.Count > 0)
-            _log.Info($"Eerste stap bij de kortsluiting: wissel {(achter.Count > 0 ? string.Join(", ", achter) : "-")} wordt van een tak richting de samenvoeging bereden (omzetten kan de kortsluiting opheffen)" +
-                      (kopAdressen.Count > 0 ? $"; wissel {string.Join(", ", kopAdressen.OrderBy(a => a))} wordt van de samengevoegde kant bereden en wordt niet omgezet (dat helpt daar niet)." : "."));
+            // BUG #265 (autolog 21-10 08:15:40): bij een lege lijst stond er "wissel - wordt van een tak ..."; nu alleen het deel dat iets zegt
+            _log.Info("Eerste stap bij de kortsluiting: " + string.Join("; ", new[]
+            {
+                achter.Count > 0 ? $"wissel {string.Join(", ", achter)} wordt van een tak richting de samenvoeging bereden (omzetten kan de kortsluiting opheffen)" : null,
+                kopAdressen.Count > 0 ? $"wissel {string.Join(", ", kopAdressen.OrderBy(a => a))} wordt van de samengevoegde kant bereden en wordt niet omgezet (dat helpt daar niet)" : null
+            }.Where(x => x is not null)) + ".");
 
         if (bijLoc.Count > 0) _log.Info($"Niet zonder toestemming geprobeerd: wissel {string.Join(", ", bijLoc.OrderBy(a => a))} (ligt bij een bezette melder, de loc staat er mogelijk op).");
         var alarmBlokkenVoor = HuidigeAlarmBlokken();   // BUG #174: de oplossing hoort alleen bij een kortsluitpunt met hetzelfde alarmblok
@@ -2561,6 +2580,12 @@ public partial class BaanVerkenner
                 continue;
             }
             if (_wisselStand.TryGetValue(adres, out var nu) && nu == afb) { cfg = cfg.MetStand(adres, afb); continue; }
+            if (VolgerOnderLoc(adres) is int volger)
+            {
+                _log.Waarschuwing($"Melder {melder}: wissel {adres} zou nu naar {(afb ? "afbuigend" : "rechtdoor")} moeten, maar wissel {volger} (overloopset) gaat dan mee en die ligt bij de melder waar de loc al staat ({Lijst(_monitor.Bezet)}). " +
+                                  $"Hij wordt nu niet omgezet (omzetten met de loc erop geeft kortsluiting); de loc rijdt met de huidige stand verder. De kaart kent deze stap nu, de volgende keer gaan beide al om voordat de loc er is (BUG #264, nog niet getest op de baan).");
+                continue;
+            }
             _log.Info($"Melder {melder}: de loc rijdt {r.Tekst()} van achteren op wissel {adres} af (de kaart kent die splitsing); wissel {adres} gaat nu naar {(afb ? "afbuigend" : "rechtdoor")} voordat de loc er is.");
             await ZetWissel(adres, afb);
             cfg = cfg.MetStand(adres, afb);
