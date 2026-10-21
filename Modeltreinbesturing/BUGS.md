@@ -2854,3 +2854,8 @@ hangt af van de huidige stand van 5/6/9; met de vervolgen die bij de huidige sta
 ## BUG #292 – OPGELOST (nog niet getest op de baan): blokfase gaf een melder op terwijl hij via een andere weg bereikbaar was (simulatie keerlus 21-10)
 Melder 8 mislukte vijf keer via 129 -> 8 en werd opgegeven. Zijn alle pogingen op, dan krijgen de melders van dit traject zonder blok één laatste ronde vanaf de plek waar de loc dan staat.
 Test: keerlus BUG #281/#282 (voltooid, elke melder een blok).
+
+## BUG #293 – OPGELOST (nog niet getest op de baan): navigatie vanaf 4 zette wissel 9 rechtdoor voor 4 -> 129 (simulatie keerlus 14:44:47; baan 21-10 14:51 en 15:27)
+Kortsluitpunt #3 bewees dat 4 -> 129 (achteruit) wissel 9 afbuigend vraagt, maar die oplossing hoorde bij een andere stand en gold daardoor niet voor het pad van een navigatie die op 4
+begint (#280 helpt pas vanaf de melder ervoor). Bewezen oplossingen waarvan de laatste stap in het pad zit, gelden nu altijd voor dat pad; een verboden ingang gaat nog steeds voor.
+Geprobeerd en teruggedraaid: alle navigaties de wissels bij de loc laten sparen (brak de rondrit-simulatie: de loc reed dan de verkeerde kant op). Test: bewezen op pad (#293).

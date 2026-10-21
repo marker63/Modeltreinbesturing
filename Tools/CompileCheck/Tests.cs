@@ -983,7 +983,8 @@ public static class Tests
         int eersteProef = regels.FindIndex(x => x.StartsWith("Blokproef voor melder"));
         int blokFase = regels.FindIndex(x => x.Contains("Nu worden de Dinamo-blokken gezocht"));
         Eis(blokFase >= 0 && eersteProef > blokFase, $"rondrit: de eerste blokproef (regel {eersteProef}) komt pas na het ontdekken van alle melders (regel {blokFase})");
-        Eis(k.Voltooid && k.Melders.All(m => m.DinamoBlok is not null), "rondrit: voltooid en elke melder heeft een Dinamo-blok");
+        Eis(k.Voltooid && k.Melders.All(m => m.DinamoBlok is not null), "rondrit: voltooid en elke melder heeft een Dinamo-blok (zonder: " + string.Join(",", k.Melders.Where(m => m.DinamoBlok is null).Select(m => m.Nummer)) + ")");
+        if (Environment.GetEnvironmentVariable("RONDRIT_LOG") == "1") Console.WriteLine(r.Log.AlsTekst());
         Eis(r.Kortsluitingen <= 10, $"rondrit: beperkt aantal kortsluitingen (nu {r.Kortsluitingen})");
     }
 
@@ -2662,6 +2663,9 @@ public static class Tests
         var p286 = new[] { 139, 140, 132, 133, 136, 144, 143 }.Select(n => ms286.Knopen.First(x => x.Melder == n).X).ToList();
         bool oplopend286 = p286.Zip(p286.Skip(1)).All(z => z.Second > z.First), aflopend286 = p286.Zip(p286.Skip(1)).All(z => z.Second < z.First);
         Eis(oplopend286 || aflopend286, "melderschema (#286): pendelbaan in de volgorde van het spoor (x: " + string.Join(",", p286.Select(x => x.ToString("0"))) + ")");
+        // BUG #293: het pad 4 -> 129 -> 14 (achteruit) krijgt wissel 9 afbuigend uit kortsluitpunt #3, ook al hoort dat bij een andere stand
+        var o293 = BaanVerkenner.BewezenOplossingenOpPad(k279, new List<int> { 4, 129, 14 }, Richting.Achteruit);
+        Eis(o293.Any(x => x.Adres == 9 && x.Afbuigend), "bewezen op pad (#293): 4 -> 129 achteruit vraagt wissel 9 afbuigend (nu " + string.Join(",", o293.Select(x => x.Adres + (x.Afbuigend ? "A" : "R"))) + ")");
         // BUG #288: melder 139 is vooruit een doodlopend einde: de blokproef begint achteruit
         Eis(BaanVerkenner.BlokproefRichtingen(k286, 139)[0] == Richting.Achteruit && BaanVerkenner.BlokproefRichtingen(k286, 133)[0] == Richting.Vooruit, "blokproef (#288): bij 139 eerst achteruit (weg van het stootjuk), bij 133 gewoon eerst vooruit");
         // BUG #287: vanaf de pendelbaan (133) is melder 4 van het eerste traject niet bereikbaar; 143 wel

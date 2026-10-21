@@ -2431,6 +2431,15 @@ public partial class BaanVerkenner
         var metOplossing = _kaart.MetBekendeKortsluitOplossingen(pad, r, nieuw, out var wijz2);
         if (wijz2.Count > 0)
             _log.Info($"Wisselstand voor het pad {string.Join("-", pad)} ({r.Tekst()}) aangepast om een bekende kortsluiting te vermijden: {string.Join("; ", wijz2)}. Nieuwe stand: {metOplossing}.");
+        // BUG #293 (simulatie keerlus 14:44:47; baan 21-10 14:51 en 15:27): een navigatie die op 4 begint (4 -> 129 achteruit) zette wissel 9 rechtdoor, terwijl kortsluitpunt #3 bewees
+        // dat die stap wissel 9 afbuigend vraagt; die oplossing hoorde bij een andere stand en telde hier niet. Bewezen oplossingen waarvan de laatste stap in dit pad zit, gelden nu altijd.
+        // Een verboden ingang hieronder gaat nog steeds voor (en #280 zet de wissel onderweg om als het pad hem beide kanten op vraagt).
+        foreach (var (a, afb, uitleg) in BewezenOplossingenOpPad(_kaart, pad, r))
+            if (metOplossing.Bevat(a) != afb)
+            {
+                metOplossing = metOplossing.MetStand(a, afb);
+                _log.Info($"Wisselstand voor het pad {string.Join("-", pad)} ({r.Tekst()}): wissel {a} {(afb ? "afbuigend" : "rechtdoor")} ({uitleg}, BUG #293).");
+            }
         // BUG #159: een verboden ingang (bijv. 16 -> 5 met wissel 2 afbuigend) wordt nooit gereden, ook niet via een geleerde oplossing.
         metOplossing = _kaart.MetVerbodenIngangen(pad, r, metOplossing, out var wijz4);
         if (wijz4.Count > 0)
@@ -2441,6 +2450,24 @@ public partial class BaanVerkenner
         if (wijz3.Count > 0)
             _log.Info($"Wisselstand voor het pad {string.Join("-", pad)} ({r.Tekst()}) aangepast aan de kruiswissel-referentie: {string.Join("; ", wijz3)}. Nieuwe stand: {metKruis}.");
         return metKruis;
+    }
+
+    /// <summary>BUG #293: bewezen (niet voorlopige) oplossingen van kortsluitpunten in richting <paramref name="r"/> waarvan de laatste stap van de route een stap van het pad is.
+    /// Tegenstrijdige oplossingen voor één wissel tellen niet.</summary>
+    internal static List<(int Adres, bool Afbuigend, string Uitleg)> BewezenOplossingenOpPad(Baankaart kaart, List<int> pad, Richting r)
+    {
+        var stappen = new HashSet<(int, int)>();
+        for (int i = 0; i + 1 < pad.Count; i++) stappen.Add((pad[i], pad[i + 1]));
+        var res = new Dictionary<int, (bool Afb, string Uitleg)>(); var strijdig = new HashSet<int>();
+        foreach (var kp in kaart.Kortsluitpunten.Where(k => k.Opgelost && !k.Voorlopig && k.OpgelostDoorAdres is int && k.OpgelostMetAfbuigend is bool && k.Richting == r))
+        {
+            var lp = kp.Route.LastOrDefault()?.Pad;
+            if (lp is null || lp.Count < 2 || !stappen.Contains((lp[^2], lp[^1]))) continue;
+            int a = kp.OpgelostDoorAdres!.Value; bool afb = kp.OpgelostMetAfbuigend!.Value;
+            if (res.TryGetValue(a, out var b) && b.Afb != afb) strijdig.Add(a);
+            res[a] = (afb, $"kortsluitpunt #{kp.Id}: {lp[^2]} -> {lp[^1]} {r.Tekst()} was daarmee opgelost");
+        }
+        return res.Where(kv => !strijdig.Contains(kv.Key)).OrderBy(kv => kv.Key).Select(kv => (kv.Key, kv.Value.Afb, kv.Value.Uitleg)).ToList();
     }
 
     /// <summary>BUG #270 (autolog 21-10 12:18:16-12:19:41): na de lus van opdracht #8 (stand 9 en 10 afbuigend) reed de terugweg 5 -> ... -> 21 -> 24 -> 14 -> ... -> 10 achteruit met wissel 10
