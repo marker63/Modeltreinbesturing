@@ -3052,3 +3052,15 @@ Tussenstand meting (MARCO=1): voltooid, 0 valse wissels, 8 kortsluitingen (was 4
 
 ## BUG #327 – OPGELOST (nog niet getest op de baan): 'loc staat andersom' terwijl de loc bij het vertrek op de grens van twee melders stond
 Stond de loc bij het vertrek al deels op de andere melder, dan zegt het vrijkomen van de startmelder niets over de rijrichting. #278 meldt dan geen 'andersom' meer.
+
+## BUG #328 – OPGELOST (nog niet getest op de baan): kortsluiting op een bekend kortsluitpunt werd aan het proefadres toegeschreven (optie 6)
+Simulatie met Marco's aansluiting, start op 129: de proef van adres 3 kreeg kortsluiting na melder 4 op het bekende kortsluitpunt #2 (opgelost met wissel 9 afbuigend, die stond er niet bij)
+en dat werd "wissel 3: niet van 11 naar 4". Verklaart een bekend kortsluitpunt op die plek en met die stand de kortsluiting, dan zegt de proef niets over het proefadres (de stand op het
+moment van de kortsluiting telt, niet die na het herstel).
+
+## BUG #329 – OPGELOST (nog niet getest op de baan): proef weken af doordat een ANDERE wissel anders stond dan in de basisrit (optie 6)
+Elke rit onthoudt nu per melder de werkelijke stand waarmee de loc er aankwam. Bij een afwijking (of kortsluiting) wordt die vergeleken met de basisrit op dezelfde plek; verschilt een ander
+adres dan het proefadres (staartwissel, klemoplossing, uitgestelde wissel, een vorig proefadres dat niet terug kon), dan wordt de afwijking niet aan het proefadres toegeschreven. Dit is de
+algemene bescherming tegen valse wissels als 3, 4, 7, 8, 11 en 12. Bij optie 5 niet (daar rijden proeven bewust met staartwissels).
+Bekende beperking: start de verkenning midden in de keerlus (melder 129 of 12), dan vindt de simulatie geen valse wissels meer, maar ook (bijna) geen echte: de wissels bij 129 kunnen
+daar niet veilig teruggezet worden. Vanaf melder 13 (Marco's startmelder) gaat het goed.

@@ -1107,6 +1107,11 @@ public static class Tests
                 Eis(!regels.Any(x => x.Contains("met toestemming van de gebruiker")), $"keerlus (start {start}) BUG #305: geen toestemmingsvragen meer voor wissels bij de loc");
                 Eis(k.Melders.Count == 23, $"keerlus (start {start}): alle 23 melders (met 1 en 9) gevonden (nu {k.Melders.Count})");
                 Eis(naar10 == 0, $"keerlus (start {start}): de terugweg 129 -> 14 gaat niet steeds naar 10 (nu {naar10}x)");
+                // Nachtwerk 25/26-10: met Marco's aansluiting geen valse wissels (3, 4, 7, 8, 11, 12 bestaan op de baan niet) en een beperkt aantal kortsluitingen (was 40, nu 8)
+                var echt = new HashSet<int> { 1, 2, 5, 6, 9, 10, 13, 14 };
+                var valse = k.Wissels.Where(w => w.Waarnemingen.Count > 0 && !echt.Contains(w.Adres)).Select(w => w.Adres).ToList();
+                Eis(valse.Count == 0, $"keerlus (start {start}) nachtwerk: geen valse wissels (nu {string.Join(",", valse)})");
+                Eis(r.Kortsluitingen <= 10, $"keerlus (start {start}) nachtwerk: hoogstens 10 kortsluitingen (nu {r.Kortsluitingen})");
                 Eis(k.Voltooid && k.Melders.All(m => m.DinamoBlok is not null), $"keerlus (start {start}) BUG #281/#282: de blokfase wordt afgemaakt, elke melder heeft een Dinamo-blok (zonder: {string.Join(",", k.Melders.Where(m => m.DinamoBlok is null).Select(m => m.Nummer))})");
                 if (start == 13)
                 {
@@ -3325,6 +3330,7 @@ public static class Tests
                 var regels = r.Log.Regels.Select(x => x.Tekst).ToList();
                 var gevonden = k.Wissels.Where(w => w.Waarnemingen.Count > 0).Select(w => w.Adres).ToList();
                 string regel = $"MARCO start {start,3} {variant,-7}: {r.Einde,-12} {(k.Voltooid ? "voltooid" : "NIET-voltooid"),-13} melders {k.Melders.Count,2}/23  met-blok {k.Melders.Count(m => m.DinamoBlok is not null),2}  wissels [{string.Join(",", gevonden.OrderBy(x => x))}]  valse {gevonden.Count(a => !echt.Contains(a))}  kortsl {r.Kortsluitingen,2}  onder-loc {sim?.OnderLocOmgezet ?? 0,2}  gebruiker {regels.Count(x => x.Contains("Gebruiker heeft de loc"))}  zelf-ok {regels.Count(x => x.Contains("Zelf opgelost"))}  zelf-mis {regels.Count(x => x.Contains("Zelf oplossen lukte niet"))}  {r.Seconden / 60:0} min";
+                if (uv is not null) regel += $"  (uitval: {uv.GenegeerdeCommandos} commando's genegeerd)";
                 Console.WriteLine(regel);
                 uit.Add(regel);
                 if (Environment.GetEnvironmentVariable("MARCO_LOG") is { } pad && pad.Length > 0)
@@ -3658,6 +3664,13 @@ public static class Tests
         Log2005Test();
         RondritTest();
         HervatZonderBasisritTest();
+        {
+            // Nachtwerk 25/26-10: Marco's aansluiting met een Dinamo-uitval van 90 s midden in de verkenning
+            var oud = Environment.GetEnvironmentVariable("MARCO_VARIANT"); Environment.SetEnvironmentVariable("MARCO_VARIANT", "uitval");
+            var regels = MarcoBench();
+            Environment.SetEnvironmentVariable("MARCO_VARIANT", oud);
+            Eis(regels.Count == 1 && regels[0].Contains(" voltooid ") && regels[0].Contains("valse 0") && regels[0].Contains("gebruiker 0"), "marco (uitval): voltooid, geen valse wissels, geen hulp nodig (" + string.Join("", regels) + ")");
+        }
         WachtendeAlarmOplossingTest();
         KlemStandOnthoudenTest();
         OntsporingEersteBasisritTest();

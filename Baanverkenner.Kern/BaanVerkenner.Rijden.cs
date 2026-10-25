@@ -15,6 +15,8 @@ public class RitResultaat
     public bool EindeVanHetSpoor { get; set; }
     /// <summary>BUG #311: de andere melders die bezet waren op het moment van de kortsluiting (de loc stond er al deels in).</summary>
     public List<int> OokBezetBijKortsluiting { get; set; } = new();
+    /// <summary>BUG #329: de werkelijke wisselstand (sleutel) waarmee de loc melder Reeks[i] bereikte, per index i.</summary>
+    public Dictionary<int, string> StandBijMelder { get; set; } = new();
 }
 
 /// <summary>Wat een rit moet doen. Zonder DoelMelder is het een verkenningsrit (rijden tot
@@ -2242,6 +2244,7 @@ public partial class BaanVerkenner
                 bool cfgNieuw = !_kaart.Overgangen.Any(x => x.Van == res.Reeks[^1] && x.Naar == m && x.Richting == r && x.GezienBijConfiguraties.Contains(cfgWerkelijk.Sleutel));
                 _kaart.RegistreerOvergang(res.Reeks[^1], m, r, cfgWerkelijk, dtOpgeslagen);
                 _laatsteOvergang = (res.Reeks[^1], m, r, cfgWerkelijk.Sleutel, cfgNieuw, _klok.Nu);
+                res.StandBijMelder[res.Reeks.Count] = cfgWerkelijk.Sleutel;   // BUG #329
                 // BUG #74: ingangskant onthouden. Binnen de rit is het de melder daarvoor; bij de eerste stap van de rit de ingang van
                 // de vorige rit, mits de loc daar nog in dezelfde richting rijdt en niet met de hand verplaatst is.
                 int? ingangVia = res.Reeks.Count >= 2 ? res.Reeks[^2]

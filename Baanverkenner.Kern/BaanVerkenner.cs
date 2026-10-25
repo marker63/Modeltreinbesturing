@@ -43,6 +43,7 @@ public class Opdracht
     public List<int>? BasisReeks { get; set; }
     public RitEinde BasisEinde { get; set; }
     public List<int> BasisOokBezet { get; set; } = new();
+    public Dictionary<int, string> BasisStanden { get; set; } = new();
     public string? BasisRijstand { get; set; }
     public string Sleutel => $"{Configuratie.Sleutel}|{Start}|{Richting}{(BlokProef ? "|blok" : "")}";
 }
@@ -1154,7 +1155,7 @@ public partial class BaanVerkenner
             {
                 basis = await Basisrit(o);
                 if (basis is null) { await TerugNaarHuis(o.Route); return; }
-                o.BasisReeks = basis.Reeks.ToList(); o.BasisEinde = basis.Einde; o.BasisOokBezet = basis.OokBezetBijKortsluiting.ToList(); o.BasisRijstand = RijStand(o).Sleutel;
+                o.BasisReeks = basis.Reeks.ToList(); o.BasisEinde = basis.Einde; o.BasisOokBezet = basis.OokBezetBijKortsluiting.ToList(); o.BasisRijstand = RijStand(o).Sleutel; o.BasisStanden = new(basis.StandBijMelder);
                 BewaarNu();
             }
 
@@ -1735,7 +1736,7 @@ public partial class BaanVerkenner
     internal static RitResultaat? BewaardeBasis(Opdracht o, Configuratie rijstand)
     {
         if (o.BasisReeks is not { Count: > 0 } reeks || o.BasisRijstand != rijstand.Sleutel || o.KruisProef || o.BlokProef) return null;
-        var r = new RitResultaat { Einde = o.BasisEinde, Richting = o.Richting, OokBezetBijKortsluiting = o.BasisOokBezet.ToList() };
+        var r = new RitResultaat { Einde = o.BasisEinde, Richting = o.Richting, OokBezetBijKortsluiting = o.BasisOokBezet.ToList(), StandBijMelder = new(o.BasisStanden) };
         r.Reeks.AddRange(reeks);
         return r;
     }
@@ -2116,12 +2117,63 @@ public partial class BaanVerkenner
             _log.Waarschuwing($"Proef met adres {a}: Dinamo heeft het commando voor wissel {a} niet teruggemeld (de wissel is dus waarschijnlijk niet omgezet). Wat er in deze rit gebeurde ({proef.Einde}) wordt niet aan adres {a} toegeschreven (BUG #307).");
             return;
         }
+        // BUG #328 (nachtwerk 25/26-10, simulatie met Marco's aansluiting vanaf melder 129): de proef van adres 3 reed 129, 10, 9, 1, 12, 11, 4 en kreeg kortsluiting na 4, het bekende
+        // kortsluitpunt #2 dat met wissel 9 afbuigend opgelost is; de proef reed met wissel 9 rechtdoor. Dat werd "wissel 3: niet van 11 naar 4 met 3 afbuigend" en zo kwamen 3, 4, 7, 8,
+        // 11 en 12 als valse wissels in de kaart. Verklaart een bekend kortsluitpunt op die plek de kortsluiting (zijn oplossing stond er niet bij, of het is nog open en zijn stand zat in de
+        // proef), dan zegt de proef niets over het proefadres.
+        if (Rondrit && proef.Einde == RitEinde.Kortsluiting && proef.Reeks.Count >= 1)
+        {
+            int x328 = proef.Reeks[^1];
+            // de stand op het moment van de kortsluiting (daarna kan het herstel al wissels omgezet hebben)
+            var proefStand328 = _laatsteKortsluitContext is { } kc328 && kc328.Melder == x328 ? kc328.Stand : WerkelijkeStand(o.Configuratie.Met(a));
+            var verklaard = _kaart.Kortsluitpunten.FirstOrDefault(k => k.Soort == KortsluitpuntSoort.Kortsluiting && k.NaMelder == x328 && k.Richting == o.Richting && !k.Opgegeven
+                && !k.Configuratie.Bevat(a) && k.Configuratie.Afbuigend.All(proefStand328.Bevat)
+                && ((k.Opgelost && k.OpgelostDoorAdres is int s328 && s328 != a && k.OpgelostMetAfbuigend is bool afb328 && proefStand328.Bevat(s328) != afb328)
+                    || (!k.Opgelost && !k.Tijdelijk && k.Configuratie.Afbuigend.All(proefStand328.Bevat))));
+            if (verklaard is not null)
+            {
+                _log.Info($"Proef met adres {a}: kortsluiting na melder {x328} op het bekende kortsluitpunt #{verklaard.Id}" +
+                          (verklaard.Opgelost ? $" (opgelost met wissel {verklaard.OpgelostDoorAdres} {(verklaard.OpgelostMetAfbuigend == true ? "afbuigend" : "rechtdoor")}, die stond er nu niet bij)" : "") +
+                          $"; dat zegt niets over adres {a} (BUG #328, nog niet getest op de baan).");
+                return;
+            }
+        }
         var b = basis.Reeks;
         var t = proef.Reeks;
         int i = 0;
         while (i < b.Count && i < t.Count && b[i] == t[i]) i++;
         var c = o.Configuratie;
         var cA = c.Met(a);
+        // BUG #329 (nachtwerk 25/26-10, simulatie met Marco's aansluiting): een proef die afweek doordat een ANDERE wissel anders stond dan in de basisrit (een staartwissel, een klemoplossing,
+        // een uitgestelde wissel, een kruismotor) gaf valse wissels ("adres 3: na 24 rechtdoor 21, afbuigend 8"). Vergeleken wordt nu de werkelijke stand waarmee de proef de plek van de
+        // afwijking (of de kortsluiting) bereikte met die van de basisrit op dezelfde plek; verschilt die in een ander adres dan het proefadres, dan zegt de proef niets over het proefadres.
+        {
+            var volg329 = _ins.GekoppeldeParen().Select(p => p.Volger).ToHashSet();
+            string? proefStand = null, basisStand = null; int plek = -1;
+            if (proef.Einde == RitEinde.Kortsluiting && i == t.Count && t.Count >= 1)
+            {
+                plek = t.Count;   // de stap vanaf t[^1]; in de basisrit de melder op index t.Count
+                proefStand = _laatsteKortsluitContext is { } kc329 && kc329.Melder == t[^1] ? kc329.Stand.Sleutel : null;
+                basis.StandBijMelder.TryGetValue(plek, out basisStand);
+            }
+            else if (i < t.Count && i >= 1)
+            {
+                plek = i;
+                proef.StandBijMelder.TryGetValue(i, out proefStand);
+                basis.StandBijMelder.TryGetValue(i, out basisStand);
+            }
+            if (Rondrit && proefStand is not null && basisStand is not null)   // alleen optie 6: bij optie 5 rijden de proeven bewust met staartwissels
+            {
+                var ps = Configuratie.VanSleutel(proefStand).Afbuigend.Where(x => x != a && !volg329.Contains(x)).ToHashSet();
+                var bs = Configuratie.VanSleutel(basisStand).Afbuigend.Where(x => x != a && !volg329.Contains(x)).ToHashSet();
+                if (!ps.SetEquals(bs))
+                {
+                    var anders = ps.Except(bs).Select(x => $"{x} afbuigend").Concat(bs.Except(ps).Select(x => $"{x} rechtdoor")).ToList();
+                    _log.Info($"Proef met adres {a}: bij de afwijking stond wissel {string.Join(", ", anders)} anders dan in de basisrit op die plek; de afwijking wordt niet aan adres {a} toegeschreven (BUG #329, nog niet getest op de baan).");
+                    return;
+                }
+            }
+        }
 
         // (1) Omzetten gaf kortsluiting vóór er iets anders gebeurde
         if (proef.Einde == RitEinde.Kortsluiting && i == t.Count && t.Count <= b.Count
