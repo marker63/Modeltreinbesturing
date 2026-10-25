@@ -3064,3 +3064,19 @@ adres dan het proefadres (staartwissel, klemoplossing, uitgestelde wissel, een v
 algemene bescherming tegen valse wissels als 3, 4, 7, 8, 11 en 12. Bij optie 5 niet (daar rijden proeven bewust met staartwissels).
 Bekende beperking: start de verkenning midden in de keerlus (melder 129 of 12), dan vindt de simulatie geen valse wissels meer, maar ook (bijna) geen echte: de wissels bij 129 kunnen
 daar niet veilig teruggezet worden. Vanaf melder 13 (Marco's startmelder) gaat het goed.
+
+## BUG #330 – OPGELOST (nog niet getest op de baan): na hervatten in hetzelfde programma was een lopende kortsluiting onbekend
+Dinamo meldt een blok-alarm alleen als het verandert. Hervatte Marco de verkenning terwijl de kortsluiting nog liep, dan wist de nieuwe verkenner daar niets van en probeerde hij te rijden.
+De hardware geeft nu ook de actieve alarmen (IBlokAlarmBron.ActieveAlarmBlokken); de verkenner neemt die bij de start over.
+
+## BUG #331 – OPGELOST (nog niet getest op de baan): bij hervatten met de loc elders vroeg de verkenner meteen om de loc op 13 te zetten
+Marco 25-10 10:05: geen vragen meer om de loc terug te zetten. Bij hervatten rijdt de verkenner nu eerst zelf naar de startmelder (zelf oplossen, maximaal 10 minuten). Kent de kaart nog
+geen weg van de melder waar de loc staat, dan kruipt de loc naar een buurmelder (elke ronde de andere kant op) in plaats van negen minuten niets te doen.
+Meting (MARCO_HERVAT): 6 keer stoppen en hervatten: was 6 keer hulp van de gebruiker, nu 0; voltooid, 0 valse wissels.
+
+## BUG #332 – OPGELOST (nog niet getest op de baan): uitwijken voor een wissel onder de loc lukte niet als een tweede wissel ook bij de uitwijkmelder lag
+Op 129 moesten wissel 5 en 9 om; 9 ligt ook bij 4, 5 niet. Toen gebeurde er niets en gingen beide om met de loc op 129 (kortsluiting). Nu rijdt de loc naar 4, gaat alleen wissel 5 om en
+blijft wissel 9 staan zolang de loc op 4 staat.
+
+## BUG #333 – OPGELOST (nog niet getest op de baan): met een hergebruikte basisrit zonder nieuwe overgangen reed de loc voor niets naar de start van de opdracht
+En de terugweg zette daarbij wissels om met de loc op 129. Is er met de bewaarde basisrit niets meer te testen, dan wordt de opdracht afgerond zonder te rijden.

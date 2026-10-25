@@ -1022,6 +1022,18 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
     private readonly Dictionary<int, bool> _bekendeStand = new();
 
     /// <summary>BUG #101: zie <see cref="IHardwareInterface.HerhaalBekendeMelderStanden"/>. Alleen bezette melders worden doorgegeven (vrij is de beginstand).</summary>
+    /// <summary>BUG #330: zie <see cref="IBlokAlarmBron.ActieveAlarmBlokken"/>.</summary>
+    public IReadOnlyCollection<int> ActieveAlarmBlokken
+    {
+        get
+        {
+            for (int poging = 0; poging < 3; poging++)
+                try { return _laatsteBlokAlarm.Where(kv => kv.Value).Select(kv => kv.Key).ToList(); }
+                catch (InvalidOperationException) { }   // tegelijk gewijzigd door de ontvangstthread: opnieuw
+            return Array.Empty<int>();
+        }
+    }
+
     public void HerhaalBekendeMelderStanden()
     {
         List<int> bezet;

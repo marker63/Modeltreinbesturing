@@ -115,7 +115,17 @@ public partial class BaanVerkenner
         {
             _ingang = null;
             int van313 = bezet.First();
-            var eerste313 = StapWeg(_kaart, Kruis, van313, doel, _zelfVermijd)?.FirstOrDefault();
+            var weg331 = StapWeg(_kaart, Kruis, van313, doel, _zelfVermijd);
+            var eerste313 = weg331?.FirstOrDefault();
+            if (weg331 is null)
+            {
+                // BUG #331 (nachtwerk 25/26-10, meting met stoppen en hervatten): na het hervatten stond de loc op 129 en kende de kaart (nog) geen weg naar 13; negen minuten lang gebeurde er
+                // niets (130 lege rondes). Nu kruipt de loc naar de buurmelder (elke ronde de andere kant op); van daaruit is er vaak wel een bekende weg.
+                var rk = ronde % 2 == 0 ? Richting.Vooruit : Richting.Achteruit;
+                _log.Info($"Zelf oplossen, ronde {ronde}: de kaart kent nog geen weg van melder {van313} naar melder {doel}; de loc kruipt {rk.Tekst()} naar de volgende melder (BUG #331, nog niet getest op de baan).");
+                await KruipNaarBuurmelder(van313, rk, TimeSpan.FromSeconds(20));
+                return false;
+            }
             if (await ProbeerZelfNaarMelder(doel, _zelfVermijd)) return true;
             // BUG #313 (autolog 25-10 12:39:15, 12:41:02, 12:43:23): drie keer dezelfde weg 129 -> 14, drie keer naar 10. Een eerste stap die mislukte, wordt bij het zelf oplossen niet
             // nog eens genomen: de volgende ronde zoekt een andere weg (bijv. 129 -> 24 -> 21 ... -> 13).
@@ -124,6 +134,15 @@ public partial class BaanVerkenner
             onderLocGeprobeerd.Clear();
         }
         return false;
+    }
+
+    /// <summary>BUG #331: kruipt in richting <paramref name="r"/> tot een andere melder dan <paramref name="van"/> bezet is (of de tijd om is) en stopt dan op die melder.</summary>
+    private async Task KruipNaarBuurmelder(int van, Richting r, TimeSpan max)
+    {
+        await KruipTotMelder(r, max, van);
+        _monitor.Bijwerken();
+        var b = _monitor.Bezet;
+        if (b.Count == 2 && b.Contains(van) && HuidigeAlarmBlokken().Count == 0) await Nastellen(b.First(m => m != van), r, achter: van);
     }
 
     /// <summary>BUG #313: stappen die bij het zelf oplossen mislukten (van, naar); de weg naar het doel gaat er niet meer over.</summary>
@@ -225,7 +244,7 @@ public partial class BaanVerkenner
     }
 
     /// <summary>BUG #305: kruipt (naar alle blokken, het blok is dan onbekend) in richting <paramref name="r"/> tot er een melder bezet raakt of de tijd om is.</summary>
-    private async Task KruipTotMelder(Richting r, TimeSpan max)
+    private async Task KruipTotMelder(Richting r, TimeSpan max, int? behalve = null)
     {
         if (BlokVereist)
         {
@@ -239,7 +258,7 @@ public partial class BaanVerkenner
         {
             await Wacht(Poll);
             _monitor.Bijwerken();
-            if (_monitor.Bezet.Count > 0) break;
+            if (behalve is int bh ? _monitor.Bezet.Any(m => m != bh) : _monitor.Bezet.Count > 0) break;
         }
         await VolledigeStop();
     }

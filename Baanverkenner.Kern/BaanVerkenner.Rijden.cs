@@ -865,6 +865,12 @@ public partial class BaanVerkenner
                 onder.TryAdd(a, _monitor.Bezet.OrderBy(x => x).First());
         // BUG #254 (log 20-10 15:28:43): wissel 2 werd gespaard (loc op melder 12), maar zijn bewezen partner wissel 1 ging wel naar rechtdoor: precies de stand die de kortsluiting gaf
         // (kortsluitpunt #3), de blokproef voor melder 12 kon daardoor niet draaien. Een partner van een gespaarde wissel wordt ook gespaard.
+        // BUG #332: na het uitwijken blijven de wissels die ook bij de uitwijkmelder liggen staan zolang de loc daar staat
+        if (_uitwijkLaatStaan is { } uls)
+        {
+            if (_monitor.Bezet.Contains(uls.P)) foreach (var a in uls.Adressen) onder.TryAdd(a, uls.P);
+            else _uitwijkLaatStaan = null;
+        }
         foreach (var pa in _kaart.OverloopPartnersVan(onder.Keys).ToList())
             if (_ins.WisselAdressen().Contains(pa)) onder.TryAdd(pa, onder.Values.First());
         foreach (var a in _ins.WisselAdressen())
@@ -3313,8 +3319,12 @@ public partial class BaanVerkenner
     /// hetzelfde nog eens. Niet omzetten (de spaarregels) laat de loc de verkeerde kant op rijden (17:56:17: naar 4 in plaats van 24). Wat een mens doet: eerst een stukje terug, van de wissel
     /// af, dan omzetten en weer vooruit. Moet voor deze stap een wissel om die bij een bezette melder ligt, dan rijdt de loc eerst met de huidige stand terug naar de vorige melder (een bekende,
     /// eenduidige overgang met deze stand), tot de huidige melder vrij is. Geeft de nieuwe start en het verlengde pad, of null als dat niet nodig of niet mogelijk is. Nog niet getest op de baan.</summary>
+    /// <summary>BUG #332: wissels die na het uitwijken (#256) naar melder P blijven staan zolang de loc op P staat (ze liggen ook bij P).</summary>
+    private (int P, HashSet<int> Adressen)? _uitwijkLaatStaan;
+
     private async Task<(int Van, List<int> Pad)?> UitwijkenVoorWissels(int van, Richting r, List<int> pad, Configuratie cfg)
     {
+        _uitwijkLaatStaan = null;
         _monitor.Bijwerken();
         var bezet = _monitor.Bezet.ToHashSet();
         if (bezet.Count == 0 || !bezet.Contains(van) || HuidigeAlarmBlokken().Count > 0) return null;
@@ -3343,7 +3353,11 @@ public partial class BaanVerkenner
             return null;
         }
         int p = terug[0];
-        if (WisselsBijBezet(_kaart, new[] { p }).Intersect(teOm).Any()) return null;   // de wissel ligt dan tussen p en van: daar staat de loc er na het terugrijden nog op
+        // de wissel ligt dan tussen p en van: daar staat de loc er na het terugrijden nog op. BUG #332 (nachtwerk 25/26-10, meting met hervatten): op 129 moesten wissel 5 en 9 om; 9 ligt
+        // ook bij 4, 5 niet. Toen gebeurde er niets en gingen beide om met de loc op 129. Nu rijdt de loc naar 4, gaat alleen wissel 5 om, en blijft wissel 9 staan zolang de loc op 4 staat.
+        var bijP332 = WisselsBijBezet(_kaart, new[] { p }).Intersect(teOm).ToList();
+        if (bijP332.Count == teOm.Count) return null;
+        _uitwijkLaatStaan = bijP332.Count > 0 ? (p, bijP332.ToHashSet()) : null;
         _log.Info($"Wissel {Lijst(teOm)} moet om voor de stap vanaf melder {van}, maar ligt bij de melder waar de loc staat (de loc kan op de tong staan). Eerst terug naar melder {p} met de huidige stand, dan omzetten (BUG #256, nog niet getest op de baan).");
         await Rit(van, r.Om(), new RitDoel { Configuratie = nu, DoelMelder = p, VerwachtPad = new List<int> { van, p } });
         _monitor.Bijwerken();

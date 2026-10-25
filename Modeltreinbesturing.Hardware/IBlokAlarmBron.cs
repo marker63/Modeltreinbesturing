@@ -15,4 +15,8 @@ public interface IBlokAlarmBron
     /// <summary>(Dinamo-blok zoals in de software, dus 1-based = Blok.Nummer; true = er is
     /// kortsluiting in dat blok, false = die melding is weer opgeheven).</summary>
     event Action<int, bool>? BlokAlarmGewijzigd;
+
+    /// <summary>BUG #330: de blokken waarvoor nu een alarm actief is. Het event meldt alleen wijzigingen; een verkenner die later begint (hervatten in hetzelfde programma terwijl
+    /// Dinamo een kortsluiting meldt) zou het lopende alarm anders niet kennen.</summary>
+    IReadOnlyCollection<int> ActieveAlarmBlokken => Array.Empty<int>();
 }

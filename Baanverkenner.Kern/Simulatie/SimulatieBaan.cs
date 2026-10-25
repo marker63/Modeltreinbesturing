@@ -255,6 +255,7 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
     /// <summary>Dinamo meldt een kortsluiting per blok (BUG #43). Alleen als <see cref="MeldBlokAlarm"/> aan staat.</summary>
     public event Action<int, bool>? BlokAlarmGewijzigd;
     public bool MeldBlokAlarm { get; set; }
+    public IReadOnlyCollection<int> ActieveAlarmBlokken => _alarmBlokken.ToList();   // BUG #330
     private readonly HashSet<int> _alarmBlokken = new();
     private void AlarmAan(params int[] blokken) { if (!MeldBlokAlarm) return; foreach (var b in blokken) if (_alarmBlokken.Add(b)) BlokAlarmGewijzigd?.Invoke(b, true); }
     /// <summary>Echte Dinamo: de kortsluiting wordt een fractie van een seconde NA het ontstaan gemeld (eerst zie je de melder bezet worden).</summary>

@@ -253,7 +253,12 @@ public partial class BaanVerkenner
         _token = token;
         _hw.BezetmeldingGewijzigd += _monitor.Ontvang;
         _hw.KortsluitingStatusGewijzigd += HardwareMeldtKortsluiting;
-        if (_hw is IBlokAlarmBron alarmBron) alarmBron.BlokAlarmGewijzigd += HardwareMeldtBlokAlarm;
+        if (_hw is IBlokAlarmBron alarmBron)
+        {
+            alarmBron.BlokAlarmGewijzigd += HardwareMeldtBlokAlarm;
+            // BUG #330: een alarm dat al liep voordat deze verkenner begon (hervatten in hetzelfde programma) telt ook
+            foreach (var b in alarmBron.ActieveAlarmBlokken) HardwareMeldtBlokAlarm(b, true);
+        }
         if (_hw is IVerbindingsBron stilteBron) stilteBron.StilteGewijzigd += HardwareMeldtStilte;
         try
         {
@@ -503,7 +508,12 @@ public partial class BaanVerkenner
             int s = _kaart.StartMelder;
             var bezetNu = _monitor.Bezet;
             if (!(bezetNu.Count == 1 && bezetNu.Contains(s)))
-                await VraagLocTerugTeZetten(s, $"De verkenning wordt hervat vanaf de startmelder {s}.", zelfEerst: false);
+            {
+                // Nachtwerk 25/26-10 (Marco 25-10 10:05: "geen vragen meer om de loc steeds terug te zetten op de startmelder"): bij hervatten met de loc ergens anders op de baan rijdt de
+                // verkenner nu eerst zelf naar de startmelder (zelf oplossen, maximaal 10 minuten). De meting met 6 keer stoppen en hervatten vroeg anders 6 keer om hulp.
+                _log.Info($"De loc staat bij het hervatten op melder {(bezetNu.Count == 0 ? "?" : Lijst(bezetNu))}, niet op de startmelder {s}: de verkenner rijdt eerst zelf naar melder {s} (nog niet getest op de baan).");
+                await VraagLocTerugTeZetten(s, $"De verkenning wordt hervat vanaf de startmelder {s}.", zelfEerst: bezetNu.Count >= 1);
+            }
             return;
         }
 
@@ -1123,6 +1133,14 @@ public partial class BaanVerkenner
         {
             if (o.KruisProef) { await VoerKruisProefUit(o); return; }
             if (o.BlokProef) { await VoerBlokProefUit(o); return; }   // BUG #174
+            // BUG #333 (nachtwerk 25/26-10, meting met hervatten): met een hergebruikte basisrit (#318) zonder nieuwe overgangen reed de loc helemaal naar de start van de opdracht (129) en
+            // meteen weer terug; de terugweg zette daarbij wissel 5+6 en 9 om met de loc op 129. Is er met de bewaarde basisrit niets meer te testen, dan hoeft de loc er niet heen.
+            if (!_status.Controle && !o.TestCombinaties && BewaardeBasis(o, RijStand(o)) is { } vooraf
+                && Overgangen(vooraf.Reeks, o.Richting).All(x => _status.GetesteOvergangen.Contains(x)))
+            {
+                _log.Info($"Opdracht #{o.Id}: de bewaarde basisrit bevat geen overgangen die niet al met alle adressen getest zijn; de loc hoeft niet naar melder {o.Start} (BUG #333, nog niet getest op de baan).");
+                return;
+            }
             await NaarStartVan(viaIngang ?? o.Route, rijstand);
             // BUG #96 (Marco 16:01: "weer kortsluiting in het kruiswissel en motor 13 staat verkeerd"): motor 13 of 10 omzetten terwijl de loc op melder 24
             // staat geeft ALTIJD kortsluiting (log 15:40, 15:48, 14:40). Is dat hier nodig en kon het niet vooraf (#95), dan wordt de opdracht

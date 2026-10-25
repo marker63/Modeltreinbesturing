@@ -3345,6 +3345,58 @@ public static class Tests
         return uit;
     }
 
+    /// <summary>Nachtwerk 25/26-10: Marco stopt en hervat de verkenning vaak (25-10: zes keer). Deze meting stopt de verkenning elke <paramref name="minuten"/> minuten (simulatietijd),
+    /// bewaart de voortgang als JSON, en hervat met een nieuwe verkenner op dezelfde (gesimuleerde) baan; de loc blijft staan waar hij stond. MARCO_HERVAT=1 draait alleen deze meting.</summary>
+    internal static string MarcoHervatBench(double minuten = 40, int start = 13)
+    {
+        var echt = new HashSet<int> { 1, 2, 5, 6, 9, 10, 13, 14 };
+        Baanverkenner.Kern.Simulatie.MiniworldBaan.EchteAansluiting = true;
+        try
+        {
+            var sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(true, start, null);
+            var simMeld = new List<(DateTime T, string S)>();
+            sim.StatusBericht += t => { if (t.Contains("KORTSLUITING")) simMeld.Add((sim.HuidigeSimTijd, "##SIM## " + t)); };
+            var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 14, DinamoBlokken = "1-12", KruisMotoren = "10+13", HoogsteMelder = 150,
+                Rondrit = true, GekoppeldeWissels = "5+6,2+1", OmgekeerdAangesloten = "6" };
+            sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+            var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+            var status = new VerkenStatus { Instellingen = ins };
+            var t0 = klok.Nu; int stops = 0, gebruiker = 0, kort = 0; var alleRegels = new List<string>();
+            BaanVerkenner? v = null;
+            for (int ronde = 0; ronde < 30; ronde++)
+            {
+                var log = new VerkenLog(klok);
+                v = new BaanVerkenner(sim, ins, klok, log, (kop, tekst) =>
+                {
+                    var m = System.Text.RegularExpressions.Regex.Match(tekst, @"met de hand op melder (\d+)");
+                    if (kop == "Loc terugzetten" && m.Success) sim.ZetLocOpMelder(int.Parse(m.Groups[1].Value));
+                    return Task.FromResult(true);
+                }, status) { VraagJaNee = (_, _) => Task.FromResult<bool?>(true) };
+                using var cts = new CancellationTokenSource();
+                var rondeStart = klok.Nu;
+                Action<DateTime> tik = nu => { if ((nu - rondeStart).TotalMinutes > minuten || (nu - t0).TotalHours > 10) cts.Cancel(); };
+                klok.Getikt += tik;
+                bool klaar = false;
+                try { v.VoerUit(cts.Token).GetAwaiter().GetResult(); klaar = true; } catch (OperationCanceledException) { } catch (Exception ex) { alleRegels.Add("FOUT: " + ex.Message); klaar = true; }
+                klok.Getikt -= tik;
+                alleRegels.AddRange(log.Regels.Select(x => (T: x.Tijd, S: x.Tekst)).Concat(simMeld.Where(x => x.T >= rondeStart && x.T <= klok.Nu)).OrderBy(x => x.T).Select(x => x.T.ToString("HH:mm:ss.f") + "  " + x.S));
+                gebruiker += log.Regels.Count(x => x.Tekst.Contains("Gebruiker heeft de loc"));
+                kort += log.Regels.Count(x => x.Tekst.Contains("KORTSLUITING/ONTSPORING vermoed"));
+                if (klaar || v.Kaart.Voltooid || (klok.Nu - t0).TotalHours > 10) break;
+                stops++;
+                status = VerkenStatus.VanJson(v.Status.AlsJson())!;   // zoals het bestand op schijf
+                klok.Wacht(TimeSpan.FromSeconds(60)).GetAwaiter().GetResult();   // Marco start het programma opnieuw
+            }
+            var k = v!.Kaart;
+            var gevonden = k.Wissels.Where(w => w.Waarnemingen.Count > 0).Select(w => w.Adres).ToList();
+            if (Environment.GetEnvironmentVariable("MARCO_LOG") is { } pad && pad.Length > 0) System.IO.File.WriteAllLines($"{pad}_hervat_{start}.txt", alleRegels);
+            string regel = $"MARCO-HERVAT start {start} elke {minuten:0} min: {stops} keer gestopt en hervat, {(k.Voltooid ? "voltooid" : "NIET-voltooid")}, melders {k.Melders.Count}/23, met-blok {k.Melders.Count(m => m.DinamoBlok is not null)}, wissels [{string.Join(",", gevonden.OrderBy(x => x))}], valse {gevonden.Count(a => !echt.Contains(a))}, kortsl {kort}, onder-loc {sim.OnderLocOmgezet}, gebruiker {gebruiker}, {(klok.Nu - t0).TotalMinutes:0} min";
+            Console.WriteLine(regel);
+            return regel;
+        }
+        finally { Baanverkenner.Kern.Simulatie.MiniworldBaan.EchteAansluiting = false; }
+    }
+
     /// <summary>BUG #188: meetopzet. BENCH=1 draait alleen deze meting (start-lijst in BENCH_START) en schrijft per run een regel plus een totaalscore; zo wordt elke wijziging
     /// bewezen met cijfers vergeleken met de basislijn in plaats van geraden. Echte wissels in de nagebouwde baan: 1,2,5,6,9,14 (en de kruismotoren 10,13).</summary>
     static void BenchTest()
@@ -3565,6 +3617,7 @@ public static class Tests
         if (Environment.GetEnvironmentVariable("ALLEEN_308") == "1") { AlarmVoorTerugmeldingTest(); Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)"); return _fouten == 0 ? 0 : 1; }
         if (Environment.GetEnvironmentVariable("BENCH") == "1") { BenchTest(); return 0; }
         if (Environment.GetEnvironmentVariable("MARCO") == "1") { MarcoBench(); return 0; }
+        if (Environment.GetEnvironmentVariable("MARCO_HERVAT") == "1") { foreach (var mn in (Environment.GetEnvironmentVariable("MARCO_MIN") ?? "40").Split(',')) MarcoHervatBench(double.Parse(mn)); return 0; }
         if (Environment.GetEnvironmentVariable("ALLEEN_RONDRIT") == "1") { RondritTest(); Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)"); return _fouten == 0 ? 0 : 1; }
         if (Environment.GetEnvironmentVariable("RONDRIT") == "1") { RondritBench(); return 0; }
         var kaart = Laad("baankaart_voltooid_2026-10-04.json");
@@ -3670,6 +3723,11 @@ public static class Tests
             var regels = MarcoBench();
             Environment.SetEnvironmentVariable("MARCO_VARIANT", oud);
             Eis(regels.Count == 1 && regels[0].Contains(" voltooid ") && regels[0].Contains("valse 0") && regels[0].Contains("gebruiker 0"), "marco (uitval): voltooid, geen valse wissels, geen hulp nodig (" + string.Join("", regels) + ")");
+        }
+        {
+            // Nachtwerk 25/26-10: elke 40 minuten stoppen en hervatten (Marco deed dat 25-10 zes keer); de loc staat dan ergens op de baan en de verkenner rijdt zelf terug (#330, #331)
+            var h = MarcoHervatBench(40);
+            Eis(h.Contains(" voltooid") && h.Contains("valse 0") && h.Contains("gebruiker 0"), "marco (stoppen en hervatten): voltooid, geen valse wissels, geen hulp nodig (" + h + ")");
         }
         WachtendeAlarmOplossingTest();
         KlemStandOnthoudenTest();
