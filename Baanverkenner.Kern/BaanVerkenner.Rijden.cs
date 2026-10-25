@@ -454,7 +454,18 @@ public partial class BaanVerkenner
         if (!forceer) await VrijRijdenVoorWissel(adres);   // BUG #181
         long bevestigingenVoor = (_hw as IWisselBevestiging)?.AantalWisselBevestigingen ?? 0;
         long eigenVoor = (_hw as IWisselBevestiging)?.BevestigingenVan(adres, afbuigend) ?? -1;   // BUG #307
+        bool alarmBijCommando = HuidigeAlarmBlokken().Count > 0;   // BUG #308
         _hw.ZetWissel(adres, afbuigend);
+        // BUG #308 (autolog 25-10 10:35:29.727-10:35:30.328): de kortsluiting in blok 3 ging om 10:35:30.127 weg, 0,2 s VOORDAT Dinamo wissel 2 terugmeldde; toch heette het
+        // "de kortsluiting ging weg nadat wissel 2 naar afbuigend is geschakeld" (de loc stond op 14, ver van wissel 2). Gaat een alarm weg voordat de eigen terugmelding er is,
+        // dan heeft deze wissel het niet weggenomen. Meteen na het commando kijken (vóór de wachttijd), anders is de volgorde niet meer te zien.
+        _alarmWegVoorEigenTerugmelding = false;
+        if (eigenVoor >= 0 && alarmBijCommando && _hw is IWisselBevestiging bron308)
+            for (int i = 0; i < 15 && bron308.BevestigingenVan(adres, afbuigend) <= eigenVoor; i++)
+            {
+                if (HuidigeAlarmBlokken().Count == 0) { _alarmWegVoorEigenTerugmelding = true; break; }
+                await Wacht(TimeSpan.FromMilliseconds(100));
+            }
         // BUG #181: tijdens het NAVIGEREN (de loc rijdt naar een andere plek) mag geen wissel omgaan die de kaart bij een nu bezette melder noemt: de loc staat er met een deel
         // op of tegen de tong (de gevaarlijkste overschrijving van een stand). Verkenningsritten zetten de wissel vóór de loc bewust om en tellen niet mee.
         if (_stapNavigeert && _wisselStand.TryGetValue(adres, out var vorige) && vorige != afbuigend && _monitor.Bezet.Count >= 2 && WisselsBijBezet(_kaart, _monitor.Bezet).Contains(adres))
@@ -607,6 +618,9 @@ public partial class BaanVerkenner
         for (int i = 0; i < 10 && bron.AantalWisselBevestigingen <= bevestigingenVoor; i++) await Wacht(TimeSpan.FromMilliseconds(100));
         return bron.AantalWisselBevestigingen > bevestigingenVoor;
     }
+
+    /// <summary>BUG #308: bij het laatste wisselcommando verdween het alarm al voordat Dinamo deze wissel terugmeldde.</summary>
+    private bool _alarmWegVoorEigenTerugmelding;
 
     /// <summary>BUG #307: per wissel het laatste commando (Dinamo-stand) en het aantal eigen terugmeldingen daarvoor.</summary>
     private readonly Dictionary<int, (bool Afbuigend, long EigenVoor)> _laatsteCommandoPerWissel = new();
@@ -1516,6 +1530,13 @@ public partial class BaanVerkenner
             bool oud = _wisselStand.TryGetValue(a, out var nu) && nu;
             var herstelVoor = _uitvalHersteldOm;
             await ZetWissel(a, !oud, forceer: true);
+            if (_alarmWegVoorEigenTerugmelding && HuidigeAlarmBlokken().Count == 0)
+            {
+                _log.Waarschuwing($"De kortsluiting ging weg voordat Dinamo wissel {a} terugmeldde: niet door deze wissel (Dinamo zette het alarm zelf uit). Niet vastgelegd; wissel {a} gaat terug (BUG #308, nog niet getest op de baan).");
+                _kortsluitingGemeld = false;
+                await ZetWissel(a, oud, forceer: true);
+                return true;
+            }
             var eind = _klok.Nu + TimeSpan.FromSeconds(2.5);
             while (HuidigeAlarmBlokken().Count > 0 && _klok.Nu < eind) await Wacht(TimeSpan.FromMilliseconds(300));
             if (HuidigeAlarmBlokken().Count == 0 && _uitvalHersteldOm != herstelVoor)

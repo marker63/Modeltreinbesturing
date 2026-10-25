@@ -1168,6 +1168,38 @@ public static class Tests
         Eis(BaanVerkenner.AankomstViaBewezenIngang(kaart2, new Opdracht { Id = 8, Start = 15, Richting = Richting.Achteruit, Configuratie = Configuratie.Basis.Met(14), Route = normaal }, Configuratie.Basis.Met(13).Met(14), kruis, out _) is null, "ingang (#149): andere opdrachten (start 15) blijven ongemoeid");
     }
 
+    // BUG #308: gaat het alarm weg voordat Dinamo de wissel terugmeldt, dan was het niet die wissel (autolog 25-10 10:35:30: wissel 2 'loste' blok 3 op met de loc op 14)
+    static void AlarmVoorTerugmeldingTest()
+    {
+        Console.WriteLine("Test: alarm weg vóór de terugmelding van de wissel (BUG #308)");
+        var sim = new Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan { DinamoGedrag = true, LocAdres = 5408, UitvalVanafCommando = 1, UitvalDuur = TimeSpan.FromMinutes(30) };
+        var A = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A; var B = Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B;
+        var s1 = sim.NieuweSectie(1, 80, 1); var s2 = sim.NieuweSectie(2, 80, 2);
+        sim.Verbind(s1, B, s2, A); sim.PlaatsLoc(s1, 40, +1);
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 4, DinamoBlokken = "1-2" };
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var log = new VerkenLog(klok);
+        var status = new VerkenStatus { Instellingen = ins };
+        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true), status);
+        v.VraagJaNee = (_, _) => Task.FromResult<bool?>(true);
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var kaart = status.Kaart;
+        kaart.Kortsluitpunten.Add(new Kortsluitpunt { Id = 1, NaMelder = 1, Richting = Richting.Vooruit, Soort = KortsluitpuntSoort.Kortsluiting, Configuratie = Configuratie.Basis, AlarmBlokken = new List<int> { 1 } });
+        var alarm = typeof(BaanVerkenner).GetMethod("HardwareMeldtBlokAlarm", bf)!;
+        var mon = (MelderMonitor)typeof(BaanVerkenner).GetField("_monitor", bf)!.GetValue(v)!;
+        mon.Ontvang(1, true);
+        klok.Wacht(TimeSpan.FromSeconds(1)).GetAwaiter().GetResult(); mon.Bijwerken();
+        alarm.Invoke(v, new object[] { 1, true });
+        bool weg = false;
+        klok.Getikt += _ => { if (!weg && sim.GenegeerdeCommandos > 0) { weg = true; alarm.Invoke(v, new object[] { 1, false }); } };   // Dinamo zet het alarm zelf uit; de wissel zelf werd niet uitgevoerd
+        var probeer = typeof(BaanVerkenner).GetMethod("ProbeerAlarmWegTeKrijgen", bf)!;
+        bool ok = ((Task<bool>)probeer.Invoke(v, new object[] { "test" })!).GetAwaiter().GetResult();
+        var tekst = log.AlsTekst();
+        if (Environment.GetEnvironmentVariable("DUMP308") == "1") Console.WriteLine(tekst);
+        Eis(ok && tekst.Contains("BUG #308") && !kaart.Kortsluitpunten.Any(k => k.Opgelost) && !tekst.Contains("De kortsluiting ging weg nadat wissel"), "alarm (#308): weg vóór de eigen terugmelding wordt niet aan de wissel toegeschreven");
+    }
+
     static void AlarmWisselBijLocTest()
     {
         Console.WriteLine("Test: alarm - wissel bij de loc met toestemming proberen (BUG #147)");
@@ -3328,6 +3360,7 @@ public static class Tests
     public static int Main()
     {
         if (Environment.GetEnvironmentVariable("ALLEEN_KEERLUS") == "1") { KeerlusTest(); Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)"); return _fouten == 0 ? 0 : 1; }
+        if (Environment.GetEnvironmentVariable("ALLEEN_308") == "1") { AlarmVoorTerugmeldingTest(); Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)"); return _fouten == 0 ? 0 : 1; }
         if (Environment.GetEnvironmentVariable("BENCH") == "1") { BenchTest(); return 0; }
         if (Environment.GetEnvironmentVariable("RONDRIT") == "1") { RondritBench(); return 0; }
         var kaart = Laad("baankaart_voltooid_2026-10-04.json");
@@ -3403,6 +3436,7 @@ public static class Tests
         KruisZonderReferentieTest();
         WisselTerugmeldingTest();
         EigenTerugmeldingTest();
+        AlarmVoorTerugmeldingTest();
         NastellenAnderBlokTest();
         StatischeKortsluitingTest();
         StopTijdensTerugritTest();

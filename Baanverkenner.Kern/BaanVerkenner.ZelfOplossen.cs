@@ -129,6 +129,12 @@ public partial class BaanVerkenner
             if (!geprobeerd.Add(sleutel)) continue;
             _log.Info($"Zelf oplossen: wissel {a} bij de bezette melder ({Lijst(bezet)}) gaat naar {(!nu ? "afbuigend" : "rechtdoor")}; komt de loc van een zijtak naar de samenvoeging, dan kan dat de kortsluiting opheffen (BUG #169/#305).");
             await ZetWissel(a, !nu);
+            if (_alarmWegVoorEigenTerugmelding && HuidigeAlarmBlokken().Count == 0)
+            {
+                _log.Info($"Zelf oplossen: de kortsluiting ging weg voordat Dinamo wissel {a} terugmeldde; dat was dus niet deze wissel (BUG #308). Wissel {a} gaat terug.");
+                await ZetWissel(a, nu);
+                return true;
+            }
             // Dinamo meldt het opheffen soms pas na enkele seconden (autolog 25-10 10:31:37-10:31:38 en 10:24:46-10:24:47): 4 s wachten
             await Wacht(TimeSpan.FromSeconds(4));
             if (HuidigeAlarmBlokken().Count == 0)

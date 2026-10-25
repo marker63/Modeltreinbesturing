@@ -2932,3 +2932,9 @@ De foutmelding van Dinamo om 10:17:54 (F-bit, geen blok) werd daardoor als korts
 terugmeldingen per wissel en stand bij; heeft Dinamo het proefcommando van een wissel (ook laat) niet teruggemeld, dan wordt wat er in die proefrit gebeurde niet aan die wissel
 toegeschreven. De uitvalbewaking (#126) blijft op het totaal werken. Gezien in het hardwarelog van de sessie vanaf 10:01: 56 van de 120 wisselcommando's kregen geen eigen terugmelding
 en 16 kwamen 2 tot 4,6 s te laat (sessie 09:34: 2 van 58); Dinamo liep in die sessie dus achter.
+
+## BUG #308 – OPGELOST (nog niet getest op de baan): "wissel 2 loste de kortsluiting op" terwijl de loc op 14 stond (autolog 25-10 10:35:19-10:35:34)
+Met alle wissels rechtdoor kwam er na melder 14 een kortsluiting in blok 3. Bij het proberen ging het alarm om 10:35:30.127 weg, 0,4 s na het commando "wissel 2 afbuigend" maar 0,2 s
+VOORDAT Dinamo wissel 2 terugmeldde (10:35:30.328): de wissel was toen nog niet omgezet, Dinamo zette het alarm zelf uit. Toch werd het als oplossing (en kortsluitpunt) vastgelegd. Nu: stond
+er bij een wisselcommando een kortsluiting en verdwijnt die voordat de eigen terugmelding van die wissel binnen is, dan wordt het niet aan de wissel toegeschreven; de wissel gaat terug.
+(Hoe de kortsluiting in blok 3 met de loc op 14 ontstond, is uit de logs niet te zien; Marco herstartte daarna en de volgende rit ging goed.)
