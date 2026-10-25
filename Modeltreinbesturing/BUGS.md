@@ -3032,3 +3032,23 @@ gebruikt. In de vastgelegde stand telt nu alleen de meester; de volger volgt alt
 De loc reed 10 -> 129 met wissel 5+6 afbuigend, kwam op melder 129 (daar liggen de tongen van wissel 6) en had 0,5 s later kortsluiting. De kaart onthield "10 -> 129 gereden met 5
 afbuigend" en de terugweg koos die stand daarna steeds weer: de loc zat telkens klem op 10 en twee keer moest de gebruiker helpen. Krijgt de loc binnen 3 s na het binnenrijden van een
 melder kortsluiting, dan telt die stand niet als gereden stand voor die overgang.
+
+## BUG #324 – OPGELOST (nog niet getest op de baan): proef zette een wissel om die bij de startmelder ligt (simulatie met Marco's aansluiting)
+Opdracht #9 begon op melder 24; de proef van adres 10 zette wissel 10 om met de loc op 24, terwijl de kaart wist dat wissel 10 daar ligt (kortsluitpunt na 24 opgelost met wissel 10).
+Moet voor een proef een wissel om (het proefadres of een bekende oplossing erbij) die volgens de kaart of een opgelost kortsluitpunt bij de startmelder ligt, dan wordt dat adres in
+deze opdracht niet getest.
+
+## BUG #325 – OPGELOST (nog niet getest op de baan): wissel omgezet met de loc op de melder van zijn tongen, doordat de weg terug in losse stukken werd gereden
+(a) De weg 4 -> 129 -> 14 (achteruit) kreeg per stap de eenvoudigste gereden stand (4 -> 129 met wissel 5 rechtdoor, 129 -> 14 met 5 afbuigend): twee stukken, en wissel 5+6 ging om met de
+loc op 129. Opeenvolgende stappen in dezelfde richting krijgen nu een gereden stand die zo veel mogelijk gelijk is aan die van de volgende stap (ook de voorstap terug naar de laatste goede
+melder: 21 -> 24 -> 14 met wissel 10 meteen rechtdoor). (b) Vragen twee stappen van een pad een andere stand van dezelfde wissel, dan begint het tweede stuk nu een melder eerder als de
+stap daarvoor niets van die wissel vraagt (wissel om op melder 4, niet op 129).
+
+## BUG #326 – OPGELOST (nog niet getest op de baan): bij optie 6 wordt de wissel die het alarm van een nieuwe kortsluiting wegnam meteen de voorlopige oplossing (#319 uitgebreid)
+Anders reed elke volgende proef weer tegen dezelfde kortsluiting (10 keer na melder 4 met wissel 9 rechtdoor). Net als bij een bestaand kortsluitpunt (#144) bevestigen of weerleggen
+ritten de oplossing (#204). Bij optie 5 blijft het een hint. De keerlustest (#232) draait nu met Marco's aansluiting; de oude aansluiting (wissel 6 los van 5) klopte niet met de
+overloopset die Marco 20-10 vaststelde.
+Tussenstand meting (MARCO=1): voltooid, 0 valse wissels, 8 kortsluitingen (was 40), 0 keer onder de loc omgezet (was 10), 0 keer hulp, 223 minuten (was 343, niet voltooid).
+
+## BUG #327 – OPGELOST (nog niet getest op de baan): 'loc staat andersom' terwijl de loc bij het vertrek op de grens van twee melders stond
+Stond de loc bij het vertrek al deels op de andere melder, dan zegt het vrijkomen van de startmelder niets over de rijrichting. #278 meldt dan geen 'andersom' meer.

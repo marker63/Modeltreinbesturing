@@ -705,6 +705,26 @@ public partial class BaanVerkenner
     /// <summary>BUG #164: zoals <see cref="ZelfTerugWeg"/>, maar valt terug op overgangen die bij een andere wisselstand gezien zijn als er geen weg met alle
     /// wissels rechtdoor is (de loc kwam bij een kortsluiting-oplossing op een onverwachte melder, bijv. 12 achter wissel 1 en 2). Per stap de bekende
     /// configuratie met de minste afbuigende wissels. Null als er ook zo geen weg is.</summary>
+    /// <summary>Nachtwerk 25/26-10 (simulatie met Marco's aansluiting, 14:23:03): de weg 4 -> 129 -> 14 (achteruit, één richting) kreeg per stap de eenvoudigste gereden stand: 4 -> 129 met
+    /// wissel 5 rechtdoor, 129 -> 14 met 5 afbuigend. De loc reed daardoor in twee stukken en wissel 5+6 ging om met de loc op 129, waar de tongen van wissel 6 liggen: kortsluiting.
+    /// Opeenvolgende stappen in dezelfde richting krijgen nu, als dat kan, een gereden stand die zo veel mogelijk gelijk is aan die van de volgende stap.</summary>
+    internal static List<(int Van, int Naar, Richting Richting, Configuratie Cfg)> StemStandenAf(Baankaart kaart, List<(int Van, int Naar, Richting Richting, Configuratie Cfg)> weg)
+    {
+        for (int i = weg.Count - 2; i >= 0; i--)
+        {
+            if (weg[i].Richting != weg[i + 1].Richting) continue;
+            var volgende = weg[i + 1].Cfg.Afbuigend.ToHashSet();
+            var (van, naar, r) = (weg[i].Van, weg[i].Naar, weg[i].Richting);
+            var opties = kaart.Overgangen.Where(o => o.Van == van && o.Naar == naar && o.Richting == r).SelectMany(o => o.GezienBijConfiguraties)
+                .Concat(kaart.Overgangen.Where(o => o.Van == naar && o.Naar == van && o.Richting == r.Om()).SelectMany(o => o.GezienBijConfiguraties))
+                .Distinct().Select(Configuratie.VanSleutel).ToList();
+            if (opties.Count == 0) continue;
+            var beste = opties.OrderBy(c => c.Afbuigend.ToHashSet().SymmetricExceptWithCount(volgende)).ThenBy(c => c.Afbuigend.Length).ThenBy(c => c.Sleutel, StringComparer.Ordinal).First();
+            weg[i] = (van, naar, r, beste);
+        }
+        return weg;
+    }
+
     internal static List<(int Van, int Naar, Richting Richting, Configuratie Cfg)>? ZelfTerugWegAlleStanden(Baankaart kaart, int van, int naar, int? aankomstVia = null, Richting? aankomstRichting = null)
     {
         if (van == naar) return new();
@@ -739,7 +759,7 @@ public partial class BaanVerkenner
                     var cur = volgend;
                     while (cur != start) { var (v, r, cc) = vorige[cur]; weg.Add((v.M, cur.M, r, cc)); cur = v; }
                     weg.Reverse();
-                    return weg;
+                    return StemStandenAf(kaart, weg);
                 }
                 rij.Enqueue(volgend);
             }
@@ -1262,7 +1282,18 @@ public partial class BaanVerkenner
                 // vraagt); de proefrit heette 'afbuigend: 6, 13, 14' maar reed met 13 rechtdoor en leverde valse vondsten op (wissel 6, 7, 8 en 9 'splitsen').
                 // Voor elke proef wordt de stand dus eerst weer gelijk gemaakt aan de rijstand; kan dat niet veilig, dan wordt dit adres niet getest.
                 // BUG #216: de proef rijdt met de bekende oplossing van een kortsluitpunt erbij (bijv. wissel 14); die stand alvast als doel nemen, anders zet het herstel hem eerst terug en de proef meteen weer om.
-                ProefStandMetOplossing(_kaart, _ins.WisselAdressen(), o.Start, o.Richting, rijstand, a, out var voorExtra, Kruis);
+                var proefStand324 = ProefStandMetOplossing(_kaart, _ins.WisselAdressen(), o.Start, o.Richting, rijstand, a, out var voorExtra, Kruis);
+                // BUG #324 (nachtwerk 25/26-10, simulatie met Marco's aansluiting 14:15:46): de proef van adres 9 vanaf melder 24 kreeg de bekende oplossing 'wissel 10 afbuigend' erbij; de rit
+                // zette die om met de loc op 24, waar wissel 10 ligt: kortsluiting onder de loc. Moet voor de proef een wissel (proefadres of extra) om die volgens de kaart bij de
+                // startmelder ligt, dan wordt dit adres in deze opdracht niet getest.
+                var onderStart324 = WisselsBijBezet(_kaart, new[] { o.Start });
+                var omOnderLoc324 = new[] { a }.Concat(voorExtra.Select(e => e.Adres))
+                    .Where(x => (onderStart324.Contains(x) || LigtBijLocVolgensKortsluiting(x, new[] { o.Start })) && !IsVolger(x) && (_wisselStand.TryGetValue(x, out var sx) && sx) != proefStand324.Bevat(x)).ToList();
+                if (omOnderLoc324.Count > 0)
+                {
+                    _log.Info($"Adres {a} wordt in opdracht #{o.Id} niet getest: daarvoor moet wissel {string.Join(" en ", omOnderLoc324)} om, en die ligt volgens de kaart bij melder {o.Start} waar de loc staat (BUG #324, nog niet getest op de baan).");
+                    continue;
+                }
                 if (!await HerstelRijstand(rijstand, a, voorExtra))
                 {
                     _log.Waarschuwing($"Adres {a} wordt in opdracht #{o.Id} nu niet getest: de wisselstand kon niet veilig gelijk gemaakt worden aan de rijstand ({rijstand}); een proef met een andere stand zou valse vondsten geven.");
@@ -2638,16 +2669,32 @@ public partial class BaanVerkenner
     internal static List<List<int>> SplitsOpOvergangEisen(Baankaart kaart, List<int> pad, Richting r)
     {
         var stukken = new List<List<int>>();
-        var huidig = new List<int> { pad[0] }; var eisen = new Dictionary<int, bool>();
+        var huidig = new List<int> { pad[0] }; var eisen = new Dictionary<int, (bool Afb, int Stap)>();
+        var stapEisen = new List<Dictionary<int, bool>>();
+        for (int i = 0; i + 1 < pad.Count; i++) stapEisen.Add(BaanVerkenner.StapEisenUitOvergangen(kaart, pad[i], pad[i + 1], r));
         for (int i = 0; i + 1 < pad.Count; i++)
         {
-            var stap = BaanVerkenner.StapEisenUitOvergangen(kaart, pad[i], pad[i + 1], r);
-            if (huidig.Count >= 2 && stap.Any(kv => eisen.TryGetValue(kv.Key, out var b) && b != kv.Value))
+            var stap = stapEisen[i];
+            var botsing = stap.Where(kv => eisen.TryGetValue(kv.Key, out var b) && b.Afb != kv.Value).Select(kv => kv.Key).ToList();
+            if (huidig.Count >= 2 && botsing.Count > 0)
             {
-                stukken.Add(huidig);
-                huidig = new List<int> { pad[i] }; eisen = new Dictionary<int, bool>();
+                // Nachtwerk 25/26-10 (simulatie met Marco's aansluiting, 13:11:37): de terugweg 129 -> 10 -> ... -> 4 -> 129 | 129 -> 14 zette wissel 5+6 om met de loc op 129 (tongen van
+                // wissel 6). Vraagt de stap ervoor (4 -> 129) niets van die wissel, dan begint het tweede stuk al een melder eerder (op 4), zodat de wissel omgaat voordat de loc op 129 is.
+                bool eerder = huidig.Count >= 3 && botsing.All(a => eisen[a].Stap < i - 1) && !stapEisen[i - 1].Keys.Intersect(botsing).Any();
+                if (eerder)
+                {
+                    huidig.RemoveAt(huidig.Count - 1);
+                    stukken.Add(huidig);
+                    huidig = new List<int> { pad[i - 1], pad[i] };
+                    eisen = stapEisen[i - 1].ToDictionary(kv => kv.Key, kv => (kv.Value, i - 1));
+                }
+                else
+                {
+                    stukken.Add(huidig);
+                    huidig = new List<int> { pad[i] }; eisen = new Dictionary<int, (bool, int)>();
+                }
             }
-            foreach (var (a, afb) in stap) eisen[a] = afb;
+            foreach (var (a, afb) in stap) eisen[a] = (afb, i);
             huidig.Add(pad[i + 1]);
         }
         stukken.Add(huidig);
@@ -3200,4 +3247,9 @@ public partial class BaanVerkenner
         RitEinde.StapKlaar => "stap gereden",
         _ => e.ToString()
     };
+}
+
+internal static class HashSetUitbreiding
+{
+    public static int SymmetricExceptWithCount(this HashSet<int> a, HashSet<int> b) { var c = new HashSet<int>(a); c.SymmetricExceptWith(b); return c.Count; }
 }

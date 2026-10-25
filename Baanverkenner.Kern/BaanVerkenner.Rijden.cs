@@ -1849,9 +1849,16 @@ public partial class BaanVerkenner
         // alleen bij het punt van precies die kortsluiting (dezelfde melder, geen nieuwere kortsluiting tussendoor)
         if (w.Kortsluiting != _laatsteKortsluitingOm || w.KortsluitMelder != kp.NaMelder) return;
         if (kp.Configuratie.Bevat(w.Adres) || Kruis.IsMotor(w.Adres) || IsVolger(w.Adres)) return;
-        // Niet meteen als oplossing vastleggen (dat gaf in de simulaties meer kortsluitingen: een wissel die alleen het alarm wegnam is geen bewezen oplossing), maar als eerste kandidaat
-        // als het kortsluitpunt opgelost wordt. Zo wordt hij als eerste getest in plaats van vergeten.
         kp.AlarmHintAdres = w.Adres;
+        // Nachtwerk 25/26-10 (simulatie met Marco's aansluiting): bij optie 6 (rondrijden) wordt zo'n wissel net als bij een bestaand kortsluitpunt (#144) meteen de VOORLOPIGE oplossing.
+        // Anders reed elke volgende proef (adres 3, 4, 7, ...) weer tegen dezelfde kortsluiting na melder 4 (wissel 9 rechtdoor): 10 kortsluitingen achter elkaar. Ritten bevestigen of
+        // weerleggen de oplossing (#204). Met deze regel: 11 in plaats van 24 kortsluitingen en 240 in plaats van 385 minuten. Bij optie 5 (stap voor stap) blijft het een hint.
+        if (Rondrit && _kaart.RegistreerHandmatigeOplossing(kp, w.Adres, true, Kruis))
+        {
+            kp.Voorlopig = true;
+            _log.Vondst($"Kortsluitpunt #{kp.Id} (na melder {kp.NaMelder}, {kp.Richting.Tekst()}, {kp.Configuratie}) is voorlopig opgelost door wissel {w.Adres} op afbuigend: die wissel haalde het alarm bij deze kortsluiting weg. Ritten bevestigen of weerleggen dit (nog niet getest op de baan).");
+            return;
+        }
         _log.Info($"Kortsluitpunt #{kp.Id} (na melder {kp.NaMelder}, {kp.Richting.Tekst()}, {kp.Configuratie}): wissel {w.Adres} afbuigend haalde het alarm van deze kortsluiting weg. Bij het oplossen van dit punt wordt die wissel als eerste geprobeerd (BUG #319, nog niet getest op de baan).");
     }
 
@@ -2031,6 +2038,7 @@ public partial class BaanVerkenner
         _kortsluitingGemeld = HuidigeAlarmBlokken().Count > 0;
 
         int? achterkantGenegeerd = null;   // BUG #227
+        var bezetBijVertrek = _monitor.Bezet.ToHashSet();   // nachtwerk 25/26-10: stond de loc bij het vertrek al op de grens, dan zegt de andere melder niets over de rijrichting (#278)
         bool kruipNaarEinde = false;       // BUG #284
         var uitgesteld268 = new List<MelderMonitor.Wijziging>();   // BUG #268
         DateTime? stapStopTot = null;   // BUG #175: tot wanneer de loc na de laatste melder van een stap-rit nog doorrijdt
@@ -2127,7 +2135,7 @@ public partial class BaanVerkenner
             // BUG #278 (autolog 21-10 13:55:33-14:15:35, twintig minuten): elke rit 'vooruit vanaf 13' kwam op melder 5 (13 -> 5 is achteruit gereden): de loc stond andersom. #227 zag melder 5
             // als staart, maar zodra melder 13 vrij werd telde de regel hieronder (#54) melder 5 toch als bereikt; daarna 'onverwacht melder 5', een overschreven rijrichting (5 > 13) en steeds
             // opnieuw neerzetten. Wordt de startmelder vrij terwijl de loc op die achterkantmelder staat, dan rijdt de loc de verkeerde kant op: stoppen en melden dat hij andersom staat.
-            if (res.Reeks.Count == 1 && achterkantGenegeerd is int ag278 && bezet.Contains(ag278) && !bezet.Contains(res.Reeks[0]))
+            if (res.Reeks.Count == 1 && achterkantGenegeerd is int ag278 && bezet.Contains(ag278) && !bezet.Contains(res.Reeks[0]) && !bezetBijVertrek.Contains(ag278))
             {
                 await StopLoc();
                 string t278 = $"De loc rijdt vanaf melder {res.Reeks[0]} {r.Tekst()} naar melder {ag278}, maar {res.Reeks[0]} -> {ag278} is {r.Om().Tekst()} gereden: de loc staat andersom (neus de verkeerde kant op). De rit is gestopt, er is niets vastgelegd. Draai de loc om (of zet hem andersom neer) (BUG #278).";
@@ -3642,7 +3650,8 @@ public partial class BaanVerkenner
             if (basisWeg is { Count: > 0 } bw && aankVia is int av && aankR is Richting ar && !KerenToegestaan(av, ar, bw[0].Naar, bw[0].Richting)) basisWeg = null;
             var restWeg = basisWeg?.Select(w => (w.Van, w.Naar, w.Richting, Cfg: Configuratie.Basis)).ToList()
                       ?? ZelfTerugWegAlleStanden(_kaart, vanaf, _kaart.StartMelder, aankVia, aankR);
-            var weg = restWeg is null ? null : voorstap.Concat(restWeg).ToList();
+            // nachtwerk 25/26-10: ook de voorstap terug naar de laatste goede melder in dezelfde richting zo veel mogelijk met de stand van de stap daarna (21 -> 24 -> 14: wissel 10 eerst rechtdoor)
+            var weg = restWeg is null ? null : StemStandenAf(_kaart, voorstap.Concat(restWeg).ToList());
             if (voorstap.Count > 0) basisWeg = null;
             if (weg is null) { _log.Info($"Melder {x} ligt niet op de route terug en er is geen bekende weg naar melder {_kaart.StartMelder}; de verkenner rijdt niet zelf terug."); return false; }
             _log.Info($"De kortsluiting is weg en de loc staat op melder {x}: de verkenner rijdt zelf terug naar melder {_kaart.StartMelder} over de bekende {(basisWeg is null ? "weg (met de wisselstanden waarmee die gezien is)" : "basisweg")} ({Lijst(new[] { x }.Concat(weg.Select(s => s.Naar)).ToList())}) (niet getest op de baan).");

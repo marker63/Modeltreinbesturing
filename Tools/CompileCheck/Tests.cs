@@ -1046,7 +1046,7 @@ public static class Tests
         var o = new Opdracht { Id = 1, Start = 13, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis };
         typeof(BaanVerkenner).GetMethod("RegistreerKortsluitpunt", bf)!.Invoke(v, new object?[] { o, new List<int> { 13, 14, 24, 8 }, new Configuratie(new[] { 13 }), new List<Etappe>(), Richting.Vooruit, KortsluitpuntSoort.Kortsluiting });
         var kp = v.Kaart.Kortsluitpunten.LastOrDefault();
-        Eis(kp is { Opgelost: false, AlarmHintAdres: 14 }, "alarmoplossing (#319): wissel 14 die het alarm wegnam vóór het kortsluitpunt bestond, wordt bij het nieuwe punt na melder 8 bewaard als eerste kandidaat");
+        Eis(kp is { Opgelost: true, OpgelostDoorAdres: 14, Voorlopig: true, AlarmHintAdres: 14 }, "alarmoplossing (#319): wissel 14 die het alarm wegnam vóór het kortsluitpunt bestond, wordt bij optie 6 de voorlopige oplossing van het nieuwe punt na melder 8");
         ctx.SetValue(v, ((int, Richting, Configuratie)?)(129, Richting.Vooruit, new Configuratie(new[] { 10 })));
         typeof(BaanVerkenner).GetMethod("RegistreerAlarmOplossing", bf)!.Invoke(v, new object?[] { 9, true, new[] { 129 }, new List<int> { 9 } });
         typeof(BaanVerkenner).GetMethod("RegistreerKortsluitpunt", bf)!.Invoke(v, new object?[] { o, new List<int> { 13, 14, 24, 21 }, new Configuratie(new[] { 10 }), new List<Etappe>(), Richting.Vooruit, KortsluitpuntSoort.Kortsluiting });
@@ -1081,13 +1081,15 @@ public static class Tests
     // BUG #232: optie 6 op de Miniworld-simulatie MET de keerlus 129-4-11-12-1-9-10-129 (zoals de logs van 18-10 laten zien)
     static void KeerlusTest()
     {
-        Console.WriteLine("Test: rondrijden met de keerlus achter melder 129 (BUG #232)");
+        Console.WriteLine("Test: rondrijden met de keerlus achter melder 129 (BUG #232), met Marco's aansluiting (overloopsets 5+6 en 2+1, wissel 6 omgekeerd; nachtwerk 25/26-10)");
         Baanverkenner.Kern.Simulatie.MiniworldBaan.Keerlus = true;
+        Baanverkenner.Kern.Simulatie.MiniworldBaan.EchteAansluiting = true;
+        Action<VerkenInstellingen> marco = i => { i.Rondrit = true; i.StapVoorStap = false; i.GekoppeldeWissels = "5+6,2+1"; i.OmgekeerdAangesloten = "6"; };
         try
         {
             foreach (var start in (Environment.GetEnvironmentVariable("KEERLUS_START") ?? "13").Split(',').Select(int.Parse))
             {
-                var r = MiniworldRit(start, 10, insAanpassing: i => { i.Rondrit = true; i.StapVoorStap = false; });
+                var r = MiniworldRit(start, 10, insAanpassing: marco);
                 var k = r.V.Kaart;
                 var regels = r.Log.Regels.Select(x => x.Tekst).ToList();
                 // BUG #245: alleen de verkenningsfase telt; in de blokfase rijdt de loc na de keerlus nog verkeerd (open punt #234)
@@ -1110,7 +1112,7 @@ public static class Tests
                 {
                     // BUG #268: zelfde keerlus, maar Dinamo meldt bij elke kortsluiting even melder 137 en 138 (zoals op de baan 21-10 11:21:55)
                     Baanverkenner.Kern.Simulatie.SimulatieBaan? sim268 = null;
-                    var r268 = MiniworldRit(start, 10, simAanpassing: s => { s.KortsluitEchoMelders = new[] { 137, 138 }; sim268 = s; }, insAanpassing: i => { i.Rondrit = true; i.StapVoorStap = false; });
+                    var r268 = MiniworldRit(start, 10, simAanpassing: s => { s.KortsluitEchoMelders = new[] { 137, 138 }; sim268 = s; }, insAanpassing: marco);
                     var reg268 = r268.Log.Regels.Select(x => x.Tekst).ToList();
                     Console.WriteLine($"  keerlus met kortsluitecho: {r268.Kortsluitingen} kortsluiting(en), {sim268!.KortsluitEchosGemeld} echo's, melders {r268.V.Kaart.Melders.Count}");
                     Eis(sim268.KortsluitEchosGemeld > 0, "kortsluitecho (#268): de simulatie meldde 137/138 rond een kortsluiting");
@@ -1121,7 +1123,7 @@ public static class Tests
                 // Nog open (#234): in deze simulatie lukt de blokfase daarna niet voor 15 melders (de loc rijdt na de keerlus de verkeerde kant op); daarom geen eis op 'voltooid'.
             }
         }
-        finally { Baanverkenner.Kern.Simulatie.MiniworldBaan.Keerlus = false; }
+        finally { Baanverkenner.Kern.Simulatie.MiniworldBaan.Keerlus = false; Baanverkenner.Kern.Simulatie.MiniworldBaan.EchteAansluiting = false; }
     }
 
     // BUG #195: optie 6 'Rondrijden' in de Miniworld-simulatie, per startplek en in gewone en strenge sim
