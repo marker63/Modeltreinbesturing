@@ -21,9 +21,16 @@ public static class MiniworldBaan
     /// Afgeleid uit de logs, niet door Marco bevestigd. Standaard uit, zodat de bestaande tests (21 melders, 10 als zijspoor) hetzelfde blijven.</summary>
     public static bool Keerlus { get; set; }
 
+    /// <summary>Nachtwerk 25/26-10 (Marco 25-10 19:58: "ruim 350 versies, iedere keer 1 bug opgelost en een nieuwe ontdekt"): de simulatie met de aansluiting zoals Marco die heeft
+    /// vastgesteld. Wissel 5 en 6 vormen een overloopset (op de baan altijd dezelfde stand, Marco 20-10 18:32): beide afbuigend = 14 &lt;-&gt; 129, beide rechtdoor = 14 -> kruiswissel en
+    /// 129 &lt;-&gt; 10 (keerlus). Wissel 6 is omgekeerd aangesloten (Dinamo 'afbuigend' = baan rechtdoor). Wissel 2 en 1 vormen ook een overloopset (beide afbuigend = 5 &lt;-&gt; 12).
+    /// Altijd met de keerlus. Tot nu toe draaide geen enkele volledige simulatie met deze aansluiting en Marco's instellingen (5+6, 2+1, 6 omgekeerd).</summary>
+    public static bool EchteAansluiting { get; set; }
+
     public static SimulatieBaan Maak(bool omzettenOnderLocGeeftKortsluiting = true, int startMelder = 13, Func<SimulatieBaan>? fabriek = null)
     {
         var b = fabriek?.Invoke() ?? new SimulatieBaan();
+        bool keerlus = Keerlus || EchteAansluiting;
         b.DinamoGedrag = true; b.StaatStilZonderBlokcommando = true; b.StilstaanRemtOpGrens = true; b.LocAdres = 5408;
         b.OmzettenOnderLocGeeftKortsluiting = omzettenOnderLocGeeftKortsluiting; b.MeldersBevrorenBijKortsluiting = true; b.MeldBlokAlarm = true;
         var A = SimulatieBaan.Eind.A; var B = SimulatieBaan.Eind.B;
@@ -39,7 +46,7 @@ public static class MiniworldBaan
         var s4 = b.NieuweSectie(4, 30, 2); var s11 = b.NieuweSectie(11, 245, 2); var s12 = b.NieuweSectie(12, 120, 2);
         var verbinding = b.NieuweSectie(5, 25, 3);
         SimulatieBaan.Sectie? s1 = null, s9 = null;
-        if (Keerlus) { s1 = b.NieuweSectie(1, 150, 1); s9 = b.NieuweSectie(9, 120, 1); s10.Blok = 1; }   // verbindingsstuk van de overloop: ligt in het gebied van melder 5 (geen losse melder, anders valt de loc zonder voeding stil)
+        if (keerlus) { s1 = b.NieuweSectie(1, 150, 1); s9 = b.NieuweSectie(9, 120, 1); s10.Blok = 1; }   // verbindingsstuk van de overloop: ligt in het gebied van melder 5 (geen losse melder, anders valt de loc zonder voeding stil)
 
         var k = b.NieuweKruis(13, 10, melder: 24, blok: 8, lengte: 50);
         var w5 = b.NieuweWissel(5, true, 3); var w6 = b.NieuweWissel(6, true, 9); var w9 = b.NieuweWissel(9, true, 9);
@@ -53,16 +60,26 @@ public static class MiniworldBaan
         b.Verbind(s13, B, s14, A);
         b.Verbind(w5, P, s14, B);
         b.Verbind(w5, R, k, SimulatieBaan.Poort.KA1);
-        b.Verbind(w5, Af, w6, R);
-        b.Verbind(w6, P, s129, A);
-        b.Verbind(w6, Af, s10, A);
+        if (EchteAansluiting)
+        {
+            b.Verbind(w5, Af, w6, Af);
+            b.Verbind(w6, P, s129, A);
+            b.Verbind(w6, R, s10, A);
+            b.OmgekeerdeAdressen.Add(6);
+        }
+        else
+        {
+            b.Verbind(w5, Af, w6, R);
+            b.Verbind(w6, P, s129, A);
+            b.Verbind(w6, Af, s10, A);
+        }
         b.Verbind(w9, P, s129, B);
         b.Verbind(w9, R, k, SimulatieBaan.Poort.KA2);
         b.Verbind(w9, Af, s4, A);
         b.Verbind(s4, B, s11, A); b.Verbind(s11, B, s12, A);
         b.Verbind(w1, P, s12, B);
         b.Verbind(w1, Af, verbinding, A);
-        if (Keerlus) { b.Verbind(w1, R, s1!, A); b.Verbind(s1!, B, s9!, A); b.Verbind(s9!, B, s10, B); }
+        if (keerlus) { b.Verbind(w1, R, s1!, A); b.Verbind(s1!, B, s9!, A); b.Verbind(s9!, B, s10, B); }
         b.Verbind(w2, Af, verbinding, B);
         b.Verbind(w2, P, s5, A);
         b.Verbind(w2, R, s16, B);
@@ -75,7 +92,7 @@ public static class MiniworldBaan
         b.Verbind(w14, P, s8, A);
         b.Verbind(s8, B, s15, A); b.Verbind(s15, B, s16, A);
 
-        var start = new[] { s13, s14, s21, s29, s30, s20, s27, s28, s26, s25, s17, s8, s15, s16, s5, s129, s10, s4, s11, s12 }.Concat(Keerlus ? new[] { s1!, s9! } : Array.Empty<SimulatieBaan.Sectie>()).First(x => x.Melder == startMelder);
+        var start = new[] { s13, s14, s21, s29, s30, s20, s27, s28, s26, s25, s17, s8, s15, s16, s5, s129, s10, s4, s11, s12 }.Concat(keerlus ? new[] { s1!, s9! } : Array.Empty<SimulatieBaan.Sectie>()).First(x => x.Melder == startMelder);
         b.PlaatsLoc(start, start.Lengte / 2, +1);
         return b;
     }

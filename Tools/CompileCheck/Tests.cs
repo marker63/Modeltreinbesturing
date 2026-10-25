@@ -3300,6 +3300,43 @@ public static class Tests
     }
 
 
+    /// <summary>Nachtwerk 25/26-10: meting met de simulatie zoals Marco's baan echt is aangesloten (overloopsets 5+6 en 2+1, wissel 6 omgekeerd, keerlus) en zijn instellingen
+    /// (optie 6 rondrijden). MARCO=1 draait alleen deze meting; MARCO_START (standaard 13), MARCO_VARIANT (gewoon,streng,uitval).</summary>
+    internal static List<string> MarcoBench(bool alleenRegels = false)
+    {
+        var uit = new List<string>();
+        var echt = new HashSet<int> { 1, 2, 5, 6, 9, 10, 13, 14 };
+        Baanverkenner.Kern.Simulatie.MiniworldBaan.EchteAansluiting = true;
+        try
+        {
+            foreach (var start in (Environment.GetEnvironmentVariable("MARCO_START") ?? "13").Split(',').Select(int.Parse))
+            foreach (var variant in (Environment.GetEnvironmentVariable("MARCO_VARIANT") ?? "gewoon,streng,uitval").Split(','))
+            {
+                Baanverkenner.Kern.Simulatie.SimulatieBaan? sim = null;
+                Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan? uv = null;
+                var simMeldingen = new List<(DateTime Tijd, string Tekst)>();
+                var r = MiniworldRit(start, 10,
+                    insAanpassing: i => { i.Rondrit = true; i.StapVoorStap = false; i.GekoppeldeWissels = "5+6,2+1"; i.OmgekeerdAangesloten = "6"; },
+                    simAanpassing: sa => { sim = sa; sa.BuurwisselHeftKruisKortsluitingOp = variant == "streng"; sa.StatusBericht += t => { if (t.Contains("KORTSLUITING")) simMeldingen.Add((sa.HuidigeSimTijd, t)); }; },
+                    simFabriek: variant == "uitval" ? () => uv = new Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan { UitvalVanafCommando = 120, UitvalDuur = TimeSpan.FromSeconds(90) } : null);
+                var k = r.V.Kaart;
+                var regels = r.Log.Regels.Select(x => x.Tekst).ToList();
+                var gevonden = k.Wissels.Where(w => w.Waarnemingen.Count > 0).Select(w => w.Adres).ToList();
+                string regel = $"MARCO start {start,3} {variant,-7}: {r.Einde,-12} {(k.Voltooid ? "voltooid" : "NIET-voltooid"),-13} melders {k.Melders.Count,2}/23  met-blok {k.Melders.Count(m => m.DinamoBlok is not null),2}  wissels [{string.Join(",", gevonden.OrderBy(x => x))}]  valse {gevonden.Count(a => !echt.Contains(a))}  kortsl {r.Kortsluitingen,2}  onder-loc {sim?.OnderLocOmgezet ?? 0,2}  gebruiker {regels.Count(x => x.Contains("Gebruiker heeft de loc"))}  zelf-ok {regels.Count(x => x.Contains("Zelf opgelost"))}  zelf-mis {regels.Count(x => x.Contains("Zelf oplossen lukte niet"))}  {r.Seconden / 60:0} min";
+                Console.WriteLine(regel);
+                uit.Add(regel);
+                if (Environment.GetEnvironmentVariable("MARCO_LOG") is { } pad && pad.Length > 0)
+                {
+                    var alle = r.Log.Regels.Select(x => (T: x.Tijd, S: x.Tekst)).Concat(simMeldingen.Select(x => (T: x.Tijd, S: "##SIM## " + x.Tekst))).OrderBy(x => x.T).ToList();
+                    System.IO.File.WriteAllLines($"{pad}_{start}_{variant}.txt", alle.Select(x => x.T.ToString("HH:mm:ss.f") + "  " + x.S));
+                    System.IO.File.WriteAllText($"{pad}_{start}_{variant}.json", k.AlsJson());
+                }
+            }
+        }
+        finally { Baanverkenner.Kern.Simulatie.MiniworldBaan.EchteAansluiting = false; }
+        return uit;
+    }
+
     /// <summary>BUG #188: meetopzet. BENCH=1 draait alleen deze meting (start-lijst in BENCH_START) en schrijft per run een regel plus een totaalscore; zo wordt elke wijziging
     /// bewezen met cijfers vergeleken met de basislijn in plaats van geraden. Echte wissels in de nagebouwde baan: 1,2,5,6,9,14 (en de kruismotoren 10,13).</summary>
     static void BenchTest()
@@ -3519,6 +3556,8 @@ public static class Tests
         if (Environment.GetEnvironmentVariable("ALLEEN_314") == "1") { OntsporingEersteBasisritTest(); Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)"); return _fouten == 0 ? 0 : 1; }
         if (Environment.GetEnvironmentVariable("ALLEEN_308") == "1") { AlarmVoorTerugmeldingTest(); Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)"); return _fouten == 0 ? 0 : 1; }
         if (Environment.GetEnvironmentVariable("BENCH") == "1") { BenchTest(); return 0; }
+        if (Environment.GetEnvironmentVariable("MARCO") == "1") { MarcoBench(); return 0; }
+        if (Environment.GetEnvironmentVariable("ALLEEN_RONDRIT") == "1") { RondritTest(); Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)"); return _fouten == 0 ? 0 : 1; }
         if (Environment.GetEnvironmentVariable("RONDRIT") == "1") { RondritBench(); return 0; }
         var kaart = Laad("baankaart_voltooid_2026-10-04.json");
 

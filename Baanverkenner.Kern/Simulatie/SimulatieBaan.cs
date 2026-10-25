@@ -236,6 +236,7 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
 
     /// <summary>De tijd van de simulatie (laatste tik).</summary>
     protected DateTime SimTijd => _vorigeTik ?? DateTime.Now;
+    public DateTime HuidigeSimTijd => SimTijd;
 
     /// <summary>Alleen voor tests/foutzoeken: waar staat de loc nu?</summary>
     public string ToestandTest() => (_element switch { Sectie s => $"sectie {s.Melder}", Wissel w => w.Kruis ? $"kruis {w.Melder} in {_wisselIn} uit {_wisselUit}" : $"wissel {w.Adres} in {_wisselIn} uit {_wisselUit}", _ => "geen" })
@@ -304,8 +305,12 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
 
     public void Ontkoppelen() => Verbonden = false;
 
-    public virtual void ZetWissel(int adres, bool afbuigend) => InWachtrij(() =>
+    /// <summary>Nachtwerk 25/26-10: wisseladressen waarvan de motor omgekeerd is aangesloten (zoals wissel 6 bij Marco): Dinamo 'afbuigend' = op de baan rechtdoor.</summary>
+    public HashSet<int> OmgekeerdeAdressen { get; set; } = new();
+
+    public virtual void ZetWissel(int adres, bool dinamoAfbuigend) => InWachtrij(() =>
     {
+        bool afbuigend = OmgekeerdeAdressen.Contains(adres) ? !dinamoAfbuigend : dinamoAfbuigend;
         foreach (var w in _wissels.Where(w => w.Adres == adres || (w.Kruis && w.Adres2 == adres)))
         {
             bool tweede = w.Kruis && w.Adres2 == adres && w.Adres != adres;

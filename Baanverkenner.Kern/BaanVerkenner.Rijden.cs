@@ -780,6 +780,10 @@ public partial class BaanVerkenner
         var uit = c;
         foreach (var (a, st) in _wisselStand)
             if (c.Bevat(a) != st) uit = uit.MetStand(a, st);
+        // Nachtwerk 25/26-10 (simulatie met Marco's aansluiting): de tweede wissel van een overloopset (6 bij 5, 1 bij 2) stond hier met zijn DINAMO-stand in de kaart ('6,9,10' voor
+        // 10 -> 129, terwijl wissel 6 dan op de baan rechtdoor staat). Die volgt altijd zijn meester; in de vastgelegde stand telt alleen de meester.
+        foreach (var p in _ins.GekoppeldeParen())
+            if (uit.Bevat(p.Volger)) uit = uit.MetStand(p.Volger, false);
         return uit;
     }
 
@@ -2227,7 +2231,9 @@ public partial class BaanVerkenner
                 // BUG #165: vastleggen met de stand waarin de wissels WERKELIJK stonden (ZetConfiguratie slaat een motor over die onder de loc ligt).
                 var cfgWerkelijk = WerkelijkeStand(cfgNu);
                 Kennis.Leg("rijrichting", $"{res.Reeks[^1]}>{m}", r.Tekst(), "gereden rit");
+                bool cfgNieuw = !_kaart.Overgangen.Any(x => x.Van == res.Reeks[^1] && x.Naar == m && x.Richting == r && x.GezienBijConfiguraties.Contains(cfgWerkelijk.Sleutel));
                 _kaart.RegistreerOvergang(res.Reeks[^1], m, r, cfgWerkelijk, dtOpgeslagen);
+                _laatsteOvergang = (res.Reeks[^1], m, r, cfgWerkelijk.Sleutel, cfgNieuw, _klok.Nu);
                 // BUG #74: ingangskant onthouden. Binnen de rit is het de melder daarvoor; bij de eerste stap van de rit de ingang van
                 // de vorige rit, mits de loc daar nog in dezelfde richting rijdt en niet met de hand verplaatst is.
                 int? ingangVia = res.Reeks.Count >= 2 ? res.Reeks[^2]
@@ -2689,6 +2695,7 @@ public partial class BaanVerkenner
     }
 
     private RitDoel? _ritDoel;
+    private (int Van, int Naar, Richting R, string Cfg, bool CfgNieuw, DateTime Tijd)? _laatsteOvergang;
 
     /// <summary>BUG #107 (Marco 09:26: "wissel 5 stond verkeerd, je kon dit niet oplossen terwijl je de route al zou moeten kennen"; log 09:22):
     /// de controlerit reed 4 -> 129 -> 14 (achteruit) met wissel 5 rechtdoor. De kaart weet uit de splitsing van wissel 5 (na melder 14 vooruit:
@@ -2696,7 +2703,7 @@ public partial class BaanVerkenner
     /// Dit zijn de wissels waar een loc die op <paramref name="melder"/> staat of net aankomt en in rijrichting <paramref name="r"/> verder
     /// rijdt van achteren (vanaf de tak waar die melder aan ligt) op af rijdt, met de stand die daarvoor nodig is. Een adres waarvoor de
     /// splitsingen elkaar tegenspreken wordt weggelaten.</summary>
-    internal static List<(int Adres, bool Afbuigend)> StaartWissels(Baankaart kaart, int melder, Richting r, Func<int, bool>? stand = null)
+    internal static List<(int Adres, bool Afbuigend)> StaartWissels(Baankaart kaart, int melder, Richting r, Func<int, bool>? stand = null, IReadOnlySet<int>? strikt = null)
     {
         var wens = new Dictionary<int, bool>(); var strijdig = new HashSet<int>();
         void Voeg(int adres, bool afb)
@@ -2716,20 +2723,28 @@ public partial class BaanVerkenner
             foreach (var y in volgende)
                 foreach (var e in kaart.WisselEisenVoorStapDetail(melder, y, r).Where(e => e.Achter)) Voeg(e.Adres, e.Afbuigend);
             // de stap daarna: alleen wissels die ver genoeg weg liggen en waar alle bekende vervolgen hetzelfde van vragen
-            var tweede = new Dictionary<int, HashSet<bool>>(); bool allesBekend = true;
+            // Nachtwerk 25/26-10 (simulatie met Marco's aansluiting): vanaf 4 achteruit kan de loc na 129 naar 14 (wissel 5+6 afbuigend) of naar 10 (rechtdoor). Alleen 129 -> 14 heeft
+            // een bekende eis (wissel 5 afbuigend), dus werd wissel 5 midden in een proefrit afbuigend gezet en week de proef af van de basisrit (4, 129, 10): valse wissels 3, 4, 7, 8, 11
+            // en 12 ("na 129: rechtdoor 10, afbuigend 14"). Een wissel met een meegekoppelde tweede wissel (<paramref name="strikt"/>: de meesters van de overloopsets) wordt voor de stap
+            // daarna alleen gezet als ELK bekend vervolg hem in dezelfde stand vraagt: de tweede wissel kan op het andere vervolg liggen.
+            var tweede = new Dictionary<int, HashSet<bool>>(); var aantalMetEis = new Dictionary<int, int>(); int paden = 0; bool allesBekend = true;
             foreach (var y in volgende)
             {
                 var zs = VerwachteVolgende(kaart, y, r, null);
                 if (zs.Count == 0) { allesBekend = false; continue; }
                 foreach (var z in zs)
-                    foreach (var e in kaart.WisselEisenVoorStapDetail(y, z, r).Where(e => e.Achter))
+                {
+                    paden++;
+                    foreach (var e in kaart.WisselEisenVoorStapDetail(y, z, r).Where(e => e.Achter).GroupBy(e => e.Adres).Select(g => g.First()))
                     {
                         if (!tweede.TryGetValue(e.Adres, out var set)) tweede[e.Adres] = set = new HashSet<bool>();
                         set.Add(e.Afbuigend);
+                        aantalMetEis[e.Adres] = aantalMetEis.TryGetValue(e.Adres, out var n) ? n + 1 : 1;
                     }
+                }
             }
             if (allesBekend)
-                foreach (var kv in tweede.Where(kv => kv.Value.Count == 1 && !wens.ContainsKey(kv.Key))) Voeg(kv.Key, kv.Value.First());
+                foreach (var kv in tweede.Where(kv => kv.Value.Count == 1 && !wens.ContainsKey(kv.Key) && (strikt is null || !strikt.Contains(kv.Key) || aantalMetEis[kv.Key] == paden))) Voeg(kv.Key, kv.Value.First());
         }
         else
         {
@@ -2938,7 +2953,7 @@ public partial class BaanVerkenner
 
     private async Task<Configuratie> ZetStaartWissels(int melder, Richting r, Configuratie cfg, RitDoel doel)
     {
-        foreach (var (adres, afb) in StaartWissels(_kaart, melder, r, a => _wisselStand.TryGetValue(a, out var st) ? st : cfg.Bevat(a)))
+        foreach (var (adres, afb) in StaartWissels(_kaart, melder, r, a => _wisselStand.TryGetValue(a, out var st) ? st : cfg.Bevat(a), _ins.GekoppeldeParen().Select(p => p.Meester).ToHashSet()))
         {
             if (doel.ProefAdres == adres) continue;
             if (Kruis.IsMotor(adres)) continue;
@@ -3226,6 +3241,16 @@ public partial class BaanVerkenner
             : "";
         if (_laatsteKortsluitMelders.Count > 0) alarmTekst += $" Ook bezet op dat moment: melder {string.Join(" en ", _laatsteKortsluitMelders)} (daar zit de loc deels in)." ;
         _log.Waarschuwing($"KORTSLUITING/ONTSPORING vermoed na melder {x} ({res.Richting.Tekst()}): {reden}.{alarmTekst} Noodstop.");
+        // Nachtwerk 25/26-10 (simulatie met Marco's aansluiting, 12:44:12): de loc reed 10 -> 129 met wissel 5+6 afbuigend, kwam op melder 129 (daar liggen de tongen van wissel 6) en had
+        // 0,5 s later kortsluiting. De kaart onthield toch "10 -> 129 gereden met 5 afbuigend", en de navigatie koos die stand daarna steeds weer (loc klem op 10). Een stand waarmee de loc
+        // net een melder in reed en daar meteen kortsluiting kreeg, telt niet als gereden stand voor die overgang.
+        if (_laatsteOvergang is { } lo && lo.Naar == x && lo.CfgNieuw && (_klok.Nu - lo.Tijd).TotalSeconds <= 3)
+        {
+            var og = _kaart.Overgangen.FirstOrDefault(o => o.Van == lo.Van && o.Naar == lo.Naar && o.Richting == lo.R);
+            if (og is not null && og.GezienBijConfiguraties.Remove(lo.Cfg))
+                _log.Info($"De overgang {lo.Van} -> {lo.Naar} ({lo.R.Tekst()}) wordt niet onthouden als gereden met stand '{(lo.Cfg.Length == 0 ? "alle wissels rechtdoor" : "afbuigend: " + lo.Cfg)}': de loc kreeg direct na het binnenrijden van melder {x} kortsluiting (nog niet getest op de baan).");
+            _laatsteOvergang = null;
+        }
         // BUG #81: reageerde Dinamo op dat moment nog?
         if (StilteWaarschuwing(_hw) is { } stiltetekst) _log.Waarschuwing(stiltetekst);
         if (_laatsteWisselCommando is { } lw && (_klok.Nu - lw.Tijd).TotalSeconds <= 8 && lw.Bezet.Count > 0)

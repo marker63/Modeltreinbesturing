@@ -3010,3 +3010,25 @@ tong, gaf elke stand kortsluiting en hielpen 25 rondes zelf oplossen niet (de co
 onthouden; zolang de loc op die melders staat (max. 10 minuten) gaat die wissel niet meer naar die stand (ook niet in de combinaties van zelf oplossen). Hij wordt uitgesteld en omgezet
 zodra de loc er weg is. Daarnaast (Marco: "je noemt blok 9 maar in het blokschema ken je blok 9 nog niet"): het bloknummer in een kortsluitmelding komt van Dinamo zelf; zolang geen melder
 in dat blok bekend is, zegt de melding dat erbij. Test: klemstand (#320).
+
+## Nachtwerk 25/26-10: simulatie met Marco's echte aansluiting (#321-#323)
+Marco 25-10 19:58: "ruim 350 versies waarin iedere keer 1 bug wordt opgelost en een nieuwe weer wordt ontdekt". Oorzaak van dat patroon: geen enkele volledige simulatie draaide met de
+aansluiting en instellingen van de echte baan (overloopsets 5+6 en 2+1, wissel 6 omgekeerd, keerlus, optie 6). Alle tests waren "OK" terwijl de baan vastliep. Nieuw: MiniworldBaan.
+EchteAansluiting (wissel 5+6 als overloop: beide afbuigend = 14 <-> 129, beide rechtdoor = 14 -> kruiswissel en 129 <-> 10; wissel 6 omgekeerd aangesloten) en de meting MarcoBench
+(MARCO=1). Eerste meting met de versie van 25-10 20:00: NIET voltooid, 6 valse wissels (precies 3, 4, 7, 8, 11 en 12, die Marco al als 'niet bestaand' noemde), 40 kortsluitingen,
+10 keer een wissel omgezet onder de loc, hulp van de gebruiker nodig. Na #321-#323 (gewoon / streng / met Dinamo-uitval): alle drie voltooid, 23/23 melders met blok, 0 valse wissels,
+23-24 kortsluitingen, 0 keer hulp van de gebruiker. Nog niet getest op de baan.
+
+## BUG #321 – OPGELOST (nog niet getest op de baan): valse wissels 3, 4, 7, 8, 11, 12 door een staartwissel midden in een proefrit
+Vanaf 4 achteruit kan de loc na 129 naar 14 (wissel 5+6 afbuigend) of naar 10 (rechtdoor). Alleen 129 -> 14 had een bekende eis (wissel 5 afbuigend), dus zette de staartwisselregel
+wissel 5 tijdens elke proefrit afbuigend; de proef reed 4, 129, 14 in plaats van 4, 129, 10 (basisrit) en elk proefadres kreeg "na 129: rechtdoor 10, afbuigend 14". Een meester van een
+overloopset wordt voor de stap daarna alleen nog gezet als elk bekend vervolg hem in dezelfde stand vraagt (zijn tweede wissel kan op het andere vervolg liggen).
+
+## BUG #322 – OPGELOST (nog niet getest op de baan): de tweede wissel van een overloopset stond met zijn Dinamo-stand in de kaart
+De vastgelegde stand van een overgang bevatte wissel 6 met zijn Dinamo-stand ('6,9,10' voor 10 -> 129, terwijl 6 dan op de baan rechtdoor staat). Die standen werden later als rijstand
+gebruikt. In de vastgelegde stand telt nu alleen de meester; de volger volgt altijd.
+
+## BUG #323 – OPGELOST (nog niet getest op de baan): een stand die direct kortsluiting gaf werd onthouden als 'gereden stand'
+De loc reed 10 -> 129 met wissel 5+6 afbuigend, kwam op melder 129 (daar liggen de tongen van wissel 6) en had 0,5 s later kortsluiting. De kaart onthield "10 -> 129 gereden met 5
+afbuigend" en de terugweg koos die stand daarna steeds weer: de loc zat telkens klem op 10 en twee keer moest de gebruiker helpen. Krijgt de loc binnen 3 s na het binnenrijden van een
+melder kortsluiting, dan telt die stand niet als gereden stand voor die overgang.
