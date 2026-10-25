@@ -3002,3 +3002,11 @@ Proef adres 13 (kruismotor) reed 13, 14, 24, 8 en kreeg kortsluiting na melder 8
 toen was die waarneming al vergeten (#2 bleef open zonder hint). Nu wordt zo'n wissel bewaard tot het punt van precies die kortsluiting bestaat (zelfde melder, zelfde richting, geen
 nieuwere kortsluiting tussendoor) en daar als eerste kandidaat vastgelegd (AlarmHintAdres): bij het oplossen van het punt wordt hij als allereerste geprobeerd. Een eerste versie die
 hem meteen als (voorlopige) oplossing vastlegde gaf in de simulaties meer kortsluitingen en hulpvragen en is niet gebruikt. Test: alarmoplossing (#319).
+
+## BUG #320 – OPGELOST (nog niet getest op de baan): loc vast op de tong van wissel 9 in melder 129 (Marco 25-10 19:40; autolog 19:25:00-19:36:24)
+Na de proef met adres 3 stond de loc op 129. Wissel 9 ging met de loc erop naar afbuigend (stand voor de terugweg 129-14-13) en de loc zat klem; #230 zag dat en zette wissel 9 terug, het
+alarm ging weg. Vier seconden later zette het zelf terugrijden wissel 9 met de loc er nog op weer afbuigend: de kaart wist nog niet dat wissel 9 bij 129 ligt. Daarna stond de loc op de
+tong, gaf elke stand kortsluiting en hielpen 25 rondes zelf oplossen niet (de combinatierondes zetten wissel 9 zelfs opnieuw afbuigend). Opgelost: een stand die volgens #230 klem gaf wordt
+onthouden; zolang de loc op die melders staat (max. 10 minuten) gaat die wissel niet meer naar die stand (ook niet in de combinaties van zelf oplossen). Hij wordt uitgesteld en omgezet
+zodra de loc er weg is. Daarnaast (Marco: "je noemt blok 9 maar in het blokschema ken je blok 9 nog niet"): het bloknummer in een kortsluitmelding komt van Dinamo zelf; zolang geen melder
+in dat blok bekend is, zegt de melding dat erbij. Test: klemstand (#320).

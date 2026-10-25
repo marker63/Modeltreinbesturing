@@ -840,7 +840,7 @@ public partial class BaanVerkenner
         foreach (var pa in _kaart.OverloopPartnersVan(onder.Keys).ToList()) onder.TryAdd(pa, 0);
         foreach (var (a, wens) in _uitgesteldeWissels.ToList())
         {
-            if (onder.ContainsKey(a) || (Kruis.IsMotor(a) && Kruis.OpKruis(bezet))) continue;
+            if (onder.ContainsKey(a) || (Kruis.IsMotor(a) && Kruis.OpKruis(bezet)) || KlemStandVerboden(a, wens)) continue;
             _uitgesteldeWissels.Remove(a);
             if (_wisselStand.TryGetValue(a, out var nu) && nu == wens) continue;
             _log.Info($"Wissel {a} gaat nu alsnog naar {(wens ? "afbuigend" : "rechtdoor")}: de loc staat er niet meer bij (bezet: {Lijst(bezet)}) (BUG #271, nog niet getest op de baan).");
@@ -865,6 +865,12 @@ public partial class BaanVerkenner
         {
             if (IsVolger(a)) continue;   // BUG #259: gaat mee met zijn meester
             bool wens = c.Bevat(a);
+            if (KlemStandVerboden(a, wens) && !(_wisselStand.TryGetValue(a, out var nu320) && nu320 == wens))
+            {
+                _log.Waarschuwing($"Wissel {a} wordt nu NIET naar {(wens ? "afbuigend" : "rechtdoor")} gezet: die stand gaf net klem met de loc op deze melder(s). Hij wordt omgezet zodra de loc daar weg is (BUG #320).");
+                _uitgesteldeWissels[a] = wens;
+                continue;
+            }
             if (onder.TryGetValue(a, out var m) && !(_wisselStand.TryGetValue(a, out var nu) && nu == wens))
             {
                 _log.Waarschuwing($"Wissel {a} wordt nu NIET omgezet: de loc staat op melder {m} waar die wissel ligt (omzetten met de loc erop laat hem ontsporen). Hij wordt omgezet zodra de loc daar weg is.");
@@ -3036,7 +3042,36 @@ public partial class BaanVerkenner
 
     private bool _klemProbeActief;
     /// <summary>BUG #245: wissel die de #230-regel het laatst zelf terugzette (niet nog eens omzetten).</summary>
+    /// <summary>BUG #320 (Marco 25-10 19:40: "je noemt blok 9 maar in het blokschema ken je blok 9 nog niet"): het bloknummer in een kortsluitmelding komt van Dinamo zelf. Bij optie 6
+    /// worden de blokken pas aan het eind gezocht; zolang geen melder in dat blok bekend is, zegt de melding dat erbij.</summary>
+    private string BlokOnbekendTekst(IEnumerable<int> blokken)
+    {
+        var onbekend = blokken.Where(b => !_kaart.Melders.Any(m => m.DinamoBlok == b)).OrderBy(b => b).ToList();
+        return onbekend.Count == 0 ? "" : $" (Dat bloknummer meldt Dinamo zelf; welke melders in blok {string.Join(" en ", onbekend)} liggen is nog niet bepaald, dat volgt in de blokfase.)";
+    }
+
     private (int Adres, DateTime Tijd)? _teruggezet230;
+
+    /// <summary>BUG #320 (Marco 25-10 19:40: "je loopt vast terwijl de loc volledig in melder 129 staat bovenop de wisseltong van wissel 9"; autolog 19:25:14-19:36:24): #230 stelde vast dat
+    /// wissel 9 afbuigend onder de loc op 129 de klem gaf en zette hem terug; 4 s later zette het zelf terugrijden hem met de loc er nog op weer afbuigend (de kaart wist niet dat wissel 9 bij 129
+    /// ligt). Daarna zat de loc op de tong en hielp geen enkele wissel meer. Zo'n stand wordt nu onthouden: zolang de loc op die melders staat (max. 10 minuten) gaat die wissel niet naar die
+    /// stand; hij wordt omgezet zodra de loc er weg is.</summary>
+    private readonly Dictionary<int, (bool Afbuigend, HashSet<int> Melders, DateTime Tijd)> _klemStand320 = new();
+
+    private void OnthoudKlemStand(int adres, bool afbuigend, IEnumerable<int> melders)
+    {
+        _klemStand320[adres] = (afbuigend, melders.ToHashSet(), _klok.Nu);
+        _log.Info($"Wissel {adres} {(afbuigend ? "afbuigend" : "rechtdoor")} gaf klem met de loc op melder {Lijst(melders.OrderBy(x => x).ToList())}: zolang de loc daar staat gaat hij niet meer naar die stand (BUG #320, nog niet getest op de baan).");
+    }
+
+    /// <summary>BUG #320: mag wissel <paramref name="adres"/> nu naar <paramref name="afbuigend"/>? Nee als die stand net klem gaf met de loc op dezelfde melders.</summary>
+    private bool KlemStandVerboden(int adres, bool afbuigend)
+    {
+        if (!_klemStand320.TryGetValue(adres, out var ks)) return false;
+        var bezet = _monitor.Bezet;
+        if ((_klok.Nu - ks.Tijd).TotalMinutes >= 10 || (bezet.Count > 0 && !bezet.Any(ks.Melders.Contains))) { _klemStand320.Remove(adres); return false; }
+        return ks.Afbuigend == afbuigend && bezet.Any(ks.Melders.Contains);
+    }
 
     /// <summary>BUG #164 (Marco 16-10 09:13: "je kon de situatie rond wissel 2 en 1 niet zelf oplossen?"): de loc zit klem op een wissel, maar Dinamo meldt de kortsluiting
     /// alleen zolang er een rijcommando loopt; bij een stilstaande loc verdwijnt het alarm na 0,8 s. De alarmroutine (#108) kijkt of het alarm na het omzetten van
@@ -3083,6 +3118,7 @@ public partial class BaanVerkenner
             {
                 _kortsluitingGemeld = false;
                 _statischeKortsluiting = false;
+                OnthoudKlemStand(lw.Adres, lw.Afbuigend, bezet);   // BUG #320
                 throw new NavigatieFout($"De loc zat klem bij melder {start} doordat wissel {lw.Adres} werd omgezet terwijl de loc er al stond; de wissel staat weer terug. De stap ({stap}) wordt later opnieuw gereden.");
             }
             _log.Info($"Na het terugzetten van wissel {lw.Adres} is de kortsluiting er nog; de andere wissels worden geprobeerd.");
@@ -3186,7 +3222,7 @@ public partial class BaanVerkenner
         _puntzijdeProef = _ritDoel?.ProefAdres is int pp && ProefWisselVanPuntzijdeBereden(_ritDoel!.Basis, res.Reeks)
             ? (pp, _monitor.Bezet.Append(x).ToHashSet(), _klok.Nu) : null;
         string alarmTekst = _laatsteKortsluitBlokken.Count > 0
-            ? $" Dinamo meldt kortsluiting in blok {string.Join(" en ", _laatsteKortsluitBlokken)}."
+            ? $" Dinamo meldt kortsluiting in blok {string.Join(" en ", _laatsteKortsluitBlokken)}." + BlokOnbekendTekst(_laatsteKortsluitBlokken)
             : "";
         if (_laatsteKortsluitMelders.Count > 0) alarmTekst += $" Ook bezet op dat moment: melder {string.Join(" en ", _laatsteKortsluitMelders)} (daar zit de loc deels in)." ;
         _log.Waarschuwing($"KORTSLUITING/ONTSPORING vermoed na melder {x} ({res.Richting.Tekst()}): {reden}.{alarmTekst} Noodstop.");

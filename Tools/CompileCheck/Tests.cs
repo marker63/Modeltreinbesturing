@@ -1053,6 +1053,31 @@ public static class Tests
         Eis(v.Kaart.Kortsluitpunten.Last() is { AlarmHintAdres: null }, "alarmoplossing (#319): een oplossing bij andere melders wordt niet aan een ander kortsluitpunt gehangen");
     }
 
+    // BUG #320 (Marco 25-10 19:40; autolog 19:25:14-19:25:18): wissel 9 afbuigend gaf klem met de loc op 129 en werd teruggezet; het zelf terugrijden zette hem meteen weer afbuigend
+    static void KlemStandOnthoudenTest()
+    {
+        var sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(true, 129, null);
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var ins = new VerkenInstellingen { LocAdres = 5408, WisselAdresVan = 1, WisselAdresTot = 14, DinamoBlokken = "1-12", KruisMotoren = "10+13", Rondrit = true };
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var log = new VerkenLog(klok);
+        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true), new VerkenStatus { Instellingen = ins });
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var mon = typeof(BaanVerkenner).GetField("_monitor", bf)!.GetValue(v)!;
+        mon.GetType().GetMethod("Ontvang")!.Invoke(mon, new object[] { 129, true });
+        klok.Wacht(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult();
+        mon.GetType().GetMethod("Bijwerken")!.Invoke(mon, null);
+        var bezet = (IEnumerable<int>)mon.GetType().GetProperty("Bezet")!.GetValue(mon)!;
+        Eis(bezet.Contains(129), "klemstand (#320): de loc staat in de simulatie op melder 129 (bezet: " + string.Join(",", bezet) + ")");
+        typeof(BaanVerkenner).GetMethod("OnthoudKlemStand", bf)!.Invoke(v, new object?[] { 9, true, new[] { 129 } });
+        ((Task)typeof(BaanVerkenner).GetMethod("ZetConfiguratie", bf)!.Invoke(v, new object?[] { new Configuratie(new[] { 9 }), false })!).GetAwaiter().GetResult();
+        var stand = (Dictionary<int, bool>)typeof(BaanVerkenner).GetField("_wisselStand", bf)!.GetValue(v)!;
+        Eis(!(stand.TryGetValue(9, out var s9) && s9) && log.Regels.Any(x => x.Tekst.Contains("BUG #320") && x.Tekst.Contains("NIET naar afbuigend")),
+            "klemstand (#320): wissel 9 gaat niet opnieuw naar afbuigend zolang de loc op 129 staat (die stand gaf net klem)");
+        var uit = (Dictionary<int, bool>)typeof(BaanVerkenner).GetField("_uitgesteldeWissels", bf)!.GetValue(v)!;
+        Eis(uit.TryGetValue(9, out var u9) && u9, "klemstand (#320): wissel 9 afbuigend wordt uitgesteld tot de loc van 129 weg is");
+    }
+
     // BUG #232: optie 6 op de Miniworld-simulatie MET de keerlus 129-4-11-12-1-9-10-129 (zoals de logs van 18-10 laten zien)
     static void KeerlusTest()
     {
@@ -3593,6 +3618,7 @@ public static class Tests
         RondritTest();
         HervatZonderBasisritTest();
         WachtendeAlarmOplossingTest();
+        KlemStandOnthoudenTest();
         OntsporingEersteBasisritTest();
         AlarmWisselBijLocTest();
         KruisRuisVoorafTest();

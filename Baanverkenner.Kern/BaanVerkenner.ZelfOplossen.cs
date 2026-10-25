@@ -170,7 +170,7 @@ public partial class BaanVerkenner
             {
                 string sleutelC = $"C{a}:{rs.Sleutel}:{string.Join(",", bezet.OrderBy(x => x))}";
                 if (!geprobeerd.Add(sleutelC)) continue;
-                foreach (var x in rs.Afbuigend.Where(x => _ins.WisselAdressen().Contains(x) && !IsVolger(x) && !(_wisselStand.TryGetValue(x, out var sx) && sx))) await ZetWissel(x, true);
+                foreach (var x in rs.Afbuigend.Where(x => _ins.WisselAdressen().Contains(x) && !IsVolger(x) && !(_wisselStand.TryGetValue(x, out var sx) && sx) && !KlemStandVerboden(x, true))) await ZetWissel(x, true);   // BUG #320
                 bool nuC = _wisselStand.TryGetValue(a, out var stc) && stc;
                 _log.Info($"Zelf oplossen: combinatie - wissel {Lijst(rs.Afbuigend.ToList())} afbuigend (de stand van de rit) met wissel {a} naar {(!nuC ? "afbuigend" : "rechtdoor")} (BUG #315).");
                 await ZetWissel(a, !nuC);
