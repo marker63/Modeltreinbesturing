@@ -487,6 +487,7 @@ public partial class BaanVerkenner
             {
                 _log.Info($"Wissel {adres}: geen terugmelding, maar Dinamo meldt op dit moment (of net) kortsluiting; dat telt niet als Dinamo-uitval.");
                 terugmelding = null;
+                _zonderTerugmeldingBijAlarm++;   // BUG #301
             }
         }
         var bezetNu = _monitor.Bezet;
@@ -498,6 +499,7 @@ public partial class BaanVerkenner
         // ergens op een melder, dan krijgt de tong daarom altijd een korte extra wachttijd, ook als de kaart de wissel niet bij die melder noemt.
         else if (bezetNu.Count > 0)
             await Wacht(TimeSpan.FromMilliseconds(ExtraWisselWachtOnbekendMs));
+        if (terugmelding == true) _zonderTerugmeldingBijAlarm = 0;   // BUG #301
         if (terugmelding is bool tm) await VerwerkBevestiging(adres, afbuigend, tm);
     }
 
@@ -1436,8 +1438,15 @@ public partial class BaanVerkenner
         finally { _alarmZoekenBezig--; }
     }
 
+    /// <summary>BUG #301 (autolog 25-10 09:06:31-09:09:58): tijdens een blijvende kortsluiting in blok 8 en 9 meldde Dinamo geen enkel wisselcommando terug (wissel 6 t/m 14 en 1/2, elk twee keer):
+    /// de commando's werden niet uitgevoerd en 3,5 minuut proberen hielp niets; Marco loste het daarna met de hand op (wissel 10). Blijven bij deze kortsluiting drie commando's achter elkaar
+    /// zonder terugmelding, dan stopt het proberen en wordt meteen om hulp gevraagd.</summary>
+    private int _zonderTerugmeldingBijAlarm;
+    private bool _probeerZinloosGemeld;
+
     private async Task<bool> ProbeerAlarmWegTeKrijgenKern(string stap)
     {
+        _zonderTerugmeldingBijAlarm = 0; _probeerZinloosGemeld = false;   // BUG #301
         var bezet = _monitor.Bezet.ToHashSet();
         // BUG #109 (Marco 12:03: "wissel 9 werd geschakeld terwijl de loc er bovenop stond"): wissels die bij een bezette melder liggen (de kaart
         // noemt die melder bij die wissel) worden nooit zonder toestemming geprobeerd: de loc staat er met een deel op of tegen de tong aan.
@@ -1482,6 +1491,15 @@ public partial class BaanVerkenner
         async Task<bool> Probeer(int a, string toelichting)
         {
             if (bewezen.ContainsKey(a)) return false;   // BUG #258
+            if (_zonderTerugmeldingBijAlarm >= 3 && _hw is IWisselBevestiging)
+            {
+                if (!_probeerZinloosGemeld)
+                {
+                    _probeerZinloosGemeld = true;
+                    _log.Waarschuwing($"Dinamo meldt tijdens deze kortsluiting de wisselcommando's niet terug (de laatste {_zonderTerugmeldingBijAlarm}): ze worden waarschijnlijk niet uitgevoerd. Verder proberen heeft geen zin; de verkenner vraagt nu om hulp (BUG #301).");
+                }
+                return false;
+            }
             bool oud = _wisselStand.TryGetValue(a, out var nu) && nu;
             var herstelVoor = _uitvalHersteldOm;
             await ZetWissel(a, !oud, forceer: true);

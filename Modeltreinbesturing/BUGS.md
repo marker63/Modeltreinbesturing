@@ -2891,3 +2891,7 @@ een splitsing of kruising eerst alleen doorgangen die echt gereden zijn, en pas 
 ## BUG #300 – OPGELOST (nog niet getest op de baan): bij de eerste rondrit al na 7 s op kruipsnelheid in lange secties (autolog 25-10 08:57:05-08:58:08)
 #284 rekende met de mediane sectietijd (3 s); in 29 -> 30, 27 -> 28 en 25 -> 17 (12-14 s) ging de loc daardoor al na 7 s op kruipsnelheid en na 29 was het bijna 'doodlopend'. Nu: 0,8 x
 de langste gemeten sectietijd, tussen 8 en 14 s (zonder metingen 10 s).
+
+## BUG #301 – OPGELOST (nog niet getest op de baan): 3,5 minuut wissels proberen terwijl Dinamo ze niet uitvoerde (autolog 25-10 09:06:31-09:09:58)
+Bij de blijvende kortsluiting in blok 8 en 9 (na 129 vooruit, wissel 10 nog rechtdoor) kwam op geen enkel wisselcommando een terugmelding: ze werden niet uitgevoerd. Marco loste het daarna
+met de hand op (wissel 10 afbuigend). Blijven tijdens zo'n kortsluiting drie commando's achter elkaar zonder terugmelding, dan stopt het proberen en vraagt de verkenner meteen om hulp.
