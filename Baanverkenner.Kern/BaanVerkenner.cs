@@ -488,7 +488,7 @@ public partial class BaanVerkenner
             int s = _kaart.StartMelder;
             var bezetNu = _monitor.Bezet;
             if (!(bezetNu.Count == 1 && bezetNu.Contains(s)))
-                await VraagLocTerugTeZetten(s, $"De verkenning wordt hervat vanaf de startmelder {s}.");
+                await VraagLocTerugTeZetten(s, $"De verkenning wordt hervat vanaf de startmelder {s}.", zelfEerst: false);
             return;
         }
 

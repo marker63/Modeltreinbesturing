@@ -2910,3 +2910,12 @@ navigatie. Gevonden bij #302: ook de vooruitregels van #280/#267 worden in een n
 
 ## BUG #304 – OPGELOST: verkenning gestopt met 'Index was out of range' bij het losmaken na een kortsluiting (simulatie)
 De melding van #261 gebruikte de laatste twee melders van de kortsluitreeks, ook als die maar één melder had (de stap kwam uit de laatste rit). Nu zonder die tekst in dat geval.
+
+## BUG #305 – OPGELOST (nog niet getest op de baan): eerst 10 minuten zelf oplossen, pas daarna de gebruiker (Marco 25-10 10:05)
+"Het is een zelflerend programma ... geen vragen meer om de loc steeds terug te zetten op de startmelder maar zelf een manier vinden om het op te lossen, als het na 10 minuten nog niet
+gelukt is dan pas een actie van mij vragen." Nu: voordat de verkenner vraagt de loc terug te zetten, probeert hij maximaal 10 minuten zelf in rondes: wachten tot de kortsluiting vanzelf
+weggaat; wissels omzetten (ook die bij de loc: van een zijtak naar de samenvoeging heft omzetten de kortsluiting juist op, #169); van de grens van twee melders doorkruipen naar één melder;
+zonder bezette melder kruipend zoeken; en vanaf de melder waar hij staat zelf naar het doel over een bekende weg. Blijft een ronde precies hetzelfde, dan worden vastgehouden
+'klem-oplossingen' losgelaten. De toestemmingsvragen "Wissel bij de loc proberen?" zijn weg: die wissels probeert de verkenner zelf. Een vraag van binnen het zelf oplossen wordt
+geen vraag maar een mislukte ronde. Alleen bij het hervatten (loc op de startmelder zetten) wordt nog direct gevraagd. Simulatie keerlus: 2 keer zelf opgelost, 1 keer nog hulp
+(was 2 keer hulp). Open: in die ene keer reed de terugweg na de klem van 4/129 vanaf een verkeerd aangenomen plek (14).

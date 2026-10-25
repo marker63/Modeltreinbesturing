@@ -1583,16 +1583,14 @@ public partial class BaanVerkenner
         if (Kruis.OpKruis(bezet))
             foreach (var m in KruisMotorenVolgorde(bezet)) if (!verdachtEerst.Contains(m)) verdachtEerst.Add(m);
         var gevraagd = new HashSet<int>();
-        if (verdachtEerst.Count > 0 && VraagJaNee is not null)
+        // BUG #305 (Marco 25-10 10:05: zelflerend, eerst zelf oplossen, pas na 10 minuten de gebruiker): niet meer om toestemming vragen. Komt de loc van een tak richting de
+        // samenvoeging, dan kan omzetten de kortsluiting juist opheffen (BUG #169).
+        if (verdachtEerst.Count > 0)
         {
-            string lijst = string.Join(" en ", verdachtEerst);
-            var mag = await VraagJaNee("Wissel bij de loc proberen?",
-                $"De loc staat bij melder {string.Join(" en ", bezet.OrderBy(x => x))} en rijdt van een tak richting de samenvoeging; daar kan een verkeerde wisselstand kortsluiting geven en omzetten helpt dan. " +
-                $"Wissel {lijst} ligt daar. De verkenner probeert die één voor één om te zetten (de loc staat stil; kleine kans dat hij daarbij ontspoort).\n\nJa = proberen.\nNee = u zet hem zelf goed.");
+            _log.Info($"Wissel {string.Join(" en ", verdachtEerst)} ligt bij de loc (melder {string.Join(" en ", bezet.OrderBy(x => x))}), die van een tak richting de samenvoeging rijdt: de verkenner probeert ze zelf één voor één (zonder te vragen, BUG #305).");
             foreach (var a in verdachtEerst) gevraagd.Add(a);
-            if (mag == true)
-                foreach (var a in verdachtEerst)
-                    if (await Probeer(a, " (ligt bij de loc, met toestemming van de gebruiker)")) return true;
+            foreach (var a in verdachtEerst)
+                if (await Probeer(a, " (ligt bij de loc, zelf geprobeerd)")) return true;
         }
 
         // stap 3: de overige wissels, behalve die van de samengevoegde kant (omzetten helpt daar niet) en die bij de loc
@@ -1622,28 +1620,21 @@ public partial class BaanVerkenner
         var verdacht = bijLoc.Where(a => !Kruis.IsMotor(a) && _ins.WisselAdressen().Contains(a) && !gevraagd.Contains(a) && !kopAdressen.Contains(a))
             .OrderByDescending(a => _kaart.Wissel(a).Waarnemingen.Any(o => o.Soort == WaarnemingSoort.KortsluitingBijOmzetten && bezet.Contains(o.NaMelder)))
             .ThenBy(a => a).ToList();
-        if (verdacht.Count > 0 && VraagJaNee is not null)
+        if (verdacht.Count > 0)
         {
-            string lijst = string.Join(" en ", verdacht);
-            var mag = await VraagJaNee("Wissel bij de loc proberen?",
-                $"Geen enkele andere wissel haalt de kortsluiting weg. Waarschijnlijk staat wissel {lijst} verkeerd: die ligt bij melder {string.Join(" en ", bezet.OrderBy(x => x))}, waar de loc nu staat.\n\n" +
-                $"Ja = de verkenner probeert wissel {lijst} één voor één om te zetten (de loc staat stil; kleine kans dat hij daarbij ontspoort).\nNee = u zet hem zelf goed.");
-            if (mag == true)
-                foreach (var a in verdacht)
-                    if (await Probeer(a, " (ligt bij de loc, met toestemming van de gebruiker)")) return true;
+            _log.Info($"Geen enkele andere wissel haalt de kortsluiting weg; wissel {string.Join(" en ", verdacht)} bij de loc wordt nu zelf één voor één geprobeerd (zonder te vragen, BUG #305).");
+            foreach (var a in verdacht)
+                if (await Probeer(a, " (ligt bij de loc, zelf geprobeerd)")) return true;
         }
         // BUG #181: laatste redmiddel. De rollen (achter/kop) komen uit de kaart en kunnen ontbreken of net andersom liggen (sim: loc van 129 naar zijspoor 10, wissel 5 en 6 stonden als
         // 'samengevoegde kant' aangemerkt maar wissel 5 stond tegen de loc in). Dan blijft de loc voor altijd vastzitten. Nu worden ook die wissels (met toestemming, bij de loc) nog
         // één voor één geprobeerd voordat de verkenner opgeeft.
         var laatste = bijLoc.Where(a => !Kruis.IsMotor(a) && _ins.WisselAdressen().Contains(a) && kopAdressen.Contains(a)).OrderBy(a => a).ToList();
-        if (laatste.Count > 0 && VraagJaNee is not null)
+        if (laatste.Count > 0)
         {
-            var mag = await VraagJaNee("Wissel bij de loc proberen?",
-                $"Geen enkele andere wissel haalt de kortsluiting weg. Wissel {string.Join(" en ", laatste)} lijkt van de samengevoegde kant bereden te worden (omzetten zou dan niet helpen), maar dat is uit de kaart afgeleid en kan onjuist zijn.\n\n" +
-                $"Ja = de verkenner probeert die wissel(s) één voor één (de loc staat stil; kleine kans dat hij daarbij ontspoort).\nNee = u zet hem zelf goed.");
-            if (mag == true)
-                foreach (var a in laatste)
-                    if (await Probeer(a, " (laatste redmiddel, ligt bij de loc, met toestemming van de gebruiker)")) return true;
+            _log.Info($"Laatste redmiddel: wissel {string.Join(" en ", laatste)} lijkt van de samengevoegde kant bereden (omzetten helpt dan niet), maar dat is uit de kaart afgeleid; de verkenner probeert ze toch zelf (zonder te vragen, BUG #305).");
+            foreach (var a in laatste)
+                if (await Probeer(a, " (laatste redmiddel, ligt bij de loc, zelf geprobeerd)")) return true;
         }
         _log.Waarschuwing("Geen enkele wissel haalde de kortsluiting weg.");
         return false;
@@ -3567,8 +3558,11 @@ public partial class BaanVerkenner
         return false;
     }
 
-    private async Task VraagLocTerugTeZetten(int melder, string aanleiding)
+    private async Task VraagLocTerugTeZetten(int melder, string aanleiding, bool zelfEerst = true)
     {
+        // BUG #305: eerst maximaal 10 minuten zelf oplossen, pas daarna de gebruiker. Komt deze vraag van binnen het zelf oplossen, dan geen vraag: die ronde is mislukt.
+        if (_zelfOplossenBezig) throw new NavigatieFout($"{EersteRegel(aanleiding)} (het zelf oplossen gaat door)");
+        if (zelfEerst && await ZelfOplossen(melder, aanleiding)) return;
         for (int poging = 1; poging <= 3; poging++)
         {
             // BUG #94 (Marco 15:46: "ik zette de loc terug in melder 13 en hij reed gelijk weg"): Dinamo onthoudt per blok het laatste rijcommando.

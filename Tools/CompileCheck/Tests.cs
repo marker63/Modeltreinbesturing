@@ -1006,7 +1006,11 @@ public static class Tests
                 Eis(regels.Count(x => x.Contains("BUG #245")) > 0, $"keerlus (start {start}) BUG #245: wissel 1 (loste de kortsluiting bij melder 12 op) wordt na de proef niet onder de loc omgezet");
                 Console.WriteLine($"  keerlus start {start}: {r.Einde}, {r.Seconden / 60:0} min, {r.Kortsluitingen} kortsluiting(en), melders {k.Melders.Count} ({string.Join(",", k.Melders.Select(m => m.Nummer).OrderBy(x => x))}), voltooid {k.Voltooid}, 129->14-maar-10: {naar10}");
                 if (Environment.GetEnvironmentVariable("KEERLUS_LOG") == "1") Console.WriteLine(r.Log.AlsTekst());
-                Console.WriteLine($"  keerlus start {start}: #270 {regels.Count(x => x.Contains("BUG #270"))}x, #271 {regels.Count(x => x.Contains("BUG #271"))}x, rondjes {regels.Count(x => x.Contains("rijdt rondjes"))}x");
+                Console.WriteLine($"  keerlus start {start}: zelf opgelost {regels.Count(x => x.Contains("Zelf opgelost"))}x, zelf mislukt {regels.Count(x => x.Contains("Zelf oplossen lukte niet"))}x, gebruiker {regels.Count(x => x.Contains("Gebruiker heeft de loc"))}x, #270 {regels.Count(x => x.Contains("BUG #270"))}x, #271 {regels.Count(x => x.Contains("BUG #271"))}x, rondjes {regels.Count(x => x.Contains("rijdt rondjes"))}x");
+                if (Environment.GetEnvironmentVariable("DUMP305") is { } d305) System.IO.File.WriteAllLines(d305, regels);
+                // BUG #305: eerst zelf oplossen; in deze simulatie lukt dat minstens één keer en is er hoogstens één keer hulp van de gebruiker nodig (zonder #305: 2 keer)
+                Eis(regels.Count(x => x.Contains("Zelf opgelost")) >= 1 && regels.Count(x => x.Contains("Gebruiker heeft de loc")) <= 1, $"keerlus (start {start}) BUG #305: zelf opgelost {regels.Count(x => x.Contains("Zelf opgelost"))}x, gebruiker {regels.Count(x => x.Contains("Gebruiker heeft de loc"))}x");
+                Eis(!regels.Any(x => x.Contains("met toestemming van de gebruiker")), $"keerlus (start {start}) BUG #305: geen toestemmingsvragen meer voor wissels bij de loc");
                 Eis(k.Melders.Count == 23, $"keerlus (start {start}): alle 23 melders (met 1 en 9) gevonden (nu {k.Melders.Count})");
                 Eis(naar10 == 0, $"keerlus (start {start}): de terugweg 129 -> 14 gaat niet steeds naar 10 (nu {naar10}x)");
                 Eis(k.Voltooid && k.Melders.All(m => m.DinamoBlok is not null), $"keerlus (start {start}) BUG #281/#282: de blokfase wordt afgemaakt, elke melder heeft een Dinamo-blok (zonder: {string.Join(",", k.Melders.Where(m => m.DinamoBlok is null).Select(m => m.Nummer))})");
@@ -1196,10 +1200,8 @@ public static class Tests
             bool ok = true;
             try { ((Task)check.Invoke(v, new object[] { "test" })!).GetAwaiter().GetResult(); } catch (NavigatieFout) { ok = false; }
             var kp = kaart.Kortsluitpunten.First();
-            if (toestemming)
-                Eis(ok && gevraagd == 1 && kp.Opgelost && kp.OpgelostDoorAdres == 3, "alarm bij loc: met toestemming lost wissel 3 (ligt bij bezette melder 1) het alarm op en staat als oplossing vastgelegd");
-            else
-                Eis(!ok && gevraagd == 1 && !(stand.TryGetValue(3, out var af3) && af3) && !kp.Opgelost, "alarm bij loc: zonder toestemming blijft wissel 3 ongemoeid en volgt de gewone melding");
+            // BUG #305 (Marco 25-10 10:05): niet meer om toestemming vragen; wissel 3 bij de loc wordt zelf geprobeerd, wat de gebruiker ook zou antwoorden
+            Eis(ok && gevraagd == 0 && kp.Opgelost && kp.OpgelostDoorAdres == 3, $"alarm bij loc (#305, antwoord zou {toestemming} zijn): zonder vraag lost wissel 3 (ligt bij bezette melder 1) het alarm op en staat als oplossing vastgelegd (gevraagd {gevraagd}x)");
         }
     }
 
@@ -1741,7 +1743,7 @@ public static class Tests
         bool stopVoorVraag = false; string tekstBijVraag = "";
         var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => { tekstBijVraag = log.AlsTekst(); stopVoorVraag = tekstBijVraag.Contains("stop naar alle blokken"); return Task.FromResult(true); }, new VerkenStatus { Instellingen = ins });
         var m = typeof(BaanVerkenner).GetMethod("VraagLocTerugTeZetten", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
-        try { ((Task)m.Invoke(v, new object[] { 1, "test" })!).GetAwaiter().GetResult(); } catch (Exception) { /* melder 1 kan onbezet blijven: alleen de volgorde telt */ }
+        try { ((Task)m.Invoke(v, new object[] { 1, "test", false })!).GetAwaiter().GetResult(); } catch (Exception) { /* melder 1 kan onbezet blijven: alleen de volgorde telt */ }
         Eis(stopVoorVraag, "terugzetten: de stop naar alle blokken is gelogd VOORDAT de gebruiker de vraag krijgt");
     }
 

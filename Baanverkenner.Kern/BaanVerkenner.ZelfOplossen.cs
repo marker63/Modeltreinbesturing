@@ -1,0 +1,164 @@
+namespace Baanverkenner.Kern;
+
+public partial class BaanVerkenner
+{
+    /// <summary>BUG #305 (Marco 25-10 10:05: "Het is een zelflerend programma ... geen vragen meer om de loc steeds terug te zetten op de startmelder maar zelf een manier vinden
+    /// om het op te lossen, als het na 10 minuten nog niet gelukt is dan pas een actie van mij vragen"): zo lang probeert de verkenner het zelf voordat hij de gebruiker vraagt.</summary>
+    internal static readonly TimeSpan ZelfOplossenDuur = TimeSpan.FromMinutes(10);
+
+    private bool _zelfOplossenBezig;
+
+    /// <summary>BUG #305: probeert tot <see cref="ZelfOplossenDuur"/> lang zelf de loc (zonder kortsluiting) op <paramref name="doel"/> te krijgen, in rondes:
+    /// (1) wachten tot een kortsluiting vanzelf weggaat; (2) wissels omzetten (eerst de gewone zoekroutine, daarna ook de wissels bij de melders waar de loc staat:
+    /// rijdt de loc vanaf een zijtak naar de samenvoeging, dan heft omzetten de kortsluiting juist op, BUG #169); (3) staat de loc op de grens van twee melders, doorkruipen
+    /// tot hij op één melder staat; (4) geen melder bezet: kruipend zoeken; (5) vanaf de melder waar hij staat zelf naar het doel rijden over een bekende weg.
+    /// Geeft true als de loc op het doel staat.</summary>
+    private async Task<bool> ZelfOplossen(int doel, string aanleiding)
+    {
+        if (_zelfOplossenBezig) return false;
+        _zelfOplossenBezig = true;
+        try
+        {
+            var eind = _klok.Nu + ZelfOplossenDuur;
+            _log.Info($"Zelf oplossen (BUG #305, nog niet getest op de baan): de verkenner probeert maximaal {ZelfOplossenDuur.TotalMinutes:0} minuten zelf de loc op melder {doel} te krijgen voordat hij om hulp vraagt. Aanleiding: {EersteRegel(aanleiding)}");
+            var onderLocGeprobeerd = new HashSet<string>();
+            int ronde = 0;
+            string? vorigeUitkomst = null;
+            while (_klok.Nu < eind)
+            {
+                ronde++;
+                // Zelfde uitkomst als de vorige ronde: dan een vastgehouden 'klem-oplossing' (#194/#218) loslaten, anders gebeurt steeds precies hetzelfde
+                // (simulatie: wissel 6 en 9 bleven afbuigend en de loc reed elke ronde weer 4 -> 129 -> 10).
+                string uitkomst = $"{Lijst(_monitor.Bezet)}|{string.Join(",", HuidigeAlarmBlokken())}";
+                if (ronde > 1 && uitkomst == vorigeUitkomst && _klemOplossing.Count > 0)
+                {
+                    _log.Info($"Zelf oplossen, ronde {ronde}: zelfde situatie als de vorige ronde; de vastgehouden standen van wissel {Lijst(_klemOplossing.Keys.OrderBy(x => x).ToList())} worden losgelaten (BUG #305).");
+                    _klemOplossing.Clear();
+                }
+                vorigeUitkomst = uitkomst;
+                try
+                {
+                    if (await ZelfOplossenRonde(doel, ronde, onderLocGeprobeerd))
+                    {
+                        _log.Vondst($"Zelf opgelost in ronde {ronde}: de loc staat op melder {doel} (BUG #305).");
+                        return true;
+                    }
+                }
+                catch (NavigatieFout nf)
+                {
+                    _log.Waarschuwing($"Zelf oplossen, ronde {ronde}: {nf.Message}");
+                    try { await StopLoc(); } catch (NavigatieFout) { }
+                }
+                await Wacht(TimeSpan.FromSeconds(3));
+            }
+            _log.Waarschuwing($"Zelf oplossen lukte niet binnen {ZelfOplossenDuur.TotalMinutes:0} minuten ({ronde} rondes): nu pas hulp van de gebruiker (BUG #305).");
+            return false;
+        }
+        finally { _zelfOplossenBezig = false; }
+    }
+
+    private static string EersteRegel(string t) => t.Split('\n')[0];
+
+    private async Task<bool> ZelfOplossenRonde(int doel, int ronde, HashSet<string> onderLocGeprobeerd)
+    {
+        // (1) kortsluiting: even wachten (Dinamo zet het alarm soms zelf uit)
+        var tot = _klok.Nu + TimeSpan.FromSeconds(8);
+        while (HuidigeAlarmBlokken().Count > 0 && _klok.Nu < tot) await Wacht(TimeSpan.FromMilliseconds(300));
+        if (HuidigeAlarmBlokken().Count > 0)
+        {
+            // (2a) de gewone zoekroutine (laat de wissels onder de loc staan)
+            if (ronde == 1 && await ProbeerAlarmWegTeKrijgen($"zelf oplossen (ronde {ronde})")) { }
+            // (2b) de wissels bij de bezette melders, één voor één (elke wissel en stand maar één keer)
+            else if (!await WisselOnderLocProberen(onderLocGeprobeerd))
+            {
+                _log.Info($"Zelf oplossen, ronde {ronde}: de kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())} blijft; volgende ronde.");
+                return false;
+            }
+        }
+        await Wacht(TimeSpan.FromSeconds(1));
+        _monitor.Bijwerken();
+        var bezet = _monitor.Bezet;
+        if (bezet.Count == 1 && bezet.Contains(doel)) return true;
+
+        // (3) op de grens van twee melders (de loc is niet langer dan een melder): doorkruipen naar één melder
+        if (bezet.Count == 2 && !Kruis.OpKruis(bezet))
+        {
+            var r = _kaart.Ritten.LastOrDefault()?.Richting ?? Richting.Vooruit;
+            int naar = bezet.Contains(doel) ? doel : bezet.OrderByDescending(m => _kaart.Ritten.LastOrDefault()?.Reeks.LastIndexOf(m) ?? -1).First();
+            int ander = bezet.First(m => m != naar);
+            _log.Info($"Zelf oplossen, ronde {ronde}: de loc staat op de grens van melder {ander} en {naar}; hij kruipt naar melder {naar}.");
+            await Nastellen(naar, r, achter: ander);
+            _monitor.Bijwerken();
+            bezet = _monitor.Bezet;
+            if (HuidigeAlarmBlokken().Count > 0) return false;
+            if (bezet.Count == 1 && bezet.Contains(doel)) return true;
+        }
+
+        // (4) geen melder bezet: kruipend zoeken (eerst de laatste rijrichting, dan andersom)
+        if (bezet.Count == 0)
+        {
+            var r = _kaart.Ritten.LastOrDefault()?.Richting ?? Richting.Vooruit;
+            if (ronde % 2 == 0) r = r.Om();
+            _log.Info($"Zelf oplossen, ronde {ronde}: geen melder bezet; de loc kruipt {r.Tekst()} tot een melder bezet raakt.");
+            await KruipTotMelder(r, TimeSpan.FromSeconds(15));
+            _monitor.Bijwerken();
+            bezet = _monitor.Bezet;
+            if (bezet.Count == 1 && bezet.Contains(doel)) return true;
+        }
+
+        // (5) op één melder: zelf naar het doel over een bekende weg
+        if (bezet.Count == 1 && HuidigeAlarmBlokken().Count == 0)
+        {
+            _ingang = null;
+            if (await ProbeerZelfNaarMelder(doel)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>BUG #305: zet één nog niet geprobeerde wissel bij een bezette melder om en kijkt of de kortsluiting weggaat (zo niet: terug). Geeft true als het alarm weg is.</summary>
+    private async Task<bool> WisselOnderLocProberen(HashSet<string> geprobeerd)
+    {
+        var bezet = _monitor.Bezet;
+        var kandidaten = WisselsBijBezet(_kaart, bezet)
+            .Where(a => _ins.WisselAdressen().Contains(a) && !IsVolger(a))
+            .OrderBy(a => a).ToList();
+        foreach (var a in kandidaten)
+        {
+            bool nu = _wisselStand.TryGetValue(a, out var st) && st;
+            string sleutel = $"{a}:{!nu}:{string.Join(",", bezet.OrderBy(x => x))}";
+            if (!geprobeerd.Add(sleutel)) continue;
+            _log.Info($"Zelf oplossen: wissel {a} bij de bezette melder ({Lijst(bezet)}) gaat naar {(!nu ? "afbuigend" : "rechtdoor")}; komt de loc van een zijtak naar de samenvoeging, dan kan dat de kortsluiting opheffen (BUG #169/#305).");
+            await ZetWissel(a, !nu);
+            await Wacht(TimeSpan.FromSeconds(2));
+            if (HuidigeAlarmBlokken().Count == 0)
+            {
+                _log.Vondst($"De kortsluiting ging weg nadat wissel {a} (bij de loc) naar {(!nu ? "afbuigend" : "rechtdoor")} ging (zelf oplossen, BUG #305). Nog geen bewijs: een rit zonder kortsluiting bevestigt het.");
+                return true;
+            }
+            await ZetWissel(a, nu);
+            await Wacht(TimeSpan.FromSeconds(1));
+            return false;   // per ronde één wissel: tussen de rondes kan het alarm vanzelf weggaan
+        }
+        return false;
+    }
+
+    /// <summary>BUG #305: kruipt (naar alle blokken, het blok is dan onbekend) in richting <paramref name="r"/> tot er een melder bezet raakt of de tijd om is.</summary>
+    private async Task KruipTotMelder(Richting r, TimeSpan max)
+    {
+        if (BlokVereist)
+        {
+            var blokken = _ins.DinamoBlokLijst();
+            foreach (var b in blokken) _hw.ZetLocSnelheid(_ins.LocAdres, _ins.Kruipsnelheid, r == Richting.Vooruit, b, _ins.LocStappen);
+            await Wacht(DinamoCyclus * blokken.Count);
+        }
+        else await StuurSnelheid(r, _ins.Kruipsnelheid);
+        var eind = _klok.Nu + max;
+        while (_klok.Nu < eind && HuidigeAlarmBlokken().Count == 0)
+        {
+            await Wacht(Poll);
+            _monitor.Bijwerken();
+            if (_monitor.Bezet.Count > 0) break;
+        }
+        await VolledigeStop();
+    }
+}
