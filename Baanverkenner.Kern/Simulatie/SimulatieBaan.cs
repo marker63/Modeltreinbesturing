@@ -271,6 +271,10 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
     private DateTime? _echoAanOp, _echoUitOp;
     /// <summary>BUG #268 (test): elke zoveel seconden meldt de simulatie de <see cref="KortsluitEchoMelders"/> 0,8 s bezet, ook zonder kortsluiting. 0 = uit.</summary>
     public double EchoElkeSeconden { get; set; }
+    /// <summary>BUG #314 (test): de eerste keer dat deze melder bezet raakt, meldt de simulatie één keer een korte kortsluiting (een ontsporing die meteen hersteld is). 0 = uit.</summary>
+    public int EenmaligeKortsluitingBijMelder { get; set; }
+    private bool _eenmaligGedaan;
+    private DateTime? _eenmaligUitOp;
     private DateTime _volgendeEcho = DateTime.MinValue;
     private void MeldKortsluitingStraks(int blok, DateTime nu)
     {
@@ -453,6 +457,14 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
         }
         else _stilSinds = null;
         if (_kortMeldTijd is DateTime km && nu >= km) { _kortMeldTijd = null; KortsluitingStatusGewijzigd?.Invoke(true); }
+        if (EenmaligeKortsluitingBijMelder > 0 && !_eenmaligGedaan && BezetteMelders().Contains(EenmaligeKortsluitingBijMelder))
+        {
+            _eenmaligGedaan = true;
+            _eenmaligUitOp = nu + TimeSpan.FromSeconds(1.5);
+            AlarmAan(_element is Sectie es ? es.Blok : 1);
+            if (MeldtKortsluiting) KortsluitingStatusGewijzigd?.Invoke(true);
+        }
+        if (_eenmaligUitOp is DateTime eu314 && nu >= eu314) { _eenmaligUitOp = null; AlarmUit(); }
         Beweeg(nu, dt);
         if (FlikkerMelder > 0 && _geflikkerd < FlikkerKeer && nu >= _flikkerVolgende && nu >= _flikkerTot)
         {

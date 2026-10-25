@@ -989,6 +989,23 @@ public static class Tests
         Eis(r.Kortsluitingen <= 10, $"rondrit: beperkt aantal kortsluitingen (nu {r.Kortsluitingen})");
     }
 
+    // BUG #314: de eerste basisrit (alle wissels rechtdoor) loopt vast op een kortsluiting (ontsporing, 25-10 17:48); de basisrit wordt herhaald en de proeven vergelijken met de echte lus
+    static void OntsporingEersteBasisritTest()
+    {
+        Console.WriteLine("Test: kortsluiting/ontsporing bij de eerste basisrit (BUG #314)");
+        var r = MiniworldRit(13, 2, insAanpassing: i => { i.Rondrit = true; },
+            simAanpassing: sim => sim.EenmaligeKortsluitingBijMelder = 14,
+            stopWanneer: l => l.Regels.Count(x => x.Tekst.Contains("geen verschil")) >= 3);
+        var regels = r.Log.Regels.Select(x => x.Tekst).ToList();
+        if (Environment.GetEnvironmentVariable("DUMP314") == "1") foreach (var x in regels.Take(80)) Console.WriteLine("   " + x);
+        bool herhaald = regels.Any(x => x.Contains("de basisrit wordt nog één keer gereden"));
+        int lusIdx = regels.FindIndex(x => x.StartsWith("Basisrit (herhaald)") && x.Contains("lus"));
+        Eis(herhaald, "ontsporing (#314): na de kortsluiting in de eerste basisrit (alle wissels rechtdoor) wordt de basisrit herhaald");
+        Eis(lusIdx >= 0 && regels.Any(x => x.Contains("de eerste was een ontsporing of toeval")), "ontsporing (#314): de herhaalde basisrit rijdt de lus en wordt de basis");
+        Eis(!regels.Any(x => x.Contains("wordt in deze opdracht niet getest: de kaart weet dat omzetten direct na melder")) && regels.Count(x => x.Contains("geen verschil")) >= 3,
+            "ontsporing (#314): daarna worden de adressen gewoon getest (geen stop bij het tijdelijke kortsluitpunt)");
+    }
+
     // BUG #232: optie 6 op de Miniworld-simulatie MET de keerlus 129-4-11-12-1-9-10-129 (zoals de logs van 18-10 laten zien)
     static void KeerlusTest()
     {
@@ -3392,6 +3409,7 @@ public static class Tests
     public static int Main()
     {
         if (Environment.GetEnvironmentVariable("ALLEEN_KEERLUS") == "1") { KeerlusTest(); Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)"); return _fouten == 0 ? 0 : 1; }
+        if (Environment.GetEnvironmentVariable("ALLEEN_314") == "1") { OntsporingEersteBasisritTest(); Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)"); return _fouten == 0 ? 0 : 1; }
         if (Environment.GetEnvironmentVariable("ALLEEN_308") == "1") { AlarmVoorTerugmeldingTest(); Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)"); return _fouten == 0 ? 0 : 1; }
         if (Environment.GetEnvironmentVariable("BENCH") == "1") { BenchTest(); return 0; }
         if (Environment.GetEnvironmentVariable("RONDRIT") == "1") { RondritBench(); return 0; }
@@ -3490,6 +3508,7 @@ public static class Tests
         SchemaWisselsTest();
         Log2005Test();
         RondritTest();
+        OntsporingEersteBasisritTest();
         AlarmWisselBijLocTest();
         KruisRuisVoorafTest();
         AankomstViaIngangTest();

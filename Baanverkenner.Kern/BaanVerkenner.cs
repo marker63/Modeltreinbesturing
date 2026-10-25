@@ -1723,6 +1723,35 @@ public partial class BaanVerkenner
             // Na een kortsluiting niet nog eens dezelfde kortsluiting opzoeken.
             if (rit.Einde == RitEinde.Kortsluiting) { stops = KortsluitStops(o.Configuratie, o.Richting); }
         }
+        // BUG #314 (Marco 25-10 17:58: "de loc ontspoorde bij de 1e verkenning direct en daarna alleen maar heen en weer rijden tussen melder 13 en 14"; autolog 17:48:03): de eerste basisrit
+        // met ALLE wissels rechtdoor gaf kortsluiting na 14 (ontsporing). Daarna stopte elke proef op 14 (bekend kortsluitpunt) en kreeg elk adres "geen verschil" (13 proeven, 6 minuten, niets
+        // geleerd). Met alle wissels rechtdoor is een kortsluiting vaak een ontsporing of toeval: eerst nog één keer dezelfde basisrit, zonder stop bij dat punt. Lukt die, dan geldt die als basis
+        // en is het kortsluitpunt tijdelijk (#93).
+        if (ritten.Count == 1 && ritten[0].Einde == RitEinde.Kortsluiting && o.Configuratie.Afbuigend.Length == 0 && !Stap && !_status.Controle)
+        {
+            _monitor.Bijwerken();
+            if (_monitor.Bezet.Count == 1 && _monitor.Bezet.Contains(o.Start) && HuidigeAlarmBlokken().Count == 0)
+            {
+                _log.Info($"Opdracht #{o.Id}: de basisrit met alle wissels rechtdoor gaf kortsluiting na melder {ritten[0].Reeks[^1]}. Met alle wissels rechtdoor is dat vaak een ontsporing of toeval: de basisrit wordt nog één keer gereden, zonder stop bij dat punt (BUG #314, nog niet getest op de baan).");
+                var rijstand314 = RijStand(o);
+                var rit314 = await Rit(o.Start, o.Richting, new RitDoel { Configuratie = rijstand314, StopBijMelders = new(), StaartWissels = true });
+                _log.Info($"Basisrit (herhaald): {Lijst(rit314.Reeks)} - einde: {EindeTekst(rit314.Einde)}.");
+                VerwerkEinde(o, rit314);
+                await TerugNaarMetControle(o, rit314, rijstand314);
+                if (rit314.Einde != RitEinde.Kortsluiting)
+                {
+                    _log.Vondst($"Opdracht #{o.Id}: de herhaalde basisrit had geen kortsluiting ({Lijst(rit314.Reeks)}); de eerste was een ontsporing of toeval. Deze rit is de basis voor de proeven (BUG #314).");
+                    ritten[0] = rit314; eerste = rit314;
+                    foreach (var kp in _kaart.Kortsluitpunten.Where(k => !k.Opgelost && !k.Tijdelijk && k.Soort == KortsluitpuntSoort.Kortsluiting && k.Richting == o.Richting
+                                                                         && k.Configuratie.Equals(o.Configuratie) && rit314.Reeks.Take(rit314.Reeks.Count - 1).Contains(k.NaMelder)))
+                    {
+                        kp.Tijdelijk = true;
+                        _log.Vondst($"Kortsluitpunt #{kp.Id} (na melder {kp.NaMelder}, {kp.Richting.Tekst()}, {kp.Configuratie}) bleek tijdelijk: de herhaalde basisrit reed er zonder kortsluiting voorbij (BUG #314).");
+                    }
+                }
+                else ritten.Add(rit314);
+            }
+        }
         if (ritten.Count >= 2 && !ritten[0].Reeks.SequenceEqual(ritten[1].Reeks) && ritten[0].Einde != RitEinde.Kortsluiting)
         {
             var winnaar = ritten.Count == 3 && ritten[2].Reeks.SequenceEqual(ritten[1].Reeks) ? ritten[1] : ritten[0];
@@ -1968,7 +1997,7 @@ public partial class BaanVerkenner
     }
 
     private HashSet<int> KortsluitStops(Configuratie c, Richting r) =>
-        _kaart.Kortsluitpunten.Where(k => !k.Opgelost && k.Richting == r && k.Configuratie.Equals(c)).Select(k => k.NaMelder).ToHashSet();
+        _kaart.Kortsluitpunten.Where(k => !k.Opgelost && !k.Tijdelijk && k.Richting == r && k.Configuratie.Equals(c)).Select(k => k.NaMelder).ToHashSet();   // BUG #314: een tijdelijk punt is geen stop
 
     private static List<string> Overgangen(List<int> reeks, Richting r)
     {

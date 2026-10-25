@@ -2965,3 +2965,9 @@ Na de kortsluiting bij 10 -> 129 reed het zelf oplossen drie keer 129 -> 14 (ach
 gebeurde er van 12:45 tot 12:49 niets meer; om 12:49 kwam de vraag aan Marco. Nu: (1) een eerste stap die bij het zelf oplossen mislukte, wordt niet nog eens genomen: de volgende ronde
 zoekt een andere weg; (2) na een rijpoging mogen de wissels bij de loc opnieuw geprobeerd worden; (3) zijn ze allemaal geprobeerd, dan volgt opnieuw de volledige zoekroutine.
 Keerlus-simulatie: 0 keer hulp nodig (was 1).
+
+## BUG #314 – OPGELOST (nog niet getest op de baan): na een ontsporing in de eerste basisrit alleen nog heen en weer tussen 13 en 14 (Marco 25-10 17:58; autolog 17:48:03-17:54:21)
+De eerste basisrit (alle wissels rechtdoor) ontspoorde na melder 14 (kortsluiting blok 3). Dat werd kortsluitpunt #1, en elke proef daarna stopte op 14 ("bekend kortsluitpunt") en kreeg
+"geen verschil": 13 proeven van 13 naar 14 en terug, niets geleerd. Nu: geeft de basisrit met alle wissels rechtdoor een kortsluiting, dan wordt hij (als de loc weer op de startmelder staat)
+nog één keer gereden, zonder stop bij dat punt. Lukt dat, dan is die rit de basis voor de proeven en is het kortsluitpunt tijdelijk; een tijdelijk kortsluitpunt is geen stop meer voor
+proefritten. Simulatie: eenmalige kortsluiting bij de eerste keer op melder 14 (nieuwe testoptie in de simulatie).
