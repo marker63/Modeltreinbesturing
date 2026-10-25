@@ -1200,6 +1200,28 @@ public static class Tests
         Eis(ok && tekst.Contains("BUG #308") && !kaart.Kortsluitpunten.Any(k => k.Opgelost) && !tekst.Contains("De kortsluiting ging weg nadat wissel"), "alarm (#308): weg vóór de eigen terugmelding wordt niet aan de wissel toegeschreven");
     }
 
+    // BUG #310: een alarm-oplossing hoort alleen bij een kortsluitpunt met dezelfde rijrichting (autolog 25-10 11:30:50: achteruit na 129 werd vastgelegd bij #1, na 24 vooruit)
+    static void AlarmOplossingRichtingTest()
+    {
+        Console.WriteLine("Test: alarm-oplossing alleen bij een kortsluitpunt in dezelfde richting (BUG #310)");
+        foreach (var r in new[] { Richting.Achteruit, Richting.Vooruit })
+        {
+            var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
+            var s1 = sim.NieuweSectie(1, 80, 1); sim.PlaatsLoc(s1, 40, +1);
+            var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 6, DinamoBlokken = "1-2" };
+            sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+            var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+            var status = new VerkenStatus { Instellingen = ins };
+            var v = new BaanVerkenner(sim, ins, klok, new VerkenLog(klok), (_, _) => Task.FromResult(true), status);
+            var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var kp = new Kortsluitpunt { Id = 1, NaMelder = 24, Richting = Richting.Vooruit, Soort = KortsluitpuntSoort.Kortsluiting, Configuratie = Configuratie.Basis.Met(5), TweedeMelders = new List<int> { 129 } };
+            status.Kaart.Kortsluitpunten.Add(kp);
+            typeof(BaanVerkenner).GetField("_laatsteKortsluitContext", bf)!.SetValue(v, ((int, Richting, Configuratie)?)(129, r, Configuratie.Basis));
+            typeof(BaanVerkenner).GetMethod("RegistreerAlarmOplossing", bf)!.Invoke(v, new object?[] { 4, true, new[] { 129, 4 }, null });
+            Eis(kp.Opgelost == (r == Richting.Vooruit), $"alarm-oplossing (#310): kortsluiting {r.Tekst()} na 129, kortsluitpunt #1 (vooruit) opgelost = {kp.Opgelost}");
+        }
+    }
+
     static void AlarmWisselBijLocTest()
     {
         Console.WriteLine("Test: alarm - wissel bij de loc met toestemming proberen (BUG #147)");
@@ -3437,6 +3459,7 @@ public static class Tests
         WisselTerugmeldingTest();
         EigenTerugmeldingTest();
         AlarmVoorTerugmeldingTest();
+        AlarmOplossingRichtingTest();
         NastellenAnderBlokTest();
         StatischeKortsluitingTest();
         StopTijdensTerugritTest();

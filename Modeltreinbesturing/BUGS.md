@@ -2941,3 +2941,9 @@ er bij een wisselcommando een kortsluiting en verdwijnt die voordat de eigen ter
 
 ## BUG #309 – OPGELOST: logtekst "Dinamo hersteld volgens de gebruiker" terwijl Dinamo vanzelf herstelde (autolog 25-10 10:17:38 en 10:53:06)
 Na "Dinamo meldt wissel-commando's weer terug ... Dinamo is vanzelf hersteld" volgde "Dinamo hersteld volgens de gebruiker", terwijl de gebruiker niets had gedaan. Nu staat er "(vanzelf)".
+
+## BUG #310 – OPGELOST (nog niet getest op de baan): alarm-oplossing bij het verkeerde kortsluitpunt (autolog 25-10 11:29:59-11:30:50)
+De kortsluiting kwam achteruit na 129 (loc op 129 en 4, keerlus, blok 2 en 9). Toen het alarm wegging na "wissel 4 afbuigend" werd dat als (voorlopige) oplossing vastgelegd bij
+kortsluitpunt #1 (na 24, VOORUIT, afbuigend 5), omdat 129 daar als tweede melder bij stond. Nu hoort een alarm-oplossing alleen bij een kortsluitpunt met dezelfde rijrichting als de
+kortsluiting. (Het wegvallen van het alarm zelf was hier ook vals: 0,2 s na het commando en 0,4 s vóór de terugmelding van wissel 4 – dat vangt #308 af; deze run draaide nog
+zonder #308. De voorlopige "oplossing wissel 4" staat nog in de voortgang van 11:32; ritten over 14 -> 129 -> 24 weerleggen die (#204), wissel 4 doet op de baan niets.)

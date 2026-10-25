@@ -1802,7 +1802,11 @@ public partial class BaanVerkenner
     private void RegistreerAlarmOplossing(int adres, bool afbuigend, IEnumerable<int> bezet, IReadOnlyCollection<int>? alarmBlokken = null)
     {
         var b = bezet.ToHashSet();
+        // BUG #310 (autolog 25-10 11:29:59-11:30:50): de kortsluiting kwam achteruit na 129 (loc op 129/4, keerlus), maar de 'oplossing' werd bij kortsluitpunt #1 (na 24, VOORUIT,
+        // met 129 als tweede melder) vastgelegd. Is de rijrichting van deze kortsluiting bekend, dan alleen een kortsluitpunt met dezelfde richting.
+        Richting? rk310 = _laatsteKortsluitContext?.Richting;
         var kp = _kaart.Kortsluitpunten.Where(k => k.Soort == KortsluitpuntSoort.Kortsluiting && !k.Opgelost && !k.Opgegeven
+                                                   && (rk310 is null || k.Richting == rk310)
                                                    && (b.Contains(k.NaMelder) || k.TweedeMelders.Any(b.Contains))
                                                    && (alarmBlokken is not { Count: > 0 } || k.AlarmBlokken.Count == 0 || k.AlarmBlokken.Any(alarmBlokken.Contains)))
                                        .OrderByDescending(k => k.Id).FirstOrDefault();
