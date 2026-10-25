@@ -1031,6 +1031,28 @@ public static class Tests
         Eis(eersteProef is not null && !eersteProef.Contains("alle wissels rechtdoor"), "hervatten (#318): daarna meteen de volgende proef (nu: " + eersteProef + ", volgend adres " + volgend + ")");
     }
 
+    // BUG #319 (autolog 25-10 19:16-19:18): wissel 14 haalde het alarm weg vóórdat kortsluitpunt #2 bestond; de oplossing ging verloren
+    static void WachtendeAlarmOplossingTest()
+    {
+        var sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(true, 13, null);
+        var ins = new VerkenInstellingen { LocAdres = 5408, WisselAdresVan = 1, WisselAdresTot = 14, DinamoBlokken = "1-12", KruisMotoren = "10+13", Rondrit = true };
+        var klok = new VirtueleKlok();
+        var v = new BaanVerkenner(sim, ins, klok, new VerkenLog(klok), (_, _) => Task.FromResult(true), new VerkenStatus { Instellingen = ins });
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var ctx = typeof(BaanVerkenner).GetField("_laatsteKortsluitContext", bf)!;
+        ctx.SetValue(v, ((int, Richting, Configuratie)?)(8, Richting.Vooruit, new Configuratie(new[] { 13 })));
+        typeof(BaanVerkenner).GetField("_laatsteKortsluitingOm", bf)!.SetValue(v, new DateTime(2026, 10, 25, 19, 16, 32));
+        typeof(BaanVerkenner).GetMethod("RegistreerAlarmOplossing", bf)!.Invoke(v, new object?[] { 14, true, new[] { 8 }, new List<int> { 4 } });
+        var o = new Opdracht { Id = 1, Start = 13, Richting = Richting.Vooruit, Configuratie = Configuratie.Basis };
+        typeof(BaanVerkenner).GetMethod("RegistreerKortsluitpunt", bf)!.Invoke(v, new object?[] { o, new List<int> { 13, 14, 24, 8 }, new Configuratie(new[] { 13 }), new List<Etappe>(), Richting.Vooruit, KortsluitpuntSoort.Kortsluiting });
+        var kp = v.Kaart.Kortsluitpunten.LastOrDefault();
+        Eis(kp is { Opgelost: false, AlarmHintAdres: 14 }, "alarmoplossing (#319): wissel 14 die het alarm wegnam vóór het kortsluitpunt bestond, wordt bij het nieuwe punt na melder 8 bewaard als eerste kandidaat");
+        ctx.SetValue(v, ((int, Richting, Configuratie)?)(129, Richting.Vooruit, new Configuratie(new[] { 10 })));
+        typeof(BaanVerkenner).GetMethod("RegistreerAlarmOplossing", bf)!.Invoke(v, new object?[] { 9, true, new[] { 129 }, new List<int> { 9 } });
+        typeof(BaanVerkenner).GetMethod("RegistreerKortsluitpunt", bf)!.Invoke(v, new object?[] { o, new List<int> { 13, 14, 24, 21 }, new Configuratie(new[] { 10 }), new List<Etappe>(), Richting.Vooruit, KortsluitpuntSoort.Kortsluiting });
+        Eis(v.Kaart.Kortsluitpunten.Last() is { AlarmHintAdres: null }, "alarmoplossing (#319): een oplossing bij andere melders wordt niet aan een ander kortsluitpunt gehangen");
+    }
+
     // BUG #232: optie 6 op de Miniworld-simulatie MET de keerlus 129-4-11-12-1-9-10-129 (zoals de logs van 18-10 laten zien)
     static void KeerlusTest()
     {
@@ -3570,6 +3592,7 @@ public static class Tests
         Log2005Test();
         RondritTest();
         HervatZonderBasisritTest();
+        WachtendeAlarmOplossingTest();
         OntsporingEersteBasisritTest();
         AlarmWisselBijLocTest();
         KruisRuisVoorafTest();

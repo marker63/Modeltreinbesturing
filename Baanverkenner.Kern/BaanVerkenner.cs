@@ -1959,6 +1959,7 @@ public partial class BaanVerkenner
             bestaand.AantalKortsluitingen++;
             foreach (var b in alarmBlokken) if (!bestaand.AlarmBlokken.Contains(b)) bestaand.AlarmBlokken.Add(b);
             PasWachtendeHandOplossingToe(bestaand);
+            PasWachtendeAlarmOplossingToe(bestaand);   // BUG #319
             return;
         }
         var k = new Kortsluitpunt
@@ -1975,6 +1976,7 @@ public partial class BaanVerkenner
         };
         _kaart.Kortsluitpunten.Add(k);
         PasWachtendeHandOplossingToe(k);
+        PasWachtendeAlarmOplossingToe(k);   // BUG #319
         _log.Vondst(soort == KortsluitpuntSoort.OnverwachteTerugweg
             ? $"Onverwachte terugweg #{k.Id}: direct na melder {x} ({r.Tekst()}, {c}) kwam de loc terug via een andere melder dan verwacht. Geen kortsluiting - mogelijk een wissel die van achteren in de verkeerde stand bereden wordt, mogelijk een melder die de eerste keer niet geregistreerd is; wordt zo mogelijk later opgelost."
             : $"Kortsluitpunt #{k.Id}: direct na melder {x} ({r.Tekst()}, {c})." + (alarmBlokken.Count > 0 ? $" Dinamo meldde kortsluiting in blok {string.Join(" en ", alarmBlokken)}." : "") + (tweede.Count > 0 ? $" Ook bezet: melder {string.Join(" en ", tweede)}." : "") + " Waarschijnlijk een wissel die van achteren in de verkeerde stand bereden wordt; wordt later opgelost.");
@@ -2307,6 +2309,12 @@ public partial class BaanVerkenner
             {
                 _log.Info($"Kortsluitpunt #{k.Id}: omdat ook melder {string.Join(" en ", k.TweedeMelders)} bezet was, gaan eerst deze wissels aan de beurt: {string.Join(", ", hintKandidaten.Select(h => $"{h.Adres} {(h.Afbuigend ? "afbuigend" : "rechtdoor")}"))}.");
                 kandidaten = hintKandidaten.Concat(kandidaten.Where(kd => !hintKandidaten.Any(h => h.Adres == kd.Adres))).ToList();
+            }
+            // BUG #319: de wissel die het alarm van deze kortsluiting al eens wegnam gaat als allereerste
+            if (k.AlarmHintAdres is int ah && !k.GeprobeerdeAdressen.Contains(ah) && _ins.WisselAdressen().Contains(ah) && !IsVolger(ah))
+            {
+                kandidaten = new[] { (ah, true) }.Concat(kandidaten.Where(kd => kd.Adres != ah)).ToList();
+                _log.Info($"Kortsluitpunt #{k.Id}: eerst wissel {ah} afbuigend, die haalde het alarm van deze kortsluiting al eens weg (BUG #319).");
             }
 
             // BUG #63: kan geen bekende wissel de kortsluiting verklaren (of lukte dat niet), dan

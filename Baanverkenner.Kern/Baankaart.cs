@@ -164,6 +164,8 @@ public enum KortsluitpuntSoort { Kortsluiting, OnverwachteTerugweg }
 public class Kortsluitpunt
 {
     public int Id { get; set; }
+    /// <summary>BUG #319: wissel die bij deze kortsluiting het alarm wegnam voordat het punt bestond; wordt bij het oplossen als eerste geprobeerd.</summary>
+    public int? AlarmHintAdres { get; set; }
     public int NaMelder { get; set; }
     public Richting Richting { get; set; }
     public KortsluitpuntSoort Soort { get; set; } = KortsluitpuntSoort.Kortsluiting;

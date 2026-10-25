@@ -2996,3 +2996,9 @@ Bij hervatten (en bij een herpoging na een navigatiefout, zoals 18:52) begon de 
 dat al bekend was. Het volgende adres werd wel onthouden, de basisrit niet. Nu bewaart de opdracht de uitkomst van zijn basisrit (melders, einde, mede-bezette melders en de
 rijstand) in de voortgang. Bij hervatten of een herpoging met dezelfde rijstand wordt die hergebruikt en gaat de verkenning meteen verder met de volgende proef. Is de rijstand
 veranderd (bijv. een kortsluitpunt opgelost), dan wordt de basisrit wel opnieuw gereden. Test: hervatten (#318).
+
+## BUG #319 – OPGELOST (nog niet getest op de baan): de wissel die het alarm wegnam ging verloren als het kortsluitpunt nog niet bestond (autolog 25-10 19:16-19:18)
+Proef adres 13 (kruismotor) reed 13, 14, 24, 8 en kreeg kortsluiting na melder 8. Wissel 14 afbuigend haalde het alarm weg, maar kortsluitpunt #2 werd pas na de terugweg aangemaakt;
+toen was die waarneming al vergeten (#2 bleef open zonder hint). Nu wordt zo'n wissel bewaard tot het punt van precies die kortsluiting bestaat (zelfde melder, zelfde richting, geen
+nieuwere kortsluiting tussendoor) en daar als eerste kandidaat vastgelegd (AlarmHintAdres): bij het oplossen van het punt wordt hij als allereerste geprobeerd. Een eerste versie die
+hem meteen als (voorlopige) oplossing vastlegde gaf in de simulaties meer kortsluitingen en hulpvragen en is niet gebruikt. Test: alarmoplossing (#319).

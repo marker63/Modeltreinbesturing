@@ -1814,6 +1814,9 @@ public partial class BaanVerkenner
                                        .OrderByDescending(k => k.Id).FirstOrDefault();
         if (kp is null)
         {
+            // BUG #319 (autolog 25-10 19:16-19:18): de kortsluiting kwam in een proefrit (adres 13 afbuigend, na melder 8) en wissel 14 haalde het alarm weg, maar het kortsluitpunt wordt pas
+            // na de terugweg aangemaakt. De oplossing ging verloren (#2 bleef open). Nu wordt hij bewaard tot het kortsluitpunt van deze kortsluiting bestaat.
+            _wachtendeAlarmOplossing = (adres, afbuigend, b, alarmBlokken?.ToList() ?? new List<int>(), rk310, _laatsteKortsluitingOm, _laatsteKortsluitContext?.Melder);
             return;
         }
         if (!_kaart.RegistreerHandmatigeOplossing(kp, adres, afbuigend, Kruis)) return;
@@ -1821,6 +1824,25 @@ public partial class BaanVerkenner
         _log.Vondst($"Kortsluitpunt #{kp.Id} (na melder {kp.NaMelder}, {kp.Richting.Tekst()}, {kp.Configuratie}) is voorlopig opgelost door wissel {adres} op afbuigend: " +
                     "het alarm verdween nadat de verkenner die wissel omzette. Dit wordt voortaan in deze verkenning toegepast tot ritten het bevestigen of weerleggen (nog niet getest op de baan).");
         BewaarNu();
+    }
+
+    private (int Adres, bool Afbuigend, HashSet<int> Melders, List<int> Blokken, Richting? Richting, DateTime Kortsluiting, int? KortsluitMelder)? _wachtendeAlarmOplossing;
+
+    /// <summary>BUG #319: een wissel die het alarm wegnam voordat het kortsluitpunt bestond, alsnog als (voorlopige) oplossing vastleggen bij het nieuwe punt.</summary>
+    private void PasWachtendeAlarmOplossingToe(Kortsluitpunt kp)
+    {
+        if (_wachtendeAlarmOplossing is not { } w) return;
+        if (kp.Soort != KortsluitpuntSoort.Kortsluiting || kp.Opgelost || kp.Opgegeven || !w.Afbuigend) return;
+        if (w.Richting is { } wr && wr != kp.Richting) return;
+        if (!AlarmOplossingPastBij(kp, w.Melders, w.Blokken)) return;
+        _wachtendeAlarmOplossing = null;
+        // alleen bij het punt van precies die kortsluiting (dezelfde melder, geen nieuwere kortsluiting tussendoor)
+        if (w.Kortsluiting != _laatsteKortsluitingOm || w.KortsluitMelder != kp.NaMelder) return;
+        if (kp.Configuratie.Bevat(w.Adres) || Kruis.IsMotor(w.Adres) || IsVolger(w.Adres)) return;
+        // Niet meteen als oplossing vastleggen (dat gaf in de simulaties meer kortsluitingen: een wissel die alleen het alarm wegnam is geen bewezen oplossing), maar als eerste kandidaat
+        // als het kortsluitpunt opgelost wordt. Zo wordt hij als eerste getest in plaats van vergeten.
+        kp.AlarmHintAdres = w.Adres;
+        _log.Info($"Kortsluitpunt #{kp.Id} (na melder {kp.NaMelder}, {kp.Richting.Tekst()}, {kp.Configuratie}): wissel {w.Adres} afbuigend haalde het alarm van deze kortsluiting weg. Bij het oplossen van dit punt wordt die wissel als eerste geprobeerd (BUG #319, nog niet getest op de baan).");
     }
 
     /// <summary>BUG #93 (log 15:20): na kortsluitpunt #2 (wissel 5 afbuigend na melder 14) lukte dezelfde rit meteen daarna, zonder dat er iets
