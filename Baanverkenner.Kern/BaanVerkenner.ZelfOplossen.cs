@@ -129,7 +129,8 @@ public partial class BaanVerkenner
             if (!geprobeerd.Add(sleutel)) continue;
             _log.Info($"Zelf oplossen: wissel {a} bij de bezette melder ({Lijst(bezet)}) gaat naar {(!nu ? "afbuigend" : "rechtdoor")}; komt de loc van een zijtak naar de samenvoeging, dan kan dat de kortsluiting opheffen (BUG #169/#305).");
             await ZetWissel(a, !nu);
-            await Wacht(TimeSpan.FromSeconds(2));
+            // Dinamo meldt het opheffen soms pas na enkele seconden (autolog 25-10 10:31:37-10:31:38 en 10:24:46-10:24:47): 4 s wachten
+            await Wacht(TimeSpan.FromSeconds(4));
             if (HuidigeAlarmBlokken().Count == 0)
             {
                 _log.Vondst($"De kortsluiting ging weg nadat wissel {a} (bij de loc) naar {(!nu ? "afbuigend" : "rechtdoor")} ging (zelf oplossen, BUG #305). Nog geen bewijs: een rit zonder kortsluiting bevestigt het.");
