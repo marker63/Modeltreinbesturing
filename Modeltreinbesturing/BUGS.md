@@ -2978,3 +2978,8 @@ melder 129 nog geen wissel, dus er was niets 'bij de loc' te proberen. Ook had D
 geen bekende wissels bij de loc, dan worden eerst de wissels geprobeerd die nu afbuigend staan, daarna alle andere, elke ronde één; (2) meldt Dinamo het commando niet terug, dan gaat het
 een halve minuut lang elke 3 s opnieuw; (3) zijn alle wissels los geprobeerd, dan combinaties: de afbuigende wissels van de rit weer afbuigend (zoals 5) samen met één andere wissel
 (om 12:19 loste juist 5 + 10 dit op); (4) daarna opnieuw de volledige zoekroutine.
+
+## BUG #316 – OPGELOST (nog niet getest op de baan): partnerzoektocht negeerde de oplossing die Marco net gaf (autolog 25-10 18:17:19-18:19:12)
+Marco loste de kortsluiting na 129 (wissel 5 afbuigend) op met wissel 10 afbuigend; dat werd bij het kortsluitpunt vastgelegd. De partnerzoektocht voor wissel 5 begon daarna toch met
+wissel 2 en zette wissel 10 terug naar rechtdoor; de terugweg 24 -> 129 kwam op 14 uit. Nu is een bekende oplossing voor die plek (van de gebruiker of uit een eerdere proef) de eerste
+partner die geprobeerd wordt. (Geen eigen simulatietest: de regressietests en simulaties blijven ALLES OK.)

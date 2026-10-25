@@ -1548,6 +1548,18 @@ public partial class BaanVerkenner
         if (kandidaten.Any(bijX.Contains))
             _log.Info($"Niet als partner geprobeerd: wissel {string.Join(", ", kandidaten.Where(bijX.Contains).OrderBy(k => k))} (ligt bij melder {x} waar de loc staat; omzetten met de loc erop laat hem ontsporen).");
         kandidaten = kandidaten.Where(k => !bijX.Contains(k)).ToList();
+        // BUG #316 (autolog 25-10 18:17:19-18:18:21): Marco loste de kortsluiting na 129 op met wissel 10 afbuigend (vastgelegd bij het kortsluitpunt), maar de partnerzoektocht begon
+        // daarna met wissel 2 en zette 10 terug naar rechtdoor. Is voor deze plek al een oplossing bekend (van de gebruiker of uit een eerdere proef), dan is die wissel de eerste partner,
+        // ook als hij bij de loc ligt (hij staat dan al zo).
+        var bekend316 = _kaart.Kortsluitpunten.Where(k => k.Opgelost && k.OpgelostMetAfbuigend == true && k.OpgelostDoorAdres is int ob && ob != a && k.NaMelder == x && k.Richting == o.Richting)
+            .OrderByDescending(k => k.Id).Select(k => k.OpgelostDoorAdres!.Value).FirstOrDefault();
+        if (bekend316 != 0 && _ins.WisselAdressen().Contains(bekend316))
+        {
+            kandidaten.Remove(bekend316);
+            kandidaten.Insert(0, bekend316);
+            bijX.Remove(bekend316);
+            _log.Info($"Partnerzoektocht voor adres {a}: eerst wissel {bekend316}, de bekende oplossing van de kortsluiting na melder {x} (BUG #316).");
+        }
         foreach (var b in kandidaten)
         {
             await PauzeMoment();
