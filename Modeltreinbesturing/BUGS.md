@@ -2895,3 +2895,18 @@ de langste gemeten sectietijd, tussen 8 en 14 s (zonder metingen 10 s).
 ## BUG #301 – OPGELOST (nog niet getest op de baan): 3,5 minuut wissels proberen terwijl Dinamo ze niet uitvoerde (autolog 25-10 09:06:31-09:09:58)
 Bij de blijvende kortsluiting in blok 8 en 9 (na 129 vooruit, wissel 10 nog rechtdoor) kwam op geen enkel wisselcommando een terugmelding: ze werden niet uitgevoerd. Marco loste het daarna
 met de hand op (wissel 10 afbuigend). Blijven tijdens zo'n kortsluiting drie commando's achter elkaar zonder terugmelding, dan stopt het proberen en vraagt de verkenner meteen om hulp.
+
+## BUG #302 – OPGELOST (nog niet getest op de baan): loc op de grens van 4 en 129, verkenner vroeg om hulp (autolog 25-10 09:30:44-09:31:48)
+Na de keerlus (24 -> 129 -> 10 -> 9 -> 1 -> 12 -> 11 -> 4 -> 129, achteruit) splitste de terugweg in twee stukken; het eerste stuk was de lus zelf (129 ... 129) en telde als 'al klaar' omdat
+de loc al op 129 stond. Het tweede stuk (129 -> 24 vooruit) reed daardoor terug de lus in: 'onverwacht melder 4' en de loc bleef op de grens van 4 en 129 staan ("rijdt niet zelf terug").
+Nu: staat de loc na een onverwachte melder op twee melders (de loc is niet langer dan een melder), dan kruipt hij in dezelfde richting door tot alleen de onverwachte melder bezet is en
+rijdt de verkenner zelf terug. Geprobeerd en weer teruggedraaid: de lus echt rijden (met de wissel bij de lusmelder tijdens de rit omzetten); in de keerlus-simulatie gaf dat meer
+kortsluitingen en een handmatige plaatsing (wisselstand bij aankomst op de lusmelder). Open punt: de terugweg na een keerlus beter plannen.
+
+## BUG #303 – OPGELOST (nog niet getest op de baan): uitgestelde wissels werden in een navigatie nooit omgezet (autolog 25-10 09:31 en simulatie)
+"Wissel X wordt nu NIET omgezet ... Hij wordt omgezet zodra de loc daar weg is" (#271) gebeurde in een navigatierit niet: die tak van de rit eindigde vóór de aanroep. Nu ook in een
+navigatie. Gevonden bij #302: ook de vooruitregels van #280/#267 worden in een navigatie niet uitgevoerd. Die zijn bewust NIET aangezet: in de keerlus-simulatie gaf dat een rondje extra
+(een verboden-ingangsregel botste met de stand voor de komende stap). Open punt.
+
+## BUG #304 – OPGELOST: verkenning gestopt met 'Index was out of range' bij het losmaken na een kortsluiting (simulatie)
+De melding van #261 gebruikte de laatste twee melders van de kortsluitreeks, ook als die maar één melder had (de stap kwam uit de laatste rit). Nu zonder die tekst in dat geval.

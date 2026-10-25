@@ -2221,6 +2221,9 @@ public partial class BaanVerkenner
                         await StopLoc();
                         throw new NavigatieFout($"De loc bereikte melder {doel.DoelMelder} niet na {res.Reeks.Count} melders (hij rijdt rondjes); de rit is gestopt op melder {m}.");
                     }
+                    // BUG #303 (autolog 25-10 09:31): bij een navigatierit eindigt deze tak met 'continue', dus de uitgestelde wissels (#271) verderop werden in een navigatie
+                    // nooit omgezet ("Hij wordt omgezet zodra de loc daar weg is" gebeurde niet). Nu ook hier.
+                    await ZetUitgesteldeWissels();   // BUG #271/#303
                     // BUG #200 (Marco 17-10: loc schiet bij het neerzetten op melder 24 door naar 21): op een melder waar de loc eerder doorschoot gaat hij al op de melder ervoor naar kruipsnelheid.
                     if (!doelInzicht && !kruipVoorDoel && doel.VerwachtPad is { Count: >= 2 } vp200 && vp200[^1] == doel.DoelMelder && m == vp200[^2] && _doorschietMelders.Contains(doel.DoelMelder!.Value))
                     {
@@ -3239,7 +3242,9 @@ public partial class BaanVerkenner
         var bekend261 = BekendeVerbodenVoorLaatsteStap().Where(kandidaten.Contains).ToList();
         if (bekend261.Count > 0 && bekend261.Count < kandidaten.Count)
         {
-            _log.Info($"Alleen wissel {Lijst(bekend261)} gaat terug: de kaart weet dat de laatste stap ({_laatsteKortsluitReeks[^2]} -> {_laatsteKortsluitReeks[^1]}) met die wissel afbuigend kortsluiting geeft (BUG #261).");
+            // BUG #304 (simulatie): de stap kan ook uit de laatste rit komen terwijl de kortsluitreeks maar één melder heeft; [^2] gaf dan 'Index was out of range' en de verkenning stopte.
+            string stap304 = _laatsteKortsluitReeks.Count >= 2 ? $" ({_laatsteKortsluitReeks[^2]} -> {_laatsteKortsluitReeks[^1]})" : "";
+            _log.Info($"Alleen wissel {Lijst(bekend261)} gaat terug: de kaart weet dat de laatste stap{stap304} met die wissel afbuigend kortsluiting geeft (BUG #261).");
             kandidaten = bekend261;
         }
         // BUG #272 (autolog 21-10 12:31:55, Marco 12:41: "het probleem lag bij wissel 5"): met de loc op 24 en 129 ging wissel 5 'los' naar rechtdoor; volger 6 ligt bij 129 en schakelde mee
@@ -3473,6 +3478,17 @@ public partial class BaanVerkenner
         await Wacht(TimeSpan.FromSeconds(1));
         _monitor.Bijwerken();
         var bezet = _monitor.Bezet;
+        // BUG #302 (autolog 25-10 09:31:43): na 'onverwacht melder 4' stond de loc op de grens van 4 en 129 en vroeg de verkenner om hulp. De loc is niet langer dan een melder
+        // (Marco 21-10): twee bezette melders = op de grens. Hij kruipt nu in dezelfde richting door tot alleen de onverwachte melder bezet is en rijdt dan zelf terug.
+        if (bezet.Count == 2 && nf.Onverwacht is int ov302 && bezet.Contains(ov302) && nf.RitRichting is Richting rr302 && !Kruis.OpKruis(bezet))
+        {
+            int ander302 = bezet.First(m => m != ov302);
+            _log.Info($"De loc staat op de grens van melder {ander302} en {ov302}: hij kruipt {rr302.Tekst()} door tot alleen melder {ov302} bezet is (BUG #302, nog niet getest op de baan).");
+            await Nastellen(ov302, rr302, achter: ander302);
+            _monitor.Bijwerken();
+            bezet = _monitor.Bezet;
+            if (HuidigeAlarmBlokken().Count > 0) { _log.Info("Bij het doorkruipen kwam er een kortsluiting; de verkenner rijdt niet zelf terug."); return false; }
+        }
         if (bezet.Count != 1) { _log.Info($"De loc staat niet op precies één melder (bezet: {Lijst(bezet)}); de verkenner rijdt niet zelf terug."); return false; }
         int x = bezet.Single();
         var idx = ZelfTerugIndex(route, x, _kaart.StartMelder);
