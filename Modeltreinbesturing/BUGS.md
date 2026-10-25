@@ -2971,3 +2971,10 @@ De eerste basisrit (alle wissels rechtdoor) ontspoorde na melder 14 (kortsluitin
 "geen verschil": 13 proeven van 13 naar 14 en terug, niets geleerd. Nu: geeft de basisrit met alle wissels rechtdoor een kortsluiting, dan wordt hij (als de loc weer op de startmelder staat)
 nog één keer gereden, zonder stop bij dat punt. Lukt dat, dan is die rit de basis voor de proeven en is het kortsluitpunt tijdelijk; een tijdelijk kortsluitpunt is geen stop meer voor
 proefritten. Simulatie: eenmalige kortsluiting bij de eerste keer op melder 14 (nieuwe testoptie in de simulatie).
+
+## BUG #315 – OPGELOST (nog niet getest op de baan): "zelf oplossen ronde x" zonder dat er een wissel schakelde (Marco 25-10 18:12; autolog 18:08:01-18:14:52)
+Na de kortsluiting na 129 (blok 8 en 9, wissel 5 afbuigend) probeerde ronde 1 alle wissels één keer los. Daarna gebeurde er 36 rondes niets: in een verse verkenning kent de kaart bij
+melder 129 nog geen wissel, dus er was niets 'bij de loc' te proberen. Ook had Dinamo tijdens de kortsluiting de eerste commando's (wissel 5, 6, 3, 4) niet uitgevoerd. Nu: (1) zijn er
+geen bekende wissels bij de loc, dan worden eerst de wissels geprobeerd die nu afbuigend staan, daarna alle andere, elke ronde één; (2) meldt Dinamo het commando niet terug, dan gaat het
+een halve minuut lang elke 3 s opnieuw; (3) zijn alle wissels los geprobeerd, dan combinaties: de afbuigende wissels van de rit weer afbuigend (zoals 5) samen met één andere wissel
+(om 12:19 loste juist 5 + 10 dit op); (4) daarna opnieuw de volledige zoekroutine.

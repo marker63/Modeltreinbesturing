@@ -1239,6 +1239,32 @@ public static class Tests
         }
     }
 
+    // BUG #315: kent de kaart bij de bezette melder nog geen wissel, dan probeert het zelf oplossen toch wissels (eerst de afbuigende); 18:08-18:14 gebeurde er 36 rondes niets
+    static void ZelfOplossenZonderKennisTest()
+    {
+        Console.WriteLine("Test: zelf oplossen zonder bekende wissels bij de loc (BUG #315)");
+        var sim = new Baanverkenner.Kern.Simulatie.SimulatieBaan { DinamoGedrag = true, LocAdres = 5408 };
+        var s1 = sim.NieuweSectie(1, 80, 1); sim.PlaatsLoc(s1, 40, +1);
+        var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 6, DinamoBlokken = "1-2" };
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var log = new VerkenLog(klok);
+        var status = new VerkenStatus { Instellingen = ins };
+        var v = new BaanVerkenner(sim, ins, klok, log, (_, _) => Task.FromResult(true), status);
+        var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        var mon = (MelderMonitor)typeof(BaanVerkenner).GetField("_monitor", bf)!.GetValue(v)!;
+        mon.Ontvang(1, true); klok.Wacht(TimeSpan.FromSeconds(1)).GetAwaiter().GetResult(); mon.Bijwerken();
+        var stand = (Dictionary<int, bool>)typeof(BaanVerkenner).GetField("_wisselStand", bf)!.GetValue(v)!;
+        for (int a = 1; a <= 6; a++) stand[a] = a == 4;   // wissel 4 staat afbuigend (de stand van de rit)
+        var alarm = typeof(BaanVerkenner).GetMethod("HardwareMeldtBlokAlarm", bf)!;
+        alarm.Invoke(v, new object[] { 1, true });
+        klok.Getikt += _ => { if (stand.TryGetValue(4, out var af) && !af) alarm.Invoke(v, new object[] { 1, false }); };   // wissel 4 rechtdoor lost het op
+        var probeer = typeof(BaanVerkenner).GetMethod("WisselOnderLocProberen", bf)!;
+        var geprobeerd = new HashSet<string>();
+        bool ok = ((Task<bool>)probeer.Invoke(v, new object[] { geprobeerd })!).GetAwaiter().GetResult();
+        Eis(ok && log.AlsTekst().Contains("BUG #315"), "zelf oplossen (#315): zonder kennis bij de melder wordt eerst de afbuigende wissel 4 geprobeerd en die lost het op");
+    }
+
     static void AlarmWisselBijLocTest()
     {
         Console.WriteLine("Test: alarm - wissel bij de loc met toestemming proberen (BUG #147)");
@@ -3488,6 +3514,7 @@ public static class Tests
         EigenTerugmeldingTest();
         AlarmVoorTerugmeldingTest();
         AlarmOplossingRichtingTest();
+        ZelfOplossenZonderKennisTest();
         NastellenAnderBlokTest();
         StatischeKortsluitingTest();
         StopTijdensTerugritTest();
