@@ -22,6 +22,7 @@ public partial class BaanVerkenner
             var eind = _klok.Nu + ZelfOplossenDuur;
             _log.Info($"Zelf oplossen (BUG #305, nog niet getest op de baan): de verkenner probeert maximaal {ZelfOplossenDuur.TotalMinutes:0} minuten zelf de loc op melder {doel} te krijgen voordat hij om hulp vraagt. Aanleiding: {EersteRegel(aanleiding)}");
             var onderLocGeprobeerd = new HashSet<string>();
+            _zelfVermijd.Clear();   // BUG #313
             int ronde = 0;
             string? vorigeUitkomst = null;
             while (_klok.Nu < eind)
@@ -69,7 +70,10 @@ public partial class BaanVerkenner
             // (2a) de gewone zoekroutine (laat de wissels onder de loc staan)
             if (ronde == 1 && await ProbeerAlarmWegTeKrijgen($"zelf oplossen (ronde {ronde})")) { }
             // (2b) de wissels bij de bezette melders, één voor één (elke wissel en stand maar één keer)
-            else if (!await WisselOnderLocProberen(onderLocGeprobeerd))
+            else if (!await WisselOnderLocProberen(onderLocGeprobeerd)
+                     // BUG #313 (autolog 25-10 12:45:08-12:49:01): daarna 22 rondes niets gedaan. Is alles bij de loc geprobeerd, dan opnieuw de volledige zoekroutine (alle wissels), en
+                     // de lijst van geprobeerde wissels bij de loc begint weer leeg (de stand is intussen veranderd).
+                     && !(onderLocGeprobeerd.Count > 0 && AllesBijLocGeprobeerd(onderLocGeprobeerd) && await NogEensAlles(onderLocGeprobeerd, ronde)))
             {
                 _log.Info($"Zelf oplossen, ronde {ronde}: de kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())} blijft; volgende ronde.");
                 return false;
@@ -110,9 +114,34 @@ public partial class BaanVerkenner
         if (bezet.Count == 1 && HuidigeAlarmBlokken().Count == 0)
         {
             _ingang = null;
-            if (await ProbeerZelfNaarMelder(doel)) return true;
+            int van313 = bezet.First();
+            var eerste313 = StapWeg(_kaart, Kruis, van313, doel, _zelfVermijd)?.FirstOrDefault();
+            if (await ProbeerZelfNaarMelder(doel, _zelfVermijd)) return true;
+            // BUG #313 (autolog 25-10 12:39:15, 12:41:02, 12:43:23): drie keer dezelfde weg 129 -> 14, drie keer naar 10. Een eerste stap die mislukte, wordt bij het zelf oplossen niet
+            // nog eens genomen: de volgende ronde zoekt een andere weg (bijv. 129 -> 24 -> 21 ... -> 13).
+            if (eerste313 is { } e313 && _zelfVermijd.Add((e313.Van, e313.Naar)))
+                _log.Info($"Zelf oplossen, ronde {ronde}: de stap {e313.Van} -> {e313.Naar} lukte niet; de volgende ronde zoekt een andere weg (BUG #313, nog niet getest op de baan).");
+            onderLocGeprobeerd.Clear();
         }
         return false;
+    }
+
+    /// <summary>BUG #313: stappen die bij het zelf oplossen mislukten (van, naar); de weg naar het doel gaat er niet meer over.</summary>
+    private readonly HashSet<(int, int)> _zelfVermijd = new();
+
+    private bool AllesBijLocGeprobeerd(HashSet<string> geprobeerd)
+    {
+        var bezet = _monitor.Bezet;
+        string bij = string.Join(",", bezet.OrderBy(x => x));
+        return WisselsBijBezet(_kaart, bezet).Where(a => _ins.WisselAdressen().Contains(a) && !IsVolger(a))
+            .All(a => geprobeerd.Contains($"{a}:True:{bij}") && geprobeerd.Contains($"{a}:False:{bij}"));
+    }
+
+    private async Task<bool> NogEensAlles(HashSet<string> geprobeerd, int ronde)
+    {
+        _log.Info($"Zelf oplossen, ronde {ronde}: alle wissels bij de loc zijn geprobeerd; nu weer de volledige zoekroutine en daarna de wissels bij de loc opnieuw (BUG #313).");
+        geprobeerd.Clear();
+        return await ProbeerAlarmWegTeKrijgen($"zelf oplossen (ronde {ronde})");
     }
 
     /// <summary>BUG #305: zet één nog niet geprobeerde wissel bij een bezette melder om en kijkt of de kortsluiting weggaat (zo niet: terug). Geeft true als het alarm weg is.</summary>

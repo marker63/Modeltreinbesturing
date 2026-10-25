@@ -2959,3 +2959,9 @@ twee keer toch naar 10. Uitwijken (#256) werd zonder melding geweigerd omdat de 
 teruggedraaid: (1) wissels bij de loc nooit omzetten als uitwijken niet kan -> keerlus-simulatie: 14 x naar 10 en 4 x hulp; (2) uitwijken toestaan als 24 en 129 alleen de twee takken
 van wissel 5 zijn -> rondrit-simulatie niet meer voltooid. De simulatie laat een wissel onder de loc gewoon omgaan; op de baan lukt dat kennelijk niet (overloop 5+6, wissel 6 ligt
 bij 129). Eerst de simulatie realistischer maken (wissel onder een loc beweegt niet), dan dit oplossen.
+
+## BUG #313 – OPGELOST (nog niet getest op de baan): zelf oplossen bleef dezelfde mislukte weg nemen en deed daarna 22 rondes niets (autolog 25-10 12:39-12:49)
+Na de kortsluiting bij 10 -> 129 reed het zelf oplossen drie keer 129 -> 14 (achteruit) en kwam elke keer op 10 uit (#312). Daarna waren alle wissels bij de loc één keer geprobeerd en
+gebeurde er van 12:45 tot 12:49 niets meer; om 12:49 kwam de vraag aan Marco. Nu: (1) een eerste stap die bij het zelf oplossen mislukte, wordt niet nog eens genomen: de volgende ronde
+zoekt een andere weg; (2) na een rijpoging mogen de wissels bij de loc opnieuw geprobeerd worden; (3) zijn ze allemaal geprobeerd, dan volgt opnieuw de volledige zoekroutine.
+Keerlus-simulatie: 0 keer hulp nodig (was 1).

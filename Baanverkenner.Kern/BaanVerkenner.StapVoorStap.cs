@@ -115,7 +115,7 @@ public partial class BaanVerkenner
     /// <summary>Kortste weg (in melders) van <paramref name="van"/> naar <paramref name="naar"/> over eerder gereden overgangen, elke stap met de kleinste wisselstand
     /// waarmee hij gereden is. Door een kruiswissel kan de loc alleen van een ingang naar een uitgang waarvan die doorgang (ingang → kruiswissel → uitgang) gereden is,
     /// met de motorstand die daarbij hoort (14 → 24 → 21 met 13 rechtdoor, 8 → 24 → 14 met 13 afbuigend). Null als er geen weg is.</summary>
-    internal static List<(int Van, int Naar, Richting Richting, Configuratie Cfg)>? StapWeg(Baankaart k, KruisKennis kr, int van, int naar)
+    internal static List<(int Van, int Naar, Richting Richting, Configuratie Cfg)>? StapWeg(Baankaart k, KruisKennis kr, int van, int naar, IReadOnlyCollection<(int, int)>? vermijd = null)
     {
         if (van == naar) return new();
         var rand = new Dictionary<(int, int), (Richting R, Configuratie C)>();
@@ -152,6 +152,7 @@ public partial class BaanVerkenner
                 foreach (var n in buren)
                 {
                     if (n == prev) continue;
+                    if (vermijd is not null && vermijd.Contains((cur, n))) continue;   // BUG #313
                     if (prev != 0 && kr.Middens.Contains(cur) && !k.Doorgangen.Any(d => d.Via == prev && d.Melder == cur && d.Volgende == n)) continue;
                     if (prev != 0 && k.DoorgangOnmogelijk(prev, cur, n)) continue;   // BUG #297: niet van been A naar been B
                     if (streng && prev != 0 && buren.Count >= 3 && k.Doorgangen.Any(d => d.Via == prev && d.Melder == cur && d.AantalKeer > 0)
@@ -201,12 +202,12 @@ public partial class BaanVerkenner
     }
 
     /// <summary>De loc rijdt van zijn huidige plek naar <paramref name="doel"/> over wat al gereden is (kortste weg in melders).</summary>
-    private async Task NaarPlekMelder(int doel, Configuratie? rijstand)
+    private async Task NaarPlekMelder(int doel, Configuratie? rijstand, IReadOnlyCollection<(int, int)>? vermijd = null)
     {
         var van = HuidigePlek();
         if (van is null || van == doel) return;
         if (Kruis.OpKruis(_monitor.Bezet)) { await VerlaatKruiswissel(doel); van = HuidigePlek(); if (van is null || van == doel) return; }
-        var weg = StapWeg(_kaart, Kruis, van.Value, doel);
+        var weg = StapWeg(_kaart, Kruis, van.Value, doel, vermijd);
         if (weg is null)
         {
             _log.Waarschuwing($"Er is geen bekende weg van melder {van} naar melder {doel}: de gebruiker wordt gevraagd de loc op melder {doel} te zetten.");
@@ -328,17 +329,17 @@ public partial class BaanVerkenner
     }
 
     /// <summary>Na een mislukte navigatie of rit: rijdt de loc zelf naar <paramref name="doel"/> als hij ergens op een bekende melder staat en er geen alarm is.</summary>
-    private async Task<bool> ProbeerZelfNaarMelder(int doel)
+    private async Task<bool> ProbeerZelfNaarMelder(int doel, IReadOnlyCollection<(int, int)>? vermijd = null)
     {
         var nu = HuidigePlek();
         if (nu is null) return false;
         if (nu == doel && _monitor.Bezet.Count == 1) return true;
         if (HuidigeAlarmBlokken().Count > 0) return false;
-        if (StapWeg(_kaart, Kruis, nu.Value, doel) is null) return false;
+        if (StapWeg(_kaart, Kruis, nu.Value, doel, vermijd) is null) return false;
         try
         {
             _log.Info($"De loc staat op melder {nu}; de verkenner rijdt zelf naar melder {doel}.");
-            await NaarPlekMelder(doel, null);
+            await NaarPlekMelder(doel, null, vermijd);
         }
         catch (NavigatieFout nf)
         {
