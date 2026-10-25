@@ -20,6 +20,10 @@ public class Melderschema
         public int? DinamoBlok { get; set; }
         public int AantalBuren { get; set; }
         public bool Splitsing => AantalBuren >= 3;
+        /// <summary>BUG #317: er is al een wissel bij deze melder bekend (een waarneming noemt hem als melder ervoor, als tak of als ingang).</summary>
+        public bool WisselBekend { get; set; }
+        /// <summary>BUG #317: een aftakking (3 of meer buren) waarvan de wissel nog niet gevonden is.</summary>
+        public bool WisselOnbekend => Splitsing && !WisselBekend;
     }
 
     public class Rand
@@ -81,7 +85,8 @@ public class Melderschema
         var buren = nummers.ToDictionary(n => n, n => new HashSet<int>());
         foreach (var r in s.Randen) { buren[r.A].Add(r.B); buren[r.B].Add(r.A); }
         foreach (var n in nummers)
-            s.Knopen.Add(new Knoop { Melder = n, AantalBuren = buren[n].Count, DinamoBlok = k.Melders.FirstOrDefault(m => m.Nummer == n)?.DinamoBlok });
+            s.Knopen.Add(new Knoop { Melder = n, AantalBuren = buren[n].Count, DinamoBlok = k.Melders.FirstOrDefault(m => m.Nummer == n)?.DinamoBlok,
+                WisselBekend = k.Wissels.Any(w => w.Waarnemingen.Any(o => o.NaMelder == n || o.Via == n || o.VolgendeBijRechtdoor == n || o.VolgendeBijAfbuigend == n)) });
 
         s.Plaats(k, buren);
         foreach (var r in s.Randen)
@@ -197,7 +202,10 @@ public class Melderschema
         foreach (var kn in Knopen)
         {
             string rand = kn.Splitsing ? "#c27a1a" : "#1f6f5c", vul = kn.Splitsing ? "#fff1dc" : "#e6f2ee";
-            sb.Append($"<g><title>melder {kn.Melder}: {kn.AantalBuren} buren{(kn.DinamoBlok is int bl ? $", Dinamo-blok {bl}" : ", Dinamo-blok onbekend")}</title><rect x=\"{F(kn.X - KnoopB / 2)}\" y=\"{F(kn.Y - KnoopH / 2)}\" width=\"{F(KnoopB)}\" height=\"{F(KnoopH)}\" rx=\"6\" fill=\"{vul}\" stroke=\"{rand}\" stroke-width=\"2\"/>");
+            string streep = kn.WisselOnbekend ? " stroke-dasharray=\"4 3\"" : "";
+            string onbekendTitel = kn.WisselOnbekend ? "; aftakking, de wissel is nog niet gevonden (de verkenning test hem nog)" : "";
+            sb.Append($"<g><title>melder {kn.Melder}: {kn.AantalBuren} buren{(kn.DinamoBlok is int bl ? $", Dinamo-blok {bl}" : ", Dinamo-blok onbekend")}{onbekendTitel}</title><rect x=\"{F(kn.X - KnoopB / 2)}\" y=\"{F(kn.Y - KnoopH / 2)}\" width=\"{F(KnoopB)}\" height=\"{F(KnoopH)}\" rx=\"6\" fill=\"{vul}\" stroke=\"{rand}\" stroke-width=\"2\"{streep}/>");
+            if (kn.WisselOnbekend) sb.Append($"<text x=\"{F(kn.X)}\" y=\"{F(kn.Y - KnoopH / 2 - 4)}\" font-size=\"9.5\" text-anchor=\"middle\" fill=\"#c27a1a\">wissel ?</text>");
             sb.Append($"<text x=\"{F(kn.X)}\" y=\"{F(kn.Y + 4.5)}\" font-size=\"12\" font-weight=\"700\" text-anchor=\"middle\" fill=\"#1d2330\">{kn.Melder}</text>");
             if (kn.DinamoBlok is int blok) sb.Append($"<text x=\"{F(kn.X)}\" y=\"{F(kn.Y + KnoopH / 2 + 12)}\" font-size=\"10\" text-anchor=\"middle\" fill=\"#555\">blok {blok}</text>");
             sb.Append("</g>");

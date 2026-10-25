@@ -1135,27 +1135,7 @@ public partial class BaanVerkenner
 
             if (Stap) PlanVervolg(o, basis);   // BUG #172
 
-            if (o.BronAdres is int bron && basis.Reeks.Count >= 2)
-            {
-                // BUG #197 (log 17-10 20:05: "wissel 5: na melder 13 rechtdoor -> 14, afbuigend -> 14"): de andere kant van een wissel werd altijd direct na de startmelder gezocht.
-                // Ligt de wissel pas verderop (hier tussen 14 en 24/129: beide ritten beginnen met 13, 14), dan is de eerste melder gelijk en hoort de splitsing bij de melder
-                // vóór het eerste verschil met de bekende rit zonder deze wissel.
-                var splits = ZoekAndereKantSplitsing(_kaart, o, basis.Reeks, bron);
-                if (splits is { } sp && !_kaart.Wissel(bron).Waarnemingen.Any(w => w.Soort == WaarnemingSoort.Splitsing && w.NaMelder == sp.Na && w.Richting == o.Richting))
-                {
-                    _kaart.Wissel(bron).Waarnemingen.Add(new WisselWaarneming
-                    {
-                        Soort = WaarnemingSoort.Splitsing,
-                        NaMelder = sp.Na,
-                        Richting = o.Richting,
-                        VolgendeBijRechtdoor = sp.Rechtdoor,
-                        VolgendeBijAfbuigend = sp.Afbuigend,
-                        Configuratie = o.Configuratie.Zonder(bron).ToString(),
-                        Toelichting = $"Na melder {sp.Na} ({o.Richting.Tekst()}): rechtdoor → melder {sp.Rechtdoor?.ToString() ?? "?"}, afbuigend → melder {sp.Afbuigend} (puntzijde, gevonden door andersom te rijden)."
-                    });
-                    _log.Vondst($"Adres {bron}, andere kant: na melder {sp.Na} ({o.Richting.Tekst()}) afbuigend → melder {sp.Afbuigend}.");
-                }
-            }
+            RegistreerAndereKant(o, basis);   // BUG #197/#317
 
             // BUG #162 (Marco 15-10 16:19: "de controle heeft uren geduurd, wat niet echt nodig is"): een controle rijdt de trajecten van de kaart en vergelijkt;
             // alle adressen opnieuw testen (veertien extra rondes per opdracht, met wissels in vreemde standen) is geen controle maar een nieuwe verkenning.
@@ -1723,6 +1703,7 @@ public partial class BaanVerkenner
             var rit = await Rit(o.Start, o.Richting, new RitDoel { Configuratie = rijstandBasis, StopBijMelders = stops, StaartWissels = true, MaxStappen = Stap ? (o.Aanloop ? 2 : 1) : null });
             _log.Info($"Basisrit: {Lijst(rit.Reeks)} - einde: {EindeTekst(rit.Einde)}.");
             VerwerkEinde(o, rit);
+            if (!Stap) RegistreerAndereKant(o, rit);   // BUG #317: vóór de terugweg
             // BUG #176 (Marco 17-10 10:27: "waarom is het blok van deze melders nog niet bekend?"): de blokproef van een nieuwe melder kwam pas na alle ritten, terwijl
             // de loc er na deze rit al staat. Nu meteen, maar alleen als dat veilig is (alle wissels rechtdoor, geen bekende wissel bij die melder).
             if (Stap && !o.KruisProef && rit.Einde == RitEinde.StapKlaar && rit.Reeks.Count >= 2) await BlokProefNaRit(o, rit, rijstandBasis);
@@ -1781,6 +1762,34 @@ public partial class BaanVerkenner
             return gekozen;
         }
         return null;
+    }
+
+    /// <summary>BUG #197: de andere kant van een wissel (opdracht 'andere tak van adres X') uit de basisrit. BUG #317 (Marco 25-10 19:00: "in het melderschema meerdere aftakkingen
+    /// gevonden maar er geen wissels bij"; autolog 18:42-18:47): dit gebeurde pas na de terugweg van de basisrit. Viel Dinamo op die terugweg uit, dan werd alles sinds de uitval
+    /// teruggedraaid en ging de vondst 'wissel 2: na 5 (achteruit) afbuigend -> 12' verloren. Nu meteen na de basisrit, vóór de terugweg (en daarna nog eens, zonder dubbel).</summary>
+    private void RegistreerAndereKant(Opdracht o, RitResultaat basis)
+    {
+        if (o.BronAdres is int bron && basis.Reeks.Count >= 2)
+        {
+            // BUG #197 (log 17-10 20:05: "wissel 5: na melder 13 rechtdoor -> 14, afbuigend -> 14"): de andere kant van een wissel werd altijd direct na de startmelder gezocht.
+            // Ligt de wissel pas verderop (hier tussen 14 en 24/129: beide ritten beginnen met 13, 14), dan is de eerste melder gelijk en hoort de splitsing bij de melder
+            // vóór het eerste verschil met de bekende rit zonder deze wissel.
+            var splits = ZoekAndereKantSplitsing(_kaart, o, basis.Reeks, bron);
+            if (splits is { } sp && !_kaart.Wissel(bron).Waarnemingen.Any(w => w.Soort == WaarnemingSoort.Splitsing && w.NaMelder == sp.Na && w.Richting == o.Richting))
+            {
+                _kaart.Wissel(bron).Waarnemingen.Add(new WisselWaarneming
+                {
+                    Soort = WaarnemingSoort.Splitsing,
+                    NaMelder = sp.Na,
+                    Richting = o.Richting,
+                    VolgendeBijRechtdoor = sp.Rechtdoor,
+                    VolgendeBijAfbuigend = sp.Afbuigend,
+                    Configuratie = o.Configuratie.Zonder(bron).ToString(),
+                    Toelichting = $"Na melder {sp.Na} ({o.Richting.Tekst()}): rechtdoor → melder {sp.Rechtdoor?.ToString() ?? "?"}, afbuigend → melder {sp.Afbuigend} (puntzijde, gevonden door andersom te rijden)."
+                });
+                _log.Vondst($"Adres {bron}, andere kant: na melder {sp.Na} ({o.Richting.Tekst()}) afbuigend → melder {sp.Afbuigend}.");
+            }
+        }
     }
 
     /// <summary>Legt vast wat het einde van een (basis)rit betekent en plant vervolgopdrachten.</summary>

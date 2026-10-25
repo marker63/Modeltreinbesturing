@@ -1023,6 +1023,9 @@ public static class Tests
                 Eis(regels.Count(x => x.Contains("BUG #245")) > 0, $"keerlus (start {start}) BUG #245: wissel 1 (loste de kortsluiting bij melder 12 op) wordt na de proef niet onder de loc omgezet");
                 Console.WriteLine($"  keerlus start {start}: {r.Einde}, {r.Seconden / 60:0} min, {r.Kortsluitingen} kortsluiting(en), melders {k.Melders.Count} ({string.Join(",", k.Melders.Select(m => m.Nummer).OrderBy(x => x))}), voltooid {k.Voltooid}, 129->14-maar-10: {naar10}");
                 if (Environment.GetEnvironmentVariable("KEERLUS_LOG") == "1") Console.WriteLine(r.Log.AlsTekst());
+                var buren317 = BaanVerkenner.Buren(k);
+                var zonder317 = buren317.Where(kv => kv.Value.Count >= 3 && !k.Wissels.Any(w => w.Waarnemingen.Any(o => o.Soort == WaarnemingSoort.Splitsing && (o.NaMelder == kv.Key || o.VolgendeBijRechtdoor == kv.Key || o.VolgendeBijAfbuigend == kv.Key)))).Select(kv => kv.Key).OrderBy(x => x).ToList();
+                Console.WriteLine($"  keerlus start {start}: knooppunten zonder gevonden splitsing: {string.Join(",", zonder317)}; wissels met splitsing: {string.Join(",", k.Wissels.Where(w => w.Waarnemingen.Any(o => o.Soort == WaarnemingSoort.Splitsing)).Select(w => w.Adres).OrderBy(x => x))}");
                 Console.WriteLine($"  keerlus start {start}: zelf opgelost {regels.Count(x => x.Contains("Zelf opgelost"))}x, zelf mislukt {regels.Count(x => x.Contains("Zelf oplossen lukte niet"))}x, gebruiker {regels.Count(x => x.Contains("Gebruiker heeft de loc"))}x, #270 {regels.Count(x => x.Contains("BUG #270"))}x, #271 {regels.Count(x => x.Contains("BUG #271"))}x, rondjes {regels.Count(x => x.Contains("rijdt rondjes"))}x");
                 if (Environment.GetEnvironmentVariable("DUMP305") is { } d305) System.IO.File.WriteAllLines(d305, regels);
                 // BUG #305: eerst zelf oplossen; in deze simulatie lukt dat minstens één keer en is er hoogstens één keer hulp van de gebruiker nodig (zonder #305: 2 keer)
@@ -3425,6 +3428,12 @@ public static class Tests
         var svg = m.AlsSvg();
         Eis(svg.Contains("W10 afb.") && svg.Contains("W2 rd."), "melderschema: wissels staan bij de lijnen");
         Eis(Rapport.AlsHtml(k).Contains("<h2>Melderschema</h2>"), "melderschema: het HTML-rapport bevat het schema");
+        // BUG #317 (Marco 25-10 19:00): aftakkingen zonder gevonden wissel krijgen 'wissel ?'
+        Eis(!m.Knopen.First(x => x.Melder == 14).WisselOnbekend && !svg.Contains("wissel ?</text>") == m.Knopen.All(x => !x.WisselOnbekend), "melderschema (#317): melder 14 heeft een bekende wissel (5), 'wissel ?' alleen bij onbekende aftakkingen");
+        var k317 = Laad("baankaart_2026-10-17_2005.json");
+        foreach (var w in k317.Wissels) w.Waarnemingen.Clear();
+        var m317 = Melderschema.Maak(k317);
+        Eis(m317.Knopen.First(x => x.Melder == 14).WisselOnbekend && m317.AlsSvg().Contains("wissel ?</text>"), "melderschema (#317): zonder waarnemingen is aftakking 14 gemarkeerd als 'wissel ?' (gestippeld)");
         var uit = Environment.GetEnvironmentVariable("MELDERSCHEMA_UIT");
         if (!string.IsNullOrEmpty(uit)) { File.WriteAllText(uit, svg); Console.WriteLine("  melderschema geschreven naar " + uit); }
         Eis(k.AdressenZonderEffect is not null, "kaart geladen");

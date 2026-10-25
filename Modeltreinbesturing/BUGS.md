@@ -2983,3 +2983,10 @@ een halve minuut lang elke 3 s opnieuw; (3) zijn alle wissels los geprobeerd, da
 Marco loste de kortsluiting na 129 (wissel 5 afbuigend) op met wissel 10 afbuigend; dat werd bij het kortsluitpunt vastgelegd. De partnerzoektocht voor wissel 5 begon daarna toch met
 wissel 2 en zette wissel 10 terug naar rechtdoor; de terugweg 24 -> 129 kwam op 14 uit. Nu is een bekende oplossing voor die plek (van de gebruiker of uit een eerdere proef) de eerste
 partner die geprobeerd wordt. (Geen eigen simulatietest: de regressietests en simulaties blijven ALLES OK.)
+
+## BUG #317 – OPGELOST (nog niet getest op de baan): melderschema toonde aftakkingen zonder wissel (Marco 25-10 19:00; kaart 18:54)
+Oorzaak: een aftakking in het melderschema (oranje, 3 of meer buren) volgt uit de gereden overgangen; de wissel erbij komt pas uit een proef per adres. In de kaart van 18:54 waren
+alleen wissel 2 en 5 bekend, en alleen via een kortsluiting ("niet afb. (kortsl.)"). De splitsingen 5 (14 -> 24/129), 2, 9, 13 en 14 stonden nog als opdracht in de wachtrij.
+Daarnaast ging de gevonden splitsing 2 -> 12 (andere kant, opdracht #3) verloren: hij werd pas na de terugweg vastgelegd, en de Dinamo-uitval van 18:44 in die terugweg draaide
+alles sinds de eerste gemiste terugmelding terug. Opgelost: (1) de andere-kant-splitsing wordt direct na de heenrit vastgelegd (vóór de terugweg), (2) het melderschema markeert een
+aftakking zonder bekende wissel gestippeld met "wissel ?" (tooltip: de verkenning test hem nog). Test: melderschema (#317).
