@@ -2919,3 +2919,9 @@ zonder bezette melder kruipend zoeken; en vanaf de melder waar hij staat zelf na
 'klem-oplossingen' losgelaten. De toestemmingsvragen "Wissel bij de loc proberen?" zijn weg: die wissels probeert de verkenner zelf. Een vraag van binnen het zelf oplossen wordt
 geen vraag maar een mislukte ronde. Alleen bij het hervatten (loc op de startmelder zetten) wordt nog direct gevraagd. Simulatie keerlus: 2 keer zelf opgelost, 1 keer nog hulp
 (was 2 keer hulp). Open: in die ene keer reed de terugweg na de klem van 4/129 vanaf een verkeerd aangenomen plek (14).
+
+## BUG #306 – OPGELOST (nog niet getest op de baan): vastzittende melder 268 (autolog 25-10 09:50:05-10:00)
+Dinamo meldde om 09:50:05 melder 268 (bestaat niet) bezet, tussen 25 en 17, en daarna nooit meer vrij. 268 kwam als 25 -> 268 -> 17 in de kaart, elke neerzetting op 13 mislukte
+("bezet: 14, 268"), de verkenner vroeg drie keer om hulp en reed met wissels "bij de loc" op 268. Nu: blijft een melder bezet terwijl daarna 3 andere (al bekende) melders bezet raken,
+dan is het een vastzittende melding (de loc is niet langer dan een melder): hij telt niet meer als bezet tot Dinamo hem weer vrij meldt, en hij gaat uit de kaart (melder,
+overgangen, doorgangen, ritten). Een kortsluitecho als 137/138 telt niet mee als 'verder'.

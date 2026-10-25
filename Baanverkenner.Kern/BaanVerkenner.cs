@@ -202,6 +202,14 @@ public partial class BaanVerkenner
             // BUG #262: melder 137/138 (Dinamo meldt ze, ze knipperen alleen als de loc op 129/10 staat) zijn geen sectiemelders
             FlikkeraarGevonden = m => _log.Waarschuwing($"Melder {m} knippert ({MelderMonitor.FlikkerWissels} keer aan/uit binnen {MelderMonitor.FlikkerVenster.TotalSeconds:0} s) en is nog nooit in een rit bereikt: dat is geen bezetmelder van een sectie. Melder {m} wordt verder genegeerd (BUG #262).")
         };
+        // BUG #306: een melder die bezet blijft terwijl de loc al 3 melders verder is
+        _monitor.VastzitterGevonden = m =>
+        {
+            var weg = _kaart.VerwijderMelder(m);
+            string t306 = $"Melder {m} blijft bezet terwijl de loc al {MelderMonitor.VastzitterNaMelders} melders verder is (de loc is niet langer dan een melder): dat is een vastzittende melding van Dinamo, geen loc. Melder {m} telt niet meer als bezet tot Dinamo hem weer vrij meldt{(weg.Count > 0 ? "; uit de kaart gehaald: " + string.Join(", ", weg) : "")} (BUG #306, nog niet getest op de baan).";
+            _log.Waarschuwing(t306);
+            _kaart.Waarschuwingen.Add(t306);
+        };
     }
 
     /// <summary>Snelheden aanpassen terwijl de verkenning loopt. Geldt vanaf het

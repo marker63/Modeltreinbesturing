@@ -36,6 +36,15 @@ public class MelderMonitor
     public Action<int>? FlikkeraarGevonden { get; set; }
     public IReadOnlyCollection<int> Flikkeraars { get { lock (_slot) return _flikkeraars.ToList(); } }
 
+    /// <summary>BUG #306 (autolog 25-10 09:50:05): Dinamo meldde melder 268 (bestaat niet) bezet tussen 25 en 17 en daarna nooit meer vrij. De loc is niet langer dan een melder
+    /// (Marco 21-10), dus een melder die bezet blijft terwijl daarna <see cref="VastzitterNaMelders"/> andere melders bezet raken, is een vastzittende melding en geen loc: hij telt
+    /// niet meer mee als bezet tot Dinamo hem weer vrij meldt. Alleen melders die de kaart al kent tellen als 'verder'.</summary>
+    public const int VastzitterNaMelders = 3;
+    private readonly Dictionary<int, HashSet<int>> _naBezet = new();
+    private readonly HashSet<int> _vastzitters = new();
+    public Action<int>? VastzitterGevonden { get; set; }
+    public IReadOnlyCollection<int> Vastzitters { get { lock (_slot) return _vastzitters.ToList(); } }
+
     /// <summary>Handler voor IHardwareInterface.BezetmeldingGewijzigd (elke thread).</summary>
     public void Ontvang(int melder, bool bezet)
     {
@@ -69,11 +78,18 @@ public class MelderMonitor
         var nu = _klok.Nu;
         var drempel = TimeSpan.FromMilliseconds(Math.Max(0, _ontdenderMs()));
         var res = new List<Wijziging>();
+        var gevonden = new List<int>();
         lock (_slot)
         {
             foreach (var (melder, ruw) in _ruw)
             {
                 if (_flikkeraars.Contains(melder)) continue;   // BUG #262
+                if (_vastzitters.Contains(melder))
+                {
+                    // BUG #306: pas weer gewoon als Dinamo hem echt vrij meldt
+                    if (!ruw.Bezet && nu - ruw.Sinds >= drempel) { _vastzitters.Remove(melder); _stabiel[melder] = false; }
+                    continue;
+                }
                 bool stabiel = _stabiel.TryGetValue(melder, out var s) && s;
                 if (ruw.Bezet != stabiel && nu - ruw.Sinds >= drempel)
                 {
@@ -81,7 +97,29 @@ public class MelderMonitor
                     res.Add(new Wijziging(melder, ruw.Bezet, ruw.Sinds));
                 }
             }
+            // BUG #306: welke melders raakten bezet terwijl een andere melder bezet bleef
+            foreach (var w in res.OrderBy(x => x.Tijd))
+            {
+                if (w.Bezet)
+                {
+                    // alleen melders die de kaart al kent tellen (een kortsluitecho als 137/138 terwijl de loc stilstaat telt niet, simulatie #268)
+                    if (_isBekend is null || _isBekend(w.Melder))
+                        foreach (var (m, na) in _naBezet) if (m != w.Melder) na.Add(w.Melder);
+                    _naBezet[w.Melder] = new HashSet<int>();
+                }
+                else _naBezet.Remove(w.Melder);
+            }
+            foreach (var (m, na) in _naBezet.ToList())
+            {
+                if (na.Count < VastzitterNaMelders || !(_stabiel.TryGetValue(m, out var sb) && sb)) continue;
+                _vastzitters.Add(m);
+                _stabiel[m] = false;
+                _naBezet.Remove(m);
+                res.RemoveAll(x => x.Melder == m);
+                gevonden.Add(m);
+            }
         }
+        foreach (var m in gevonden) VastzitterGevonden?.Invoke(m);
         res.Sort((a, b) => a.Tijd.CompareTo(b.Tijd));
         return res;
     }

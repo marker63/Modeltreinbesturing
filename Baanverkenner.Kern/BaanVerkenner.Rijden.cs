@@ -1823,6 +1823,7 @@ public partial class BaanVerkenner
             }
         }
         MarkeerTijdelijkeKortsluiting(start, r, doel.Configuratie, uitkomst);
+        if (_monitor.Vastzitters is { Count: > 0 } vast306 && uitkomst.Reeks.Count > 1) { int eerste306 = uitkomst.Reeks[0]; uitkomst.Reeks.RemoveAll(x => vast306.Contains(x) && x != eerste306); }   // BUG #306
         _kaart.Ritten.Add(new GeredenRit
         {
             Nr = _kaart.Ritten.Count + 1, Tijd = DateTime.Now, Navigatie = doel.IsNavigatie, Start = start, Richting = r,

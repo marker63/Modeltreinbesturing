@@ -2770,6 +2770,37 @@ public static class Tests
             klok262.Wacht(TimeSpan.FromMilliseconds(300), CancellationToken.None).GetAwaiter().GetResult(); mon262b.Bijwerken();
             Eis(mon262b.Bezet.Contains(31) && mon262b.Flikkeraars.Count == 0, "knippermelder (#262): een nieuwe melder die gewoon bezet raakt (een paar wissels) telt wel");
         }
+        // BUG #306: melder 268 bleef bezet (autolog 25-10 09:50:05) terwijl de loc 17, 8, 15 reed; een loc op de grens van twee melders is geen vastzitter
+        {
+            var k306 = new VirtueleKlok();
+            var mon306 = new MelderMonitor(k306, () => 100, _ => true);
+            int? vast306 = null; mon306.VastzitterGevonden = m => vast306 ??= m;
+            void Stap306(int melder, bool bezet) { mon306.Ontvang(melder, bezet); k306.Wacht(TimeSpan.FromMilliseconds(500), CancellationToken.None).GetAwaiter().GetResult(); mon306.Bijwerken(); }
+            Stap306(25, true); Stap306(268, true); Stap306(25, false); Stap306(17, true); Stap306(17, false); Stap306(8, true);
+            Eis(vast306 is null && mon306.Bezet.Contains(268), "vastzitter (#306): na twee melders nog niet (268 kan nog de loc zijn)");
+            Stap306(8, false); Stap306(15, true);
+            Eis(vast306 == 268 && !mon306.Bezet.Contains(268) && mon306.Bezet.SetEquals(new[] { 15 }), "vastzitter (#306): na 17, 8 en 15 telt 268 niet meer als bezet (bezet: " + string.Join(",", mon306.Bezet) + ")");
+            Stap306(268, false); Stap306(15, false); Stap306(268, true);
+            Eis(mon306.Bezet.Contains(268) && mon306.Vastzitters.Count == 0, "vastzitter (#306): meldt Dinamo 268 vrij en daarna weer bezet, dan telt hij weer gewoon");
+            var mon306b = new MelderMonitor(k306, () => 100, _ => true);
+            int? vast306b = null; mon306b.VastzitterGevonden = m => vast306b ??= m;
+            int vorige = 0;
+            foreach (var m in new[] { 13, 14, 24, 21, 29, 30, 20, 27, 28 })
+            {
+                mon306b.Ontvang(m, true); k306.Wacht(TimeSpan.FromMilliseconds(400), CancellationToken.None).GetAwaiter().GetResult(); mon306b.Bijwerken();
+                if (vorige != 0) { mon306b.Ontvang(vorige, false); k306.Wacht(TimeSpan.FromMilliseconds(400), CancellationToken.None).GetAwaiter().GetResult(); mon306b.Bijwerken(); }
+                vorige = m;
+            }
+            Eis(vast306b is null, "vastzitter (#306): een gewone rit (steeds even twee melders bezet) geeft geen vastzitter");
+            var kaart306 = new Baankaart();
+            kaart306.Overgangen.Add(new Overgang { Van = 25, Naar = 268, Richting = Richting.Vooruit, AantalKeer = 1 });
+            kaart306.Overgangen.Add(new Overgang { Van = 268, Naar = 17, Richting = Richting.Vooruit, AantalKeer = 1 });
+            kaart306.Overgangen.Add(new Overgang { Van = 17, Naar = 8, Richting = Richting.Vooruit, AantalKeer = 1 });
+            kaart306.Melder(268); kaart306.Melder(17);
+            kaart306.Ritten.Add(new GeredenRit { Reeks = new List<int> { 25, 268, 17, 8 } });
+            var weg306 = kaart306.VerwijderMelder(268);
+            Eis(kaart306.Overgangen.Count == 1 && !kaart306.Melders.Any(x => x.Nummer == 268) && kaart306.Ritten[0].Reeks.SequenceEqual(new[] { 25, 17, 8 }), "vastzitter (#306): melder 268 gaat uit de kaart (" + string.Join("; ", weg306) + ")");
+        }
         // BUG #258: voor 14 -> 129 (vooruit) zijn wissel 5 afbuigend en wissel 6 niet-afbuigend (Dinamo) bewezen; die worden bij een kortsluiting daar niet omgezet
         var k258 = Laad("baankaart_2026-10-20_1800.json");
         var b258 = BaanVerkenner.BewezenStandenBijLoc(k258, new[] { 13, 14, 129 }, Richting.Vooruit, new[] { 14, 129 });

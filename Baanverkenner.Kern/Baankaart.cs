@@ -999,6 +999,21 @@ public class Baankaart
     /// <summary>BUG #209/#210 (Marco 18-10: "wissel 11 bestaat niet"): haalt alles weg wat aan een wisseladres hangt dat op de baan niet bestaat: waarnemingen, de adres-afhankelijke
     /// kortsluitoplossingen, en het adres in configuraties van overgangen, doorgangen, trajecten, ritten en kortsluitpunten (de overgang zelf is wel echt gereden en blijft, met
     /// de stand zonder dat adres). Geeft een melding per opgeruimd onderdeel. Nog niet getest op de baan.</summary>
+    /// <summary>BUG #306: een melder die alleen door een vastzittende Dinamo-melding in de kaart kwam (268 tussen 25 en 17) gaat er weer uit: de melder zelf, zijn overgangen
+    /// en doorgangen, en uit de gereden ritten. Geeft wat er weg is.</summary>
+    public List<string> VerwijderMelder(int m)
+    {
+        var uit = new List<string>();
+        int n = Overgangen.RemoveAll(o => o.Van == m || o.Naar == m);
+        if (n > 0) uit.Add($"{n} overgang(en) met melder {m}");
+        n = Doorgangen.RemoveAll(d => d.Via == m || d.Melder == m || d.Volgende == m);
+        if (n > 0) uit.Add($"{n} doorgang(en) met melder {m}");
+        n = Melders.RemoveAll(x => x.Nummer == m);
+        if (n > 0) uit.Add($"melder {m} zelf");
+        foreach (var r in Ritten) r.Reeks.RemoveAll(x => x == m);
+        return uit;
+    }
+
     public List<string> VerwijderNietBestaandeAdressen(IEnumerable<int> adressen)
     {
         var meldingen = new List<string>();
