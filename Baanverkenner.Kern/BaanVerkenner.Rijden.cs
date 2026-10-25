@@ -646,6 +646,18 @@ public partial class BaanVerkenner
             await Wacht(TimeSpan.FromSeconds(2));
             await ZetWissel(a, stand, forceer: true);
         }
+        // De tweede wissel van een overloopset (schakelt via ZetWissel mee) moet het ook echt doen: anders staan 2 en 1 tegen elkaar in (realistische simulatie 14:41:57)
+        foreach (var p in _ins.GekoppeldeParen().Where(p => p.Meester == a))
+        {
+            bool dv = _wisselStand.TryGetValue(p.Volger, out var vs) && vs;
+            for (int h = 1; h <= 5 && LaatsteCommandoTeruggemeld(p.Volger) == false && HuidigeAlarmBlokken().Count > 0; h++)
+            {
+                await Wacht(TimeSpan.FromSeconds(2));
+                _volgerBezig = true;
+                try { await ZetWisselKern(p.Volger, dv, forceer: true); }
+                finally { _volgerBezig = false; }
+            }
+        }
         // Lukte het na herhalen wel, dan telt het niet als 'Dinamo voert niets uit' (#301); anders één keer (niet per herhaling)
         _zonderTerugmeldingBijAlarm = LaatsteCommandoTeruggemeld(a) == false ? teller301 + 1 : 0;
     }

@@ -3353,7 +3353,8 @@ public static class Tests
         Baanverkenner.Kern.Simulatie.MiniworldBaan.EchteAansluiting = true;
         try
         {
-            var sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(true, start, null);
+            var sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(true, start, Environment.GetEnvironmentVariable("MARCO_HERVAT_REALISTISCH") == "1"
+                ? () => new Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan { UitvalVanafCommando = 120, UitvalDuur = TimeSpan.FromSeconds(90), NegeerHelftBijKortsluiting = true } : null);
             var simMeld = new List<(DateTime T, string S)>();
             sim.StatusBericht += t => { if (t.Contains("KORTSLUITING")) simMeld.Add((sim.HuidigeSimTijd, "##SIM## " + t)); };
             var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 14, DinamoBlokken = "1-12", KruisMotoren = "10+13", HoogsteMelder = 150,

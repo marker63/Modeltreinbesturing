@@ -3093,3 +3093,5 @@ tot de loc weg is). Zonder overloopsets blijft #194 zoals het was (daar zijn wis
 ## BUG #336 – OPGELOST (nog niet getest op de baan): kon de loc niet uitwijken voor een wissel onder de loc, dan ging de wissel tóch om
 (Simulatie met Dinamo-uitval, blokfase.) Met opgegeven overloopsets blijft de wissel nu staan zolang de loc op die melder staat; komt de loc daardoor ergens anders uit, dan is dat een
 gewone navigatiefout in plaats van een kortsluiting onder de loc.
+Aanvulling #334: ook de tweede wissel van een overloopset (1 bij 2, 6 bij 5) wordt tijdens een kortsluiting opnieuw gestuurd als Dinamo hem niet terugmeldt; anders stonden 2 en 1 tegen
+elkaar in. Zwaarste meting (realistisch + 11 keer stoppen en hervatten): was niet voltooid na 10 uur met 12 keer hulp, nu voltooid zonder hulp.
