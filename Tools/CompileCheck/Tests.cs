@@ -1006,6 +1006,31 @@ public static class Tests
             "ontsporing (#314): daarna worden de adressen gewoon getest (geen stop bij het tijdelijke kortsluitpunt)");
     }
 
+    // BUG #318 (Marco 25-10 19:15): bij hervatten werd de basisrit (het hele rondje) van de onderbroken opdracht opnieuw gereden
+    static void HervatZonderBasisritTest()
+    {
+        Console.WriteLine("Test: hervatten hergebruikt de basisrit (BUG #318)");
+        var r = MiniworldRit(13, 2, insAanpassing: i => { i.Rondrit = true; }, stopWanneer: l => l.Regels.Count(x => x.Tekst.Contains("geen verschil")) >= 2);
+        var st = VerkenStatus.VanJson(r.V.Status.AlsJson())!;
+        Eis(st.Huidig is { BasisReeks.Count: > 2 }, "hervatten (#318): de onderbroken opdracht bewaart zijn basisrit (nu " + (st.Huidig?.BasisReeks is { } br ? string.Join(",", br) : "geen") + ")");
+        if (st.Huidig is null) return;
+        int volgend = st.Huidig.VolgendAdres;
+        var sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(true, 13, null);
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var log = new VerkenLog(klok);
+        var v = new BaanVerkenner(sim, st.Instellingen, klok, log, (_, _) => Task.FromResult(true), st) { VraagJaNee = (_, _) => Task.FromResult<bool?>(true) };
+        using var cts = new CancellationTokenSource();
+        klok.Getikt += _ => { if (log.Regels.Count(x => x.Tekst.Contains("geen verschil") || x.Tekst.StartsWith("Verkenningsrit")) >= 2) cts.Cancel(); };
+        try { v.VoerUit(cts.Token).GetAwaiter().GetResult(); } catch (Exception) { }
+        var regels = log.Regels.Select(x => x.Tekst).ToList();
+        int hergebruik = regels.FindIndex(x => x.Contains("de basisrit is al eerder gereden"));
+        int basisrit = regels.FindIndex(x => x.StartsWith("Basisrit:"));
+        Eis(hergebruik >= 0 && (basisrit < 0 || basisrit > hergebruik), $"hervatten (#318): de basisrit wordt niet opnieuw gereden (hergebruik regel {hergebruik}, basisrit regel {basisrit})");
+        var eersteProef = regels.FirstOrDefault(x => x.StartsWith("Verkenningsrit"));
+        Eis(eersteProef is not null && !eersteProef.Contains("alle wissels rechtdoor"), "hervatten (#318): daarna meteen de volgende proef (nu: " + eersteProef + ", volgend adres " + volgend + ")");
+    }
+
     // BUG #232: optie 6 op de Miniworld-simulatie MET de keerlus 129-4-11-12-1-9-10-129 (zoals de logs van 18-10 laten zien)
     static void KeerlusTest()
     {
@@ -3544,6 +3569,7 @@ public static class Tests
         SchemaWisselsTest();
         Log2005Test();
         RondritTest();
+        HervatZonderBasisritTest();
         OntsporingEersteBasisritTest();
         AlarmWisselBijLocTest();
         KruisRuisVoorafTest();

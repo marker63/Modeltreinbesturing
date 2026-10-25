@@ -2990,3 +2990,9 @@ alleen wissel 2 en 5 bekend, en alleen via een kortsluiting ("niet afb. (kortsl.
 Daarnaast ging de gevonden splitsing 2 -> 12 (andere kant, opdracht #3) verloren: hij werd pas na de terugweg vastgelegd, en de Dinamo-uitval van 18:44 in die terugweg draaide
 alles sinds de eerste gemiste terugmelding terug. Opgelost: (1) de andere-kant-splitsing wordt direct na de heenrit vastgelegd (vóór de terugweg), (2) het melderschema markeert een
 aftakking zonder bekende wissel gestippeld met "wissel ?" (tooltip: de verkenning test hem nog). Test: melderschema (#317).
+
+## BUG #318 – OPGELOST (nog niet getest op de baan): na hervatten werd de basisrit (de hele lus) van de onderbroken opdracht opnieuw gereden (Marco 25-10 19:15; log 18:57-19:00)
+Bij hervatten (en bij een herpoging na een navigatiefout, zoals 18:52) begon de onderbroken opdracht opnieuw met de basisrit: een rondje van ruim 2 minuten (13, 14, 24, ..., 5, 13)
+dat al bekend was. Het volgende adres werd wel onthouden, de basisrit niet. Nu bewaart de opdracht de uitkomst van zijn basisrit (melders, einde, mede-bezette melders en de
+rijstand) in de voortgang. Bij hervatten of een herpoging met dezelfde rijstand wordt die hergebruikt en gaat de verkenning meteen verder met de volgende proef. Is de rijstand
+veranderd (bijv. een kortsluitpunt opgelost), dan wordt de basisrit wel opnieuw gereden. Test: hervatten (#318).

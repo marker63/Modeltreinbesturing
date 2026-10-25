@@ -38,6 +38,12 @@ public class Opdracht
     public bool Aanloop { get; set; }
     /// <summary>BUG #173: hoe vaak deze opdracht is afgebroken door een wisselprobleem (Dinamo-uitval, klem) en opnieuw begonnen is.</summary>
     public int UitvalHersteld { get; set; }
+    /// <summary>BUG #318 (Marco 25-10 19:15: "als ik een verkenning hervat begin je steeds opdracht 1 weer en moet je de hele lus weer ontdekken"): de uitkomst van de basisrit van deze
+    /// opdracht. Bij hervatten of een herpoging wordt die niet opnieuw gereden (een rondje van 2 minuten) zolang de rijstand hetzelfde is.</summary>
+    public List<int>? BasisReeks { get; set; }
+    public RitEinde BasisEinde { get; set; }
+    public List<int> BasisOokBezet { get; set; } = new();
+    public string? BasisRijstand { get; set; }
     public string Sleutel => $"{Configuratie.Sleutel}|{Start}|{Richting}{(BlokProef ? "|blok" : "")}";
 }
 
@@ -1117,8 +1123,20 @@ public partial class BaanVerkenner
             await ZetConfiguratie(rijstand);
 
             // ---- Basisrit ----
-            var basis = await Basisrit(o);
-            if (basis is null) { await TerugNaarHuis(o.Route); return; }
+            // BUG #318: is de basisrit van deze opdracht al gereden (hervatten, herpoging) met dezelfde rijstand, dan niet nog eens het hele rondje rijden.
+            RitResultaat? basis;
+            if (BewaardeBasis(o, RijStand(o)) is { } bewaard)
+            {
+                basis = bewaard;
+                _log.Info($"Opdracht #{o.Id}: de basisrit is al eerder gereden ({Lijst(basis.Reeks)} - einde: {EindeTekst(basis.Einde)}); die wordt hergebruikt in plaats van opnieuw gereden (BUG #318, nog niet getest op de baan).");
+            }
+            else
+            {
+                basis = await Basisrit(o);
+                if (basis is null) { await TerugNaarHuis(o.Route); return; }
+                o.BasisReeks = basis.Reeks.ToList(); o.BasisEinde = basis.Einde; o.BasisOokBezet = basis.OokBezetBijKortsluiting.ToList(); o.BasisRijstand = RijStand(o).Sleutel;
+                BewaarNu();
+            }
 
             // BUG #166 (Marco 16-10 18:04: "je zit in een loop", wissel 13 zes keer als verkeerd gemeld): de basisrit 15 -> 8 -> 24 -> 14 reed goed met motor 13 afbuigend,
             // maar de rijstand van de opdracht (berekend VOOR de basisrit, pad nog maar tot melder 24) had 13 rechtdoor. HerstelRijstand zette 13 daarom voor
@@ -1682,6 +1700,15 @@ public partial class BaanVerkenner
 
     /// <summary>De basisrit (zonder omgezet adres), bij de instelling "herhalen" twee keer,
     /// en bij verschil een derde keer als scheidsrechter.</summary>
+    /// <summary>BUG #318: de bewaarde basisrit van een opdracht, als die met dezelfde rijstand gereden is (anders null: dan opnieuw rijden).</summary>
+    internal static RitResultaat? BewaardeBasis(Opdracht o, Configuratie rijstand)
+    {
+        if (o.BasisReeks is not { Count: > 0 } reeks || o.BasisRijstand != rijstand.Sleutel || o.KruisProef || o.BlokProef) return null;
+        var r = new RitResultaat { Einde = o.BasisEinde, Richting = o.Richting, OokBezetBijKortsluiting = o.BasisOokBezet.ToList() };
+        r.Reeks.AddRange(reeks);
+        return r;
+    }
+
     private async Task<RitResultaat?> Basisrit(Opdracht o)
     {
         var stops = KortsluitStops(o.Configuratie, o.Richting);
