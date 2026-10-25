@@ -13,6 +13,8 @@ public class RitResultaat
     /// <summary>BUG #285: de loc verdween van de melders na een melder zonder bekend vervolg, zonder dat Dinamo een kortsluiting meldde: waarschijnlijk het einde van het spoor
     /// (stootjuk, loc ontspoord of zonder stroom voorbij de laatste sectie), geen verkeerd bereden wissel.</summary>
     public bool EindeVanHetSpoor { get; set; }
+    /// <summary>BUG #311: de andere melders die bezet waren op het moment van de kortsluiting (de loc stond er al deels in).</summary>
+    public List<int> OokBezetBijKortsluiting { get; set; } = new();
 }
 
 /// <summary>Wat een rit moet doen. Zonder DoelMelder is het een verkenningsrit (rijden tot
@@ -1884,6 +1886,17 @@ public partial class BaanVerkenner
         return uitkomst;
     }
 
+    /// <summary>BUG #311 (autolog 25-10 12:16:39-12:18:34): de basisrit (wissel 2 afbuigend) gaf kortsluiting na 129 (13, 5, 12, 11, 4, 129); de proef met wissel 3 erbij gaf dezelfde
+    /// kortsluiting, maar 129 was nog niet als nieuwe melder geteld (de loc stond er al deels in: "ook bezet: 129"). De proef heette daardoor 'kortsluiting na 4 met adres 3' en wissel 3
+    /// (bestaat op de baan niet) werd een vondst. Zelfde kortsluiting = zelfde reeks, of de reeks van de basis zonder de laatste melder terwijl die laatste melder al bezet was.</summary>
+    internal static bool ZelfdeKortsluitingAlsBasis(RitResultaat basis, RitResultaat proef)
+    {
+        if (basis.Einde != RitEinde.Kortsluiting || proef.Einde != RitEinde.Kortsluiting) return false;
+        if (proef.Reeks.SequenceEqual(basis.Reeks)) return true;
+        return basis.Reeks.Count >= 2 && proef.Reeks.Count == basis.Reeks.Count - 1 && proef.Reeks.SequenceEqual(basis.Reeks.Take(proef.Reeks.Count))
+               && proef.OokBezetBijKortsluiting.Contains(basis.Reeks[^1]);
+    }
+
     /// <summary>BUG #227: ligt <paramref name="m"/> volgens de kaart aan de andere kant van <paramref name="start"/> (start -> m minstens 3 keer in de andere richting gereden en
     /// nooit vaker in richting <paramref name="r"/>)?</summary>
     internal static bool IsAchterkantMelder(Baankaart kaart, int start, Richting r, int m)
@@ -3142,6 +3155,7 @@ public partial class BaanVerkenner
         if (_laatsteKortsluitBlokken.Count == 0 && alarmBlokken is { Count: > 0 }) _laatsteKortsluitBlokken = alarmBlokken.ToList();
         // BUG #75: welke andere melder is nu ook bezet? Daar staat de loc met een deel al in: wijst naar de betrokken wissel.
         _laatsteKortsluitMelders = _monitor.Bezet.Where(m => m != x).OrderBy(m => m).ToList();
+        res.OokBezetBijKortsluiting = _laatsteKortsluitMelders.ToList();   // BUG #311
         _hw.Noodstop();
         _laatsteKortsluitingOm = _klok.Nu;
         _laatsteKortsluitContext = (x, res.Richting, new Configuratie(_wisselStand.Where(w => w.Value).Select(w => w.Key).ToArray()));

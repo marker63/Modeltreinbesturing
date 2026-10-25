@@ -2947,3 +2947,8 @@ De kortsluiting kwam achteruit na 129 (loc op 129 en 4, keerlus, blok 2 en 9). T
 kortsluitpunt #1 (na 24, VOORUIT, afbuigend 5), omdat 129 daar als tweede melder bij stond. Nu hoort een alarm-oplossing alleen bij een kortsluitpunt met dezelfde rijrichting als de
 kortsluiting. (Het wegvallen van het alarm zelf was hier ook vals: 0,2 s na het commando en 0,4 s vóór de terugmelding van wissel 4 – dat vangt #308 af; deze run draaide nog
 zonder #308. De voorlopige "oplossing wissel 4" staat nog in de voortgang van 11:32; ritten over 14 -> 129 -> 24 weerleggen die (#204), wissel 4 doet op de baan niets.)
+
+## BUG #311 – OPGELOST (nog niet getest op de baan): valse vondst "wissel 3: niet rijden van 11 naar 4 (achteruit) als wissel 3 afbuigend" (autolog 25-10 12:16:07-12:18:34)
+De basisrit achteruit met wissel 2 afbuigend gaf kortsluiting na 129 (13, 5, 12, 11, 4, 129). De proef met wissel 3 erbij gaf dezelfde kortsluiting, maar 129 was nog niet als nieuwe
+melder geteld (de loc stond er al deels in: "ook bezet: 129"). De proef heette daardoor "kortsluiting na 4 met adres 3" en wissel 3 (bestaat op de baan niet) werd een vondst. Nu geldt
+als dezelfde kortsluiting ook: de reeks van de basisrit zonder de laatste melder, terwijl die laatste melder bij de kortsluiting al bezet was; dan veranderde het proefadres niets.

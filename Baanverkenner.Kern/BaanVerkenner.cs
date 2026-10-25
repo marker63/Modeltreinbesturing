@@ -1320,7 +1320,7 @@ public partial class BaanVerkenner
                 if (proef.Einde == RitEinde.Kortsluiting && proefExtra.Count > 0)
                     foreach (var t238 in _kaart.WeerlegVoorkennis(proef.Reeks, o.Richting, proefCfg, proef.Reeks[^1], null)) { _log.Waarschuwing("Voorkennis weerlegd (BUG #238): " + t238 + "."); _kaart.Waarschuwingen.Add(t238); }
                 bool afwijkendePad = ProefWijktAf(basis.Reeks, proef.Reeks);
-                bool zelfdeKortsluiting = basis.Einde == RitEinde.Kortsluiting && proef.Reeks.SequenceEqual(basis.Reeks);
+                bool zelfdeKortsluiting = ZelfdeKortsluitingAlsBasis(basis, proef);   // BUG #311
                 (int Partner, RitResultaat Rit)? partner = null;
                 // BUG #92 (log 14:38): wissel 10 afbuigend gaf kortsluiting zodra de loc op melder 24 (de kruiswissel) kwam en bleef die geven
                 // zolang de loc daar stond. De partnerzoektocht (andere wissels meeschakelen) zette toen wissel 5 afbuigend terwijl de loc op de
@@ -1994,6 +1994,11 @@ public partial class BaanVerkenner
             return;
         }
         _proefAfwijkend.Clear();
+        if (ZelfdeKortsluitingAlsBasis(basis, proef) && !proef.Reeks.SequenceEqual(basis.Reeks))
+        {
+            _log.Info($"Proef met adres {a}: dezelfde kortsluiting als de basisrit (na melder {basis.Reeks[^1]}, waar de loc al deels stond); adres {a} veranderde niets (BUG #311).");
+            return;
+        }
         // BUG #307 (autolog 25-10 10:17:47-10:18:15): na een Dinamo-uitval werd wissel 8 (bestaat op de baan niet) nooit teruggemeld; de foutmelding van Dinamo daarna gaf de vondst
         // "wissel 8: kortsluiting tussen 13 en 14". Een wissel die Dinamo niet omzette, kan niets veroorzaken: zo'n proef zegt niets over het adres.
         if (LaatsteCommandoTeruggemeld(a) == false && proef.Einde != RitEinde.GelijkAanBasis)

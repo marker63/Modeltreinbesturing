@@ -2847,6 +2847,16 @@ public static class Tests
             klok262.Wacht(TimeSpan.FromMilliseconds(300), CancellationToken.None).GetAwaiter().GetResult(); mon262b.Bijwerken();
             Eis(mon262b.Bezet.Contains(31) && mon262b.Flikkeraars.Count == 0, "knippermelder (#262): een nieuwe melder die gewoon bezet raakt (een paar wissels) telt wel");
         }
+        // BUG #311: proef met wissel 3 gaf dezelfde kortsluiting als de basisrit, alleen was 129 nog niet als nieuwe melder geteld (autolog 25-10 12:16:39)
+        {
+            RitResultaat R(RitEinde e, IEnumerable<int> reeks, params int[] ook) { var r = new RitResultaat { Einde = e, Richting = Richting.Achteruit }; r.Reeks.AddRange(reeks); r.OokBezetBijKortsluiting = ook.ToList(); return r; }
+            var b311 = R(RitEinde.Kortsluiting, new[] { 13, 5, 12, 11, 4, 129 }, 4);
+            Eis(BaanVerkenner.ZelfdeKortsluitingAlsBasis(b311, R(RitEinde.Kortsluiting, new[] { 13, 5, 12, 11, 4 }, 129)), "zelfde kortsluiting (#311): proef tot 4 met 129 al bezet = de kortsluiting van de basisrit na 129");
+            Eis(!BaanVerkenner.ZelfdeKortsluitingAlsBasis(b311, R(RitEinde.Kortsluiting, new[] { 13, 5, 12, 11, 4 })), "zelfde kortsluiting (#311): proef tot 4 zonder 129 bezet is een andere kortsluiting");
+            Eis(!BaanVerkenner.ZelfdeKortsluitingAlsBasis(b311, R(RitEinde.Kortsluiting, new[] { 13, 5, 12, 11 }, 4)), "zelfde kortsluiting (#311): twee melders korter telt niet");
+            Eis(BaanVerkenner.ZelfdeKortsluitingAlsBasis(b311, R(RitEinde.Kortsluiting, new[] { 13, 5, 12, 11, 4, 129 })), "zelfde kortsluiting (#311): gelijke reeks blijft gelijk");
+            Eis(!BaanVerkenner.ZelfdeKortsluitingAlsBasis(R(RitEinde.Lus, new[] { 13, 5, 12, 11, 4, 129 }), R(RitEinde.Kortsluiting, new[] { 13, 5, 12, 11, 4 }, 129)), "zelfde kortsluiting (#311): basis zonder kortsluiting telt niet");
+        }
         // BUG #306: melder 268 bleef bezet (autolog 25-10 09:50:05) terwijl de loc 17, 8, 15 reed; een loc op de grens van twee melders is geen vastzitter
         {
             var k306 = new VirtueleKlok();
