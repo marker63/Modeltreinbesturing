@@ -1994,6 +1994,13 @@ public partial class BaanVerkenner
             return;
         }
         _proefAfwijkend.Clear();
+        // BUG #307 (autolog 25-10 10:17:47-10:18:15): na een Dinamo-uitval werd wissel 8 (bestaat op de baan niet) nooit teruggemeld; de foutmelding van Dinamo daarna gaf de vondst
+        // "wissel 8: kortsluiting tussen 13 en 14". Een wissel die Dinamo niet omzette, kan niets veroorzaken: zo'n proef zegt niets over het adres.
+        if (LaatsteCommandoTeruggemeld(a) == false && proef.Einde != RitEinde.GelijkAanBasis)
+        {
+            _log.Waarschuwing($"Proef met adres {a}: Dinamo heeft het commando voor wissel {a} niet teruggemeld (de wissel is dus waarschijnlijk niet omgezet). Wat er in deze rit gebeurde ({proef.Einde}) wordt niet aan adres {a} toegeschreven (BUG #307).");
+            return;
+        }
         var b = basis.Reeks;
         var t = proef.Reeks;
         int i = 0;

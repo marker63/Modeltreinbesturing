@@ -453,6 +453,7 @@ public partial class BaanVerkenner
         if (!forceer && _wisselStand.TryGetValue(adres, out var huidig) && huidig == afbuigend) return;
         if (!forceer) await VrijRijdenVoorWissel(adres);   // BUG #181
         long bevestigingenVoor = (_hw as IWisselBevestiging)?.AantalWisselBevestigingen ?? 0;
+        long eigenVoor = (_hw as IWisselBevestiging)?.BevestigingenVan(adres, afbuigend) ?? -1;   // BUG #307
         _hw.ZetWissel(adres, afbuigend);
         // BUG #181: tijdens het NAVIGEREN (de loc rijdt naar een andere plek) mag geen wissel omgaan die de kaart bij een nu bezette melder noemt: de loc staat er met een deel
         // op of tegen de tong (de gevaarlijkste overschrijving van een stand). Verkenningsritten zetten de wissel vóór de loc bewust om en tellen niet mee.
@@ -475,6 +476,7 @@ public partial class BaanVerkenner
         // 3,6 s later kortsluiting, en dezelfde rit zonder nieuw commando lukte wel. Ligt de wissel achter een melder waarop de loc nu staat, dan
         // krijgt de tong extra tijd voordat de loc weer wegrijdt.
         // BUG #126: eerst op de terugmelding wachten. Meldt Dinamo niets terug, dan beweegt er niets en zijn de extra wachttijden hieronder zinloos (kostte 3,6 s per commando).
+        if (eigenVoor >= 0) _laatsteCommandoPerWissel[adres] = (afbuigend, eigenVoor);   // BUG #307
         bool? terugmelding = await WachtOpBevestiging(bevestigingenVoor);
         // BUG #223 (log 18-10 12:03:22-12:03:26): tijdens een kortsluiting kwam de terugmelding van wissel 2 pas na 3,6 s. Na 1 s telde dat als 'geen terugmelding' en daardoor
         // stonden rit #3 en #4 als ONBETROUWBAAR (Dinamo-uitval) in het rapport. Met een (recent) blokalarm langer wachten; komt er dan nog niets, dan telt het niet als uitval.
@@ -604,6 +606,17 @@ public partial class BaanVerkenner
         if (_hw is not IWisselBevestiging bron) return null;
         for (int i = 0; i < 10 && bron.AantalWisselBevestigingen <= bevestigingenVoor; i++) await Wacht(TimeSpan.FromMilliseconds(100));
         return bron.AantalWisselBevestigingen > bevestigingenVoor;
+    }
+
+    /// <summary>BUG #307: per wissel het laatste commando (Dinamo-stand) en het aantal eigen terugmeldingen daarvoor.</summary>
+    private readonly Dictionary<int, (bool Afbuigend, long EigenVoor)> _laatsteCommandoPerWissel = new();
+
+    /// <summary>BUG #307: heeft Dinamo het laatste commando voor deze wissel (ooit, ook laat) teruggemeld? null = niet bekend. De uitvalbewaking (#126) blijft op het totaal
+    /// werken; dit is alleen om een vondst niet toe te schrijven aan een wissel die niet is omgezet.</summary>
+    private bool? LaatsteCommandoTeruggemeld(int adres)
+    {
+        if (_hw is not IWisselBevestiging bron || !_laatsteCommandoPerWissel.TryGetValue(adres, out var lc)) return null;
+        return bron.BevestigingenVan(adres, lc.Afbuigend) > lc.EigenVoor;
     }
 
     private async Task VerwerkBevestiging(int adres, bool afbuigend, bool bevestigd)

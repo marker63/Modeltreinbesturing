@@ -1730,6 +1730,29 @@ public static class Tests
             "zelf terug (#164): 12 -> 5 (omgekeerde overgang, wissel 2 afbuigend) -> 13 (nu " + (w164 is null ? "geen weg" : string.Join(" | ", w164.Select(x => $"{x.Van}>{x.Naar} {x.Richting} {x.Cfg}"))) + ")");
     }
 
+    // BUG #307: een wissel die Dinamo niet terugmeldt (wissel 8 na de uitval, autolog 25-10 10:17:47) krijgt geen vondst; echo's van andere wissels tellen niet als terugmelding
+    static void EigenTerugmeldingTest()
+    {
+        Console.WriteLine("Test: terugmelding per wissel (BUG #307)");
+        foreach (bool uitval in new[] { true, false })
+        {
+            var sim = new Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan { DinamoGedrag = true, LocAdres = 5408, UitvalVanafCommando = uitval ? 2 : int.MaxValue, UitvalDuur = TimeSpan.FromMinutes(10) };
+            var s1 = sim.NieuweSectie(1, 80, 1); var s2 = sim.NieuweSectie(2, 80, 2);
+            sim.Verbind(s1, Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.B, s2, Baanverkenner.Kern.Simulatie.SimulatieBaan.Eind.A); sim.PlaatsLoc(s1, 40, +1);
+            var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 8, DinamoBlokken = "1-2" };
+            sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+            var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+            var v = new BaanVerkenner(sim, ins, klok, new VerkenLog(klok), (_, _) => Task.FromResult(true), new VerkenStatus { Instellingen = ins });
+            var bf = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var zet = typeof(BaanVerkenner).GetMethod("ZetWissel", bf)!;
+            ((Task)zet.Invoke(v, new object[] { 7, true, false })!).GetAwaiter().GetResult();   // wordt uitgevoerd en teruggemeld
+            ((Task)zet.Invoke(v, new object[] { 8, true, false })!).GetAwaiter().GetResult();   // bij 'uitval' niet
+            var tm = (bool?)typeof(BaanVerkenner).GetMethod("LaatsteCommandoTeruggemeld", bf)!.Invoke(v, new object[] { 8 });
+            var tm7 = (bool?)typeof(BaanVerkenner).GetMethod("LaatsteCommandoTeruggemeld", bf)!.Invoke(v, new object[] { 7 });
+            Eis(tm == !uitval && tm7 == true, $"terugmelding (#307, {(uitval ? "uitval" : "normaal")}): wissel 8 teruggemeld = {tm}, wissel 7 = {tm7}");
+        }
+    }
+
     static void StopVoorTerugzettenTest()
     {
         Console.WriteLine("Test: stop naar alle blokken voordat de loc terug gezet moet worden (BUG #94)");
@@ -3379,6 +3402,7 @@ public static class Tests
         HoortestEnKruisTest();
         KruisZonderReferentieTest();
         WisselTerugmeldingTest();
+        EigenTerugmeldingTest();
         NastellenAnderBlokTest();
         StatischeKortsluitingTest();
         StopTijdensTerugritTest();

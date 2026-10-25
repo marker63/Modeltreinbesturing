@@ -2925,3 +2925,10 @@ Dinamo meldde om 09:50:05 melder 268 (bestaat niet) bezet, tussen 25 en 17, en d
 ("bezet: 14, 268"), de verkenner vroeg drie keer om hulp en reed met wissels "bij de loc" op 268. Nu: blijft een melder bezet terwijl daarna 3 andere (al bekende) melders bezet raken,
 dan is het een vastzittende melding (de loc is niet langer dan een melder): hij telt niet meer als bezet tot Dinamo hem weer vrij meldt, en hij gaat uit de kaart (melder,
 overgangen, doorgangen, ritten). Een kortsluitecho als 137/138 telt niet mee als 'verder'.
+
+## BUG #307 – OPGELOST (nog niet getest op de baan): valse vondst "wissel 8: kortsluiting tussen 13 en 14" na een Dinamo-uitval (autolog 25-10 10:16:56-10:18:15)
+Na de uitval (10:16:56-10:17:38) werd het commando "wissel 8 afbuigend" (10:17:47) nooit door Dinamo teruggemeld; de herhaalde terugmeldingen van wissel 7 telden als bevestiging.
+De foutmelding van Dinamo om 10:17:54 (F-bit, geen blok) werd daardoor als kortsluiting door wissel 8 vastgelegd (wissel 8 bestaat op de baan niet). Nu: de hardware houdt de
+terugmeldingen per wissel en stand bij; heeft Dinamo het proefcommando van een wissel (ook laat) niet teruggemeld, dan wordt wat er in die proefrit gebeurde niet aan die wissel
+toegeschreven. De uitvalbewaking (#126) blijft op het totaal werken. Gezien in het hardwarelog van de sessie vanaf 10:01: 56 van de 120 wisselcommando's kregen geen eigen terugmelding
+en 16 kwamen 2 tot 4,6 s te laat (sessie 09:34: 2 van 58); Dinamo liep in die sessie dus achter.

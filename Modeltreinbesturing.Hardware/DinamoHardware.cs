@@ -188,6 +188,15 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
     /// <inheritdoc/>
     public long AantalWisselBevestigingen => Interlocked.Read(ref _wisselBevestigingen);
 
+    /// <summary>BUG #307: terugmeldingen per wissel en stand (onder het slot van _laatsteTerugmeldingen).</summary>
+    private readonly Dictionary<(int Adres, bool Afbuigend), long> _bevestigingenPerStand = new();
+
+    /// <inheritdoc/>
+    public long BevestigingenVan(int adres, bool afbuigend)
+    {
+        lock (_laatsteTerugmeldingen) return _bevestigingenPerStand.TryGetValue((adres, afbuigend), out var n) ? n : 0;
+    }
+
     public double? SecondenSindsLaatsteOntvangst
     {
         get
@@ -1083,7 +1092,12 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
                 {
                     byte t1 = (byte)(_ontvangstBuffer[i + 1] & 0x7F), t2 = (byte)(_ontvangstBuffer[i + 2] & 0x7F);
                     string tAdres = DinamoLogVertaler.WisselTerugmeldingTekst(t1, t2, out string tStand);
-                    lock (_laatsteTerugmeldingen) _laatsteTerugmeldingen[int.Parse(tAdres)] = (System.Diagnostics.Stopwatch.GetTimestamp(), tStand);
+                    lock (_laatsteTerugmeldingen)
+                    {
+                        _laatsteTerugmeldingen[int.Parse(tAdres)] = (System.Diagnostics.Stopwatch.GetTimestamp(), tStand);
+                        var sleutel307 = (int.Parse(tAdres), tStand.StartsWith("afb", StringComparison.OrdinalIgnoreCase));   // BUG #307
+                        _bevestigingenPerStand[sleutel307] = _bevestigingenPerStand.TryGetValue(sleutel307, out var n307) ? n307 + 1 : 1;
+                    }
                 }
                 string vertaling = DinamoLogVertaler.KortTekst("In", frameBytes);
                 HardwareCommunicatieLog.Log("In", $"[Dinamo] {Convert.ToHexString(frameBytes)}{(vertaling.Length > 0 ? "  = " + vertaling : "")}", keepalive: ditIsKeepalive);

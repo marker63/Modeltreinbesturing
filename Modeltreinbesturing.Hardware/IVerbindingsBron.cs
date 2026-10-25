@@ -24,6 +24,11 @@ public interface IWisselBevestiging
     /// <summary>Aantal terugmeldingen van wissel-commando's sinds het verbinden.</summary>
     long AantalWisselBevestigingen { get; }
 
+    /// <summary>BUG #307: aantal terugmeldingen van precies deze wissel in deze stand (Dinamo-stand) sinds het verbinden; -1 = niet bekend (dan telt alleen het totaal).
+    /// Nodig omdat Dinamo na een uitval nog oude terugmeldingen van andere wissels herhaalt (autolog 25-10 10:17:47: wissel 8 werd nooit teruggemeld, maar de echo's van wissel 7
+    /// telden als bevestiging).</summary>
+    long BevestigingenVan(int adres, bool afbuigend) => -1;
+
     /// <summary>BUG #154: de verkenner constateert dat wisselcommando's niet meer worden teruggemeld; de hardware schrijft dan dezelfde
     /// uitvaldiagnose in het hardwarelog als bij 'Dinamo antwoordt niet' (#138). Standaard doet dit niets (simulator, stubs).</summary>
     void LogWisselUitval(string reden) { }

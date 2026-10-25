@@ -11,6 +11,8 @@ public class UitvalSimulatieBaan : SimulatieBaan, IWisselBevestiging
     private DateTime? _uitvalStart;
 
     public long AantalWisselBevestigingen => _bevestigingen;
+    private readonly Dictionary<(int, bool), long> _perStand = new();
+    public long BevestigingenVan(int adres, bool afbuigend) => _perStand.TryGetValue((adres, afbuigend), out var n) ? n : 0;   // BUG #307
 
     /// <summary>Het wisselcommando (tellend sinds het verbinden) waarmee de uitval begint.</summary>
     public int UitvalVanafCommando { get; set; } = int.MaxValue;
@@ -26,5 +28,6 @@ public class UitvalSimulatieBaan : SimulatieBaan, IWisselBevestiging
         if (_uitvalStart is { } s && nu - s < UitvalDuur) { GenegeerdeCommandos++; return; }
         base.ZetWissel(adres, afbuigend);
         _bevestigingen++;
+        _perStand[(adres, afbuigend)] = _perStand.TryGetValue((adres, afbuigend), out var n) ? n + 1 : 1;   // BUG #307
     }
 }
