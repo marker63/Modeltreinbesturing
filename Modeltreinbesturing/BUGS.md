@@ -2952,3 +2952,10 @@ zonder #308. De voorlopige "oplossing wissel 4" staat nog in de voortgang van 11
 De basisrit achteruit met wissel 2 afbuigend gaf kortsluiting na 129 (13, 5, 12, 11, 4, 129). De proef met wissel 3 erbij gaf dezelfde kortsluiting, maar 129 was nog niet als nieuwe
 melder geteld (de loc stond er al deels in: "ook bezet: 129"). De proef heette daardoor "kortsluiting na 4 met adres 3" en wissel 3 (bestaat op de baan niet) werd een vondst. Nu geldt
 als dezelfde kortsluiting ook: de reeks van de basisrit zonder de laatste melder, terwijl die laatste melder bij de kortsluiting al bezet was; dan veranderde het proefadres niets.
+
+## BUG #312 – OPEN (gezien, nog niet opgelost): navigatie zet wissel 5/6 om met de loc op 129 (autolog 25-10 12:39:08 en 12:41:02)
+Bij het zelf oplossen reed de verkenner 129 -> 14 (achteruit) met wissel 5/6 en 10 afbuigend; die werden omgezet terwijl de loc op 129 stond (net vanaf 10 aangekomen). De loc reed
+twee keer toch naar 10. Uitwijken (#256) werd zonder melding geweigerd omdat de enige melder om naar uit te wijken (24) in de kaart ook 'bij wissel 5' hoort. Twee pogingen geprobeerd en
+teruggedraaid: (1) wissels bij de loc nooit omzetten als uitwijken niet kan -> keerlus-simulatie: 14 x naar 10 en 4 x hulp; (2) uitwijken toestaan als 24 en 129 alleen de twee takken
+van wissel 5 zijn -> rondrit-simulatie niet meer voltooid. De simulatie laat een wissel onder de loc gewoon omgaan; op de baan lukt dat kennelijk niet (overloop 5+6, wissel 6 ligt
+bij 129). Eerst de simulatie realistischer maken (wissel onder een loc beweegt niet), dan dit oplossen.
