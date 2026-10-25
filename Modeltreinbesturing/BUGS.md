@@ -2938,3 +2938,6 @@ Met alle wissels rechtdoor kwam er na melder 14 een kortsluiting in blok 3. Bij 
 VOORDAT Dinamo wissel 2 terugmeldde (10:35:30.328): de wissel was toen nog niet omgezet, Dinamo zette het alarm zelf uit. Toch werd het als oplossing (en kortsluitpunt) vastgelegd. Nu: stond
 er bij een wisselcommando een kortsluiting en verdwijnt die voordat de eigen terugmelding van die wissel binnen is, dan wordt het niet aan de wissel toegeschreven; de wissel gaat terug.
 (Hoe de kortsluiting in blok 3 met de loc op 14 ontstond, is uit de logs niet te zien; Marco herstartte daarna en de volgende rit ging goed.)
+
+## BUG #309 – OPGELOST: logtekst "Dinamo hersteld volgens de gebruiker" terwijl Dinamo vanzelf herstelde (autolog 25-10 10:17:38 en 10:53:06)
+Na "Dinamo meldt wissel-commando's weer terug ... Dinamo is vanzelf hersteld" volgde "Dinamo hersteld volgens de gebruiker", terwijl de gebruiker niets had gedaan. Nu staat er "(vanzelf)".

@@ -676,7 +676,8 @@ public partial class BaanVerkenner
         TerugNaarVoorUitval(vanzelfHersteld ? "Dinamo reageerde vanzelf weer" : "Dinamo hersteld");
         if (!vanzelfHersteld) await HoortestNaHerstel();
         _echo.Herstel();
-        _log.Info("Dinamo hersteld volgens de gebruiker: alle wissels worden opnieuw gestuurd. Bevindingen sinds de eerste ontbrekende terugmelding zijn niet betrouwbaar.");
+        // BUG #309 (autolog 25-10 10:17:38 en 10:53:06): na "Dinamo is vanzelf hersteld" stond er "hersteld volgens de gebruiker", terwijl de gebruiker niets gedaan had
+        _log.Info($"Dinamo hersteld{(vanzelfHersteld ? " (vanzelf)" : " volgens de gebruiker")}: alle wissels worden opnieuw gestuurd. Bevindingen sinds de eerste ontbrekende terugmelding zijn niet betrouwbaar.");
         // BUG #173 (Marco 17-10: "de loc stond stil op wissel 5, toen de problemen met de wissels begonnen"): een wissel waar de loc op of tegenaan staat wordt
         // niet opnieuw gestuurd (ook niet in dezelfde stand), en de kruismotoren niet als de loc op de kruiswissel staat. Hij blijft zoals hij stond.
         var onderLoc = WisselsOnderLoc();
