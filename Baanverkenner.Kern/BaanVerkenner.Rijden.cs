@@ -3393,7 +3393,7 @@ public partial class BaanVerkenner
         {
             // BUG #336 (nachtwerk 25/26-10, simulatie met Dinamo-uitval, blokfase 15:53:34): daarna ging de wissel tóch om, met de loc erop. Nu blijft hij staan zolang de loc op deze
             // melder staat; de rit gaat met de huidige stand (komt de loc ergens anders uit, dan is dat een gewone navigatiefout, geen kortsluiting onder de loc).
-            _log.Info($"Wissel {Lijst(teOm)} moet om voor de stap vanaf melder {van}, maar ligt bij de melder waar de loc staat; er is geen eenduidige melder om eerst naar terug te rijden. De wissel blijft staan zolang de loc daar staat (BUG #336, nog niet getest op de baan).");
+            _log.Info($"Wissel {Lijst(teOm)} moet om voor de stap vanaf melder {van}, maar ligt bij de melder waar de loc staat; er is geen eenduidige melder om eerst naar terug te rijden." + (_ins.GekoppeldeParen().Count > 0 ? " De wissel blijft staan zolang de loc daar staat (BUG #336, nog niet getest op de baan)." : ""));
             if (_ins.GekoppeldeParen().Count > 0) _uitwijkLaatStaan = (van, teOm.ToHashSet());   // zie #335: alleen met opgegeven overloopsets
             return null;
         }
@@ -3697,6 +3697,7 @@ public partial class BaanVerkenner
             // BUG #164: een melder waar de loc net onverwacht terechtkwam (bijv. 12 na een klem-oplossing) staat nog niet als overgang op de kaart.
             // De loc rijdt dan dezelfde weg terug (andere richting, zelfde wisselstand) naar de laatste melder die klopte en gaat vandaar verder.
             var voorstap = new List<(int Van, int Naar, Richting Richting, Configuratie Cfg)>();
+            bool voorstapMetOplossing = false;
             int vanaf = x;
             if (nf.Onverwacht == x && nf.LaatsteGoed is int lg && lg != x && nf.RitRichting is Richting rr && nf.RitConfiguratie is Configuratie rc)
             {
@@ -3704,6 +3705,7 @@ public partial class BaanVerkenner
                 var terugCfg = rc;
                 foreach (var ko in _kaart.AlleKortsluitOplossingen().Where(o => o.NaMelder == lg && o.Richting == rr)) terugCfg = terugCfg.MetStand(ko.Adres, ko.Afbuigend);
                 voorstap.Add((x, lg, rr.Om(), terugCfg)); vanaf = lg;
+                voorstapMetOplossing = !terugCfg.Equals(rc);
             }
             // BUG #232: met een voorstap (x -> lg) komt de loc op lg aan vanaf x; keren op lg mag dan alleen terug naar x.
             int? aankVia = voorstap.Count > 0 ? x : _ingang is { } ing232 && ing232.Melder == x ? ing232.Via : null;
@@ -3713,7 +3715,8 @@ public partial class BaanVerkenner
             var restWeg = basisWeg?.Select(w => (w.Van, w.Naar, w.Richting, Cfg: Configuratie.Basis)).ToList()
                       ?? ZelfTerugWegAlleStanden(_kaart, vanaf, _kaart.StartMelder, aankVia, aankR);
             // nachtwerk 25/26-10: ook de voorstap terug naar de laatste goede melder in dezelfde richting zo veel mogelijk met de stand van de stap daarna (21 -> 24 -> 14: wissel 10 eerst rechtdoor)
-            var weg = restWeg is null ? null : StemStandenAf(_kaart, voorstap.Concat(restWeg).ToList());
+            // (behalve als de voorstap een kortsluitoplossing nodig heeft: die stand blijft precies zo)
+            var weg = restWeg is null ? null : voorstapMetOplossing ? voorstap.Concat(StemStandenAf(_kaart, restWeg.ToList())).ToList() : StemStandenAf(_kaart, voorstap.Concat(restWeg).ToList());
             if (voorstap.Count > 0) basisWeg = null;
             if (weg is null) { _log.Info($"Melder {x} ligt niet op de route terug en er is geen bekende weg naar melder {_kaart.StartMelder}; de verkenner rijdt niet zelf terug."); return false; }
             _log.Info($"De kortsluiting is weg en de loc staat op melder {x}: de verkenner rijdt zelf terug naar melder {_kaart.StartMelder} over de bekende {(basisWeg is null ? "weg (met de wisselstanden waarmee die gezien is)" : "basisweg")} ({Lijst(new[] { x }.Concat(weg.Select(s => s.Naar)).ToList())}) (niet getest op de baan).");
