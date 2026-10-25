@@ -671,6 +671,7 @@ public partial class BaanVerkenner
             int m = rij.Dequeue();
             foreach (var o in kaart.Overgangen.Where(o => o.Van == m && o.GezienBijConfiguraties.Contains(basis)).OrderBy(o => o.Naar))
             {
+                if (vorige.TryGetValue(m, out var vm) && kaart.DoorgangOnmogelijk(vm.Van, m, o.Naar)) continue;   // BUG #297
                 if (!gezien.Add(o.Naar)) continue;
                 vorige[o.Naar] = (m, o.Richting);
                 if (o.Naar == naar)
@@ -713,6 +714,7 @@ public partial class BaanVerkenner
             foreach (var (nxt, rch, o) in opties)
             {
                 if (!KerenToegestaan(st.Via, st.R, nxt, rch)) continue;   // BUG #232
+                if (kaart.DoorgangOnmogelijk(st.Via, m, nxt)) continue;     // BUG #297: niet van been A naar been B
                 var volgend = (M: nxt, Via: m, R: (Richting?)rch);
                 if (!gezien.Add(volgend)) continue;
                 var c = o.GezienBijConfiguraties.Select(Configuratie.VanSleutel).OrderBy(x => x.Afbuigend.Length).ThenBy(x => x.Sleutel, StringComparer.Ordinal).First();
@@ -2423,7 +2425,8 @@ public partial class BaanVerkenner
         if (wijz.Count > 0)
             _log.Info($"Wisselstand voor het pad {string.Join("-", pad)} ({r.Tekst()}) aangepast aan wat over de wissels bekend is: {string.Join(", ", wijz)}. Nieuwe stand: {nieuw}.");
         // BUG #270: ook wat de gereden overgangen zeggen over een splitsing zonder splitsingswaarneming (kruismotor 10 bij 24 achteruit: 24 -> 14 alleen met 10 rechtdoor, 24 -> 129 alleen met 10 afbuigend)
-        var (metOvergang, wijz5) = MetOvergangEisen(_kaart, pad, r, nieuw);
+        int? via296 = _ingang is { } ing296 && ing296.Melder == pad[0] && ing296.Richting == r && ing296.Via != 0 ? ing296.Via : null;
+        var (metOvergang, wijz5) = MetOvergangEisen(_kaart, pad, r, nieuw, via296);
         if (wijz5.Count > 0)
         {
             _log.Info($"Wisselstand voor het pad {string.Join("-", pad)} ({r.Tekst()}) aangepast aan de standen waarmee elke stap gereden is: {string.Join(", ", wijz5)}. Nieuwe stand: {metOvergang} (BUG #270).");
@@ -2436,8 +2439,9 @@ public partial class BaanVerkenner
         // BUG #293 (simulatie keerlus 14:44:47; baan 21-10 14:51 en 15:27): een navigatie die op 4 begint (4 -> 129 achteruit) zette wissel 9 rechtdoor, terwijl kortsluitpunt #3 bewees
         // dat die stap wissel 9 afbuigend vraagt; die oplossing hoorde bij een andere stand en telde hier niet. Bewezen oplossingen waarvan de laatste stap in dit pad zit, gelden nu altijd.
         // Een verboden ingang hieronder gaat nog steeds voor (en #280 zet de wissel onderweg om als het pad hem beide kanten op vraagt).
+        var stapVast = OvergangEisen(_kaart, pad, r, via296);
         foreach (var (a, afb, uitleg) in BewezenOplossingenOpPad(_kaart, pad, r))
-            if (metOplossing.Bevat(a) != afb)
+            if (metOplossing.Bevat(a) != afb && !stapVast.ContainsKey(a))   // BUG #298: wat de gereden overgangen/doorgangen voor dit pad zeggen, gaat voor
             {
                 metOplossing = metOplossing.MetStand(a, afb);
                 _log.Info($"Wisselstand voor het pad {string.Join("-", pad)} ({r.Tekst()}): wissel {a} {(afb ? "afbuigend" : "rechtdoor")} ({uitleg}, BUG #293).");
@@ -2454,6 +2458,12 @@ public partial class BaanVerkenner
         return metKruis;
     }
 
+    /// <summary>BUG #298: de melder waar de loc na het kortsluitpunt heen reed toen de oplossing werkte (uit de waarneming 'lost kortsluiting op'), of null.</summary>
+    internal static int? OplossingVolgende(Baankaart kaart, Kortsluitpunt kp, int adres, bool afb)
+        => kaart.Wissels.Where(w => w.Adres == adres).SelectMany(w => w.Waarnemingen)
+                .Where(o => o.Soort == WaarnemingSoort.LostKortsluitingOp && o.NaMelder == kp.NaMelder && o.Richting == kp.Richting)
+                .Select(o => afb ? o.VolgendeBijAfbuigend : o.VolgendeBijRechtdoor).FirstOrDefault(v => v is int);
+
     /// <summary>BUG #293: bewezen (niet voorlopige) oplossingen van kortsluitpunten in richting <paramref name="r"/> waarvan de laatste stap van de route een stap van het pad is.
     /// Tegenstrijdige oplossingen voor één wissel tellen niet.</summary>
     internal static List<(int Adres, bool Afbuigend, string Uitleg)> BewezenOplossingenOpPad(Baankaart kaart, List<int> pad, Richting r)
@@ -2466,6 +2476,9 @@ public partial class BaanVerkenner
             var lp = kp.Route.LastOrDefault()?.Pad;
             if (lp is null || lp.Count < 2 || !stappen.Contains((lp[^2], lp[^1]))) continue;
             int a = kp.OpgelostDoorAdres!.Value; bool afb = kp.OpgelostMetAfbuigend!.Value;
+            // BUG #298 (simulatie rondrit na #297): de oplossing van kortsluitpunt #4 (na 24, 10 afbuigend; de geslaagde rit ging naar 129) werd ook gebruikt voor het pad 21 -> 24 -> 14:
+            // de loc reed naar 129. Is bekend naar welke melder de geslaagde rit ging, dan geldt de oplossing alleen als het pad daar ook heen gaat.
+            if (OplossingVolgende(kaart, kp, a, afb) is int vv && !stappen.Contains((kp.NaMelder, vv))) continue;
             if (res.TryGetValue(a, out var b) && b.Afb != afb) strijdig.Add(a);
             res[a] = (afb, $"kortsluitpunt #{kp.Id}: {lp[^2]} -> {lp[^1]} {r.Tekst()} was daarmee opgelost");
         }
@@ -2477,15 +2490,16 @@ public partial class BaanVerkenner
     /// Bij melder 24 (kruiswissel) is geen splitsing van wissel 10 bekend, wel de overgangen: 24 -> 14 (achteruit) altijd met 10 rechtdoor, 24 -> 129 altijd met 10 afbuigend. Elke stap
     /// van het pad krijgt nu de stand van de wissels die zijn vervolgen onderscheiden. Zeggen twee stappen iets anders over dezelfde wissel, dan blijft die wissel zoals hij was
     /// (<see cref="SplitsOpOvergangEisen"/> deelt zo'n pad in stukken).</summary>
-    internal static (Configuratie Stand, List<string> Wijzigingen) MetOvergangEisen(Baankaart kaart, List<int> pad, Richting r, Configuratie c)
+    internal static Dictionary<int, bool> OvergangEisen(Baankaart kaart, List<int> pad, Richting r, int? via = null)
     {
         var eisen = new Dictionary<int, bool>(); var strijdig = new HashSet<int>();
         for (int i = 0; i + 1 < pad.Count; i++)
         {
             var stap = BaanVerkenner.StapEisenUitOvergangen(kaart, pad[i], pad[i + 1], r);
             // BUG #296: de doorgang (vorige -> deze -> volgende melder) is preciezer dan de stap alleen: bij een kruiswissel hangt de stand af van het been waar de loc vandaan komt
-            if (i >= 1)
-                foreach (var (a, afb) in BaanVerkenner.DoorgangEisen(kaart, pad[i - 1], pad[i], pad[i + 1], r))
+            int? vorigeM = i >= 1 ? pad[i - 1] : via;   // BUG #296: bij de eerste stap telt de melder waar de loc vandaan kwam (de ingang)
+            if (vorigeM is int vm)
+                foreach (var (a, afb) in BaanVerkenner.DoorgangEisen(kaart, vm, pad[i], pad[i + 1], r))
                 {
                     // alleen een wissel die (voor zover de kaart weet) bij deze melder ligt: wissel 10 ligt bij 24, niet bij 129
                     var plek = kaart.Wissels.Where(w => w.Adres == a).SelectMany(w => w.Waarnemingen).SelectMany(o => new[] { (int?)o.NaMelder, o.Via, o.VolgendeBijRechtdoor, o.VolgendeBijAfbuigend }).OfType<int>().ToHashSet();
@@ -2498,8 +2512,14 @@ public partial class BaanVerkenner
                 eisen[a] = afb;
             }
         }
+        return eisen.Where(kv => !strijdig.Contains(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value);
+    }
+
+    internal static (Configuratie Stand, List<string> Wijzigingen) MetOvergangEisen(Baankaart kaart, List<int> pad, Richting r, Configuratie c, int? via = null)
+    {
+        var goed = OvergangEisen(kaart, pad, r, via);
         var wijz = new List<string>();
-        foreach (var (a, afb) in eisen.Where(kv => !strijdig.Contains(kv.Key)).OrderBy(kv => kv.Key))
+        foreach (var (a, afb) in goed.OrderBy(kv => kv.Key))
         {
             if (c.Bevat(a) == afb) continue;
             c = c.MetStand(a, afb);
@@ -2612,6 +2632,7 @@ public partial class BaanVerkenner
         for (int i = 0; i < route.Count; i++)
         {
             var e = route[i];
+            var grensDelta = new Dictionary<int, bool>();   // BUG #299: wat voor de volgende etappe al is gezet, blijft ook na het uitwijken staan
             var cfg = MetEisen(e.Pad, e.Richting, KiesBijIngang(e.Van, e.Richting, e.Pad, e.Configuratie));
             if (doel is not null && i == route.Count - 1)
             {
@@ -2632,7 +2653,9 @@ public partial class BaanVerkenner
                 cfg = KruisVoorafStand(e, cfg, cVolg, Kruis, out var uitleg3);   // BUG #135: ook zonder vaste referentie
                 if (uitleg3 is not null) _log.Info(uitleg3);
                 cVolg = _kaart.MetBekendeKortsluitOplossingen(volg.Pad, volg.Richting, cVolg, out _);
+                var voorGrens = cfg;
                 cfg = GrensWisselsVooraf(_kaart, e, volg, cfg, cVolg, out var uitleg6, Kruis);   // BUG #228
+                foreach (var a in _ins.WisselAdressen()) if (voorGrens.Bevat(a) != cfg.Bevat(a)) grensDelta[a] = cfg.Bevat(a);   // BUG #299
                 if (uitleg6 is not null) _log.Info(uitleg6);
             }
             if (doel is not null && i == route.Count - 1)
@@ -2644,7 +2667,11 @@ public partial class BaanVerkenner
             await ControleerGeenAlarmVoorStap($"navigatie {e.Van} -> {e.Naar}");
             cfg = MetAlarmStand(cfg);
             int vanN = e.Van; var padN = e.Pad;
-            if (await UitwijkenVoorWissels(e.Van, e.Richting, e.Pad, cfg) is { } uwN) { vanN = uwN.Van; padN = uwN.Pad; cfg = MetAlarmStand(MetEisen(padN, e.Richting, cfg)); }   // BUG #256
+            if (await UitwijkenVoorWissels(e.Van, e.Richting, e.Pad, cfg) is { } uwN)
+            {
+                vanN = uwN.Van; padN = uwN.Pad; cfg = MetAlarmStand(MetEisen(padN, e.Richting, cfg));   // BUG #256
+                foreach (var (a, st) in grensDelta) cfg = cfg.MetStand(a, st);   // BUG #299
+            }
             await ZetConfiguratie(cfg);
             await Rit(vanN, e.Richting, new RitDoel { Configuratie = cfg, DoelMelder = e.Naar, VerwachtPad = padN });
         }
@@ -2671,6 +2698,21 @@ public partial class BaanVerkenner
             cfg = cfg.MetStand(w.Adres, cVolg.Bevat(w.Adres));
             gezet.Add($"{w.Adres} {(cVolg.Bevat(w.Adres) ? "afbuigend" : "rechtdoor")}");
         }
+        // BUG #299 (simulatie rondrit 15:54:15-15:54:54; baan 21-10 15:31): de navigatie 14 -> 24 en dan 24 -> 8 zette motor 13 niet vooraf; op 24 kon hij niet meer om (loc op de
+        // kruiswissel) en de loc reed naar 21. De doorgang vorige -> grensmelder -> volgende (welk been naar welk been, #296) zegt welke stand nodig is; die gaat nu al tijdens de etappe
+        // ervoor om, ook voor een kruismotor zolang de kruiswissel-referentie niet geldt (optie 6, Middens nog leeg).
+        // De doorgang is preciezer dan de eis van de laatste stap alleen (129 -> 24 vraagt in het algemeen 10 afbuigend, maar 129 -> 24 -> 8 juist rechtdoor): alleen eisen van de
+        // stappen daarvóór gaan voor.
+        var eigenVoor = new HashSet<int>();
+        for (int i = 0; i + 2 < e.Pad.Count; i++)
+            foreach (var (a, _) in kaart.WisselEisenVoorStap(e.Pad[i], e.Pad[i + 1], e.Richting)) eigenVoor.Add(a);
+        if (e.Pad.Count >= 2 && volg.Pad.Count >= 2)
+            foreach (var (a, afb) in BaanVerkenner.DoorgangEisen(kaart, e.Pad[^2], e.Naar, volg.Pad[1], volg.Richting))
+            {
+                if (eigenVoor.Contains(a) || (kruis.IsMotor(a) && kruis.Middens.Count > 0) || cfg.Bevat(a) == afb) continue;
+                cfg = cfg.MetStand(a, afb);
+                gezet.Add($"{a} {(afb ? "afbuigend" : "rechtdoor")}");
+            }
         // BUG #254: de bewezen partner van een vooraf gezette wissel (wissel 1 bij wissel 2) gaat mee; die heeft zelf geen splitsing bij deze melder, maar 2 afbuigend zonder 1 geeft kortsluiting.
         foreach (var pa in kaart.OverloopPartnersVan(gezet.Select(g => int.Parse(g.Split(' ')[0])).Where(a => cVolg.Bevat(a))))
             if (!kruis.IsMotor(pa) && !eigen.Contains(pa) && cVolg.Bevat(pa) && !cfg.Bevat(pa))

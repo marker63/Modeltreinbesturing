@@ -135,25 +135,36 @@ public partial class BaanVerkenner
             Voeg(o.Naar, o.Van, o.Richting.Om(), c, false);
         }
         var uit = rand.Keys.GroupBy(x => x.Item1).ToDictionary(g => g.Key, g => g.Select(x => x.Item2).OrderBy(x => x).ToList());
-        var vorige = new Dictionary<(int Cur, int Prev), (int Cur, int Prev)>();
-        var start = (van, 0);
-        var rij = new Queue<(int Cur, int Prev)>(); rij.Enqueue(start);
-        var gezien = new HashSet<(int, int)> { start };
+        // BUG #299: eerst een weg die bij elke splitsing/kruising alleen doorgangen neemt die echt gereden zijn (vanaf deze ingang); pas als die er niet is, de ruime zoektocht.
+        Dictionary<(int Cur, int Prev), (int Cur, int Prev)> vorige = new();
         (int Cur, int Prev)? einde = null;
-        while (rij.Count > 0 && einde is null)
+        foreach (bool streng in new[] { true, false })
         {
-            var (cur, prev) = rij.Dequeue();
-            if (!uit.TryGetValue(cur, out var buren)) continue;
-            foreach (var n in buren)
+            vorige = new();
+            var start = (van, 0);
+            var rij = new Queue<(int Cur, int Prev)>(); rij.Enqueue(start);
+            var gezien = new HashSet<(int, int)> { start };
+            einde = null;
+            while (rij.Count > 0 && einde is null)
             {
-                if (n == prev) continue;
-                if (prev != 0 && kr.Middens.Contains(cur) && !k.Doorgangen.Any(d => d.Via == prev && d.Melder == cur && d.Volgende == n)) continue;
-                var st = (n, cur);
-                if (!gezien.Add(st)) continue;
-                vorige[st] = (cur, prev);
-                if (n == naar) { einde = st; break; }
-                rij.Enqueue(st);
+                var (cur, prev) = rij.Dequeue();
+                if (!uit.TryGetValue(cur, out var buren)) continue;
+                foreach (var n in buren)
+                {
+                    if (n == prev) continue;
+                    if (prev != 0 && kr.Middens.Contains(cur) && !k.Doorgangen.Any(d => d.Via == prev && d.Melder == cur && d.Volgende == n)) continue;
+                    if (prev != 0 && k.DoorgangOnmogelijk(prev, cur, n)) continue;   // BUG #297: niet van been A naar been B
+                    if (streng && prev != 0 && buren.Count >= 3 && k.Doorgangen.Any(d => d.Via == prev && d.Melder == cur && d.AantalKeer > 0)
+                        && !k.Doorgangen.Any(d => d.Via == prev && d.Melder == cur && d.Volgende == n && d.AantalKeer > 0)) continue;   // BUG #299
+                    var st = (n, cur);
+                    if (!gezien.Add(st)) continue;
+                    vorige[st] = (cur, prev);
+                    if (n == naar) { einde = st; break; }
+                    rij.Enqueue(st);
+                }
             }
+
+            if (einde is not null) break;
         }
         if (einde is null) return null;
         var knopen = new List<int>();

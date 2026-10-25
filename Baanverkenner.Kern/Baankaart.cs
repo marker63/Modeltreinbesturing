@@ -567,6 +567,19 @@ public class Baankaart
     }
 
     /// <summary>BUG #74: legt de doorgang via -> melder -> volgende vast, en meteen ook de omgekeerde (volgende -> melder -> via).</summary>
+    /// <summary>BUG #297 (Marco 21-10 17:34/17:38: "kom ik van been A dan kan ik naar C of D, van B ook naar C of D ... maar ik kan nooit van been A naar been B op een kruiswissel, en ook niet
+    /// van C naar D"): <paramref name="x"/> en <paramref name="y"/> liggen aan dezelfde kant van <paramref name="melder"/> als de loc van allebei naar eenzelfde derde been is gereden
+    /// (doorgangen x -> melder -> z en y -> melder -> z) en nooit van x naar y. Dan kan de loc niet van x via deze melder naar y (zoals bij een gewone wissel van de ene tak naar de andere).
+    /// Volgt alleen uit gereden doorgangen; niets is per melder vastgelegd.</summary>
+    public bool DoorgangOnmogelijk(int x, int melder, int y)
+    {
+        if (x == y || x == 0 || y == 0) return false;
+        bool Gereden(int a, int b) => Doorgangen.Any(d => d.Melder == melder && d.AantalKeer > 0 && ((d.Via == a && d.Volgende == b) || (d.Via == b && d.Volgende == a)));
+        if (Gereden(x, y)) return false;
+        var vanX = Doorgangen.Where(d => d.Melder == melder && d.AantalKeer > 0 && (d.Via == x || d.Volgende == x)).Select(d => d.Via == x ? d.Volgende : d.Via).ToHashSet();
+        return vanX.Any(z => z != y && Gereden(y, z));
+    }
+
     public void RegistreerDoorgang(int via, int melder, int volgende, Richting r, Configuratie c)
     {
         Zet(via, melder, volgende, r);

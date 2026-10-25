@@ -2689,6 +2689,8 @@ public partial class BaanVerkenner
             var pad = kp.Route.LastOrDefault()?.Pad;
             if (pad is null || pad.Count < 2 || !stappen.Contains((pad[^2], pad[^1]))) continue;
             int a = kp.OpgelostDoorAdres!.Value; bool afb = kp.OpgelostMetAfbuigend!.Value;
+            // BUG #298: alleen als de loc daarna dezelfde kant op gaat als de rit waarmee de oplossing bewezen werd
+            if (OplossingVolgende(kaart, kp, a, afb) is int vv && !stappen.Contains((kp.NaMelder, vv)) && VerwachteVolgende(kaart, kp.NaMelder, r, stand) is { Count: 1 } vg && vg[0] != vv) continue;
             if (stand(a) == afb) continue;
             if (res.TryGetValue(a, out var b) && b != afb) strijdig.Add(a);
             res[a] = afb;

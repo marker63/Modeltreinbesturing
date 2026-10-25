@@ -985,6 +985,7 @@ public static class Tests
         Eis(blokFase >= 0 && eersteProef > blokFase, $"rondrit: de eerste blokproef (regel {eersteProef}) komt pas na het ontdekken van alle melders (regel {blokFase})");
         Eis(k.Voltooid && k.Melders.All(m => m.DinamoBlok is not null), "rondrit: voltooid en elke melder heeft een Dinamo-blok (zonder: " + string.Join(",", k.Melders.Where(m => m.DinamoBlok is null).Select(m => m.Nummer)) + ")");
         if (Environment.GetEnvironmentVariable("RONDRIT_LOG") == "1") Console.WriteLine(r.Log.AlsTekst());
+        if (Environment.GetEnvironmentVariable("RONDRIT_LOG") == "2") foreach (var d in k.Doorgangen.Where(d => d.Melder == 24)) Console.WriteLine($"   DG {d.Via}->24->{d.Volgende} {d.Richting} n={d.AantalKeer} " + string.Join(" ", d.Tellers.Select(kv => kv.Key + ":" + kv.Value)));
         Eis(r.Kortsluitingen <= 10, $"rondrit: beperkt aantal kortsluitingen (nu {r.Kortsluitingen})");
     }
 
@@ -2672,6 +2673,11 @@ public static class Tests
         string T296(Dictionary<int, bool> d) => string.Join(",", d.Select(kv => kv.Key + (kv.Value ? "A" : "R")));
         Eis(d296a.GetValueOrDefault(13, false) && d296b.TryGetValue(13, out var x296) && !x296, $"kruis-doorgang (#296): 14 -> 24 -> 8 vraagt 13 afbuigend, 14 -> 24 -> 21 rechtdoor (nu {T296(d296a)} / {T296(d296b)})");
         Eis(d296c.GetValueOrDefault(10, false) && d296d.TryGetValue(10, out var y296) && !y296, $"kruis-doorgang (#296): 21 -> 24 -> 129 vraagt 10 afbuigend, 21 -> 24 -> 14 rechtdoor (nu {T296(d296c)} / {T296(d296d)})");
+        // BUG #297: kruiswissel bij 24: nooit van been 14 naar been 129 (zelfde kant) of van 21 naar 8; wel 14 -> 21 en 14 -> 8
+        Eis(k296.DoorgangOnmogelijk(14, 24, 129) && k296.DoorgangOnmogelijk(21, 24, 8) && !k296.DoorgangOnmogelijk(14, 24, 21) && !k296.DoorgangOnmogelijk(14, 24, 8) && !k296.DoorgangOnmogelijk(14, 24, 14),
+            "kruis A-B (#297): 14 -> 24 -> 129 en 21 -> 24 -> 8 kunnen niet; 14 -> 24 -> 21 en 14 -> 24 -> 8 wel");
+        var w297 = BaanVerkenner.ZelfTerugWegAlleStanden(k296, 14, 129);
+        Eis(w297 is null || !w297.Zip(w297.Skip(1)).Any(z => z.First.Van == 14 && z.First.Naar == 24 && z.Second.Naar == 129), "kruis A-B (#297): de weg 14 -> 129 gaat niet via 14 -> 24 -> 129 (nu " + (w297 is null ? "geen" : string.Join(",", w297.Select(x => x.Van).Append(w297.Last().Naar))) + ")");
         // BUG #293: het pad 4 -> 129 -> 14 (achteruit) krijgt wissel 9 afbuigend uit kortsluitpunt #3, ook al hoort dat bij een andere stand
         var o293 = BaanVerkenner.BewezenOplossingenOpPad(k279, new List<int> { 4, 129, 14 }, Richting.Achteruit);
         Eis(o293.Any(x => x.Adres == 9 && x.Afbuigend), "bewezen op pad (#293): 4 -> 129 achteruit vraagt wissel 9 afbuigend (nu " + string.Join(",", o293.Select(x => x.Adres + (x.Afbuigend ? "A" : "R"))) + ")");

@@ -74,7 +74,7 @@ public partial class BaanVerkenner
                     mislukt++;
                     continue;
                 }
-                if (await BlokZoekenBijStart(doel)) _log.Vondst($"Melder {doel} hoort bij Dinamo-blok {BlokVan(doel)}.");
+                if (await BlokZoekenBijStart(doel)) { _log.Vondst($"Melder {doel} hoort bij Dinamo-blok {BlokVan(doel)}."); laatsteRonde = false; }   // BUG #292: na voortgang mag er weer een laatste ronde komen
                 else mislukt++;
             }
             catch (NavigatieFout ex)

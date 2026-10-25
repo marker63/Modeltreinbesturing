@@ -2859,3 +2859,31 @@ Test: keerlus BUG #281/#282 (voltooid, elke melder een blok).
 Kortsluitpunt #3 bewees dat 4 -> 129 (achteruit) wissel 9 afbuigend vraagt, maar die oplossing hoorde bij een andere stand en gold daardoor niet voor het pad van een navigatie die op 4
 begint (#280 helpt pas vanaf de melder ervoor). Bewezen oplossingen waarvan de laatste stap in het pad zit, gelden nu altijd voor dat pad; een verboden ingang gaat nog steeds voor.
 Geprobeerd en teruggedraaid: alle navigaties de wissels bij de loc laten sparen (brak de rondrit-simulatie: de loc reed dan de verkeerde kant op). Test: bewezen op pad (#293).
+
+## BUG #294 – OPGELOST (nog niet getest op de baan): levensteken-routine schakelde wissels bij de loc; klemroutine zag Dinamo-uitval (autolog 21-10 17:10:34-17:14:08)
+Tijdens het losmaken van een klem bleven terugmeldingen weg (kortsluiting) en dat telde als Dinamo-uitval; de levensteken-routine zette daarna willekeurig wissel 14 om met de loc op 24/8
+(2,1 s later kortsluiting). Nu: tijdens het losmaken telt een ontbrekende terugmelding niet als uitval (zoals #273), en de levensteken-routine kiest nooit een wissel bij de loc, een
+overlooppartner of een volger; bij voorkeur een adres zonder gevonden effect.
+
+## BUG #295 – OPGELOST (scherm, niet te compileren hier; nog niet getest op de baan): 'Verkenning voltooid' terwijl de kaart niet voltooid was (Marco 21-10 17:34)
+"Je meldt de verkenning is compleet en bij 'Voltooide baan nogmaals checken' meld je dat er geen voltooide baan is, wat is het nou?" Ontbreken er Dinamo-blokken, dan meldt het programma
+nu "Verkenning gestopt, nog NIET voltooid" met de melders zonder blok, en 'Baan checken' legt uit wat er nog mist.
+
+## BUG #296 – OPGELOST (nog niet getest op de baan): kruiswissel 24: per been onthouden welke stand van 10 en 13 bij welk ander been hoort (Marco 21-10 17:34)
+"Kom ik van been A dan kan ik naar C of D, van B ook naar C of D." Uit de gereden doorgangen (vorige -> 24 -> volgende, met tellers; een enkele afwijkende rit is ruis) volgt per ingang
+welke wissel het uitgangsbeen kiest: 14 -> 24 -> 8 met 13 afbuigend, 14 -> 24 -> 21 met 13 rechtdoor, 21 -> 24 -> 129 met 10 afbuigend, 21 -> 24 -> 14 met 10 rechtdoor. Elk pad krijgt die
+stand (ook bij de eerste stap: de ingang waar de loc vandaan kwam). Alleen voor wissels die volgens de kaart bij die melder liggen. Test: kruis-doorgang (#296).
+
+## BUG #297 – OPGELOST (nog niet getest op de baan): nooit van been A naar been B of van C naar D (Marco 21-10 17:38)
+"Ik kan nooit van been A naar been B op een kruiswissel, en ook niet van C naar D." Twee benen liggen aan dezelfde kant als de loc van allebei naar eenzelfde derde been gereden is en nooit
+van het ene naar het andere. Zo'n doorgang wordt in de routeplanners (StapWeg, ZelfTerugWeg, ZelfTerugWegAlleStanden) nooit meer gepland. Volgt alleen uit gereden doorgangen; geldt
+daardoor ook voor gewone wissels (niet van de ene tak naar de andere). Test: kruis A-B (#297).
+
+## BUG #298 – OPGELOST (nog niet getest op de baan): bewezen kortsluitoplossing toegepast op een pad dat een andere kant op gaat (simulatie rondrit na #297)
+De oplossing van een kortsluitpunt (bv. na 24: 10 afbuigend, de geslaagde rit ging naar 129) werd ook gebruikt voor 21 -> 24 -> 14: de loc reed naar 129. Is bekend waar de geslaagde rit
+heen ging, dan geldt de oplossing alleen voor een pad dat daar ook heen gaat; wat de gereden overgangen en doorgangen voor het pad zeggen, gaat altijd voor.
+
+## BUG #299 – OPGELOST (nog niet getest op de baan): kruismotor op de etappegrens niet vooraf gezet (simulatie rondrit 15:54; baan 21-10 15:31)
+De navigatie 14 -> 129 -> 24 en dan 24 -> 8 zette de stand voor de doorgang 129 -> 24 -> 8 pas op 24 (loc op de kruiswissel): de loc reed naar 21. Nu: (1) de stand die de doorgang over
+de grensmelder vraagt, gaat al tijdens de etappe ervoor om (ook een kruismotor zolang de referentie niet geldt), en blijft staan als de loc eerst uitwijkt; (2) de routeplanner neemt bij
+een splitsing of kruising eerst alleen doorgangen die echt gereden zijn, en pas als dat niet kan de ruime weg. Test: rondrit (voltooid, elke melder een blok) en keerlus.
