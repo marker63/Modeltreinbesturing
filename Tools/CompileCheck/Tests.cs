@@ -2663,6 +2663,15 @@ public static class Tests
         var p286 = new[] { 139, 140, 132, 133, 136, 144, 143 }.Select(n => ms286.Knopen.First(x => x.Melder == n).X).ToList();
         bool oplopend286 = p286.Zip(p286.Skip(1)).All(z => z.Second > z.First), aflopend286 = p286.Zip(p286.Skip(1)).All(z => z.Second < z.First);
         Eis(oplopend286 || aflopend286, "melderschema (#286): pendelbaan in de volgorde van het spoor (x: " + string.Join(",", p286.Select(x => x.ToString("0"))) + ")");
+        // BUG #296: kruiswissel bij 24, van been 14: naar 21 met 13 rechtdoor, naar 8 met 13 afbuigend; van been 21 (achteruit): naar 14 met 10 rechtdoor, naar 129 met 10 afbuigend
+        var k296 = Laad("baankaart_2026-10-21_1729.json");
+        var d296a = BaanVerkenner.DoorgangEisen(k296, 14, 24, 8, Richting.Vooruit);
+        var d296b = BaanVerkenner.DoorgangEisen(k296, 14, 24, 21, Richting.Vooruit);
+        var d296c = BaanVerkenner.DoorgangEisen(k296, 21, 24, 129, Richting.Achteruit);
+        var d296d = BaanVerkenner.DoorgangEisen(k296, 21, 24, 14, Richting.Achteruit);
+        string T296(Dictionary<int, bool> d) => string.Join(",", d.Select(kv => kv.Key + (kv.Value ? "A" : "R")));
+        Eis(d296a.GetValueOrDefault(13, false) && d296b.TryGetValue(13, out var x296) && !x296, $"kruis-doorgang (#296): 14 -> 24 -> 8 vraagt 13 afbuigend, 14 -> 24 -> 21 rechtdoor (nu {T296(d296a)} / {T296(d296b)})");
+        Eis(d296c.GetValueOrDefault(10, false) && d296d.TryGetValue(10, out var y296) && !y296, $"kruis-doorgang (#296): 21 -> 24 -> 129 vraagt 10 afbuigend, 21 -> 24 -> 14 rechtdoor (nu {T296(d296c)} / {T296(d296d)})");
         // BUG #293: het pad 4 -> 129 -> 14 (achteruit) krijgt wissel 9 afbuigend uit kortsluitpunt #3, ook al hoort dat bij een andere stand
         var o293 = BaanVerkenner.BewezenOplossingenOpPad(k279, new List<int> { 4, 129, 14 }, Richting.Achteruit);
         Eis(o293.Any(x => x.Adres == 9 && x.Afbuigend), "bewezen op pad (#293): 4 -> 129 achteruit vraagt wissel 9 afbuigend (nu " + string.Join(",", o293.Select(x => x.Adres + (x.Afbuigend ? "A" : "R"))) + ")");

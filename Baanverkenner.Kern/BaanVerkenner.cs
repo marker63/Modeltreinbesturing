@@ -353,7 +353,9 @@ public partial class BaanVerkenner
             if (Rondrit && BlokVereist && !_status.Controle) await RondritBlokkenZoeken();
             Afronden();
             if (_status.Controle) RondControleAf();
-            _log.Stap(controleRit ? "Controle voltooid." : "Verkenning voltooid.");
+            // BUG #295 (Marco 21-10 17:34: "je meldt de verkenning is compleet en bij 'Voltooide baan nogmaals checken' meld je dat er geen voltooide baan is, wat is het nou?"): zonder alle
+            // Dinamo-blokken is de kaart niet voltooid; dan ook niet 'Verkenning voltooid' melden.
+            _log.Stap(controleRit ? "Controle voltooid." : _kaart.Voltooid ? "Verkenning voltooid." : $"Verkenning gestopt, nog NIET voltooid: van melder {Lijst(_kaart.Melders.Where(m => m.DinamoBlok is null).Select(m => m.Nummer).OrderBy(x => x))} is het Dinamo-blok nog niet bekend.");
         }
         catch (OperationCanceledException)
         {
@@ -2479,11 +2481,23 @@ public partial class BaanVerkenner
     {
         var eisen = new Dictionary<int, bool>(); var strijdig = new HashSet<int>();
         for (int i = 0; i + 1 < pad.Count; i++)
-            foreach (var (a, afb) in BaanVerkenner.StapEisenUitOvergangen(kaart, pad[i], pad[i + 1], r))
+        {
+            var stap = BaanVerkenner.StapEisenUitOvergangen(kaart, pad[i], pad[i + 1], r);
+            // BUG #296: de doorgang (vorige -> deze -> volgende melder) is preciezer dan de stap alleen: bij een kruiswissel hangt de stand af van het been waar de loc vandaan komt
+            if (i >= 1)
+                foreach (var (a, afb) in BaanVerkenner.DoorgangEisen(kaart, pad[i - 1], pad[i], pad[i + 1], r))
+                {
+                    // alleen een wissel die (voor zover de kaart weet) bij deze melder ligt: wissel 10 ligt bij 24, niet bij 129
+                    var plek = kaart.Wissels.Where(w => w.Adres == a).SelectMany(w => w.Waarnemingen).SelectMany(o => new[] { (int?)o.NaMelder, o.Via, o.VolgendeBijRechtdoor, o.VolgendeBijAfbuigend }).OfType<int>().ToHashSet();
+                    if (plek.Count > 0 && !plek.Contains(pad[i])) continue;
+                    stap.TryAdd(a, afb);
+                }
+            foreach (var (a, afb) in stap)
             {
                 if (eisen.TryGetValue(a, out var b) && b != afb) strijdig.Add(a);
                 eisen[a] = afb;
             }
+        }
         var wijz = new List<string>();
         foreach (var (a, afb) in eisen.Where(kv => !strijdig.Contains(kv.Key)).OrderBy(kv => kv.Key))
         {

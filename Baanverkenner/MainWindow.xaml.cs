@@ -575,7 +575,8 @@ public partial class MainWindow : Window
         {
             MessageBox.Show(this, st is { Controle: true }
                 ? "Er is nog een onderbroken controle. Hervat die met de knop 'Vorige verkenning hervatten / uitbreiden'."
-                : "Er is geen voltooide verkenning om te controleren.", "Baan checken", MessageBoxButton.OK, MessageBoxImage.Information);
+                : st is null ? "Er is geen bewaarde verkenning om te controleren."
+                : $"De verkenning is nog niet voltooid: van melder {string.Join(", ", st.Kaart.Melders.Where(m => m.DinamoBlok is null).Select(m => m.Nummer).OrderBy(x => x))} is het Dinamo-blok nog niet bekend. Maak die eerst af met 'Vorige verkenning hervatten / uitbreiden'.", "Baan checken", MessageBoxButton.OK, MessageBoxImage.Information);   // BUG #295
             return;
         }
         if (st.Controle)
@@ -744,9 +745,20 @@ public partial class MainWindow : Window
                 else ToonControleVerslag(vs);
                 return;
             }
-            FaseTekst.Text = "Verkenning voltooid";
-            BezigTekst.Text = "Bekijk het resultaat of sla het rapport en de baankaart op.";
+            // BUG #295: alleen 'voltooid' als de kaart echt voltooid is (alle Dinamo-blokken bekend)
+            var zonderBlok295 = verkenner.Kaart.Melders.Where(m => m.DinamoBlok is null).Select(m => m.Nummer).OrderBy(x => x).ToList();
+            bool af295 = verkenner.Kaart.Voltooid;
+            FaseTekst.Text = af295 ? "Verkenning voltooid" : "Verkenning nog niet voltooid";
+            BezigTekst.Text = af295 ? "Bekijk het resultaat of sla het rapport en de baankaart op." : $"Nog geen Dinamo-blok voor melder {string.Join(", ", zonderBlok295)}.";
             ToonResultaat(verkenner.Status);
+            if (!af295)
+            {
+                MessageBox.Show(this,
+                    $"De verkenning is gestopt, maar nog NIET voltooid: van melder {string.Join(", ", zonderBlok295)} is het Dinamo-blok nog niet bekend.\n\n" +
+                    "Zet de loc op het traject van die melders en kies 'Vorige verkenning hervatten / uitbreiden'. Pas daarna kan 'Voltooide baan nogmaals checken' gebruikt worden.",
+                    "Nog niet voltooid", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
             MessageBox.Show(this,
                 $"De verkenning is voltooid.\n\n{verkenner.Kaart.Melders.Count} melders, {verkenner.Kaart.Wissels.Count} wissels, {verkenner.Kaart.Kopsporen.Count} doodlopende einden en {verkenner.Kaart.VoorgesteldeBlokken.Count} voorgestelde blokken gevonden.\n\nMet 'Rapport bekijken' zie je het volledige overzicht.",
                 "Klaar", MessageBoxButton.OK, MessageBoxImage.Information);

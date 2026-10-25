@@ -561,7 +561,13 @@ public partial class BaanVerkenner
         while (_klok.Nu - start < TimeSpan.FromSeconds(120))
         {
             var onder = WisselsOnderLoc();
-            var kand = _ins.WisselAdressen().Where(a => !Kruis.IsMotor(a) && !onder.ContainsKey(a)).ToList();
+            // BUG #294 (autolog 21-10 17:11:13-17:14:08): de levensteken-routine schakelde wissel 14 om met de loc op 24/8 (2,1 s later kortsluiting) en kon een volger los omzetten
+            // (overloopset 5+6 uit elkaar). Nu nooit een wissel bij de loc of een overlooppartner daarvan, nooit een volger, en bij voorkeur een adres zonder gevonden effect.
+            foreach (var a in WisselsBijBezet(_kaart, _monitor.Bezet)) onder.TryAdd(a, 0);
+            foreach (var pa in _kaart.OverloopPartnersVan(onder.Keys).ToList()) onder.TryAdd(pa, 0);
+            var kand = _ins.WisselAdressen().Where(a => !Kruis.IsMotor(a) && !onder.ContainsKey(a) && !IsVolger(a) && !_ins.GekoppeldeParen().Any(p => p.Meester == a && onder.ContainsKey(p.Volger))).ToList();
+            var zonder = kand.Where(a => _kaart.AdressenZonderEffect.Contains(a)).ToList();
+            if (zonder.Count > 0) kand = zonder;
             if (kand.Count == 0) return false;
             int adres = kand[rnd.Next(kand.Count)];
             bool stand = _wisselStand.TryGetValue(adres, out var h) && h;
@@ -2761,6 +2767,33 @@ public partial class BaanVerkenner
         return (vast, onderscheid);
     }
 
+    /// <summary>BUG #296 (Marco 21-10 17:34: "hoe vaak ben je nu al gestruikeld op wissel 10 en 13 ... een kruiswissel: kom ik van been A dan kan ik naar C of D, van B ook naar C of D"):
+    /// de stand die de doorgang <paramref name="via"/> -> <paramref name="melder"/> -> <paramref name="naar"/> vraagt, uit de doorgangen (ingangsbeen -> uitgangsbeen) die de loc gereden heeft.
+    /// Per uitgangsbeen telt per wissel hoe vaak hij afbuigend stond (een enkele afwijkende rit is ruis); een wissel die bij alle uitgangsbenen van deze ingang een vaste stand heeft en
+    /// tussen de uitgangsbenen verschilt, bepaalt het been. Zo onthoudt de kaart voor elk been van de kruiswissel bij 24 welke stand van 10 en 13 bij welk ander been hoort.</summary>
+    internal static Dictionary<int, bool> DoorgangEisen(Baankaart kaart, int via, int melder, int naar, Richting r)
+    {
+        var uit = kaart.Doorgangen.Where(d => d.Via == via && d.Melder == melder && d.Richting == r && d.AantalKeer > 0).ToList();
+        if (uit.Count < 2 || !uit.Any(d => d.Volgende == naar)) return new();
+        var vast = new Dictionary<int, Dictionary<int, bool>>();
+        foreach (var d in uit)
+        {
+            var tel = d.Tellers.Count > 0 ? d.Tellers : d.Configuraties.ToDictionary(c => c, _ => 1);
+            int n = tel.Values.Sum();
+            if (n == 0) continue;
+            var v = new Dictionary<int, bool>();
+            foreach (var a in uit.SelectMany(x => x.Tellers.Count > 0 ? x.Tellers.Keys.ToList() : x.Configuraties).SelectMany(s => Configuratie.VanSleutel(s).Afbuigend).Distinct())
+            {
+                double p = tel.Where(kv => Configuratie.VanSleutel(kv.Key).Bevat(a)).Sum(kv => kv.Value) / (double)n;
+                if (p >= 0.8) v[a] = true; else if (p <= 0.2) v[a] = false;
+            }
+            vast[d.Volgende] = v;
+        }
+        if (!vast.ContainsKey(naar) || vast.Count < 2) return new();
+        var onderscheid = vast[naar].Keys.Where(a => vast.Values.All(x => x.ContainsKey(a)) && vast.Values.Select(x => x[a]).Distinct().Count() > 1);
+        return onderscheid.ToDictionary(a => a, a => vast[naar][a]);
+    }
+
     /// <summary>BUG #270: de standen die de stap <paramref name="van"/> -> <paramref name="naar"/> volgens de gereden overgangen vraagt (alleen de wissels die de vervolgen van
     /// <paramref name="van"/> onderscheiden).</summary>
     internal static Dictionary<int, bool> StapEisenUitOvergangen(Baankaart kaart, int van, int naar, Richting r)
@@ -2923,6 +2956,13 @@ public partial class BaanVerkenner
     /// Nooit kruismotoren, nooit wissels die bij een bezette melder liggen (de loc kan erop staan, #109) en nooit wissels die de rit zelf nodig heeft.
     /// Alle wissels worden teruggezet als er niets helpt. Nog niet getest op de baan.</summary>
     private async Task<bool> ProbeerKlemWegTeKrijgen(int start, Richting r, RitDoel doel, string stap)
+    {
+        _alarmZoekenBezig++;   // BUG #294: tijdens het losmaken telt een ontbrekende terugmelding niet als Dinamo-uitval (zie #273)
+        try { return await ProbeerKlemWegTeKrijgenKern(start, r, doel, stap); }
+        finally { _alarmZoekenBezig--; }
+    }
+
+    private async Task<bool> ProbeerKlemWegTeKrijgenKern(int start, Richting r, RitDoel doel, string stap)
     {
         if (_klemProbeActief || _hw is not IBlokAlarmBron) return false;
         // BUG #173 (Marco 17-10): zit de loc klem (vaak op of tegen een wissel), dan eerst terug het geteste stuk op in plaats van andere wissels te proberen.
