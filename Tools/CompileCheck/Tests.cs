@@ -3325,12 +3325,12 @@ public static class Tests
                 var r = MiniworldRit(start, 10,
                     insAanpassing: i => { i.Rondrit = true; i.StapVoorStap = false; i.GekoppeldeWissels = "5+6,2+1"; i.OmgekeerdAangesloten = "6"; },
                     simAanpassing: sa => { sim = sa; sa.BuurwisselHeftKruisKortsluitingOp = variant == "streng"; sa.StatusBericht += t => { if (t.Contains("KORTSLUITING")) simMeldingen.Add((sa.HuidigeSimTijd, t)); }; },
-                    simFabriek: variant == "uitval" ? () => uv = new Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan { UitvalVanafCommando = 120, UitvalDuur = TimeSpan.FromSeconds(90) } : null);
+                    simFabriek: variant is "uitval" or "realistisch" ? () => uv = new Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan { UitvalVanafCommando = 120, UitvalDuur = TimeSpan.FromSeconds(90), NegeerHelftBijKortsluiting = variant == "realistisch" } : null);
                 var k = r.V.Kaart;
                 var regels = r.Log.Regels.Select(x => x.Tekst).ToList();
                 var gevonden = k.Wissels.Where(w => w.Waarnemingen.Count > 0).Select(w => w.Adres).ToList();
                 string regel = $"MARCO start {start,3} {variant,-7}: {r.Einde,-12} {(k.Voltooid ? "voltooid" : "NIET-voltooid"),-13} melders {k.Melders.Count,2}/23  met-blok {k.Melders.Count(m => m.DinamoBlok is not null),2}  wissels [{string.Join(",", gevonden.OrderBy(x => x))}]  valse {gevonden.Count(a => !echt.Contains(a))}  kortsl {r.Kortsluitingen,2}  onder-loc {sim?.OnderLocOmgezet ?? 0,2}  gebruiker {regels.Count(x => x.Contains("Gebruiker heeft de loc"))}  zelf-ok {regels.Count(x => x.Contains("Zelf opgelost"))}  zelf-mis {regels.Count(x => x.Contains("Zelf oplossen lukte niet"))}  {r.Seconden / 60:0} min";
-                if (uv is not null) regel += $"  (uitval: {uv.GenegeerdeCommandos} commando's genegeerd)";
+                if (uv is not null) regel += $"  (uitval: {uv.GenegeerdeCommandos} commando's genegeerd, bij kortsluiting {uv.GenegeerdBijKortsluiting})";
                 Console.WriteLine(regel);
                 uit.Add(regel);
                 if (Environment.GetEnvironmentVariable("MARCO_LOG") is { } pad && pad.Length > 0)
@@ -3618,6 +3618,7 @@ public static class Tests
         if (Environment.GetEnvironmentVariable("BENCH") == "1") { BenchTest(); return 0; }
         if (Environment.GetEnvironmentVariable("MARCO") == "1") { MarcoBench(); return 0; }
         if (Environment.GetEnvironmentVariable("MARCO_HERVAT") == "1") { foreach (var mn in (Environment.GetEnvironmentVariable("MARCO_MIN") ?? "40").Split(',')) MarcoHervatBench(double.Parse(mn)); return 0; }
+        if (Environment.GetEnvironmentVariable("ALLEEN_MATRIX") == "1") { StapMatrixTest(); Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)"); return _fouten == 0 ? 0 : 1; }
         if (Environment.GetEnvironmentVariable("ALLEEN_RONDRIT") == "1") { RondritTest(); Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)"); return _fouten == 0 ? 0 : 1; }
         if (Environment.GetEnvironmentVariable("RONDRIT") == "1") { RondritBench(); return 0; }
         var kaart = Laad("baankaart_voltooid_2026-10-04.json");
@@ -3719,10 +3720,12 @@ public static class Tests
         HervatZonderBasisritTest();
         {
             // Nachtwerk 25/26-10: Marco's aansluiting met een Dinamo-uitval van 90 s midden in de verkenning
-            var oud = Environment.GetEnvironmentVariable("MARCO_VARIANT"); Environment.SetEnvironmentVariable("MARCO_VARIANT", "uitval");
+            var oud = Environment.GetEnvironmentVariable("MARCO_VARIANT"); Environment.SetEnvironmentVariable("MARCO_VARIANT", "uitval,realistisch");
             var regels = MarcoBench();
             Environment.SetEnvironmentVariable("MARCO_VARIANT", oud);
-            Eis(regels.Count == 1 && regels[0].Contains(" voltooid ") && regels[0].Contains("valse 0") && regels[0].Contains("gebruiker 0"), "marco (uitval): voltooid, geen valse wissels, geen hulp nodig (" + string.Join("", regels) + ")");
+            Eis(regels.Count == 2 && regels[0].Contains(" voltooid ") && regels[0].Contains("valse 0") && regels[0].Contains("gebruiker 0"), "marco (uitval): voltooid, geen valse wissels, geen hulp nodig (" + regels.FirstOrDefault() + ")");
+            // realistisch: ook tijdens een kortsluiting voert Dinamo de helft van de wisselcommando's niet uit (logs 25-10)
+            Eis(regels.Count == 2 && regels[1].Contains(" voltooid ") && regels[1].Contains("valse 0") && regels[1].Contains("gebruiker 0"), "marco (realistisch, #334): voltooid, geen valse wissels, geen hulp nodig (" + regels.LastOrDefault() + ")");
         }
         {
             // Nachtwerk 25/26-10: elke 40 minuten stoppen en hervatten (Marco deed dat 25-10 zes keer); de loc staat dan ergens op de baan en de verkenner rijdt zelf terug (#330, #331)

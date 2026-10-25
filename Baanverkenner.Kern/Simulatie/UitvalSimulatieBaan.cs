@@ -20,12 +20,19 @@ public class UitvalSimulatieBaan : SimulatieBaan, IWisselBevestiging
     /// <summary>Het aantal commando's dat tijdens de uitval niet is uitgevoerd.</summary>
     public int GenegeerdeCommandos { get; private set; }
 
+    /// <summary>Nachtwerk 25/26-10 (logs 25-10 09:06, 18:05, 19:25: "geen terugmelding, maar Dinamo meldt kortsluiting"): tijdens een kortsluiting voert Dinamo een wisselcommando vaak niet
+    /// uit. Bij aan wordt tijdens een kortsluiting de helft van de wisselcommando's (willekeurig, vaste reeks) genegeerd (niet uitgevoerd en niet teruggemeld).</summary>
+    public bool NegeerHelftBijKortsluiting { get; set; }
+    private readonly Random _rnd = new(42);
+    public int GenegeerdBijKortsluiting { get; private set; }
+
     public override void ZetWissel(int adres, bool afbuigend)
     {
         _teller++;
         var nu = SimTijd;
         if (_teller >= UitvalVanafCommando) _uitvalStart ??= nu;
         if (_uitvalStart is { } s && nu - s < UitvalDuur) { GenegeerdeCommandos++; return; }
+        if (NegeerHelftBijKortsluiting && HeeftKortsluiting && _rnd.NextDouble() < 0.5) { GenegeerdBijKortsluiting++; return; }
         base.ZetWissel(adres, afbuigend);
         _bevestigingen++;
         _perStand[(adres, afbuigend)] = _perStand.TryGetValue((adres, afbuigend), out var n) ? n + 1 : 1;   // BUG #307

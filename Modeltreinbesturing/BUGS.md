@@ -3080,3 +3080,16 @@ blijft wissel 9 staan zolang de loc op 4 staat.
 
 ## BUG #333 – OPGELOST (nog niet getest op de baan): met een hergebruikte basisrit zonder nieuwe overgangen reed de loc voor niets naar de start van de opdracht
 En de terugweg zette daarbij wissels om met de loc op 129. Is er met de bewaarde basisrit niets meer te testen, dan wordt de opdracht afgerond zonder te rijden.
+
+## BUG #334 – OPGELOST (nog niet getest op de baan): tijdens een kortsluiting ging een niet uitgevoerd wisselcommando verloren
+Logs 25-10 (09:06, 18:05, 19:25): "geen terugmelding, maar Dinamo meldt kortsluiting". Nieuwe simulatievariant 'realistisch': tijdens een kortsluiting voert Dinamo de helft van de
+wisselcommando's niet uit. Daarmee: NIET voltooid, 6 keer hulp nodig (de oplossende wissel 10 ging nooit echt om). Nu gaat een commando zonder terugmelding tijdens het alarm tot 5 keer
+opnieuw (elke 2 s), ook bij het terugzetten. Pas als ook dat niets geeft, telt het voor #301. Nu: voltooid, 0 keer hulp.
+
+## BUG #335 – OPGELOST (nog niet getest op de baan): een losgemaakte proefwissel werd teruggezet terwijl de loc er nog op stond (#194)
+Met opgegeven overloopsets (Gekoppelde wissels) schakelen de partners al vanzelf mee; een losgemaakte wissel gaat dan niet terug zolang de loc op die melders staat (#320 houdt hem tegen
+tot de loc weg is). Zonder overloopsets blijft #194 zoals het was (daar zijn wissel 1 en 2 samen de oplossing).
+
+## BUG #336 – OPGELOST (nog niet getest op de baan): kon de loc niet uitwijken voor een wissel onder de loc, dan ging de wissel tóch om
+(Simulatie met Dinamo-uitval, blokfase.) Met opgegeven overloopsets blijft de wissel nu staan zolang de loc op die melder staat; komt de loc daardoor ergens anders uit, dan is dat een
+gewone navigatiefout in plaats van een kortsluiting onder de loc.

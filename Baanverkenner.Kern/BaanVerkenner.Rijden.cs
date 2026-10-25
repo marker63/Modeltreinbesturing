@@ -631,6 +631,25 @@ public partial class BaanVerkenner
 
     /// <summary>BUG #307: heeft Dinamo het laatste commando voor deze wissel (ooit, ook laat) teruggemeld? null = niet bekend. De uitvalbewaking (#126) blijft op het totaal
     /// werken; dit is alleen om een vondst niet toe te schrijven aan een wissel die niet is omgezet.</summary>
+    /// <summary>BUG #334 (nachtwerk 25/26-10; logs 25-10 09:06, 18:05, 19:25: "geen terugmelding, maar Dinamo meldt kortsluiting"): tijdens een kortsluiting voert Dinamo een wisselcommando
+    /// vaak niet uit. De zoekroutine probeerde elke wissel één keer; een niet uitgevoerd commando betekende dat juist de oplossende wissel (wissel 10 bij 129 -> 24) nooit echt omging. In de
+    /// simulatie met de helft van de commando's genegeerd: niet voltooid, 6 keer hulp nodig. Nu gaat een commando zonder terugmelding tijdens het alarm tot 5 keer opnieuw (elke 2 s), zoals
+    /// het zelf oplossen al deed (#315). Pas als ook dat niets geeft, telt het voor #301 (Dinamo voert niets meer uit).</summary>
+    private async Task ZetWisselTijdensAlarm(int a, bool stand)
+    {
+        await ZetWissel(a, stand, forceer: true);
+        if (_hw is not IWisselBevestiging) return;
+        int teller301 = _zonderTerugmeldingBijAlarm;
+        for (int h = 1; h <= 5 && LaatsteCommandoTeruggemeld(a) == false && HuidigeAlarmBlokken().Count > 0; h++)
+        {
+            if (h == 1) _log.Info($"Wissel {a}: Dinamo meldde het commando niet terug (tijdens de kortsluiting voert Dinamo het vaak niet uit); het gaat opnieuw (BUG #334, nog niet getest op de baan).");
+            await Wacht(TimeSpan.FromSeconds(2));
+            await ZetWissel(a, stand, forceer: true);
+        }
+        // Lukte het na herhalen wel, dan telt het niet als 'Dinamo voert niets uit' (#301); anders één keer (niet per herhaling)
+        _zonderTerugmeldingBijAlarm = LaatsteCommandoTeruggemeld(a) == false ? teller301 + 1 : 0;
+    }
+
     private bool? LaatsteCommandoTeruggemeld(int adres)
     {
         if (_hw is not IWisselBevestiging bron || !_laatsteCommandoPerWissel.TryGetValue(adres, out var lc)) return null;
@@ -1550,7 +1569,7 @@ public partial class BaanVerkenner
             }
             bool oud = _wisselStand.TryGetValue(a, out var nu) && nu;
             var herstelVoor = _uitvalHersteldOm;
-            await ZetWissel(a, !oud, forceer: true);
+            await ZetWisselTijdensAlarm(a, !oud);   // BUG #334
             if (_alarmWegVoorEigenTerugmelding && HuidigeAlarmBlokken().Count == 0)
             {
                 _log.Waarschuwing($"De kortsluiting ging weg voordat Dinamo wissel {a} terugmeldde: niet door deze wissel (Dinamo zette het alarm zelf uit). Niet vastgelegd; wissel {a} gaat terug (BUG #308, nog niet getest op de baan).");
@@ -1588,6 +1607,17 @@ public partial class BaanVerkenner
                             _log.Info($"Wissel {pw} gaat niet terug naar afbuigend: die werd losgemaakt toen de loc op melder {Lijst(losBij)} stond, niet bij deze kortsluiting (melder {Lijst(bezet)}).");
                             continue;
                         }
+                        // BUG #335 (nachtwerk 25/26-10, realistische simulatie 12:31:37): wissel 13 ging zo terug naar afbuigend met de loc op 24, waar die wissel ligt: kortsluiting onder de loc.
+                        // Een wissel die volgens de kaart (of een opgelost kortsluitpunt) bij de bezette melder ligt, gaat niet terug zolang de loc daar staat.
+                        // De wissel werd op deze plek losgemaakt omdat de loc er mogelijk klem op zat: dan ligt hij (waarschijnlijk) onder de loc. Hij blijft rechtdoor zolang de loc hier staat (ook de volgende rit zet hem niet om voordat de loc weg is, zie #320).
+                        // #194 is er voor overlooppartners (wissel 1 en 2 samen afbuigend). Heeft de gebruiker de overloopsets opgegeven (Gekoppelde wissels, Marco: 5+6 en 2+1), dan schakelen
+                        // die partners al vanzelf mee en is terugzetten van een andere wissel onder de loc alleen een risico.
+                        if (_ins.GekoppeldeParen().Count > 0)
+                        {
+                            _log.Info($"Wissel {pw} gaat nu niet terug naar afbuigend: hij werd hier losgemaakt en ligt waarschijnlijk onder de loc (melder {Lijst(bezet)}); hij gaat pas om als de loc daar weg is (BUG #335, nog niet getest op de baan).");
+                            OnthoudKlemStand(pw, true, bezet);
+                            continue;
+                        }
                         await ZetWissel(pw, true, forceer: true);
                         var eind2 = _klok.Nu + TimeSpan.FromSeconds(2.5);
                         while (_klok.Nu < eind2) await Wacht(TimeSpan.FromMilliseconds(300));
@@ -1607,7 +1637,7 @@ public partial class BaanVerkenner
                 }
                 return true;
             }
-            await ZetWissel(a, oud, forceer: true);
+            await ZetWisselTijdensAlarm(a, oud);   // BUG #334: ook het terugzetten moet echt gebeuren
             return false;
         }
 
@@ -3349,14 +3379,17 @@ public partial class BaanVerkenner
         }
         if (terug.Count != 1)
         {
-            _log.Info($"Wissel {Lijst(teOm)} moet om voor de stap vanaf melder {van}, maar ligt bij de melder waar de loc staat; er is geen eenduidige melder om eerst naar terug te rijden.");
+            // BUG #336 (nachtwerk 25/26-10, simulatie met Dinamo-uitval, blokfase 15:53:34): daarna ging de wissel tóch om, met de loc erop. Nu blijft hij staan zolang de loc op deze
+            // melder staat; de rit gaat met de huidige stand (komt de loc ergens anders uit, dan is dat een gewone navigatiefout, geen kortsluiting onder de loc).
+            _log.Info($"Wissel {Lijst(teOm)} moet om voor de stap vanaf melder {van}, maar ligt bij de melder waar de loc staat; er is geen eenduidige melder om eerst naar terug te rijden. De wissel blijft staan zolang de loc daar staat (BUG #336, nog niet getest op de baan).");
+            if (_ins.GekoppeldeParen().Count > 0) _uitwijkLaatStaan = (van, teOm.ToHashSet());   // zie #335: alleen met opgegeven overloopsets
             return null;
         }
         int p = terug[0];
         // de wissel ligt dan tussen p en van: daar staat de loc er na het terugrijden nog op. BUG #332 (nachtwerk 25/26-10, meting met hervatten): op 129 moesten wissel 5 en 9 om; 9 ligt
         // ook bij 4, 5 niet. Toen gebeurde er niets en gingen beide om met de loc op 129. Nu rijdt de loc naar 4, gaat alleen wissel 5 om, en blijft wissel 9 staan zolang de loc op 4 staat.
         var bijP332 = WisselsBijBezet(_kaart, new[] { p }).Intersect(teOm).ToList();
-        if (bijP332.Count == teOm.Count) return null;
+        if (bijP332.Count == teOm.Count) { if (_ins.GekoppeldeParen().Count > 0) _uitwijkLaatStaan = (van, teOm.ToHashSet()); return null; }   // BUG #336
         _uitwijkLaatStaan = bijP332.Count > 0 ? (p, bijP332.ToHashSet()) : null;
         _log.Info($"Wissel {Lijst(teOm)} moet om voor de stap vanaf melder {van}, maar ligt bij de melder waar de loc staat (de loc kan op de tong staan). Eerst terug naar melder {p} met de huidige stand, dan omzetten (BUG #256, nog niet getest op de baan).");
         await Rit(van, r.Om(), new RitDoel { Configuratie = nu, DoelMelder = p, VerwachtPad = new List<int> { van, p } });

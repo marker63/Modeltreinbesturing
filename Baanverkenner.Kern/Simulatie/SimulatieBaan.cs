@@ -171,6 +171,8 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
     private readonly List<(double Van, double Tot, object Element)> _spoor = new();
     private readonly Dictionary<Sectie, int> _orientatieIn = new();   // laatste oriëntatie van de loc per sectie
     private bool _kortsluiting;
+    /// <summary>Nachtwerk 25/26-10: is er nu een kortsluiting (voor de uitvalsimulatie: Dinamo voert dan vaak geen wisselcommando's uit).</summary>
+    public bool HeeftKortsluiting => _kortsluiting || _alarmBlokken.Count > 0;
     private DateTime _volgendeHerstelpoging;
     private DateTime _fBitTot = DateTime.MinValue;
     private DateTime? _vorigeTik;
