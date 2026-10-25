@@ -1330,13 +1330,13 @@ public partial class BaanVerkenner
         PasSnelhedenAan(nieuw, Math.Min(_ins.Kruipsnelheid, Math.Max(2, nieuw - 2)));
     }
 
-    /// <summary>BUG #284: na hoeveel seconden zonder nieuwe melder de loc op een nog onbekend stuk naar kruipsnelheid gaat: anderhalf keer de gewone (mediane) sectietijd bij
-    /// verkensnelheid, tussen 6 en 12 s.</summary>
+    /// <summary>BUG #284/#300: na hoeveel seconden zonder nieuwe melder de loc op een nog onbekend stuk naar kruipsnelheid gaat.</summary>
     private double KruipNaarEindeNa()
     {
-        var tijden = _kaart.Overgangen.Where(o => o.AantalMetingen > 0 && o.GemiddeldeSeconden > 0).Select(o => o.GemiddeldeSeconden * RefSnelheid / Math.Max(1, _ins.Verkensnelheid)).OrderBy(x => x).ToList();
-        double mediaan = tijden.Count == 0 ? 6 : tijden[tijden.Count / 2];
-        return Math.Clamp(mediaan * 1.5, 6, 12);
+        // BUG #300 (autolog 25-10 08:57:05-08:58:08): met de mediaan (3 s) ging de loc bij de eerste rondrit al na 7 s op kruipsnelheid, ook in de lange secties 29 -> 30, 27 -> 28 en
+        // 25 -> 17 (12-14 s): de rit duurde veel langer en na 29 bijna 'doodlopend'. Nu: 0,8 x de langste gemeten sectietijd, tussen 8 en 14 s (zonder metingen 10 s).
+        var tijden = _kaart.Overgangen.Where(o => o.AantalMetingen > 0 && o.GemiddeldeSeconden > 0).Select(o => o.GemiddeldeSeconden * RefSnelheid / Math.Max(1, _ins.Verkensnelheid)).ToList();
+        return tijden.Count == 0 ? 10 : Math.Clamp(tijden.Max() * 0.8, 8, 14);
     }
 
     private TimeSpan WachttijdTussenMelders()

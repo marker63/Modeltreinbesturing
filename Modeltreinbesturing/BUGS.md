@@ -2887,3 +2887,7 @@ heen ging, dan geldt de oplossing alleen voor een pad dat daar ook heen gaat; wa
 De navigatie 14 -> 129 -> 24 en dan 24 -> 8 zette de stand voor de doorgang 129 -> 24 -> 8 pas op 24 (loc op de kruiswissel): de loc reed naar 21. Nu: (1) de stand die de doorgang over
 de grensmelder vraagt, gaat al tijdens de etappe ervoor om (ook een kruismotor zolang de referentie niet geldt), en blijft staan als de loc eerst uitwijkt; (2) de routeplanner neemt bij
 een splitsing of kruising eerst alleen doorgangen die echt gereden zijn, en pas als dat niet kan de ruime weg. Test: rondrit (voltooid, elke melder een blok) en keerlus.
+
+## BUG #300 – OPGELOST (nog niet getest op de baan): bij de eerste rondrit al na 7 s op kruipsnelheid in lange secties (autolog 25-10 08:57:05-08:58:08)
+#284 rekende met de mediane sectietijd (3 s); in 29 -> 30, 27 -> 28 en 25 -> 17 (12-14 s) ging de loc daardoor al na 7 s op kruipsnelheid en na 29 was het bijna 'doodlopend'. Nu: 0,8 x
+de langste gemeten sectietijd, tussen 8 en 14 s (zonder metingen 10 s).
