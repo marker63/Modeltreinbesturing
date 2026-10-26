@@ -288,6 +288,7 @@ public partial class BaanVerkenner
             _log.Stap(_status.Controle ? "Voltooide baan wordt nogmaals gecontroleerd (de bestaande kaart blijft ongewijzigd; aan het eind volgt een vergelijking)." : uitbreiden ? "Voltooide verkenning wordt uitgebreid met een tweede traject." : hervat ? "Verkenning wordt hervat." : "Verkenning start.");
             // BUG #345: overgangen die een oudere versie ten onrechte weghaalde (14 -> 129) komen bij het hervatten terug, zodat de weg 129 <-> 14 <-> 13 weer bekend is
             if (hervat) foreach (var t in _kaart.HerstelWeggehaaldeHeenOvergangen()) _log.Vondst("Kaartcontrole: " + t);
+            if (hervat) foreach (var t in _kaart.WeerlegKortsluitVondstenUitRitten()) _log.Waarschuwing("Kaartcontrole: " + t);   // BUG #348
             // BUG #128: niets uit eerdere verkenningen meenemen zonder bevestiging van de gebruiker (Marco 10:48: alles vanaf nul leren om te controleren of fouten echt zijn opgelost).
             _voorkennis = false;
             if (!hervat && Leerprofiel is { } lp0 && (lp0.AantalMetingen > 0 || lp0.KortsluitOplossingen.Count > 0 || lp0.BlokHints.Count > 0))
@@ -1900,7 +1901,47 @@ public partial class BaanVerkenner
                 });
                 _log.Vondst($"Adres {bron}, andere kant: na melder {sp.Na} ({o.Richting.Tekst()}) afbuigend → melder {sp.Afbuigend}.");
             }
+            else if (splits is null && WeerlegdeKortsluitVondst(_kaart, o, basis.Reeks) is { } weg348)
+            {
+                // Wat: de vondst "adres X afbuigend geeft kortsluiting" wordt weer uit de kaart gehaald als de rit van de andere kant laat zien dat adres X daar niets doet.
+                // Waarom (BUG #348, Marco 26-10 13:33: "wissel 7 bestaat niet, dit werd een keer veroorzaakt doordat de trein ontspoorde bij het schakelen van wissel 5"): de kortsluiting
+                // na 13 -> 14 om 09:11:47 kwam van een ontsporing, niet van adres 7. De opdracht 'andere tak van adres 7' reed om 09:54 vanaf 24 met adres 7 afbuigend gewoon 24, 14, 13:
+                // precies dezelfde weg als rechtdoor, over de plek van de 'kortsluiting' heen. Een echte wissel had daar de loc een andere kant op gestuurd.
+                _kaart.Wissel(bron).Waarnemingen.Remove(weg348);
+                if (_kaart.Wissel(bron).Waarnemingen.Count == 0) _status.Geidentificeerd.Remove(bron);
+                var t348 = $"Vondst voor adres {bron} weerlegd: '{weg348.Toelichting}' klopt niet. Met adres {bron} afbuigend reed de loc vanaf melder {o.Start} gewoon {Lijst(basis.Reeks.Take(3).ToList())}, dezelfde weg als rechtdoor; de kortsluiting van toen kwam dus ergens anders vandaan (bijv. een ontsporing). De vondst is uit de kaart gehaald (BUG #348, nog niet getest op de baan).";
+                _kaart.Waarschuwingen.Add(t348);
+                _log.Waarschuwing(t348);
+            }
         }
+    }
+
+    /// <summary>BUG #348: wissels met een vondst, maar zonder waarneming waarin beide standen gereden zijn (rechtdoor naar de ene melder, afbuigend naar een andere). Per wissel één regel.</summary>
+    internal static List<string> HalfGevondenWissels(Baankaart kaart)
+    {
+        var uit = new List<string>();
+        foreach (var w in kaart.Wissels.Where(w => w.Waarnemingen.Count > 0).OrderBy(w => w.Adres))
+        {
+            if (w.Waarnemingen.Any(x => x.VolgendeBijRechtdoor is int r && x.VolgendeBijAfbuigend is int a && r != a)) continue;
+            var k = w.Waarnemingen.FirstOrDefault(x => x.Soort == WaarnemingSoort.KortsluitingBijOmzetten);
+            uit.Add(k is not null
+                ? $"wissel {w.Adres} is maar half gevonden: alleen bekend is dat afbuigend kortsluiting geeft ({k.Toelichting.TrimEnd('.')}); de afbuigende tak zelf is nog niet gereden. Is dit één keer gebeurd, dan kan het ook een valse vondst zijn (bijv. een ontsporing)."
+                : $"wissel {w.Adres} is maar half gevonden: er is nog geen rit waarin rechtdoor en afbuigend naar verschillende melders gingen.");
+        }
+        return uit;
+    }
+
+    /// <summary>BUG #348: de KortsluitingBijOmzetten-waarneming van adres <c>o.BronAdres</c> die door deze 'andere tak'-rit weerlegd wordt, of null. Weerlegd = de rit met het adres
+    /// afbuigend ging vanaf de startmelder (q) over de melder van de kortsluiting (x) gewoon door naar de oude ingang (via), dus precies de omgekeerde weg van via -> x -> q.</summary>
+    internal static WisselWaarneming? WeerlegdeKortsluitVondst(Baankaart kaart, Opdracht o, IReadOnlyList<int> reeks)
+    {
+        if (o.BronAdres is not int bron || reeks.Count < 3 || reeks[0] != o.Start) return null;
+        var k = kaart.Wissel(bron).Waarnemingen.FirstOrDefault(w => w.Soort == WaarnemingSoort.KortsluitingBijOmzetten && w.Via is int via
+            && w.NaMelder == reeks[1] && via == reeks[2] && w.VolgendeBijRechtdoor == o.Start && w.Richting == o.Richting.Om());
+        // niet als een eerdere rit met dit adres afbuigend daar juist een andere kant op ging (dan doet het adres wel iets en zette Dinamo de wissel nu misschien niet om)
+        if (k is not null && kaart.Ritten.Any(r => !r.Navigatie && !r.Onbetrouwbaar && r.Afbuigend.Contains(bron) && r.Richting == o.Richting
+            && Enumerable.Range(0, Math.Max(0, r.Reeks.Count - 2)).Any(i => r.Reeks[i] == reeks[0] && r.Reeks[i + 1] == reeks[1] && r.Reeks[i + 2] != reeks[2]))) return null;
+        return k;
     }
 
     /// <summary>Legt vast wat het einde van een (basis)rit betekent en plant vervolgopdrachten.</summary>
@@ -3300,6 +3341,14 @@ public partial class BaanVerkenner
         foreach (var t in _kaart.LosKortsluitpuntenOpUitRitten()) _log.Vondst("Kortsluitpunt afgeleid (BUG #214): " + t);
         foreach (var t in _kaart.VulOntbrekendeOplossingWaarnemingen()) _log.Info("Kaartcontrole (BUG #212): " + t);
         foreach (var t in _kaart.HerstelWeggehaaldeHeenOvergangen()) _log.Info("Kaartcontrole: " + t);   // BUG #345
+        foreach (var t in _kaart.WeerlegKortsluitVondstenUitRitten()) _log.Waarschuwing("Kaartcontrole: " + t);   // BUG #348
+        // BUG #348 (Marco 26-10 13:30: "zit er ook een controle dat als je een wissel gevonden hebt er minimaal 2 standen bereden en dus gevonden moeten worden?"): een wissel waarvan
+        // alleen bekend is dat afbuigend ergens kortsluiting geeft, is maar half gevonden: waar de afbuigende tak heen gaat is nog niet gereden. Die worden in het log en het rapport genoemd.
+        foreach (var t in HalfGevondenWissels(_kaart))
+        {
+            _log.Waarschuwing("Kaartcontrole (BUG #348): " + t);
+            if (!_kaart.Waarschuwingen.Contains(t)) _kaart.Waarschuwingen.Add(t);
+        }
         BerekenAdressenZonderEffect();
         _kaart.VoorgesteldeBlokken = BlokVoorstel.Bereken(_kaart);
         _kaart.Wisselstraatvoorstellen = WisselstraatVoorstel.Bereken(_kaart);

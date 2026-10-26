@@ -3147,3 +3147,12 @@ kaart van 11:21: daarna kent hij weer 129 -> 14 -> 13.
 
 ## BUG #347 – OPGELOST (nog niet getest op de baan): melding "volgorde onduidelijk" 18 keer in een halve seconde
 (Log 26-10 11:31:00.) "Melder 24 is vrij maar meerdere melders blijven bezet (129, 10)" kwam bij elke controle opnieuw in het log. Nu één keer per situatie.
+
+## BUG #348 – OPGELOST (nog niet getest op de baan): geen controle of een gevonden wissel in beide standen bereden is; valse vondst wissel 7 bleef staan
+(Marco 26-10 13:30: "zit er ook een controle dat als je een wissel gevonden hebt er minimaal 2 standen bereden moeten worden?"; 13:33: "wissel 7 bestaat niet, dit werd een keer
+veroorzaakt doordat de trein ontspoorde bij het schakelen van wissel 5".)
+- Een vondst "adres X afbuigend geeft kortsluiting van via naar x" wordt weerlegd als een rit met X afbuigend van de andere kant gewoon q, x, via reed (dezelfde weg als rechtdoor,
+  over de plek heen) en geen enkele rit met X afbuigend daar een andere kant op ging. Dat gebeurt meteen na de opdracht 'andere tak van adres X' en bij het hervatten (kaartcontrole
+  uit de gereden ritten). Kaart 11:21: alleen adres 7 wordt weerlegd (rit 12: 24, 14, 13 met 7 afbuigend); 5, 13 en 14 blijven.
+- Kaartcontrole aan het eind: wissels waarvan nog geen rit rechtdoor en afbuigend naar verschillende melders liet zien, worden als "maar half gevonden" in log en rapport genoemd.
+Niets over wissel 7 is vastgelegd in de code (zelflerend).

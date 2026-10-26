@@ -3586,6 +3586,18 @@ public static class Tests
         Eis(BaanVerkenner.ZoekKruipSnelheid(5, 12, 1) == 5 && BaanVerkenner.ZoekKruipSnelheid(5, 12, 2) == 5 && BaanVerkenner.ZoekKruipSnelheid(5, 12, 3) == 7 && BaanVerkenner.ZoekKruipSnelheid(5, 12, 23) == 12,
             "#343: zoeksnelheid 5, 5, 7 ... en na 23 pogingen 12 (verkenningssnelheid)");
         k2.Overgangen.First(o => o.Van == 14 && o.Naar == 129).AantalKeer = 3;
+        // BUG #348: de opdracht 'andere tak van adres 7' reed vanaf 24 met 7 afbuigend gewoon 24, 14, 13: de vondst '13 -> 14 met 7 afbuigend kortsluiting' is weerlegd; wissel 5 niet
+        var k348 = Laad("baankaart_2026-10-26_0925.json");
+        var o7 = new Opdracht { BronAdres = 7, Start = 24, Richting = Richting.Achteruit, BronRechtdoorVolgende = 14, Configuratie = Configuratie.Basis.Met(7) };
+        Eis(BaanVerkenner.WeerlegdeKortsluitVondst(k348, o7, new List<int> { 24, 14, 13, 5 }) is { NaMelder: 14, Via: 13 }, "#348: wissel 7 (ontsporing, Marco 13:33) wordt door de rit 24, 14, 13 weerlegd");
+        var o5 = new Opdracht { BronAdres = 5, Start = 13, Richting = Richting.Vooruit, BronRechtdoorVolgende = 14, Configuratie = Configuratie.Basis.Met(5) };
+        Eis(BaanVerkenner.WeerlegdeKortsluitVondst(k348, o5, new List<int> { 13, 14, 129 }) is null, "#348: wissel 5 (13, 14, 129: andere kant op) blijft");
+        var k348b = Laad("baankaart_2026-10-26_1121.json");
+        var weg348 = k348b.WeerlegKortsluitVondstenUitRitten();
+        Eis(weg348.Count == 1 && weg348[0].Contains("adres 7") && k348b.Wissel(7).Waarnemingen.Count == 0 && k348b.Wissel(5).Waarnemingen.Count > 0 && k348b.Wissel(13).Waarnemingen.Count > 0 && k348b.Wissel(14).Waarnemingen.Count > 0,
+            "#348: in de kaart van 11:21 haalt de kaartcontrole alleen de vondst van adres 7 weg (" + string.Join(" | ", weg348) + ")");
+        var half348 = BaanVerkenner.HalfGevondenWissels(k348);
+        Eis(half348.Any(t => t.StartsWith("wissel 7 ")) && !half348.Any(t => t.StartsWith("wissel 2 ")) && !half348.Any(t => t.StartsWith("wissel 10 ")), "#348: wissel 7 is maar half gevonden, 2 en 10 (splitsing gezien) niet (" + string.Join(" | ", half348.Select(t => t[..10])) + ")");
         // BUG #345: kaart van 11:21 mist 14 -> 129 (weggehaald door de oude onverwachte-terugwegregel); bij het hervatten komt hij terug met wissel 5 afbuigend
         var k345 = Laad("baankaart_2026-10-26_1121.json");
         Eis(!k345.Overgangen.Any(o => o.Van == 14 && o.Naar == 129), "#345: in de kaart van 11:21 ontbreekt 14 -> 129");

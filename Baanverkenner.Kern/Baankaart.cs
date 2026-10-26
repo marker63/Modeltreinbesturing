@@ -1132,6 +1132,32 @@ public class Baankaart
         return uit;
     }
 
+    /// <summary>Wat: haalt vondsten "adres X afbuigend geeft kortsluiting van via naar x" weg die een latere gewone rit tegenspreekt. Waarom (BUG #348): wissel 7 werd 'gevonden' door een
+    /// ontsporing (Marco 26-10 13:33); de rit om 09:54 met adres 7 afbuigend reed 24, 14, 13 (dezelfde weg als rechtdoor, over de plek heen) en liet zien dat adres 7 daar niets doet.
+    /// Hoe: een rit (geen navigatie, betrouwbaar) met X afbuigend in de omgekeerde richting die q, x, via achter elkaar reed, terwijl q de rechtdoor-melder van de vondst is.
+    /// Geeft per weggehaalde vondst een melding. Nog niet getest op de baan.</summary>
+    public List<string> WeerlegKortsluitVondstenUitRitten()
+    {
+        var uit = new List<string>();
+        foreach (var w in Wissels)
+            foreach (var k in w.Waarnemingen.Where(x => x.Soort == WaarnemingSoort.KortsluitingBijOmzetten && x.Via is int && x.VolgendeBijRechtdoor is int).ToList())
+            {
+                int via = k.Via!.Value, q = k.VolgendeBijRechtdoor!.Value, x = k.NaMelder;
+                var rit = Ritten.FirstOrDefault(r => !r.Navigatie && !r.Onbetrouwbaar && r.Afbuigend.Contains(w.Adres) && r.Richting == k.Richting.Om()
+                    && Enumerable.Range(0, Math.Max(0, r.Reeks.Count - 2)).Any(i => r.Reeks[i] == q && r.Reeks[i + 1] == x && r.Reeks[i + 2] == via));
+                if (rit is null) continue;
+                // Alleen als geen enkele rit met dit adres afbuigend juist wél een andere kant op ging (q, x, y met y != via): dan doet het adres daar wel iets, en was die ene rit
+                // bijvoorbeeld een rit waarbij Dinamo de wissel niet echt omzette (kaart 11:21: wissel 14, rit 92 ging 15, 8, 17 maar rit 94-98 gingen 15, 8, 24).
+                if (Ritten.Any(r => !r.Navigatie && !r.Onbetrouwbaar && r.Afbuigend.Contains(w.Adres) && r.Richting == k.Richting.Om()
+                    && Enumerable.Range(0, Math.Max(0, r.Reeks.Count - 2)).Any(i => r.Reeks[i] == q && r.Reeks[i + 1] == x && r.Reeks[i + 2] != via))) continue;
+                w.Waarnemingen.Remove(k);
+                var t = $"vondst voor adres {w.Adres} weerlegd: '{k.Toelichting.TrimEnd('.')}' klopt niet, want rit {rit.Nr} reed met adres {w.Adres} afbuigend gewoon {q}, {x}, {via} (dezelfde weg als rechtdoor); de kortsluiting van toen had een andere oorzaak (BUG #348)";
+                uit.Add(t);
+                if (!Waarschuwingen.Contains(t)) Waarschuwingen.Add(t);
+            }
+        return uit;
+    }
+
     public List<string> VulOntbrekendeOplossingWaarnemingen()
     {
         var res = new List<string>();
