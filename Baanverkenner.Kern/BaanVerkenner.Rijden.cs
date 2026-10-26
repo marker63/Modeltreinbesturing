@@ -1766,6 +1766,9 @@ public partial class BaanVerkenner
         return res;
     }
 
+    /// <summary>BUG #347: de laatst gemelde 'volgorde onduidelijk'-situatie (melder|bezette melders), zodat die melding niet elke 50 ms herhaald wordt.</summary>
+    private string? _volgordeOnduidelijkGemeld347;
+
     /// <summary>BUG #342 (realistische simulatie met stoppen en hervatten, 16:17-16:37): na de keerlus stond de loc andersom ten opzichte van de kaart. Elke rit stopte met "de loc staat
     /// andersom ... draai de loc om" (#278) en de blokfase liep vast: alle blokken 'lukte niet', verkenning niet voltooid. De verkenner draait nu zelf de rijrichting om: 'vooruit' in de
     /// kaart wordt dan het Dinamo-commando achteruit en andersom. Dit blijft bewaard (ook na het hervatten); blijkt het weer andersom, dan draait hij weer terug. Nog niet getest op de baan.</summary>
@@ -2245,7 +2248,15 @@ public partial class BaanVerkenner
                     nieuweBezetten.Add(new MelderMonitor.Wijziging(verborgen[0], true, _klok.Nu));
                 }
                 else if (verborgen.Count > 1)
-                    _log.Waarschuwing($"Melder {res.Reeks[^1]} is vrij maar meerdere melders blijven bezet ({Lijst(verborgen)}): volgorde onduidelijk, niet automatisch toegevoegd.");
+                {
+                    // BUG #347 (log 11:31:00-11:31:01): deze melding kwam 18 keer in een halve seconde (elke controle opnieuw). Nu één keer per situatie.
+                    string sl347 = $"{res.Reeks[^1]}|{string.Join(",", verborgen.OrderBy(x => x))}";
+                    if (_volgordeOnduidelijkGemeld347 != sl347)
+                    {
+                        _volgordeOnduidelijkGemeld347 = sl347;
+                        _log.Waarschuwing($"Melder {res.Reeks[^1]} is vrij maar meerdere melders blijven bezet ({Lijst(verborgen)}): volgorde onduidelijk, niet automatisch toegevoegd.");
+                    }
+                }
             }
             foreach (var w in nieuweBezetten)
             {

@@ -3144,3 +3144,6 @@ kaart van 11:21: daarna kent hij weer 129 -> 14 -> 13.
 ## BUG #346 – OPGELOST (nog niet getest op de baan): bij zelf oplossen keerde de loc op een lang stuk te snel om
 (Marco 26-10, log 11:20:47.) Na 30 s kruipen zonder nieuwe melder (melder 12 -> 11 is lang) keerde de loc om en kroop daarna heen en weer tussen 9 en 11. Nu eerst nog één keer
 75 s dezelfde kant op; pas als dat ook niets oplevert de andere kant op.
+
+## BUG #347 – OPGELOST (nog niet getest op de baan): melding "volgorde onduidelijk" 18 keer in een halve seconde
+(Log 26-10 11:31:00.) "Melder 24 is vrij maar meerdere melders blijven bezet (129, 10)" kwam bij elke controle opnieuw in het log. Nu één keer per situatie.
