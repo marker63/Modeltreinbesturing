@@ -3580,6 +3580,12 @@ public static class Tests
         if (!string.IsNullOrEmpty(zaadPad)) { File.WriteAllText(zaadPad, lpZaad.AlsJson()); Console.WriteLine("  zaadprofiel geschreven naar " + zaadPad); }
     }
 
+    /// <summary>BUG #352 (bug354 op de baan 26-10 14:16: nog steeds 6 datagrammen per commando): de echte Dinamo-koppeling moet IWisselPuls hebben, anders kan de verkenner niets instellen.</summary>
+    static void DinamoPulsTest()
+    {
+        Eis(typeof(Modeltreinbesturing.Hardware.IWisselPuls).IsAssignableFrom(typeof(Modeltreinbesturing.Hardware.DinamoHardware)), "#352: DinamoHardware implementeert IWisselPuls (1 puls per commando instelbaar)");
+    }
+
     /// <summary>BUG #337, #339 en #343 (Marco 26-10, baankaart 08:21).</summary>
     static void Bug337En339Test()
     {
@@ -3796,6 +3802,7 @@ public static class Tests
         if (Environment.GetEnvironmentVariable("KEERLUS") != "0") KeerlusTest();
         AanloopTest();
         Bug337En339Test();
+        DinamoPulsTest();
         MiniworldAlarmVertragingTest();
         MiniworldVoorkennisTest();
         HerstelBlijftStaanTest();

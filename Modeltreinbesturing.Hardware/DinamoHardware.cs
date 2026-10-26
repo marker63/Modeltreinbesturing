@@ -34,7 +34,7 @@ namespace Modeltreinbesturing.Hardware;
 /// kan dus geen commando verstuurd worden - dat wordt dan duidelijk gemeld i.p.v. blok 0
 /// (een ander, geldig blok) te gebruiken. Nog NIET getest tegen echte hardware.
 /// </summary>
-public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBron, IWisselBevestiging
+public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBron, IWisselBevestiging, IWisselPuls
 {
     private SerialPort? _poort;
     private System.Threading.Timer? _stuurTimer;

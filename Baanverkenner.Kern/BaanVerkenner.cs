@@ -342,6 +342,7 @@ public partial class BaanVerkenner
             _fase = "Wissels in beginstand";
             MeldVoortgang();
             _log.Stap("Alle adressen in het bereik op rechtdoor zetten (commando gestuurd; de centrale meldt de werkelijke stand van de wisselmotoren niet terug).");
+            await WachtTotDinamoUitgevoerd();   // BUG #355
             // BUG #353: bij hervatten met bekende standen alleen de wissels die anders staan, en niet onder de loc (anders 14 commando's achter elkaar, ook voor wissels waar de loc op staat)
             if (hervat && _status.WisselStanden.Count > 0) await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);
             else foreach (var a in _ins.WisselAdressen()) await ZetWissel(a, false, forceer: true);
@@ -438,6 +439,28 @@ public partial class BaanVerkenner
 
     /// <summary>BUG #129: bepaalt de Engelse wissels van deze verkenning: bij hervatten die uit de kaart, anders wat de gebruiker opgaf. De vaste referentie
     /// (melder 24, motor 13/10) telt alleen mee als de gebruiker koos voor gegevens uit eerdere verkenningen.</summary>
+    /// <summary>Wat: wacht bij de start tot Dinamo geen oude wisselcommando's meer uitvoert (3 s geen terugmelding), hoogstens 3 minuten.
+    /// Waarom (BUG #355, hardwarelog 26-10 14:16): na het herstarten van het programma voerde Dinamo nog tientallen pulsen voor wissel 13 uit die de vorige sessie (bug348, 13:53) had
+    /// gestuurd. Die liepen door de nieuwe verkenning heen. Dinamo zelf onthoudt zijn wachtrij; het programma herstarten maakt die niet leeg.</summary>
+    private async Task WachtTotDinamoUitgevoerd()
+    {
+        if (_hw is not IWisselBevestiging wb) return;
+        long n0 = wb.AantalWisselBevestigingen;
+        await Wacht(TimeSpan.FromSeconds(3));
+        if (wb.AantalWisselBevestigingen == n0) return;
+        _log.Waarschuwing("Dinamo voert nog wisselcommando's van eerder uit (er komen terugmeldingen binnen zonder dat deze verkenning iets stuurde). De verkenner wacht tot dat klaar is (hoogstens 3 minuten). Sneller: Dinamo even uit- en aanzetten (BUG #355, nog niet getest op de baan).");
+        var tot = _klok.Nu + TimeSpan.FromMinutes(3);
+        long vorige = wb.AantalWisselBevestigingen;
+        var rustSinds = _klok.Nu;
+        while (_klok.Nu < tot)
+        {
+            await Wacht(TimeSpan.FromMilliseconds(500));
+            if (wb.AantalWisselBevestigingen != vorige) { vorige = wb.AantalWisselBevestigingen; rustSinds = _klok.Nu; }
+            else if (_klok.Nu - rustSinds >= TimeSpan.FromSeconds(3)) { _log.Info("Dinamo is klaar met de oude wisselcommando's; de verkenning gaat verder (BUG #355)."); return; }
+        }
+        _log.Waarschuwing("Dinamo voert na 3 minuten nog steeds oude wisselcommando's uit; de verkenning gaat toch verder (BUG #355).");
+    }
+
     private void InitKruis(bool hervat)
     {
         // Wat: stelt in hoe wisselcommando's naar Dinamo gaan (aantal keer en pulstijd). Waarom: BUG #352, zie VerkenInstellingen.WisselHerhalingen.

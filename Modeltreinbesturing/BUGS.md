@@ -3184,3 +3184,9 @@ gestuurde standen worden nu bewaard en bij hervatten overgenomen; daarna gaan al
 
 ## BUG #354 – OPGELOST (nog niet getest op de baan): "wissels bij startmelder 24 worden al gezet voordat de loc daar aankomt" terwijl de loc er al stond
 (Simulatie 13:47:00: wissel 10 afbuigend met de loc op 24.) Staat de loc al op de startmelder, dan worden de wissels daar niet vooraf gezet.
+
+## BUG #355 – OPGELOST (nog niet getest op de baan): bug354 stuurde toch nog 6 keer; oude Dinamo-wachtrij liep door de nieuwe verkenning
+(Hardwarelog 26-10 14:16.) (1) De Dinamo-koppeling had de nieuwe instelbaarheid (#352) wel, maar meldde zich er niet voor aan (interface IWisselPuls ontbrak): de verkenner kon niets
+instellen en elk commando ging nog steeds 6 keer. Nu wel, met een test. (2) Dinamo voerde om 14:16 nog tientallen pulsen voor wissel 13 uit die de vorige sessie om 13:53 had gestuurd;
+programma herstarten maakt die wachtrij niet leeg. De verkenner wacht nu bij de start tot Dinamo 3 s lang niets meer terugmeldt (hoogstens 3 minuten). Sneller: Dinamo even uit/aan.
+(3) De melding "na 20 s nog niet teruggemeld" kwam ook als er na 4 s al werd gestopt; tekst gecorrigeerd.

@@ -2036,7 +2036,7 @@ public partial class BaanVerkenner
             else if (_klok.Nu > stilTot) break;
             await Wacht(TimeSpan.FromMilliseconds(300));
         }
-        if (open.Count > 0) _log.Waarschuwing($"Dinamo heeft wissel {Lijst(open)} na 20 s nog steeds niet teruggemeld; de rit gaat toch door (BUG #352).");
+        if (open.Count > 0) _log.Waarschuwing($"Dinamo heeft wissel {Lijst(open)} nog steeds niet teruggemeld{(_klok.Nu >= tot ? " na 20 s" : " en meldt helemaal niets meer terug")}; de rit gaat toch door (BUG #352).");
     }
 
     /// <summary>BUG #352: wanneer het laatste commando per wissel verstuurd is.</summary>
