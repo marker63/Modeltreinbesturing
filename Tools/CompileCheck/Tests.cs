@@ -3581,11 +3581,18 @@ public static class Tests
         Eis(BaanVerkenner.OvergangBlijftBijOnverwachteTerugweg(k, 14, 129, Richting.Vooruit, "5"), "#339: 14 -> 129 is de enige overgang van melder 129: hij blijft bij een onverwachte terugweg (129 niet los in het melderschema)");
         var k2 = Laad("baankaart_2026-10-26_0821.json");
         k2.Overgangen.Add(new Overgang { Van = 129, Naar = 24, Richting = Richting.Achteruit, AantalKeer = 1, GezienBijConfiguraties = new List<string> { "" } });
-        Eis(!BaanVerkenner.OvergangBlijftBijOnverwachteTerugweg(k2, 14, 129, Richting.Vooruit, "5"), "#339: heeft 129 nog een andere overgang en is 14 -> 129 maar één keer gereden, dan gaat hij er (zoals vroeger) uit");
+        Eis(BaanVerkenner.OvergangBlijftBijOnverwachteTerugweg(k2, 14, 129, Richting.Vooruit, "5"), "#339/#345: ook als 129 nog een andere overgang heeft, blijft de echt gereden heenweg 14 -> 129");
         // BUG #343: loc op geen melder: elke twee pogingen meer snelheid, nooit boven de verkenningssnelheid
         Eis(BaanVerkenner.ZoekKruipSnelheid(5, 12, 1) == 5 && BaanVerkenner.ZoekKruipSnelheid(5, 12, 2) == 5 && BaanVerkenner.ZoekKruipSnelheid(5, 12, 3) == 7 && BaanVerkenner.ZoekKruipSnelheid(5, 12, 23) == 12,
             "#343: zoeksnelheid 5, 5, 7 ... en na 23 pogingen 12 (verkenningssnelheid)");
         k2.Overgangen.First(o => o.Van == 14 && o.Naar == 129).AantalKeer = 3;
+        // BUG #345: kaart van 11:21 mist 14 -> 129 (weggehaald door de oude onverwachte-terugwegregel); bij het hervatten komt hij terug met wissel 5 afbuigend
+        var k345 = Laad("baankaart_2026-10-26_1121.json");
+        Eis(!k345.Overgangen.Any(o => o.Van == 14 && o.Naar == 129), "#345: in de kaart van 11:21 ontbreekt 14 -> 129");
+        var her345 = k345.HerstelWeggehaaldeHeenOvergangen();
+        Eis(k345.Overgangen.Any(o => o.Van == 14 && o.Naar == 129 && o.Richting == Richting.Vooruit && o.GezienBijConfiguraties.SequenceEqual(new[] { "5" })), "#345: 14 -> 129 vooruit (wissel 5 afbuigend) is teruggezet (" + string.Join("; ", her345) + ")");
+        Eis(k345.HerstelWeggehaaldeHeenOvergangen().Count == 0, "#345: een tweede keer verandert er niets");
+        Eis(BaanVerkenner.StapWeg(k345, new KruisKennis(), 129, 13, null) is { } w345 && w345.Count <= 3, "#345: de kaart kent nu een korte weg van 129 naar 13 (" + string.Join(" ", BaanVerkenner.StapWeg(k345, new KruisKennis(), 129, 13, null)?.Select(x => $"{x.Van}->{x.Naar}") ?? new string[0]) + ")");
         Eis(BaanVerkenner.OvergangBlijftBijOnverwachteTerugweg(k2, 14, 129, Richting.Vooruit, "5"), "#339: een overgang die al vaker gereden is, blijft");
     }
 

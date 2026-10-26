@@ -3134,3 +3134,13 @@ vooruit en achteruit, zonder dat hij bewoog. Nu krijgt hij elke twee pogingen 2 
 (Marco 26-10, log 10:19:59-10:20:22.) Op weg naar melder 10 kwam na melder 24 "geen melder meer bezet"; de herstelroutine liet de loc op 24 staan, maar de navigatie nam aan dat hij
 op 10 stond. De proef 'vooruit vanaf melder 10' begon zo op 24 en wissel 9 ging om terwijl de loc er vlakbij stond. Nu controleert de navigatie aan het eind of de loc echt op het
 doel staat (2 s speling voor een flikkerende melder); zo niet, dan is het een navigatiefout en begint de opdracht daar niet.
+
+## BUG #345 – OPGELOST (nog niet getest op de baan): de verkenner was de weg tussen 129 en 13 kwijt
+(Marco 26-10 11:22: "hij is de weg kwijt tussen 129 en 13, die hij eigenlijk al lang moet weten".) De oude onverwachte-terugwegregel (#40) haalde om 08:12 (bug336) de overgang
+14 -> 129 (wissel 5 afbuigend) uit de kaart, en eerder ook 5 -> 12 (wissel 2 afbuigend). #339 hield dat alleen tegen als de melder anders los kwam te staan. Nu blijft een echt gereden
+heenweg altijd in de kaart, en bij het hervatten zet de verkenner de ten onrechte weggehaalde overgangen terug (bron: de waarschuwing van toen en de gereden rit). Getest met de
+kaart van 11:21: daarna kent hij weer 129 -> 14 -> 13.
+
+## BUG #346 – OPGELOST (nog niet getest op de baan): bij zelf oplossen keerde de loc op een lang stuk te snel om
+(Marco 26-10, log 11:20:47.) Na 30 s kruipen zonder nieuwe melder (melder 12 -> 11 is lang) keerde de loc om en kroop daarna heen en weer tussen 9 en 11. Nu eerst nog één keer
+75 s dezelfde kant op; pas als dat ook niets oplevert de andere kant op.

@@ -1107,6 +1107,31 @@ public class Baankaart
 
     /// <summary>BUG #212: elk opgelost kortsluitpunt met een oplossingsadres hoort bij dat wissel een waarneming "lost kortsluiting op" te hebben (anders ontbreekt het wissel in de wisselslijst
     /// terwijl de kaart het adres wel als oplossing kent). Voegt de ontbrekende waarneming toe en geeft een melding per toevoeging. Nog niet getest op de baan.</summary>
+    /// <summary>Wat: zet overgangen terug die vóór BUG #339 ten onrechte uit de kaart gehaald zijn. Waarom: bij een 'onverwachte terugweg' (heen 14 -> 129, terug via 10) haalde de
+    /// verkenner de heenweg 14 -> 129 weg, terwijl de loc die echt gereden had. Daarna kende de kaart geen weg meer tussen 129 en 14/13 (Marco 26-10 11:22: "hij is de weg kwijt
+    /// tussen 129 en 13, die hij eigenlijk al lang moet weten"). Hoe: de waarschuwing van toen noemt de heenweg (melder w naar y, richting); de gereden rit met w, y achter elkaar
+    /// in die richting geeft de wisselstand. Ontbreekt de overgang, dan komt hij terug (één keer gereden). Geeft per teruggezette overgang een melding. BUG #345, nog niet getest op de baan.</summary>
+    public List<string> HerstelWeggehaaldeHeenOvergangen()
+    {
+        var uit = new List<string>();
+        var re = new System.Text.RegularExpressions.Regex(@"^Onverwachte terugweg na melder (\d+)/(\d+) \((vooruit|achteruit), (alle wissels rechtdoor|afbuigend: ([\d, ]+))\): heen ging de loc van \1 naar \2");
+        foreach (var w in Waarschuwingen.Where(x => x.Contains("niet in de kaart opgenomen")))
+        {
+            var m = re.Match(w);
+            if (!m.Success) continue;
+            int van = int.Parse(m.Groups[1].Value), naar = int.Parse(m.Groups[2].Value);
+            var r = m.Groups[3].Value == "vooruit" ? Richting.Vooruit : Richting.Achteruit;
+            if (Overgangen.Any(o => o.Van == van && o.Naar == naar && o.Richting == r)) continue;
+            var rit = Ritten.LastOrDefault(x => !x.Navigatie && x.Richting == r && Enumerable.Range(0, Math.Max(0, x.Reeks.Count - 1)).Any(i => x.Reeks[i] == van && x.Reeks[i + 1] == naar));
+            if (rit is null) continue;
+            // de stand uit de waarschuwing zelf (zonder de meeschakelende tweede wissel van een overloopset, zoals de andere overgangen in de kaart)
+            var cfg = m.Groups[5].Success ? Configuratie.VanSleutel(m.Groups[5].Value) : Configuratie.Basis;
+            Overgangen.Add(new Overgang { Van = van, Naar = naar, Richting = r, AantalKeer = 1, GezienBijConfiguraties = new List<string> { cfg.Sleutel } });
+            uit.Add($"overgang {van} -> {naar} ({m.Groups[3].Value}, {(cfg.Afbuigend.Length == 0 ? "alle wissels rechtdoor" : "afbuigend: " + cfg.Sleutel)}) teruggezet: die was echt gereden (rit {rit.Nr}) maar ten onrechte weggehaald (BUG #345)");
+        }
+        return uit;
+    }
+
     public List<string> VulOntbrekendeOplossingWaarnemingen()
     {
         var res = new List<string>();

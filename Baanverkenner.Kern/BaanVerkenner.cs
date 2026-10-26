@@ -286,6 +286,8 @@ public partial class BaanVerkenner
             if (_kaart.RefSnelheid <= 0) _kaart.RefSnelheid = _ins.Verkensnelheid;
             _startVerkensnelheid = _ins.Verkensnelheid;
             _log.Stap(_status.Controle ? "Voltooide baan wordt nogmaals gecontroleerd (de bestaande kaart blijft ongewijzigd; aan het eind volgt een vergelijking)." : uitbreiden ? "Voltooide verkenning wordt uitgebreid met een tweede traject." : hervat ? "Verkenning wordt hervat." : "Verkenning start.");
+            // BUG #345: overgangen die een oudere versie ten onrechte weghaalde (14 -> 129) komen bij het hervatten terug, zodat de weg 129 <-> 14 <-> 13 weer bekend is
+            if (hervat) foreach (var t in _kaart.HerstelWeggehaaldeHeenOvergangen()) _log.Vondst("Kaartcontrole: " + t);
             // BUG #128: niets uit eerdere verkenningen meenemen zonder bevestiging van de gebruiker (Marco 10:48: alles vanaf nul leren om te controleren of fouten echt zijn opgelost).
             _voorkennis = false;
             if (!hervat && Leerprofiel is { } lp0 && (lp0.AantalMetingen > 0 || lp0.KortsluitOplossingen.Count > 0 || lp0.BlokHints.Count > 0))
@@ -3136,15 +3138,16 @@ public partial class BaanVerkenner
         }
     }
 
-    /// <summary>BUG #339: blijft de overgang <paramref name="w"/> -> <paramref name="y"/> in de kaart na een onverwachte terugweg? Ja als hij al meer dan eens gereden is, of als melder
-    /// <paramref name="y"/> zonder die overgang geen enkele overgang meer heeft (dan staat hij los in het melderschema).</summary>
+    /// <summary>BUG #339/#345: blijft de overgang <paramref name="w"/> -> <paramref name="y"/> in de kaart na een onverwachte terugweg? Sinds #345 altijd (als hij in de kaart staat):
+    /// de loc heeft hem echt gereden; de onverwachte terugweg zelf wordt als kortsluitpunt onthouden.</summary>
     internal static bool OvergangBlijftBijOnverwachteTerugweg(Baankaart kaart, int w, int y, Richting r, string sleutel)
     {
         bool Weg(Overgang x) => x.Van == w && x.Naar == y && x.Richting == r && x.GezienBijConfiguraties.All(k => k == sleutel);
         var weg = kaart.Overgangen.Where(Weg).ToList();
         if (weg.Count == 0) return false;
-        if (weg.Any(x => x.AantalKeer > 1)) return true;
-        return !kaart.Overgangen.Any(x => !Weg(x) && (x.Van == y || x.Naar == y));
+        // BUG #345: de heenrit is echt gereden (de loc is niet langer dan een melder, Marco 21-10): de overgang blijft altijd. Vroeger (#40) ging hij eruit; daardoor raakte de
+        // kaart de weg 14 <-> 129 kwijt zodra melder 129 nog andere overgangen had.
+        return true;
     }
 
     /// <summary>BUG #105: de weg VOORUIT (in de rijrichting van de rit) van de laatste melder van <paramref name="rit"/> naar <paramref name="start"/>,
@@ -3296,6 +3299,7 @@ public partial class BaanVerkenner
         foreach (var t in _kaart.HerstelStrijdigeOplossingen()) { _log.Waarschuwing("Kaart hersteld (BUG #217): " + t); _kaart.Waarschuwingen.Add(t); }
         foreach (var t in _kaart.LosKortsluitpuntenOpUitRitten()) _log.Vondst("Kortsluitpunt afgeleid (BUG #214): " + t);
         foreach (var t in _kaart.VulOntbrekendeOplossingWaarnemingen()) _log.Info("Kaartcontrole (BUG #212): " + t);
+        foreach (var t in _kaart.HerstelWeggehaaldeHeenOvergangen()) _log.Info("Kaartcontrole: " + t);   // BUG #345
         BerekenAdressenZonderEffect();
         _kaart.VoorgesteldeBlokken = BlokVoorstel.Bereken(_kaart);
         _kaart.Wisselstraatvoorstellen = WisselstraatVoorstel.Bereken(_kaart);

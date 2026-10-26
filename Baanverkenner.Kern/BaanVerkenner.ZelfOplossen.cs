@@ -135,9 +135,10 @@ public partial class BaanVerkenner
                 _log.Info($"Zelf oplossen, ronde {ronde}: de kaart kent nog geen weg van melder {van313} naar melder {doel}; de loc kruipt {rk.Tekst()} verder, melder voor melder, tot er een bekende weg is (BUG #331/#338, nog niet getest op de baan).");
                 int huidig338 = van313;
                 var langs338 = new List<int> { van313 };
+                bool langer338 = false;   // BUG #346: na een poging zonder nieuwe melder eerst nog één keer langer dezelfde kant op
                 for (int n338 = 0; n338 < 6; n338++)
                 {
-                    try { await KruipNaarBuurmelder(huidig338, rk, TimeSpan.FromSeconds(30)); }
+                    try { await KruipNaarBuurmelder(huidig338, rk, TimeSpan.FromSeconds(langer338 ? 75 : 30)); }
                     catch (NavigatieFout nf338)
                     {
                         // de loc kwam niet netjes op de volgende melder (bijv. de kruiswissel): de volgende ronde de andere kant op, anders gebeurt elke ronde hetzelfde
@@ -153,10 +154,20 @@ public partial class BaanVerkenner
                     {
                         huidig338 = b338.First();
                         langs338.Add(huidig338);
+                        langer338 = false;
                         if (huidig338 == doel || StapWeg(_kaart, Kruis, huidig338, doel, _zelfVermijd) is not null) break;
                         continue;
                     }
                     if (b338.Count == 0 || b338.Count == 2) break;   // grens of kwijt: de volgende ronde (stap 3/4) lost dat op
+                    // BUG #346 (Marco 26-10, log 11:20:47): melder 12 -> 11 is een lang stuk; na 30 s kruipen was er nog geen nieuwe melder en de loc keerde om, waarna hij tussen
+                    // 9 en 11 heen en weer kroop. Eerst nog één keer 75 s dezelfde kant op; pas als dat ook niets geeft, de andere kant op.
+                    if (!langer338)
+                    {
+                        langer338 = true;
+                        _log.Info($"Zelf oplossen, ronde {ronde}: na 30 s {rk.Tekst()} kruipen nog geen nieuwe melder na {huidig338}; nog één keer langer dezelfde kant op (BUG #346).");
+                        n338--;
+                        continue;
+                    }
                     _log.Info($"Zelf oplossen, ronde {ronde}: {rk.Tekst()} kwam de loc niet verder dan melder {huidig338}; de volgende keer de andere kant op (BUG #338).");
                     rk = rk.Om();
                     break;
