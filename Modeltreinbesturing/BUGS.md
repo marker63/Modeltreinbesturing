@@ -3125,3 +3125,12 @@ verboden zolang de loc daar staat (#320).
 (Realistische simulatie met hervatten.) Elke rit stopte met "de loc staat andersom, draai de loc om" (#278) en alle blokken mislukten. De verkenner draait nu zelf de rijrichting
 om ('vooruit' in de kaart wordt Dinamo-commando achteruit); dat blijft bewaard bij hervatten en draait terug als het weer andersom blijkt. Zwaarste meting (realistisch + hervatten):
 was 472 min, nu 338 min zonder hulp (in 1 van de 3 metingen 1 keer hulp, na een wissel die bij het hervatten onder de loc lag).
+
+## BUG #343 – OPGELOST (nog niet getest op de baan): loc op geen enkele melder: 23 kleine kruippogingen zonder resultaat
+(Marco 26-10, log 10:21-10:31.) Na "geen enkele melder meer bezet" bij melder 24 (melder 24 flikkerde al: slecht contact) kroop de loc 23 keer 15 s op snelheid 5, afwisselend
+vooruit en achteruit, zonder dat hij bewoog. Nu krijgt hij elke twee pogingen 2 snelheid erbij (tot de verkenningssnelheid) en duurt een poging 20 s.
+
+## BUG #344 – OPGELOST (nog niet getest op de baan): een opdracht begon op melder 10 terwijl de loc daar nooit was aangekomen
+(Marco 26-10, log 10:19:59-10:20:22.) Op weg naar melder 10 kwam na melder 24 "geen melder meer bezet"; de herstelroutine liet de loc op 24 staan, maar de navigatie nam aan dat hij
+op 10 stond. De proef 'vooruit vanaf melder 10' begon zo op 24 en wissel 9 ging om terwijl de loc er vlakbij stond. Nu controleert de navigatie aan het eind of de loc echt op het
+doel staat (2 s speling voor een flikkerende melder); zo niet, dan is het een navigatiefout en begint de opdracht daar niet.

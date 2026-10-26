@@ -219,6 +219,14 @@ public partial class BaanVerkenner
         _stapNavigeert = true;
         try { await NaarStartVan(WegNaarEtappes(weg), rijstand); }
         finally { _stapNavigeert = false; }
+        // Controle: staat de loc nu echt op het doel? BUG #344 (Marco 26-10, log 10:19:59-10:20:22): op weg naar melder 10 kwam er na melder 24 een kortsluiting/ontsporing ("geen melder
+        // meer bezet"); de herstelroutine liet de loc op 24 staan, maar hier werd toch aangenomen dat hij op 10 stond. De proef 'vooruit vanaf melder 10' begon daardoor op melder 24 en
+        // wissel 9 ging om terwijl de loc er vlakbij stond. Nu: niet op het doel (Dinamo gaf even de tijd voor een flikkerende melder) = navigatiefout, zodat de opdracht netjes stopt.
+        var tot344 = _klok.Nu + TimeSpan.FromSeconds(2);
+        _monitor.Bijwerken();
+        while (!_monitor.Bezet.Contains(doel) && _klok.Nu < tot344) { await Wacht(TimeSpan.FromMilliseconds(300)); _monitor.Bijwerken(); }
+        if (!_monitor.Bezet.Contains(doel))
+            throw new NavigatieFout($"De loc kwam niet op melder {doel} aan (nu bezet: {(_monitor.Bezet.Count == 0 ? "geen" : Lijst(_monitor.Bezet.OrderBy(x => x).ToList()))}); de opdracht begint daar dus niet (BUG #344, nog niet getest op de baan).");
         _stapPlek = doel;
     }
 

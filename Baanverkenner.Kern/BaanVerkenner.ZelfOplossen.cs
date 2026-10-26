@@ -24,6 +24,7 @@ public partial class BaanVerkenner
             var onderLocGeprobeerd = new HashSet<string>();
             _zelfVermijd.Clear();   // BUG #313
             _kruipRichting338 = null;   // BUG #338
+            _geenMelderRondes343 = 0;   // BUG #343
             int ronde = 0;
             string? vorigeUitkomst = null;
             while (_klok.Nu < eind)
@@ -102,10 +103,15 @@ public partial class BaanVerkenner
         // (4) geen melder bezet: kruipend zoeken (eerst de laatste rijrichting, dan andersom)
         if (bezet.Count == 0)
         {
+            // Wat: de loc staat nergens op een melder (bijv. op een stuk zonder melder of met slecht contact). Hij kruipt afwisselend de ene en de andere kant op tot een melder bezet raakt.
+            // BUG #343 (Marco 26-10, log 10:21-10:31): 23 rondes van 15 s op snelheid 5 verplaatsten de loc niet (hij stond waarschijnlijk stil op een stuk met slecht contact bij melder 24).
+            // Daarom krijgt elke twee rondes de snelheid er 2 bij (tot de verkenningssnelheid) en duurt een poging 20 s.
             var r = _kaart.Ritten.LastOrDefault()?.Richting ?? Richting.Vooruit;
             if (ronde % 2 == 0) r = r.Om();
-            _log.Info($"Zelf oplossen, ronde {ronde}: geen melder bezet; de loc kruipt {r.Tekst()} tot een melder bezet raakt.");
-            await KruipTotMelder(r, TimeSpan.FromSeconds(15));
+            _geenMelderRondes343++;
+            int v343 = ZoekKruipSnelheid(_ins.Kruipsnelheid, _ins.Verkensnelheid, _geenMelderRondes343);
+            _log.Info($"Zelf oplossen, ronde {ronde}: geen melder bezet; de loc kruipt {r.Tekst()} (snelheid {v343}) tot een melder bezet raakt{(v343 > _ins.Kruipsnelheid ? " (meer snelheid: de vorige pogingen verplaatsten hem niet, BUG #343)" : "")}.");
+            await KruipTotMelder(r, TimeSpan.FromSeconds(20), snelheid: v343);
             _monitor.Bijwerken();
             bezet = _monitor.Bezet;
             if (bezet.Count == 1 && bezet.Contains(doel)) return true;
@@ -180,6 +186,12 @@ public partial class BaanVerkenner
 
     /// <summary>BUG #338: de richting waarin de loc bij het zelf oplossen (zonder bekende weg) kruipt; blijft dezelfde tot hij niet verder komt.</summary>
     private Richting? _kruipRichting338;
+
+    /// <summary>BUG #343: de snelheid voor de n-de poging (vanaf 1) om een loc te vinden die op geen enkele melder staat: kruipsnelheid, elke twee pogingen 2 erbij, hoogstens de verkenningssnelheid.</summary>
+    internal static int ZoekKruipSnelheid(int kruip, int verken, int n) => Math.Min(Math.Max(verken, kruip), kruip + 2 * ((Math.Max(1, n) - 1) / 2));
+
+    /// <summary>BUG #343: hoeveel rondes van dit zelf oplossen de loc al op geen enkele melder stond; bepaalt hoe hard hij kruipt.</summary>
+    private int _geenMelderRondes343;
 
     /// <summary>BUG #313: stappen die bij het zelf oplossen mislukten (van, naar); de weg naar het doel gaat er niet meer over.</summary>
     private readonly HashSet<(int, int)> _zelfVermijd = new();
@@ -280,15 +292,17 @@ public partial class BaanVerkenner
     }
 
     /// <summary>BUG #305: kruipt (naar alle blokken, het blok is dan onbekend) in richting <paramref name="r"/> tot er een melder bezet raakt of de tijd om is.</summary>
-    private async Task KruipTotMelder(Richting r, TimeSpan max, int? behalve = null)
+    private async Task KruipTotMelder(Richting r, TimeSpan max, int? behalve = null, int? snelheid = null)
     {
+        // Rijdt de loc langzaam (kruipsnelheid, of de opgegeven snelheid) in richting r tot er een melder bezet raakt (behalve 'behalve') of de tijd om is, en stopt dan.
+        int v = snelheid ?? _ins.Kruipsnelheid;
         if (BlokVereist)
         {
             var blokken = _ins.DinamoBlokLijst();
-            foreach (var b in blokken) LocSnelheid(_ins.LocAdres, _ins.Kruipsnelheid, r == Richting.Vooruit, b, _ins.LocStappen);
+            foreach (var b in blokken) LocSnelheid(_ins.LocAdres, v, r == Richting.Vooruit, b, _ins.LocStappen);
             await Wacht(DinamoCyclus * blokken.Count);
         }
-        else await StuurSnelheid(r, _ins.Kruipsnelheid);
+        else await StuurSnelheid(r, v);
         var eind = _klok.Nu + max;
         while (_klok.Nu < eind && HuidigeAlarmBlokken().Count == 0)
         {

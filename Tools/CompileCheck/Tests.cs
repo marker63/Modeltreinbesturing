@@ -3572,7 +3572,7 @@ public static class Tests
         if (!string.IsNullOrEmpty(zaadPad)) { File.WriteAllText(zaadPad, lpZaad.AlsJson()); Console.WriteLine("  zaadprofiel geschreven naar " + zaadPad); }
     }
 
-    /// <summary>BUG #337 en #339 (Marco 26-10 08:29, baankaart 08:21).</summary>
+    /// <summary>BUG #337, #339 en #343 (Marco 26-10, baankaart 08:21).</summary>
     static void Bug337En339Test()
     {
         var k = Laad("baankaart_2026-10-26_0821.json");
@@ -3582,6 +3582,9 @@ public static class Tests
         var k2 = Laad("baankaart_2026-10-26_0821.json");
         k2.Overgangen.Add(new Overgang { Van = 129, Naar = 24, Richting = Richting.Achteruit, AantalKeer = 1, GezienBijConfiguraties = new List<string> { "" } });
         Eis(!BaanVerkenner.OvergangBlijftBijOnverwachteTerugweg(k2, 14, 129, Richting.Vooruit, "5"), "#339: heeft 129 nog een andere overgang en is 14 -> 129 maar één keer gereden, dan gaat hij er (zoals vroeger) uit");
+        // BUG #343: loc op geen melder: elke twee pogingen meer snelheid, nooit boven de verkenningssnelheid
+        Eis(BaanVerkenner.ZoekKruipSnelheid(5, 12, 1) == 5 && BaanVerkenner.ZoekKruipSnelheid(5, 12, 2) == 5 && BaanVerkenner.ZoekKruipSnelheid(5, 12, 3) == 7 && BaanVerkenner.ZoekKruipSnelheid(5, 12, 23) == 12,
+            "#343: zoeksnelheid 5, 5, 7 ... en na 23 pogingen 12 (verkenningssnelheid)");
         k2.Overgangen.First(o => o.Van == 14 && o.Naar == 129).AantalKeer = 3;
         Eis(BaanVerkenner.OvergangBlijftBijOnverwachteTerugweg(k2, 14, 129, Richting.Vooruit, "5"), "#339: een overgang die al vaker gereden is, blijft");
     }
