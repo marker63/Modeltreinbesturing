@@ -459,6 +459,12 @@ public partial class BaanVerkenner
         long bevestigingenVoor = (_hw as IWisselBevestiging)?.AantalWisselBevestigingen ?? 0;
         long eigenVoor = (_hw as IWisselBevestiging)?.BevestigingenVan(adres, afbuigend) ?? -1;   // BUG #307
         bool alarmBijCommando = HuidigeAlarmBlokken().Count > 0;   // BUG #308
+        // BUG #352: zet Dinamo het HOLD-bit (buffers raken vol), dan eerst even wachten (hoogstens 5 s) in plaats van de wachtrij nog voller te maken
+        if (_hw is IWisselPuls hp && hp.DinamoHold)
+        {
+            _log.Info($"Dinamo meldt dat zijn buffers vol raken (HOLD): wissel {adres} wacht even (BUG #352).");
+            for (int i = 0; i < 25 && hp.DinamoHold; i++) await Wacht(TimeSpan.FromMilliseconds(200));
+        }
         _hw.ZetWissel(adres, afbuigend);
         // BUG #308 (autolog 25-10 10:35:29.727-10:35:30.328): de kortsluiting in blok 3 ging om 10:35:30.127 weg, 0,2 s VOORDAT Dinamo wissel 2 terugmeldde; toch heette het
         // "de kortsluiting ging weg nadat wissel 2 naar afbuigend is geschakeld" (de loc stond op 14, ver van wissel 2). Gaat een alarm weg voordat de eigen terugmelding er is,
@@ -492,6 +498,7 @@ public partial class BaanVerkenner
         // krijgt de tong extra tijd voordat de loc weer wegrijdt.
         // BUG #126: eerst op de terugmelding wachten. Meldt Dinamo niets terug, dan beweegt er niets en zijn de extra wachttijden hieronder zinloos (kostte 3,6 s per commando).
         if (eigenVoor >= 0) _laatsteCommandoPerWissel[adres] = (afbuigend, eigenVoor);   // BUG #307
+        _commandoTijd[adres] = _klok.Nu;   // BUG #352
         bool? terugmelding = await WachtOpBevestiging(bevestigingenVoor);
         // BUG #223 (log 18-10 12:03:22-12:03:26): tijdens een kortsluiting kwam de terugmelding van wissel 2 pas na 3,6 s. Na 1 s telde dat als 'geen terugmelding' en daardoor
         // stonden rit #3 en #4 als ONBETROUWBAAR (Dinamo-uitval) in het rapport. Met een (recent) blokalarm langer wachten; komt er dan nog niets, dan telt het niet als uitval.
@@ -635,12 +642,18 @@ public partial class BaanVerkenner
     /// vaak niet uit. De zoekroutine probeerde elke wissel één keer; een niet uitgevoerd commando betekende dat juist de oplossende wissel (wissel 10 bij 129 -> 24) nooit echt omging. In de
     /// simulatie met de helft van de commando's genegeerd: niet voltooid, 6 keer hulp nodig. Nu gaat een commando zonder terugmelding tijdens het alarm tot 5 keer opnieuw (elke 2 s), zoals
     /// het zelf oplossen al deed (#315). Pas als ook dat niets geeft, telt het voor #301 (Dinamo voert niets meer uit).</summary>
+    /// <summary>BUG #350: hoe vaak een wisselcommando tijdens een kortsluiting herhaald wordt als Dinamo het niet terugmeldt.</summary>
+    internal const int HerhalingenTijdensAlarm = 5;
+
     private async Task ZetWisselTijdensAlarm(int a, bool stand)
     {
         await ZetWissel(a, stand, forceer: true);
         if (_hw is not IWisselBevestiging) return;
         int teller301 = _zonderTerugmeldingBijAlarm;
-        for (int h = 1; h <= 5 && LaatsteCommandoTeruggemeld(a) == false && HuidigeAlarmBlokken().Count > 0; h++)
+        // BUG #350 (Marco 26-10 13:53: "je zet een wissel soms wel 6 keer achter elkaar naar dezelfde stand, dat heeft toch geen nut?"; log 11:15:54-11:16:25: 6x 'Adres 9: afbuigend'):
+        // het hardwarelog van 13:37 liet zien dat Dinamo terugmeldingen soms minuten later stuurt; geen terugmelding betekent dus niet dat het commando niet is uitgevoerd. Nu nog maar
+        // één herhaling (was vijf).
+        for (int h = 1; h <= HerhalingenTijdensAlarm && LaatsteCommandoTeruggemeld(a) == false && HuidigeAlarmBlokken().Count > 0; h++)
         {
             if (h == 1) _log.Info($"Wissel {a}: Dinamo meldde het commando niet terug (tijdens de kortsluiting voert Dinamo het vaak niet uit); het gaat opnieuw (BUG #334, nog niet getest op de baan).");
             await Wacht(TimeSpan.FromSeconds(2));
@@ -650,7 +663,7 @@ public partial class BaanVerkenner
         foreach (var p in _ins.GekoppeldeParen().Where(p => p.Meester == a))
         {
             bool dv = _wisselStand.TryGetValue(p.Volger, out var vs) && vs;
-            for (int h = 1; h <= 5 && LaatsteCommandoTeruggemeld(p.Volger) == false && HuidigeAlarmBlokken().Count > 0; h++)
+            for (int h = 1; h <= HerhalingenTijdensAlarm && LaatsteCommandoTeruggemeld(p.Volger) == false && HuidigeAlarmBlokken().Count > 0; h++)
             {
                 await Wacht(TimeSpan.FromSeconds(2));
                 _volgerBezig = true;
@@ -1526,6 +1539,24 @@ public partial class BaanVerkenner
     private async Task<bool> ProbeerAlarmWegTeKrijgenKern(string stap)
     {
         _zonderTerugmeldingBijAlarm = 0; _probeerZinloosGemeld = false;   // BUG #301
+        // Wat: eerst het commando herhalen voor een wissel waarvan de kaart weet dat hij bij deze stap rechtdoor moet staan (afbuigend = bekende kortsluiting), terwijl de verkenner
+        // hem al rechtdoor had gezet. Waarom (BUG #349, Marco 26-10 13:42: "je rijdt vol op een kortsluiting tussen melder 16 en 5, die je in bijna de eerste rit al had leren kennen, en
+        // dan zeg je wissel 2 ga ik NIET schakelen"): om 13:37:06 ging 'wissel 2 rechtdoor' naar Dinamo zonder terugmelding (Dinamo meldde nog oude commando's terug); op de baan
+        // stond wissel 2 nog afbuigend. De zoekroutine sloeg wissel 2 over ("die stand is al bewezen", #258), terwijl juist dat commando niet was aangekomen.
+        foreach (var a349 in BekendeVerbodenVoorLaatsteStap(rechtdoorGezet: true))
+        {
+            if (HuidigeAlarmBlokken().Count == 0) break;
+            _log.Waarschuwing($"De kaart weet dat deze stap met wissel {a349} afbuigend kortsluiting geeft, en de verkenner had wissel {a349} al rechtdoor gezet. Waarschijnlijk is dat commando niet uitgevoerd: wissel {a349} rechtdoor wordt opnieuw gestuurd (BUG #349, nog niet getest op de baan).");
+            await ZetWisselTijdensAlarm(a349, false);
+            var eind349 = _klok.Nu + TimeSpan.FromSeconds(2.5);
+            while (HuidigeAlarmBlokken().Count > 0 && _klok.Nu < eind349) await Wacht(TimeSpan.FromMilliseconds(300));
+            if (HuidigeAlarmBlokken().Count == 0)
+            {
+                _log.Vondst($"De kortsluiting ging weg nadat het commando 'wissel {a349} rechtdoor' opnieuw gestuurd is ({stap}): het eerdere commando was niet uitgevoerd (BUG #349).");
+                _kortsluitingGemeld = false;
+                return true;
+            }
+        }
         var bezet = _monitor.Bezet.ToHashSet();
         // BUG #109 (Marco 12:03: "wissel 9 werd geschakeld terwijl de loc er bovenop stond"): wissels die bij een bezette melder liggen (de kaart
         // noemt die melder bij die wissel) worden nooit zonder toestemming geprobeerd: de loc staat er met een deel op of tegen de tong aan.
@@ -1595,6 +1626,17 @@ public partial class BaanVerkenner
             {
                 // BUG #273: tussendoor zijn alle wissels opnieuw gestuurd (Dinamo-herstel): het wegvallen van het alarm zegt niets over deze wissel
                 _log.Waarschuwing($"De kortsluiting is weg, maar tijdens het omzetten van wissel {a} was er een Dinamo-herstel (andere wissels geschakeld en alle wissels opnieuw gestuurd). Dat wordt niet aan wissel {a} toegeschreven en niet vastgelegd (BUG #273).");
+                _kortsluitingGemeld = false;
+                return true;
+            }
+            // Wat: alleen een wissel waarvan Dinamo het commando ook echt heeft teruggemeld (= uitgevoerd) krijgt de eer voor het wegvallen van de kortsluiting.
+            // Waarom (BUG #351, Marco 26-10 13:49: "wissel 7 haalde de kortsluiting weg, maar wissel 7 bestaat niet"): Dinamo voert wisselcommando's soms pas na een minuut uit (hardwarelog
+            // 13:46-13:48: 'wissel 2 rechtdoor' van 13:46:34 teruggemeld om 13:47:43, 'wissel 1' om 13:47:49, alarm weg om 13:47:50; 'wissel 2/1 afbuigend' van 13:47:18 teruggemeld om
+            // 13:47:53-55, alarm terug om 13:47:55). Wissel 7 ging om 13:47:48 om, werd nooit teruggemeld, en kreeg toch de eer. #308 keek maar 1,5 s.
+            if (HuidigeAlarmBlokken().Count == 0 && _hw is IWisselBevestiging && LaatsteCommandoTeruggemeld(a) == false)
+            {
+                _log.Waarschuwing($"De kortsluiting ging weg na het omzetten van wissel {a}, maar Dinamo heeft dat commando nog niet teruggemeld (dus waarschijnlijk nog niet uitgevoerd): een eerder, laat uitgevoerd commando haalde de kortsluiting weg. Niet aan wissel {a} toegeschreven (BUG #351, nog niet getest op de baan).");
+                // geen terugzet-commando: dat zou in een achterlopende Dinamo-wachtrij alleen nog een puls extra zijn
                 _kortsluitingGemeld = false;
                 return true;
             }
@@ -1815,7 +1857,7 @@ public partial class BaanVerkenner
     }
 
     /// <summary>BUG #261: wissels die nu afbuigend staan en voor de laatste stap van de kortsluitrit een bekende verboden ingang zijn (via -> na, richting).</summary>
-    private List<int> BekendeVerbodenVoorLaatsteStap()
+    private List<int> BekendeVerbodenVoorLaatsteStap(bool rechtdoorGezet = false)
     {
         // BUG #261 (autolog 20-10 18:45:10, 18:47:58, 18:50:23): de kortsluiting werd gemeld vóór de terugweg (context 24 achteruit), terwijl de stap die hem veroorzaakte 14 -> 24 vooruit
         // was (de laatste rit). Daarom ook de laatste gereden rit die op een bezette melder eindigt, met zijn eigen richting.
@@ -1826,7 +1868,7 @@ public partial class BaanVerkenner
         if (_kaart.Ritten.LastOrDefault() is { } rit && rit.Reeks.Count >= 2 && (bezet.Count == 0 || bezet.Contains(rit.Reeks[^1]))) stappen.Add((rit.Reeks[^2], rit.Reeks[^1], rit.Richting));
         var verboden = _kaart.VerbodenIngangen();
         return stappen.SelectMany(st => verboden.Where(v => v.Via == st.U && v.Na == st.X && v.R == st.R))
-                      .Where(v => _wisselStand.TryGetValue(v.Adres, out var w) && w && !IsVolger(v.Adres))
+                      .Where(v => (rechtdoorGezet ? !(_wisselStand.TryGetValue(v.Adres, out var w0) && w0) : _wisselStand.TryGetValue(v.Adres, out var w) && w) && !IsVolger(v.Adres))   // BUG #349: of juist de wissels die al rechtdoor 'staan'
                       .Select(v => v.Adres).Distinct().OrderBy(x => x).ToList();
     }
 
@@ -1975,6 +2017,31 @@ public partial class BaanVerkenner
     /// <summary>BUG #223: de afbuigende wissels op het moment dat de loc vertrok (null als de rit niet vertrok).</summary>
     private List<int>? _ritStartStand;
 
+    /// <summary>Wat: wacht voordat de loc wegrijdt tot Dinamo alle wisselcommando's van de laatste 2 minuten heeft teruggemeld (= uitgevoerd), hoogstens 20 s.
+    /// Waarom (BUG #352, hardwarelog 26-10 13:37-13:41): 'wissel 2 rechtdoor' van 13:37:06 werd pas om 13:41:08 uitgevoerd; de loc reed om 13:40:48 al 16 -> 5 met wissel 2 nog afbuigend.</summary>
+    private async Task WachtOpUitvoeringWissels()
+    {
+        if (_hw is not IWisselBevestiging) return;
+        List<int> Open() => _laatsteCommandoPerWissel.Keys.Where(a => LaatsteCommandoTeruggemeld(a) == false && _commandoTijd.TryGetValue(a, out var t) && _klok.Nu - t < TimeSpan.FromMinutes(2)).OrderBy(a => a).ToList();
+        var open = Open();
+        if (open.Count == 0) return;
+        _log.Info($"Dinamo heeft wissel {Lijst(open)} nog niet teruggemeld (nog niet uitgevoerd): de loc wacht daarop voordat hij wegrijdt (hoogstens 20 s, BUG #352).");
+        var tot = _klok.Nu + TimeSpan.FromSeconds(20);
+        // Meldt Dinamo intussen helemaal niets terug (ook geen oudere commando's), dan is dit geen achterstand maar uitval (#126/#173): dan niet langer wachten.
+        long totaal0 = ((IWisselBevestiging)_hw).AantalWisselBevestigingen;
+        var stilTot = _klok.Nu + TimeSpan.FromSeconds(4);
+        while (_klok.Nu < tot && (open = Open()).Count > 0)
+        {
+            if (((IWisselBevestiging)_hw).AantalWisselBevestigingen != totaal0) { totaal0 = ((IWisselBevestiging)_hw).AantalWisselBevestigingen; stilTot = _klok.Nu + TimeSpan.FromSeconds(4); }
+            else if (_klok.Nu > stilTot) break;
+            await Wacht(TimeSpan.FromMilliseconds(300));
+        }
+        if (open.Count > 0) _log.Waarschuwing($"Dinamo heeft wissel {Lijst(open)} na 20 s nog steeds niet teruggemeld; de rit gaat toch door (BUG #352).");
+    }
+
+    /// <summary>BUG #352: wanneer het laatste commando per wissel verstuurd is.</summary>
+    private readonly Dictionary<int, DateTime> _commandoTijd = new();
+
     private async Task<RitResultaat> Rit(int start, Richting r, RitDoel doel)
     {
         _ritStartStand = null;
@@ -1984,6 +2051,7 @@ public partial class BaanVerkenner
         if (!doel.IsNavigatie && _losgemaakteProefWissels.Count > 0) _losgemaakteProefWissels.Clear();
         _ritMinDt = double.MaxValue; _ritMaxDt = 0;
         lock (_alarmSlot) _genegeerdeAlarmen.Clear();
+        await WachtOpUitvoeringWissels();   // BUG #352
         var uitkomst = await RitUitvoeren(start, r, doel);
         // BUG #164: een blokalarm dat binnenkwam terwijl de verkenner aan het stoppen was (en daarom genegeerd werd) is een echte kortsluiting als de rit eindigt
         // op een nieuwe plek of een onverwachte afwijking. Zo ontstaat hetzelfde kortsluitpunt als wanneer de melding een fractie eerder was gekomen.

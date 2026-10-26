@@ -462,10 +462,20 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
         byte byte1 = (byte)(0b0001_0000 | ((afbuigend ? 1 : 0) << 2) | ((a >> 7) & 0x03));
         byte byte2 = (byte)(a & 0x7F);
         byte byte3 = 0x0c; // tijd - Koploper laat dit nooit weg, altijd deze waarde geobserveerd
+        // BUG #352: per adres een eigen pulstijd (1/60 s), bijv. langer voor de kruismotoren in plaats van 6 losse pulsen
+        lock (_pulsTijden) if (_pulsTijden.TryGetValue(adres, out var pt) && pt > 0) byte3 = (byte)Math.Min(127, pt);
         NoteerWisselCommando(adres, afbuigend);
-        for (int i = 0; i < AantalHerhalingenWisselcommando; i++)
+        for (int i = 0; i < _wisselHerhalingen; i++)
             VerstuurDatagram(new byte[] { byte1, byte2, byte3 }, prioriteit: true);
     }
+
+    // BUG #352: zie IWisselPuls. Standaard blijft 6 (het hoofdprogramma); de baanverkenner zet het zelf lager.
+    private int _wisselHerhalingen = AantalHerhalingenWisselcommando;
+    private readonly Dictionary<int, int> _pulsTijden = new();
+    private volatile bool _dinamoHold;
+    public int WisselHerhalingen { get => _wisselHerhalingen; set => _wisselHerhalingen = Math.Clamp(value, 1, 10); }
+    public void ZetPulsTijd(int adres, int zestigsten) { lock (_pulsTijden) _pulsTijden[adres] = zestigsten; }
+    public bool DinamoHold => _dinamoHold;
 
     /// <summary>Zie ZetWissel hierboven voor de volledige toelichting - hoeveel keer
     /// hetzelfde wissel-/seincommando verstuurd wordt. Worden sinds de laatste fix (zie
@@ -1098,6 +1108,7 @@ public class DinamoHardware : IHardwareInterface, IBlokAlarmBron, IVerbindingsBr
 
                 bool ditIsKeepalive = aantalDataBytes == 0;
                 NoteerOntvangst();
+                _dinamoHold = (_ontvangstBuffer[i] & 0x10) != 0;   // BUG #352: HOLD-bit (bit 4 van de header): Dinamo's buffers raken vol
                 // BUG #139/#140: elke regel krijgt meteen de Nederlandse vertaling (bij een terugmelding van een wissel wordt die ook onthouden).
                 var frameBytes = _ontvangstBuffer.GetRange(i, berichtLengte).ToArray();
                 if (aantalDataBytes >= 2 && (_ontvangstBuffer[i + 1] & 0x70) == 0x10)

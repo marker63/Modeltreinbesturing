@@ -25,6 +25,11 @@ public class VerkenInstellingen
     public int WisselAdresTot { get; set; } = 32;
     /// <summary>Wachttijd na elk wisselcommando (spoel/motor moet klaar zijn).</summary>
     public int WisselPauzeMs { get; set; } = 600;
+    /// <summary>BUG #352: hoe vaak elk wisselcommando achter elkaar naar Dinamo gaat. Dinamo voert elke keer een aparte puls uit; met 6 liep de wachtrij in Dinamo op 26-10 tot minuten
+    /// achter. Standaard 1. Gaat de kruiswissel dan niet goed om, dan helpt eerder een langere pulstijd (KruisPulsTijd) dan meer herhalingen.</summary>
+    public int WisselHerhalingen { get; set; } = 1;
+    /// <summary>BUG #352: pulstijd voor de kruismotoren (KruisMotoren) in 1/60 s; standaard 24 = 0,4 s (gewone wissels: 12 = 0,2 s, de Dinamo-standaard).</summary>
+    public int KruisPulsTijd { get; set; } = 24;
 
     // ---- Dinamo / blokken ----
     /// <summary>Dinamo-blokadressen die geprobeerd worden bij het koppelen van secties aan

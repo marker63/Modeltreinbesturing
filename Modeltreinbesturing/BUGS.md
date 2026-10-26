@@ -3156,3 +3156,31 @@ veroorzaakt doordat de trein ontspoorde bij het schakelen van wissel 5".)
   uit de gereden ritten). Kaart 11:21: alleen adres 7 wordt weerlegd (rit 12: 24, 14, 13 met 7 afbuigend); 5, 13 en 14 blijven.
 - Kaartcontrole aan het eind: wissels waarvan nog geen rit rechtdoor en afbuigend naar verschillende melders liet zien, worden als "maar half gevonden" in log en rapport genoemd.
 Niets over wissel 7 is vastgelegd in de code (zelflerend).
+
+## BUG #349 – OPGELOST (nog niet getest op de baan): bij de bekende kortsluiting 16 -> 5 werd wissel 2 niet geprobeerd
+(Marco 26-10 13:42, log 13:40:58.) 'Wissel 2 rechtdoor' van 13:37:06 was door Dinamo nog niet uitgevoerd (zie #352); de zoekroutine sloeg wissel 2 over omdat rechtdoor "al bewezen" was.
+Nu: geeft een stap kortsluiting waarvan de kaart weet dat wissel X dan rechtdoor moet, en staat X volgens de verkenner al rechtdoor, dan wordt dat commando als eerste opnieuw gestuurd.
+
+## BUG #350 – (teruggedraaid) minder herhalingen tijdens een kortsluiting
+(Marco 26-10 13:53: "je zet een wissel soms 6 keer achter elkaar naar dezelfde stand".) Eén herhaling i.p.v. vijf maakte de realistische simulatie slechter (3x hulp). De echte oorzaak
+van de vele pulsen zat in de hardware-laag (#352); de herhaling tijdens een kortsluiting blijft daarom 5 (HerhalingenTijdensAlarm).
+
+## BUG #351 – OPGELOST (nog niet getest op de baan): wissel 7 en 3 'haalden de kortsluiting weg'
+(Marco 26-10 13:49, log 13:47:56 en 13:48:39.) De kortsluiting ging weg doordat een minuut oud commando (wissel 2/1) eindelijk werd uitgevoerd. Een wissel krijgt nu alleen de eer
+als Dinamo zijn commando ook heeft teruggemeld (= uitgevoerd).
+
+## BUG #352 – OPGELOST (nog niet getest op de baan): Dinamo liep minuten achter met wisselcommando's
+(Hardwarelog 26-10: om 09:25 terugmelding 0,4 s na het commando, vanaf 10:00 tot 1-7 minuten.) Volgens de Dinamo-specificatie (Magneetartikel) is de terugmelding het moment dat de puls
+gegeven is. Het programma stuurde elk wisselcommando 6 keer (voor een langere puls van de kruiswissel); Dinamo voerde elk als aparte puls uit. Nu:
+- de baanverkenner stuurt elk commando 1 keer (instelling WisselHerhalingen, standaard 1) en geeft de kruismotoren een langere puls via de tijd-byte (KruisPulsTijd, standaard 24 = 0,4 s);
+  het hoofdprogramma houdt 6;
+- vóór elke rit wacht de loc tot Dinamo de wisselcommando's van de laatste 2 minuten heeft teruggemeld (hoogstens 20 s; meldt Dinamo helemaal niets, dan is het uitval en niet wachten);
+- het HOLD-bit van Dinamo (buffers vol) wordt gelezen; dan wacht een nieuw wisselcommando even.
+Simulatie 'vertraagd' (elke puls 0,4 s, één tegelijk): met 6 keer 9 kortsluitingen en 2x onder de loc, met 1 keer 8 en 0.
+
+## BUG #353 – OPGELOST (nog niet getest op de baan): na hervatten werden alle wissels opnieuw gestuurd, ook onder de loc
+(Simulatie met stoppen en hervatten 14:44:32.) De verkenner kende na het hervatten geen enkele stand en stuurde alle 14 wissels; wissel 6 ging om met de loc op 129. De laatst
+gestuurde standen worden nu bewaard en bij hervatten overgenomen; daarna gaan alleen wissels die anders moeten (niet onder de loc).
+
+## BUG #354 – OPGELOST (nog niet getest op de baan): "wissels bij startmelder 24 worden al gezet voordat de loc daar aankomt" terwijl de loc er al stond
+(Simulatie 13:47:00: wissel 10 afbuigend met de loc op 24.) Staat de loc al op de startmelder, dan worden de wissels daar niet vooraf gezet.

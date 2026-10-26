@@ -1,4 +1,4 @@
-namespace Modeltreinbesturing.Hardware;
+﻿namespace Modeltreinbesturing.Hardware;
 
 /// <summary>
 /// BUG #81: optionele uitbreiding op <see cref="IHardwareInterface"/> voor koppelingen die
@@ -33,3 +33,18 @@ public interface IWisselBevestiging
     /// uitvaldiagnose in het hardwarelog als bij 'Dinamo antwoordt niet' (#138). Standaard doet dit niets (simulator, stubs).</summary>
     void LogWisselUitval(string reden) { }
 }
+
+/// <summary>BUG #352 (Marco 26-10 13:53/13:56, hardwarelog 26-10): hoe een wisselcommando naar de centrale gaat. Dinamo voert elk verstuurd magneetartikel-datagram als een aparte puls uit
+/// (en meldt elk apart terug). Met 6 identieke datagrammen per commando liep de wachtrij in Dinamo vanmiddag tot minuten achter. Alleen Dinamo (en de simulatie).</summary>
+public interface IWisselPuls
+{
+    /// <summary>Hoe vaak hetzelfde wisseldatagram achter elkaar wordt verstuurd (elke keer = een puls in Dinamo).</summary>
+    int WisselHerhalingen { get; set; }
+
+    /// <summary>Pulstijd voor één adres in 1/60 s (Dinamo-specificatie 'Magneetartikel', standaard 12 = 200 ms); 0 = standaard.</summary>
+    void ZetPulsTijd(int adres, int zestigsten);
+
+    /// <summary>Dinamo heeft het HOLD-bit gezet: de buffers raken vol, liefst even geen nieuwe opdrachten sturen (specificatie, header bit 4).</summary>
+    bool DinamoHold { get; }
+}
+

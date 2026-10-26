@@ -61,6 +61,9 @@ public class VerkenStatus
     public int VolgendeOpdrachtId { get; set; } = 1;
     public int VolgendeKortsluitId { get; set; } = 1;
     public int AfgerondeOpdrachten { get; set; }
+    /// <summary>BUG #353: de wisselstanden (Dinamo-stand) zoals de verkenner ze het laatst gestuurd heeft; bij hervatten weer gebruikt, zodat niet alle wissels opnieuw (en mogelijk onder
+    /// de loc) gestuurd worden.</summary>
+    public Dictionary<int, bool> WisselStanden { get; set; } = new();
     /// <summary>BUG #342: de loc staat andersom ten opzichte van de kaart (na een keerlus); rijcommando's gaan dan omgekeerd naar Dinamo.</summary>
     public bool LocOmgedraaid { get; set; }
     public int KortsluitingenTotaal { get; set; }
@@ -299,6 +302,13 @@ public partial class BaanVerkenner
                 _log.Info(_voorkennis ? "Gegevens uit eerdere verkenningen worden gebruikt (gekozen door de gebruiker)." : "Alles begint vanaf nul: er wordt niets overgenomen uit eerdere verkenningen. Deze verkenning leert wel voor later.");
             }
             InitKruis(hervat);
+            // Wat: bij hervatten de laatst gestuurde wisselstanden overnemen. Waarom (BUG #353, simulatie met stoppen en hervatten 14:44:32): de verkenner kende na het hervatten geen enkele
+            // stand, stuurde daarom alle wissels opnieuw en zette zo wissel 5/6 om terwijl de loc op melder 129 (bij wissel 6) stond. Op de baan blijven de wissels staan zoals ze stonden.
+            if (hervat && _status.WisselStanden.Count > 0 && _wisselStand.Count == 0)
+            {
+                foreach (var kv in _status.WisselStanden) _wisselStand[kv.Key] = kv.Value;
+                _log.Info($"Wisselstanden van vóór het stoppen overgenomen (afbuigend: {(_wisselStand.Any(kv => kv.Value) ? Lijst(_wisselStand.Where(kv => kv.Value).Select(kv => kv.Key).OrderBy(x => x).ToList()) : "geen")}); alleen wissels die anders moeten, worden gestuurd (BUG #353, nog niet getest op de baan).");
+            }
             // BUG #87: bewezen kortsluitoplossingen uit eerdere verkenningen meenemen.
             if (Voorkennis is { } lpo)
             {
@@ -332,7 +342,9 @@ public partial class BaanVerkenner
             _fase = "Wissels in beginstand";
             MeldVoortgang();
             _log.Stap("Alle adressen in het bereik op rechtdoor zetten (commando gestuurd; de centrale meldt de werkelijke stand van de wisselmotoren niet terug).");
-            foreach (var a in _ins.WisselAdressen()) await ZetWissel(a, false, forceer: true);
+            // BUG #353: bij hervatten met bekende standen alleen de wissels die anders staan, en niet onder de loc (anders 14 commando's achter elkaar, ook voor wissels waar de loc op staat)
+            if (hervat && _status.WisselStanden.Count > 0) await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);
+            else foreach (var a in _ins.WisselAdressen()) await ZetWissel(a, false, forceer: true);
 
             if (!hervat || (_status.Controle && _status.GeplandeOpdrachten.Count == 0))
             {
@@ -428,6 +440,14 @@ public partial class BaanVerkenner
     /// (melder 24, motor 13/10) telt alleen mee als de gebruiker koos voor gegevens uit eerdere verkenningen.</summary>
     private void InitKruis(bool hervat)
     {
+        // Wat: stelt in hoe wisselcommando's naar Dinamo gaan (aantal keer en pulstijd). Waarom: BUG #352, zie VerkenInstellingen.WisselHerhalingen.
+        if (_hw is IWisselPuls wp)
+        {
+            wp.WisselHerhalingen = Math.Clamp(_ins.WisselHerhalingen, 1, 10);
+            var km = KruisKennis.Parse(_ins.KruisMotoren).Motoren;
+            foreach (var m in km) wp.ZetPulsTijd(m, _ins.KruisPulsTijd);
+            _log.Info($"Wisselcommando's gaan {wp.WisselHerhalingen} keer naar Dinamo (was 6: Dinamo voert elke keer een aparte puls uit en liep daardoor minuten achter){(km.Count > 0 ? $"; kruismotor {string.Join(" en ", km.OrderBy(x => x))} krijgt een puls van {_ins.KruisPulsTijd * 1000 / 60} ms" : "")} (BUG #352, nog niet getest op de baan).");
+        }
         if (Rondrit)
         {
             // BUG #195: bij 'Rondrijden' is een kruiswissel een gewone wissel; de motoren worden net als elk ander adres geprobeerd en de kruiswissel volgt uit de kortsluitingen en vervolgen.
@@ -2938,8 +2958,16 @@ public partial class BaanVerkenner
                 if (uitleg is not null) _log.Info(uitleg);
                 cfg = KruisVoorafStand(e, cfg, doel, Kruis, out var uitleg2);   // BUG #119
                 if (uitleg2 is not null) _log.Info(uitleg2);
-                cfg = StartmelderWisselsVooraf(_kaart, e, cfg, doel, out var uitleg4, Kruis);   // BUG #122
-                if (uitleg4 is not null) _log.Info(uitleg4);
+                // BUG #354 (simulatie met stoppen en hervatten 13:47:00): 'wissels bij startmelder 24 worden al gezet voordat de loc daar aankomt: 10 afbuigend' terwijl de loc al op 24 stond
+                // (kruiswissel): kortsluiting onder de loc. Staat de loc al op de startmelder, dan niet 'vooraf' zetten.
+                _monitor.Bijwerken();
+                if (_monitor.Bezet.Contains(e.Naar))
+                    _log.Info($"De loc staat al op startmelder {e.Naar}: de wissels daar worden niet vooraf gezet (BUG #354).");
+                else
+                {
+                    cfg = StartmelderWisselsVooraf(_kaart, e, cfg, doel, out var uitleg4, Kruis);   // BUG #122
+                    if (uitleg4 is not null) _log.Info(uitleg4);
+                }
             }
             else if (i < route.Count - 1)
             {
@@ -3392,6 +3420,7 @@ public partial class BaanVerkenner
     private void BewaarNu()
     {
         _kaart.Bijgewerkt = _klok.Nu;
+        _status.WisselStanden = new Dictionary<int, bool>(_wisselStand);   // BUG #353
         BerekenAdressenZonderEffect();
         try { Bewaren?.Invoke(_status); }
         catch (Exception ex) { _log.Waarschuwing($"Voortgang bewaren mislukte: {ex.Message}"); }

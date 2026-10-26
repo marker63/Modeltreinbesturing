@@ -2847,14 +2847,19 @@ public static class Tests
             st261[1] = true; st261[9] = true; st261[10] = true;
             typeof(BaanVerkenner).GetField("_laatsteKortsluitReeks", bf261)!.SetValue(v261, new List<int> { 12, 5, 13, 14, 24 });
             typeof(BaanVerkenner).GetField("_laatsteKortsluitContext", bf261)!.SetValue(v261, ((int, Richting, Configuratie)?)(24, Richting.Vooruit, Configuratie.Basis));
-            var bk261 = (List<int>)typeof(BaanVerkenner).GetMethod("BekendeVerbodenVoorLaatsteStap", bf261)!.Invoke(v261, null)!;
+            var bk261 = (List<int>)typeof(BaanVerkenner).GetMethod("BekendeVerbodenVoorLaatsteStap", bf261)!.Invoke(v261, new object[] { false })!;
             Eis(bk261.SequenceEqual(new[] { 10 }), "verboden laatste stap (#261): alleen wissel 10 (nu " + string.Join(",", bk261) + ")");
+            // BUG #349: staat wissel 10 volgens de verkenner al rechtdoor, dan is hij de wissel waarvan het commando herhaald moet worden
+            st261[10] = false;
+            var bk349 = (List<int>)typeof(BaanVerkenner).GetMethod("BekendeVerbodenVoorLaatsteStap", bf261)!.Invoke(v261, new object[] { true })!;
+            Eis(bk349.SequenceEqual(new[] { 10 }), "#349: wissel 10 staat al 'rechtdoor' bij een bekende kortsluiting met 10 afbuigend: dat commando wordt eerst herhaald (nu " + string.Join(",", bk349) + ")");
+            st261[10] = true;
             // de kortsluiting werd gemeld vóór de terugweg (context 24 achteruit): dan telt de laatste rit (14 -> 24 vooruit)
             typeof(BaanVerkenner).GetField("_laatsteKortsluitContext", bf261)!.SetValue(v261, ((int, Richting, Configuratie)?)(24, Richting.Achteruit, Configuratie.Basis));
             typeof(BaanVerkenner).GetField("_laatsteKortsluitReeks", bf261)!.SetValue(v261, new List<int>());
             var kaart261 = (VerkenStatus)typeof(BaanVerkenner).GetField("_status", bf261)!.GetValue(v261)!;
             kaart261.Kaart.Ritten.Add(new GeredenRit { Reeks = new List<int> { 12, 5, 13, 14, 24 }, Richting = Richting.Vooruit, Start = 12 });
-            var bk261b = (List<int>)typeof(BaanVerkenner).GetMethod("BekendeVerbodenVoorLaatsteStap", bf261)!.Invoke(v261, null)!;
+            var bk261b = (List<int>)typeof(BaanVerkenner).GetMethod("BekendeVerbodenVoorLaatsteStap", bf261)!.Invoke(v261, new object[] { false })!;
             Eis(bk261b.Contains(10), "verboden laatste stap (#261): ook via de laatste rit als de melding van de terugweg kwam (nu " + string.Join(",", bk261b) + ")");
         }
         // BUG #279: na de navigatie 29 .. 24, 129 .. 11, 4 (achteruit) met de loc op 4 en 129 is wissel 9 rechtdoor (van 24 -> 129 aan het begin) niet 'bewezen' voor de plek van de loc
@@ -3324,14 +3329,17 @@ public static class Tests
                 Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan? uv = null;
                 var simMeldingen = new List<(DateTime Tijd, string Tekst)>();
                 var r = MiniworldRit(start, 10,
-                    insAanpassing: i => { i.Rondrit = true; i.StapVoorStap = false; i.GekoppeldeWissels = "5+6,2+1"; i.OmgekeerdAangesloten = "6"; },
+                    insAanpassing: i => { i.Rondrit = true; i.StapVoorStap = false; i.GekoppeldeWissels = "5+6,2+1"; i.OmgekeerdAangesloten = "6"; i.KruisMotoren = "10+13"; if (variant == "vertraagd6") i.WisselHerhalingen = 6; },
                     simAanpassing: sa => { sim = sa; sa.BuurwisselHeftKruisKortsluitingOp = variant == "streng"; sa.StatusBericht += t => { if (t.Contains("KORTSLUITING")) simMeldingen.Add((sa.HuidigeSimTijd, t)); }; },
-                    simFabriek: variant is "uitval" or "realistisch" ? () => uv = new Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan { UitvalVanafCommando = 120, UitvalDuur = TimeSpan.FromSeconds(90), NegeerHelftBijKortsluiting = variant == "realistisch" } : null);
+                    simFabriek: variant is "uitval" or "realistisch" ? () => uv = new Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan { UitvalVanafCommando = 120, UitvalDuur = TimeSpan.FromSeconds(90), NegeerHelftBijKortsluiting = variant == "realistisch" }
+                        // BUG #352: Dinamo voert elk datagram als aparte puls van 0,4 s uit (vertraagd = nieuwe instelling 1 keer, vertraagd6 = oude 6 keer)
+                        : variant is "vertraagd" or "vertraagd6" ? () => uv = new Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan { VertraagdeUitvoering = true } : null);
                 var k = r.V.Kaart;
                 var regels = r.Log.Regels.Select(x => x.Tekst).ToList();
                 var gevonden = k.Wissels.Where(w => w.Waarnemingen.Count > 0).Select(w => w.Adres).ToList();
                 string regel = $"MARCO start {start,3} {variant,-7}: {r.Einde,-12} {(k.Voltooid ? "voltooid" : "NIET-voltooid"),-13} melders {k.Melders.Count,2}/23  met-blok {k.Melders.Count(m => m.DinamoBlok is not null),2}  wissels [{string.Join(",", gevonden.OrderBy(x => x))}]  valse {gevonden.Count(a => !echt.Contains(a))}  kortsl {r.Kortsluitingen,2}  onder-loc {sim?.OnderLocOmgezet ?? 0,2}  gebruiker {regels.Count(x => x.Contains("Gebruiker heeft de loc"))}  zelf-ok {regels.Count(x => x.Contains("Zelf opgelost"))}  zelf-mis {regels.Count(x => x.Contains("Zelf oplossen lukte niet"))}  {r.Seconden / 60:0} min";
                 if (uv is not null) regel += $"  (uitval: {uv.GenegeerdeCommandos} commando's genegeerd, bij kortsluiting {uv.GenegeerdBijKortsluiting})";
+                if (uv is { VertraagdeUitvoering: true }) regel += $"  (langste achterstand Dinamo {uv.LangsteAchterstand.TotalSeconds:0} s)";
                 Console.WriteLine(regel);
                 uit.Add(regel);
                 if (Environment.GetEnvironmentVariable("MARCO_LOG") is { } pad && pad.Length > 0)

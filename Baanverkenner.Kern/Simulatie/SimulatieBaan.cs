@@ -495,7 +495,11 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
             }
         }
         BijwerkenMelders(forceer: false);
+        NaTik(nu);
     }
+
+    /// <summary>BUG #352: voor afgeleide simulaties (Dinamo-wachtrij met pulsen), na elke tik.</summary>
+    protected virtual void NaTik(DateTime nu) { }
 
     private void Beweeg(DateTime nu, double dt)
     {
