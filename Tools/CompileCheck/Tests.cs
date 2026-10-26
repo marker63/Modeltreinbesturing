@@ -1103,7 +1103,8 @@ public static class Tests
                 Console.WriteLine($"  keerlus start {start}: zelf opgelost {regels.Count(x => x.Contains("Zelf opgelost"))}x, zelf mislukt {regels.Count(x => x.Contains("Zelf oplossen lukte niet"))}x, gebruiker {regels.Count(x => x.Contains("Gebruiker heeft de loc"))}x, #270 {regels.Count(x => x.Contains("BUG #270"))}x, #271 {regels.Count(x => x.Contains("BUG #271"))}x, rondjes {regels.Count(x => x.Contains("rijdt rondjes"))}x");
                 if (Environment.GetEnvironmentVariable("DUMP305") is { } d305) System.IO.File.WriteAllLines(d305, regels);
                 // BUG #305: eerst zelf oplossen; in deze simulatie lukt dat minstens één keer en is er hoogstens één keer hulp van de gebruiker nodig (zonder #305: 2 keer)
-                Eis(regels.Count(x => x.Contains("Zelf opgelost")) >= 1 && regels.Count(x => x.Contains("Gebruiker heeft de loc")) == 0, $"keerlus (start {start}) BUG #305/#313: zelf opgelost {regels.Count(x => x.Contains("Zelf opgelost"))}x, gebruiker {regels.Count(x => x.Contains("Gebruiker heeft de loc"))}x");
+                // BUG #340: met de andere tak direct na de proef is zelf oplossen vaak niet meer nodig; de eis is dat het nooit mislukt en de gebruiker niets hoeft te doen
+                Eis(regels.Count(x => x.Contains("Zelf oplossen lukte niet")) == 0 && regels.Count(x => x.Contains("Gebruiker heeft de loc")) == 0, $"keerlus (start {start}) BUG #305/#313/#340: zelf opgelost {regels.Count(x => x.Contains("Zelf opgelost"))}x, gebruiker {regels.Count(x => x.Contains("Gebruiker heeft de loc"))}x");
                 Eis(!regels.Any(x => x.Contains("met toestemming van de gebruiker")), $"keerlus (start {start}) BUG #305: geen toestemmingsvragen meer voor wissels bij de loc");
                 Eis(k.Melders.Count == 23, $"keerlus (start {start}): alle 23 melders (met 1 en 9) gevonden (nu {k.Melders.Count})");
                 Eis(naar10 == 0, $"keerlus (start {start}): de terugweg 129 -> 14 gaat niet steeds naar 10 (nu {naar10}x)");
@@ -3571,6 +3572,20 @@ public static class Tests
         if (!string.IsNullOrEmpty(zaadPad)) { File.WriteAllText(zaadPad, lpZaad.AlsJson()); Console.WriteLine("  zaadprofiel geschreven naar " + zaadPad); }
     }
 
+    /// <summary>BUG #337 en #339 (Marco 26-10 08:29, baankaart 08:21).</summary>
+    static void Bug337En339Test()
+    {
+        var k = Laad("baankaart_2026-10-26_0821.json");
+        Eis(BaanVerkenner.AfbuigendBewezenBijLoc(k, new List<int> { 14, 129 }, Richting.Vooruit, new HashSet<int> { 129 }, 5), "#337: na 14 -> 129 (loc op 129) is wissel 5 afbuigend bewezen: na het losmaken gaat hij terug naar afbuigend");
+        Eis(!BaanVerkenner.AfbuigendBewezenBijLoc(k, new List<int> { 13, 14 }, Richting.Vooruit, new HashSet<int> { 14 }, 14), "#337: wissel 14 afbuigend is niet bewezen bij 13 -> 14: een losgemaakte proefstand blijft rechtdoor");
+        Eis(BaanVerkenner.OvergangBlijftBijOnverwachteTerugweg(k, 14, 129, Richting.Vooruit, "5"), "#339: 14 -> 129 is de enige overgang van melder 129: hij blijft bij een onverwachte terugweg (129 niet los in het melderschema)");
+        var k2 = Laad("baankaart_2026-10-26_0821.json");
+        k2.Overgangen.Add(new Overgang { Van = 129, Naar = 24, Richting = Richting.Achteruit, AantalKeer = 1, GezienBijConfiguraties = new List<string> { "" } });
+        Eis(!BaanVerkenner.OvergangBlijftBijOnverwachteTerugweg(k2, 14, 129, Richting.Vooruit, "5"), "#339: heeft 129 nog een andere overgang en is 14 -> 129 maar één keer gereden, dan gaat hij er (zoals vroeger) uit");
+        k2.Overgangen.First(o => o.Van == 14 && o.Naar == 129).AantalKeer = 3;
+        Eis(BaanVerkenner.OvergangBlijftBijOnverwachteTerugweg(k2, 14, 129, Richting.Vooruit, "5"), "#339: een overgang die al vaker gereden is, blijft");
+    }
+
     static void Eis(bool ok, string tekst) { Console.WriteLine((ok ? "OK    " : "FOUT  ") + tekst); if (!ok) _fouten++; }
     // BUG #196-#199 (log 17-10 20:05): wissel 5 na melder 14, melderschema, onverwachte-terugwegregel
     static void Log2005Test()
@@ -3750,6 +3765,7 @@ public static class Tests
         StapMatrixTest();
         if (Environment.GetEnvironmentVariable("KEERLUS") != "0") KeerlusTest();
         AanloopTest();
+        Bug337En339Test();
         MiniworldAlarmVertragingTest();
         MiniworldVoorkennisTest();
         HerstelBlijftStaanTest();

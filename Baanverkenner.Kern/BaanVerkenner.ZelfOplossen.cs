@@ -1,4 +1,4 @@
-namespace Baanverkenner.Kern;
+﻿namespace Baanverkenner.Kern;
 
 public partial class BaanVerkenner
 {
@@ -23,6 +23,7 @@ public partial class BaanVerkenner
             _log.Info($"Zelf oplossen (BUG #305, nog niet getest op de baan): de verkenner probeert maximaal {ZelfOplossenDuur.TotalMinutes:0} minuten zelf de loc op melder {doel} te krijgen voordat hij om hulp vraagt. Aanleiding: {EersteRegel(aanleiding)}");
             var onderLocGeprobeerd = new HashSet<string>();
             _zelfVermijd.Clear();   // BUG #313
+            _kruipRichting338 = null;   // BUG #338
             int ronde = 0;
             string? vorigeUitkomst = null;
             while (_klok.Nu < eind)
@@ -121,9 +122,41 @@ public partial class BaanVerkenner
             {
                 // BUG #331 (nachtwerk 25/26-10, meting met stoppen en hervatten): na het hervatten stond de loc op 129 en kende de kaart (nog) geen weg naar 13; negen minuten lang gebeurde er
                 // niets (130 lege rondes). Nu kruipt de loc naar de buurmelder (elke ronde de andere kant op); van daaruit is er vaak wel een bekende weg.
-                var rk = ronde % 2 == 0 ? Richting.Vooruit : Richting.Achteruit;
-                _log.Info($"Zelf oplossen, ronde {ronde}: de kaart kent nog geen weg van melder {van313} naar melder {doel}; de loc kruipt {rk.Tekst()} naar de volgende melder (BUG #331, nog niet getest op de baan).");
-                await KruipNaarBuurmelder(van313, rk, TimeSpan.FromSeconds(20));
+                // BUG #338 (Marco 26-10 08:29: "je bleef hangen tussen melder 10 en 13 ... ik zag je steeds hele kleine stukjes rijden"): elke ronde de andere kant op gaf heen en weer tussen
+                // 10 en 9 (twee melders vlak bij elkaar). Nu blijft de loc dezelfde kant op kruipen, melder voor melder (tot 6 melders per ronde), tot er vanaf de melder waar hij staat een
+                // bekende weg naar het doel is. Alleen als hij niet verder komt (kopspoor of stilstand) gaat hij de andere kant op.
+                var rk = _kruipRichting338 ?? _kaart.Ritten.LastOrDefault()?.Richting ?? Richting.Achteruit;
+                _log.Info($"Zelf oplossen, ronde {ronde}: de kaart kent nog geen weg van melder {van313} naar melder {doel}; de loc kruipt {rk.Tekst()} verder, melder voor melder, tot er een bekende weg is (BUG #331/#338, nog niet getest op de baan).");
+                int huidig338 = van313;
+                var langs338 = new List<int> { van313 };
+                for (int n338 = 0; n338 < 6; n338++)
+                {
+                    try { await KruipNaarBuurmelder(huidig338, rk, TimeSpan.FromSeconds(30)); }
+                    catch (NavigatieFout nf338)
+                    {
+                        // de loc kwam niet netjes op de volgende melder (bijv. de kruiswissel): de volgende ronde de andere kant op, anders gebeurt elke ronde hetzelfde
+                        _log.Info($"Zelf oplossen, ronde {ronde}: {rk.Tekst()} kruipen lukte niet ({EersteRegel(nf338.Message)}); de volgende keer de andere kant op (BUG #338).");
+                        try { await StopLoc(); } catch (NavigatieFout) { }
+                        _kruipRichting338 = rk.Om();
+                        return false;
+                    }
+                    _monitor.Bijwerken();
+                    var b338 = _monitor.Bezet;
+                    if (HuidigeAlarmBlokken().Count > 0) break;
+                    if (b338.Count == 1 && b338.First() != huidig338)
+                    {
+                        huidig338 = b338.First();
+                        langs338.Add(huidig338);
+                        if (huidig338 == doel || StapWeg(_kaart, Kruis, huidig338, doel, _zelfVermijd) is not null) break;
+                        continue;
+                    }
+                    if (b338.Count == 0 || b338.Count == 2) break;   // grens of kwijt: de volgende ronde (stap 3/4) lost dat op
+                    _log.Info($"Zelf oplossen, ronde {ronde}: {rk.Tekst()} kwam de loc niet verder dan melder {huidig338}; de volgende keer de andere kant op (BUG #338).");
+                    rk = rk.Om();
+                    break;
+                }
+                _kruipRichting338 = rk;
+                if (langs338.Count > 1) _log.Info($"Zelf oplossen, ronde {ronde}: de loc kroop langs melder {string.Join(", ", langs338)} (BUG #338).");
                 return false;
             }
             if (await ProbeerZelfNaarMelder(doel, _zelfVermijd)) return true;
@@ -144,6 +177,9 @@ public partial class BaanVerkenner
         var b = _monitor.Bezet;
         if (b.Count == 2 && b.Contains(van) && HuidigeAlarmBlokken().Count == 0) await Nastellen(b.First(m => m != van), r, achter: van);
     }
+
+    /// <summary>BUG #338: de richting waarin de loc bij het zelf oplossen (zonder bekende weg) kruipt; blijft dezelfde tot hij niet verder komt.</summary>
+    private Richting? _kruipRichting338;
 
     /// <summary>BUG #313: stappen die bij het zelf oplossen mislukten (van, naar); de weg naar het doel gaat er niet meer over.</summary>
     private readonly HashSet<(int, int)> _zelfVermijd = new();
@@ -249,7 +285,7 @@ public partial class BaanVerkenner
         if (BlokVereist)
         {
             var blokken = _ins.DinamoBlokLijst();
-            foreach (var b in blokken) _hw.ZetLocSnelheid(_ins.LocAdres, _ins.Kruipsnelheid, r == Richting.Vooruit, b, _ins.LocStappen);
+            foreach (var b in blokken) LocSnelheid(_ins.LocAdres, _ins.Kruipsnelheid, r == Richting.Vooruit, b, _ins.LocStappen);
             await Wacht(DinamoCyclus * blokken.Count);
         }
         else await StuurSnelheid(r, _ins.Kruipsnelheid);

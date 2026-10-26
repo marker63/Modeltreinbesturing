@@ -3095,3 +3095,33 @@ tot de loc weg is). Zonder overloopsets blijft #194 zoals het was (daar zijn wis
 gewone navigatiefout in plaats van een kortsluiting onder de loc.
 Aanvulling #334: ook de tweede wissel van een overloopset (1 bij 2, 6 bij 5) wordt tijdens een kortsluiting opnieuw gestuurd als Dinamo hem niet terugmeldt; anders stonden 2 en 1 tegen
 elkaar in. Zwaarste meting (realistisch + 11 keer stoppen en hervatten): was niet voltooid na 10 uur met 12 keer hulp, nu voltooid zonder hulp.
+
+## BUG #337 – OPGELOST (nog niet getest op de baan): #335 liet wissel 5 rechtdoor staan, de loc raakte de weg kwijt bij melder 10
+(Marco 26-10 08:29, log 08:10-08:12.) Wissel 5 stond afbuigend voor 14 -> 129 en werd bij een kortsluiting losgemaakt; dat hielp niet (wissel 10 haalde het alarm weg), maar #335 zette
+hem niet meer terug. De terugweg 129 -> 14 kon daardoor niet. Nu gaat een losgemaakte wissel weer terug naar afbuigend als de kaart afbuigend voor de laatste stappen van de loc al
+bewezen heeft (14 -> 129 is alleen met wissel 5 afbuigend gereden). Was afbuigend alleen een proefstand, dan blijft hij rechtdoor zoals in #335. Een kruismotor met de loc op de
+kruiswissel gaat nooit terug.
+
+## BUG #338 – OPGELOST (nog niet getest op de baan): bij zelf oplossen zonder bekende weg reed de loc in hele kleine stukjes heen en weer
+(Marco 26-10 08:29: "je bleef hangen tussen melder 10 en 13 ... steeds hele kleine stukjes".) #331 kroop elke ronde de andere kant op, dus tussen 10 en 9 heen en weer. Nu blijft de
+loc dezelfde kant op kruipen, melder voor melder (tot 6 melders per ronde, 30 s per melder), tot er vanaf zijn melder een bekende weg naar het doel is. Alleen als hij niet verder komt
+(kopspoor, stilstand of niet netjes neer te zetten) gaat hij de volgende keer de andere kant op.
+
+## BUG #339 – OPGELOST (nog niet getest op de baan): melder 129 stond ineens los in het melderschema
+(Marco 26-10 08:29.) Bij een onverwachte terugweg (heen 14 -> 129, terug naar 10) haalde de verkenner de overgang 14 -> 129 uit de kaart. Dat was de enige overgang van melder 129,
+dus 129 had geen buur meer in het schema. De heenrit is echt gereden: de overgang blijft nu als hij al vaker gereden is of als de melder anders zonder overgang achterblijft.
+
+## BUG #340 – OPGELOST (nog niet getest op de baan): de andere tak van een wissel werd pas veel later onderzocht
+(Marco 26-10 08:40: "wissel 2 mag niet afbuigend van 16 naar 5 ... dan wissel 2 rechtdoor, door naar 13, dan wissel 2 weer afbuigend en weer naar melder 5 rijden en kijken wat na
+melder 5 volgt ... dat geldt voor alle melders en wisselstanden".) De opdracht 'andere tak van adres 2 verkennen (vanaf melder 13, andersom)' werd om 08:06:37 gepland maar kwam
+achteraan de wachtrij. In optie 6 gaat zo'n opdracht nu meteen voor als de loc na de proef al op zijn startmelder staat; de lopende opdracht gaat daarna verder bij het volgende adres.
+Simulatie met Marco's aansluiting: realistisch 318 -> 282 min, stoppen en hervatten 317 -> 270 min, minder kortsluitingen.
+
+## BUG #341 – OPGELOST (nog niet getest op de baan): een wissel die net klem gaf, werd vier seconden later weer omgezet met de loc erop
+(Realistische simulatie met hervatten.) Wissel 13 terugzetten haalde de klem op melder 24/21 weg; de proef van een kortsluitpunt zette hem meteen weer afbuigend. Die stand is nu
+verboden zolang de loc daar staat (#320).
+
+## BUG #342 – OPGELOST (nog niet getest op de baan): na de keerlus stond de loc andersom en liep de blokfase vast
+(Realistische simulatie met hervatten.) Elke rit stopte met "de loc staat andersom, draai de loc om" (#278) en alle blokken mislukten. De verkenner draait nu zelf de rijrichting
+om ('vooruit' in de kaart wordt Dinamo-commando achteruit); dat blijft bewaard bij hervatten en draait terug als het weer andersom blijkt. Zwaarste meting (realistisch + hervatten):
+was 472 min, nu 338 min zonder hulp (in 1 van de 3 metingen 1 keer hulp, na een wissel die bij het hervatten onder de loc lag).

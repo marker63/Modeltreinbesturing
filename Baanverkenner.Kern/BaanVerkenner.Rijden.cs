@@ -211,7 +211,7 @@ public partial class BaanVerkenner
         _voedingBlokken.Clear();
         if (!BlokVereist)
         {
-            _hw.ZetLocSnelheid(_ins.LocAdres, stap, vooruit, 0, _ins.LocStappen);
+            LocSnelheid(_ins.LocAdres, stap, vooruit, 0, _ins.LocStappen);
             await Wacht(TimeSpan.FromMilliseconds(100));
             return;
         }
@@ -219,7 +219,7 @@ public partial class BaanVerkenner
         if (blokken is not null && ookBlokVanMelder is int extraMelder && BlokVan(extraMelder) is int extraBlok && !blokken.Contains(extraBlok))
             blokken.Add(extraBlok);
         blokken ??= _ins.DinamoBlokLijst();
-        foreach (var b in blokken) _hw.ZetLocSnelheid(_ins.LocAdres, stap, vooruit, b, _ins.LocStappen);
+        foreach (var b in blokken) LocSnelheid(_ins.LocAdres, stap, vooruit, b, _ins.LocStappen);
         if (stap > 0) _voedingBlokken.UnionWith(blokken);
         await WachtOfAlarm(DinamoCyclus * blokken.Count, stap);
     }
@@ -250,7 +250,7 @@ public partial class BaanVerkenner
             .Where(b => !_voedingBlokken.Contains(b)).ToList();
         if (ontbreekt.Count == 0) return;
         _log.Info($"De loc staat op meerdere melders ({Lijst(bezet)}); rijcommando ook naar blok {string.Join(", ", ontbreekt)}.");
-        foreach (var b in ontbreekt) _hw.ZetLocSnelheid(_ins.LocAdres, stap, r == Richting.Vooruit, b, _ins.LocStappen);
+        foreach (var b in ontbreekt) LocSnelheid(_ins.LocAdres, stap, r == Richting.Vooruit, b, _ins.LocStappen);
         _voedingBlokken.UnionWith(ontbreekt);
         await WachtOfAlarm(DinamoCyclus * ontbreekt.Count, stap);
     }
@@ -275,7 +275,7 @@ public partial class BaanVerkenner
     {
         _voedingBlokken.Clear();
         if (stap > 0) _voedingBlokken.Add(blok);
-        _hw.ZetLocSnelheid(_ins.LocAdres, stap, r == Richting.Vooruit, blok, _ins.LocStappen);
+        LocSnelheid(_ins.LocAdres, stap, r == Richting.Vooruit, blok, _ins.LocStappen);
         await Wacht(DinamoCyclus);
     }
 
@@ -287,7 +287,7 @@ public partial class BaanVerkenner
         _voedingBlokken.Clear();
         if (!BlokVereist) { await StuurSnelheid(r, stap); return; }
         var blokken = _ins.DinamoBlokLijst();
-        foreach (var b in blokken) _hw.ZetLocSnelheid(_ins.LocAdres, stap, r == Richting.Vooruit, b, _ins.LocStappen);
+        foreach (var b in blokken) LocSnelheid(_ins.LocAdres, stap, r == Richting.Vooruit, b, _ins.LocStappen);
         if (stap > 0) _voedingBlokken.UnionWith(blokken);
         await WachtOfAlarm(DinamoCyclus * blokken.Count, stap);
     }
@@ -319,7 +319,7 @@ public partial class BaanVerkenner
         _voedingBlokken.Clear();
         if (!BlokVereist)
         {
-            _hw.ZetLocSnelheid(_ins.LocAdres, 0, true, 0, _ins.LocStappen);
+            LocSnelheid(_ins.LocAdres, 0, true, 0, _ins.LocStappen);
             await Wacht(TimeSpan.FromMilliseconds(1500));
             return;
         }
@@ -331,8 +331,8 @@ public partial class BaanVerkenner
         }
         // BUG #69: blokken die eerder een rijcommando kregen (bijv. alle blokken na een blokgrens-poging) ook op 0 zetten
         var extra = oudeVoeding.Where(b => !blokken.Contains(b)).ToList();
-        foreach (var b in blokken) _hw.ZetLocSnelheid(_ins.LocAdres, 0, true, b, _ins.LocStappen);
-        foreach (var b in extra) _hw.ZetLocSnelheid(_ins.LocAdres, 0, true, b, _ins.LocStappen);
+        foreach (var b in blokken) LocSnelheid(_ins.LocAdres, 0, true, b, _ins.LocStappen);
+        foreach (var b in extra) LocSnelheid(_ins.LocAdres, 0, true, b, _ins.LocStappen);
         await Wacht(DinamoCyclus * (blokken.Count + extra.Count) + TimeSpan.FromMilliseconds(500));
     }
 
@@ -345,7 +345,7 @@ public partial class BaanVerkenner
         if (!BlokVereist)
         {
             _hw.Noodstop();
-            _hw.ZetLocSnelheid(_ins.LocAdres, 0, true, 0, _ins.LocStappen);
+            LocSnelheid(_ins.LocAdres, 0, true, 0, _ins.LocStappen);
             await Wacht(TimeSpan.FromMilliseconds(800));
             return;
         }
@@ -365,7 +365,7 @@ public partial class BaanVerkenner
             bool alarmTijdensPas = HuidigeAlarmBlokken().Count > 0 || (pas == 1 && (_klok.Nu - _laatsteKortsluitingOm).TotalSeconds < 3);
             _negeerKortsluitingTot = _klok.Nu + duur + TimeSpan.FromSeconds(3);
             _hw.Noodstop();
-            foreach (var b in blokken) _hw.ZetLocSnelheid(_ins.LocAdres, 0, true, b, _ins.LocStappen);
+            foreach (var b in blokken) LocSnelheid(_ins.LocAdres, 0, true, b, _ins.LocStappen);
             var eind = _klok.Nu + duur;
             while (_klok.Nu < eind)
             {
@@ -388,7 +388,7 @@ public partial class BaanVerkenner
         {
             _log.Waarschuwing("Na de volledige stop veranderden er nog melders - stop wordt herhaald.");
             _hw.Noodstop();
-            foreach (var b in blokken) _hw.ZetLocSnelheid(_ins.LocAdres, 0, true, b, _ins.LocStappen);
+            foreach (var b in blokken) LocSnelheid(_ins.LocAdres, 0, true, b, _ins.LocStappen);
             await Wacht(DinamoCyclus * blokken.Count + TimeSpan.FromMilliseconds(1500));
             _monitor.Bijwerken();
         }
@@ -1058,7 +1058,7 @@ public partial class BaanVerkenner
                     // kan al een sectie verder zijn - een 0 naar alleen het proefblok komt
                     // dan niet meer aan).
                     KoppelBlok(melder, blok);
-                    _hw.ZetLocSnelheid(_ins.LocAdres, 0, r == Richting.Vooruit, blok, _ins.LocStappen);
+                    LocSnelheid(_ins.LocAdres, 0, r == Richting.Vooruit, blok, _ins.LocStappen);
                     await StopLoc();
                     // BUG #176: staat de loc nu deels op een melder die er tijdens de proef bij kwam, dan ligt die voor hem: terugkruipen. Zonder dit kroop hij eerst
                     // verder (op de baan 13/14: vooruit, dan pas terug) en schoot in de simulatie door tot in de volgende melder.
@@ -1100,7 +1100,7 @@ public partial class BaanVerkenner
             if (gewijzigd)
             {
                 KoppelBlok(melder, blok);
-                _hw.ZetLocSnelheid(_ins.LocAdres, 0, r.Om() == Richting.Vooruit, blok, _ins.LocStappen);
+                LocSnelheid(_ins.LocAdres, 0, r.Om() == Richting.Vooruit, blok, _ins.LocStappen);
                 await StopLoc(); // via de blokken waar de loc nu staat (zie BlokZoekenBijStart)
                 await Nastellen(melder, r.Om(), voor: vorige);
                 return true;
@@ -1171,7 +1171,7 @@ public partial class BaanVerkenner
             if (gewijzigd)
             {
                 KoppelBlok(melder, blok);
-                _hw.ZetLocSnelheid(_ins.LocAdres, 0, r == Richting.Vooruit, blok, _ins.LocStappen);
+                LocSnelheid(_ins.LocAdres, 0, r == Richting.Vooruit, blok, _ins.LocStappen);
                 await StopLoc();
                 return true;
             }
@@ -1619,14 +1619,20 @@ public partial class BaanVerkenner
                             _log.Info($"Wissel {pw} gaat niet terug naar afbuigend: die werd losgemaakt toen de loc op melder {Lijst(losBij)} stond, niet bij deze kortsluiting (melder {Lijst(bezet)}).");
                             continue;
                         }
-                        // BUG #335 (nachtwerk 25/26-10, realistische simulatie 12:31:37): wissel 13 ging zo terug naar afbuigend met de loc op 24, waar die wissel ligt: kortsluiting onder de loc.
-                        // Een wissel die volgens de kaart (of een opgelost kortsluitpunt) bij de bezette melder ligt, gaat niet terug zolang de loc daar staat.
-                        // De wissel werd op deze plek losgemaakt omdat de loc er mogelijk klem op zat: dan ligt hij (waarschijnlijk) onder de loc. Hij blijft rechtdoor zolang de loc hier staat (ook de volgende rit zet hem niet om voordat de loc weg is, zie #320).
-                        // #194 is er voor overlooppartners (wissel 1 en 2 samen afbuigend). Heeft de gebruiker de overloopsets opgegeven (Gekoppelde wissels, Marco: 5+6 en 2+1), dan schakelen
-                        // die partners al vanzelf mee en is terugzetten van een andere wissel onder de loc alleen een risico.
-                        if (_ins.GekoppeldeParen().Count > 0)
+                        // BUG #335/#337 (Marco 26-10 08:29, log 08:10:28-08:12:06): de nachtversie zette een losgemaakte wissel nooit meer terug zolang de loc er stond (en verbood die stand). Op de
+                        // baan was dat fout: wissel 5 was voor de rit 14 -> 129 afbuigend (de loc was eroverheen gereden), het losmaken hielp niet (wissel 10 nam het alarm weg), en de terugweg
+                        // 129 -> 14 kon daarna niet met 5 afbuigend: de loc reed naar 10 en raakte de weg kwijt. Terugzetten naar de stand waarover de loc net gereden is, is weer zoals vóór #335.
+                        // Alleen een kruismotor met de loc op de kruiswissel blijft staan (omzetten geeft daar altijd kortsluiting, #96).
+                        if (Kruis.IsMotor(pw) && Kruis.OpKruis(bezet))
                         {
-                            _log.Info($"Wissel {pw} gaat nu niet terug naar afbuigend: hij werd hier losgemaakt en ligt waarschijnlijk onder de loc (melder {Lijst(bezet)}); hij gaat pas om als de loc daar weg is (BUG #335, nog niet getest op de baan).");
+                            _log.Info($"Motor {pw} gaat nu niet terug naar afbuigend: de loc staat op de kruiswissel (melder {Kruis.MiddenTekst}) (BUG #337, nog niet getest op de baan).");
+                            continue;
+                        }
+                        // BUG #337: het onderscheid is of de kaart afbuigend voor de laatste stappen van de loc al bewezen heeft (wissel 5 bij 14 -> 129: terug). Was afbuigend alleen een
+                        // proefstand voor deze rit (realistische simulatie: wissel 14 bij 13 -> ... -> 8, dezelfde melders als rechtdoor), dan blijft hij rechtdoor zoals in #335.
+                        if (_ins.GekoppeldeParen().Count > 0 && !AfbuigendBewezenBijLoc(pw, bezet))
+                        {
+                            _log.Info($"Wissel {pw} gaat nu niet terug naar afbuigend: hij werd hier losgemaakt en afbuigend is voor de laatste stappen van de loc (melder {Lijst(bezet)}) nog niet bewezen; hij gaat pas om als de loc daar weg is (BUG #335/#337, nog niet getest op de baan).");
                             OnthoudKlemStand(pw, true, bezet);
                             continue;
                         }
@@ -1758,6 +1764,42 @@ public partial class BaanVerkenner
         }
         foreach (var a in strijdig) res.Remove(a);
         return res;
+    }
+
+    /// <summary>BUG #342 (realistische simulatie met stoppen en hervatten, 16:17-16:37): na de keerlus stond de loc andersom ten opzichte van de kaart. Elke rit stopte met "de loc staat
+    /// andersom ... draai de loc om" (#278) en de blokfase liep vast: alle blokken 'lukte niet', verkenning niet voltooid. De verkenner draait nu zelf de rijrichting om: 'vooruit' in de
+    /// kaart wordt dan het Dinamo-commando achteruit en andersom. Dit blijft bewaard (ook na het hervatten); blijkt het weer andersom, dan draait hij weer terug. Nog niet getest op de baan.</summary>
+    private void DraaiLocRichtingOm()
+    {
+        _status.LocOmgedraaid = !_status.LocOmgedraaid;
+        _log.Waarschuwing($"De loc staat andersom ten opzichte van de kaart (bijvoorbeeld na de keerlus): de verkenner draait vanaf nu zelf de rijrichting om; 'vooruit' in de kaart is nu Dinamo-commando {(_status.LocOmgedraaid ? "achteruit" : "vooruit")}. De gebruiker hoeft de loc niet om te draaien (BUG #342, nog niet getest op de baan).");
+    }
+
+    /// <summary>BUG #342: elk rijcommando naar Dinamo gaat hierlangs; staat de loc andersom (<see cref="VerkenStatus.LocOmgedraaid"/>), dan wordt de richting omgedraaid.</summary>
+    private void LocSnelheid(int adres, int stap, bool vooruit, int blok, int stappen) => _hw.ZetLocSnelheid(adres, stap, _status.LocOmgedraaid ? !vooruit : vooruit, blok, stappen);
+
+    /// <summary>BUG #337: heeft de kaart voor de laatste stappen van de loc (tot de bezette melders) wissel <paramref name="a"/> afbuigend bewezen, ongeacht hoe hij nu staat?</summary>
+    private bool AfbuigendBewezenBijLoc(int a, IReadOnlyCollection<int> bezet)
+    {
+        var reeks = LaatsteReeksBijLoc(bezet);
+        Richting? r = _laatsteKortsluitContext?.Richting ?? _kaart.Ritten.LastOrDefault()?.Richting;
+        if (reeks.Count < 2 || r is not Richting rr) return false;
+        return AfbuigendBewezenBijLoc(_kaart, reeks, rr, bezet, a);
+    }
+
+    /// <summary>BUG #337: wissel <paramref name="a"/> afbuigend is voor de laatste stappen (tot de bezette melders) bewezen: door een splitsing (<see cref="BewezenStandenBijLoc"/>) of
+    /// doordat de stap in de kaart alleen met <paramref name="a"/> afbuigend gereden is (14 -> 129 alleen met wissel 5 afbuigend).</summary>
+    internal static bool AfbuigendBewezenBijLoc(Baankaart kaart, IReadOnlyList<int> reeks, Richting r, IReadOnlyCollection<int> bezet, int a)
+    {
+        if (BewezenStandenBijLoc(kaart, reeks, r, bezet).TryGetValue(a, out var afb)) return afb;
+        for (int i = reeks.Count - 2; i >= 0; i--)
+        {
+            int x = reeks[i], y = reeks[i + 1];
+            if (!bezet.Contains(y)) break;
+            var ov = kaart.Overgangen.Where(o => o.Van == x && o.Naar == y && o.Richting == r).SelectMany(o => o.GezienBijConfiguraties).ToList();
+            if (ov.Count > 0 && ov.All(c => Configuratie.VanSleutel(c).Bevat(a))) return true;
+        }
+        return false;
     }
 
     /// <summary>BUG #258: de bewezen standen (zie <see cref="BewezenStandenBijLoc"/>) die nu ook zo staan; die worden bij een kortsluiting niet omgezet.</summary>
@@ -2191,6 +2233,7 @@ public partial class BaanVerkenner
                 string t278 = $"De loc rijdt vanaf melder {res.Reeks[0]} {r.Tekst()} naar melder {ag278}, maar {res.Reeks[0]} -> {ag278} is {r.Om().Tekst()} gereden: de loc staat andersom (neus de verkeerde kant op). De rit is gestopt, er is niets vastgelegd. Draai de loc om (of zet hem andersom neer) (BUG #278).";
                 _kaart.Waarschuwingen.Add(t278);
                 _log.Waarschuwing(t278);
+                DraaiLocRichtingOm();   // BUG #342
                 throw new NavigatieFout(t278) { LaatsteGoed = res.Reeks[0], Onverwacht = ag278, LocAndersom = true };
             }
             if (bezet.Count > 0 && (wijzigingen.Any(w => !w.Bezet && w.Melder == res.Reeks[^1]) || !bezet.Contains(res.Reeks[^1])))
@@ -2228,6 +2271,7 @@ public partial class BaanVerkenner
                     string t227 = $"Na melder {ag} werd melder {m} bezet: de loc rijdt vanaf melder {res.Reeks[0]} de kant van {r.Om().Tekst()} op, dus hij staat andersom (neus de verkeerde kant op). De rit is gestopt, er is niets vastgelegd (BUG #227).";
                     _kaart.Waarschuwingen.Add(t227);
                     _log.Waarschuwing(t227);
+                    DraaiLocRichtingOm();   // BUG #342
                     throw new NavigatieFout(t227) { LaatsteGoed = res.Reeks[0], Onverwacht = m, LocAndersom = true };
                 }
 
@@ -2270,6 +2314,7 @@ public partial class BaanVerkenner
                     string t = $"De loc reed vanaf melder {res.Reeks[0]} ({r.Tekst()}) naar melder {m}, maar {r.Tekst()} gaat hier naar melder {bas[1]}; naar melder {m} gaat de loc {r.Om().Tekst()}. De loc staat dus andersom (neus de verkeerde kant op). De rit is meteen gestopt, er is niets vastgelegd.";
                     _kaart.Waarschuwingen.Add(t);
                     _log.Waarschuwing(t);
+                    DraaiLocRichtingOm();   // BUG #342
                     throw new NavigatieFout(t) { LaatsteGoed = res.Reeks[0], Onverwacht = m, LocAndersom = true };
                 }
 
@@ -2627,7 +2672,7 @@ public partial class BaanVerkenner
                         }
                         if (bevestigd)
                         {
-                            _hw.ZetLocSnelheid(_ins.LocAdres, 0, r == Richting.Vooruit, bb, _ins.LocStappen);
+                            LocSnelheid(_ins.LocAdres, 0, r == Richting.Vooruit, bb, _ins.LocStappen);
                             await StopLoc();
                             await Nastellen(start, r);
                         }
@@ -3496,6 +3541,14 @@ public partial class BaanVerkenner
                 _log.Info(HuidigeAlarmBlokken().Count > 0
                     ? $"Wissel {Lijst(_zojuistLosgemaakt)} terugzetten haalde de kortsluiting niet weg: de loc zit daar niet klem. De andere wissels worden geprobeerd."
                     : $"Wissel {Lijst(_zojuistLosgemaakt)} terugzetten haalde de kortsluiting weg: de loc zat daar klem.");
+            // BUG #341 (realistische simulatie met stoppen en hervatten, 15:28:34-15:28:44): wissel 13 terugzetten haalde de klem op melder 24/21 weg, en vier seconden later zette de
+            // proef van kortsluitpunt #3 hem weer afbuigend met de loc er nog op: kortsluiting onder de loc. De stand die klem gaf, is nu verboden zolang de loc daar staat (#320).
+            if (_zojuistLosgemaakt.Count > 0 && HuidigeAlarmBlokken().Count == 0)
+            {
+                _monitor.Bijwerken();
+                var klem341 = _monitor.Bezet.Concat(_laatsteKortsluitMelders).Distinct().ToList();
+                if (klem341.Count > 0) foreach (var z in _zojuistLosgemaakt) OnthoudKlemStand(z, true, klem341);
+            }
             // BUG #150: staat de loc stil en blijft het alarm, dan zit hij klem op een wissel (meestal de samenvoegende partner van de proefwissel,
             // bv. wissel 1 bij wissel 2): eerst wissels proberen (de ene na de andere, bij de loc alleen met toestemming), niet blind terugrijden.
             if (!_alarmWegProbeerd && HuidigeAlarmBlokken().Count > 0)
@@ -3533,7 +3586,7 @@ public partial class BaanVerkenner
             if (BlokVereist)
             {
                 var blokken = _ins.DinamoBlokLijst();
-                foreach (var b in blokken) _hw.ZetLocSnelheid(_ins.LocAdres, _ins.Kruipsnelheid, terug == Richting.Vooruit, b, _ins.LocStappen);
+                foreach (var b in blokken) LocSnelheid(_ins.LocAdres, _ins.Kruipsnelheid, terug == Richting.Vooruit, b, _ins.LocStappen);
                 await Wacht(DinamoCyclus * blokken.Count);
             }
             else await StuurSnelheid(terug, _ins.Kruipsnelheid);

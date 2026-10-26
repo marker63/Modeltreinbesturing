@@ -61,6 +61,8 @@ public class VerkenStatus
     public int VolgendeOpdrachtId { get; set; } = 1;
     public int VolgendeKortsluitId { get; set; } = 1;
     public int AfgerondeOpdrachten { get; set; }
+    /// <summary>BUG #342: de loc staat andersom ten opzichte van de kaart (na een keerlus); rijcommando's gaan dan omgekeerd naar Dinamo.</summary>
+    public bool LocOmgedraaid { get; set; }
     public int KortsluitingenTotaal { get; set; }
     /// <summary>BUG #74: de voltooide kaart wordt uitgebreid met een tweede, los traject: de volgende start bepaalt een nieuwe startmelder
     /// (waar de loc nu staat) en laat alles wat al gevonden is staan.</summary>
@@ -362,6 +364,7 @@ public partial class BaanVerkenner
                         continue;
                     }
                     _status.Huidig = null;
+                    if (_onderbroken340) { _onderbroken340 = false; BewaarNu(); continue; }   // BUG #340: de opdracht staat weer in de wachtrij, na de andere tak
                     _status.AfgerondeOpdrachten++;
                     BewaarNu();
                 }
@@ -402,8 +405,8 @@ public partial class BaanVerkenner
 
     private void StopZonderWachten()
     {
-        if (!BlokVereist) { _hw.ZetLocSnelheid(_ins.LocAdres, 0, true, 0, _ins.LocStappen); return; }
-        foreach (var b in _ins.DinamoBlokLijst()) _hw.ZetLocSnelheid(_ins.LocAdres, 0, true, b, _ins.LocStappen);
+        if (!BlokVereist) { LocSnelheid(_ins.LocAdres, 0, true, 0, _ins.LocStappen); return; }
+        foreach (var b in _ins.DinamoBlokLijst()) LocSnelheid(_ins.LocAdres, 0, true, b, _ins.LocStappen);
     }
 
     /// <summary>Noodstop van buitenaf (knop in het venster).</summary>
@@ -648,6 +651,34 @@ public partial class BaanVerkenner
         _status.GeplandeOpdrachten.Add(o.Sleutel);
         if (vooraan) _status.Wachtrij.Insert(0, o); else _status.Wachtrij.Add(o);
         _log.Info($"Nieuwe opdracht #{o.Id}: vanaf melder {o.Start} {o.Richting.Tekst()} ({o.Configuratie}) - {o.Reden}.");
+        if (Rondrit && o.BronAdres is not null && o.Reden.StartsWith("andere tak van adres")) _andereTak340 ??= o;   // BUG #340
+    }
+
+    /// <summary>BUG #340 (Marco 26-10 08:40: "wissel 2 mag niet afbuigend staan van 16 naar 5 ... dan wissel 2 rechtdoor, door naar 13, dan wissel 2 weer afbuigend en weer naar melder 5
+    /// rijden en kijken wat na melder 5 volgt ... dat scheelt heel veel tijd"; "dat zelfde geldt voor alle andere melders en wisselstanden"): de opdracht 'andere tak van adres N' die
+    /// een proef oplevert, kwam achteraan de wachtrij (opdracht #3 om 08:06:37 werd tot 08:21 niet gereden). In optie 6 wordt die opdracht nu meteen gereden als de loc na de proef al op zijn startmelder staat.</summary>
+    private Opdracht? _andereTak340;
+    private bool _onderbroken340;
+
+    /// <summary>BUG #340: na de proef met adres <paramref name="a"/> in opdracht <paramref name="o"/>: is er net een opdracht 'andere tak' gepland die vlak bij de loc begint, dan gaat die
+    /// voor; de rest van <paramref name="o"/> (vanaf het volgende adres) komt direct daarna. Geeft true als <paramref name="o"/> nu onderbroken wordt.</summary>
+    private bool OnderbreekVoorAndereTak(Opdracht o, int a)
+    {
+        var at = _andereTak340;
+        _andereTak340 = null;
+        if (at is null || !Rondrit || at == o || !_status.Wachtrij.Contains(at)) return false;
+        var plek = HuidigePlek() ?? o.Start;
+        if (at.Start != plek) return false;   // alleen als de loc al op de startmelder van de andere tak staat (16 -> 5 -> 13: de loc staat na de proef weer op 13)
+        var adressen = _ins.WisselAdressen().ToList();
+        int i = adressen.IndexOf(a);
+        if (i < 0 || i == adressen.Count - 1) return false;   // laatste adres: de opdracht is toch klaar
+        o.VolgendAdres = adressen[i + 1];
+        _status.Wachtrij.Remove(at);
+        _status.Wachtrij.Insert(0, o);
+        _status.Wachtrij.Insert(0, at);
+        _onderbroken340 = true;
+        _log.Info($"Opdracht #{at.Id} ({at.Reden}) gaat nu meteen voor: de loc staat al op melder {plek}. Opdracht #{o.Id} gaat daarna verder vanaf adres {o.VolgendAdres} (BUG #340, nog niet getest op de baan).");
+        return true;
     }
 
     /// <summary>BUG #103 (log 08:06): de route naar melder 129 liep 14 -> 129 -> 24 en daarna nog een hele ronde 24 -> ... -> 14 -> 129 (75 s), terwijl de loc al
@@ -1435,6 +1466,7 @@ public partial class BaanVerkenner
                     Vergelijk(o, basis, proef, a);
                     if (partner is { } pp) VerwerkPartner(o, basis, proef, a, pp.Partner, pp.Rit);
                 }
+                if (OnderbreekVoorAndereTak(o, a)) return;   // BUG #340
             }
             o.VolgendAdres = int.MaxValue;
             foreach (var s in overgangen)
@@ -3088,14 +3120,31 @@ public partial class BaanVerkenner
                 // verwacht kan dus ook zonder wissel ontstaan, bijvoorbeeld een melder die bij
                 // de eerste rit niet (op tijd) geregistreerd werd. Deze tekst beweert daarom
                 // niet meer dat het om een wissel gaat.
-                string tekst = $"Onverwachte terugweg na melder {w}/{y} ({o.Richting.Tekst()}, {c}): heen ging de loc van {w} naar {y}, terug ging hij na {y} naar {z} - niet terug naar {w}. Geen kortsluiting. Mogelijk ligt hier een wissel die van achteren in de verkeerde stand bereden wordt, mogelijk is dit een gewoon recht stuk spoor en is een melder bij de heenrit niet geregistreerd. Deze overgang is niet in de kaart opgenomen.";
+                // BUG #339 (Marco 26-10 08:29: "je wist al dat melder 129 na melder 14 kwam en ineens staat blok 129 ergens los op het scherm"): de overgang 14 -> 129 (wissel 5 afbuigend)
+                // was de enige van melder 129 en ging hier uit de kaart; melder 129 had daarna geen buur meer in het melderschema. De heenrit is echt gereden: de overgang blijft als hij
+                // eerder al gereden was of als melder y anders zonder overgang achterblijft.
+                bool laatStaan = OvergangBlijftBijOnverwachteTerugweg(_kaart, w, y, o.Richting, c.Sleutel);
+                string tekst = $"Onverwachte terugweg na melder {w}/{y} ({o.Richting.Tekst()}, {c}): heen ging de loc van {w} naar {y}, terug ging hij na {y} naar {z} - niet terug naar {w}. Geen kortsluiting. Mogelijk ligt hier een wissel die van achteren in de verkeerde stand bereden wordt, mogelijk is dit een gewoon recht stuk spoor en is een melder bij de heenrit niet geregistreerd. "
+                    + (laatStaan ? $"De overgang {w} naar {y} blijft in de kaart: hij is eerder gereden of melder {y} heeft verder geen overgang (BUG #339, nog niet getest op de baan)." : "Deze overgang is niet in de kaart opgenomen.");
                 _kaart.Waarschuwingen.Add(tekst);
                 _log.Waarschuwing(tekst);
-                _kaart.Overgangen.RemoveAll(x => x.Van == w && x.Naar == y && x.Richting == o.Richting && x.GezienBijConfiguraties.All(k => k == c.Sleutel));
+                if (!laatStaan)
+                    _kaart.Overgangen.RemoveAll(x => x.Van == w && x.Naar == y && x.Richting == o.Richting && x.GezienBijConfiguraties.All(k => k == c.Sleutel));
                 RegistreerKortsluitpunt(o, rit.Reeks.Take(idx).ToList(), c, o.Route, o.Richting, KortsluitpuntSoort.OnverwachteTerugweg);
             }
             throw;
         }
+    }
+
+    /// <summary>BUG #339: blijft de overgang <paramref name="w"/> -> <paramref name="y"/> in de kaart na een onverwachte terugweg? Ja als hij al meer dan eens gereden is, of als melder
+    /// <paramref name="y"/> zonder die overgang geen enkele overgang meer heeft (dan staat hij los in het melderschema).</summary>
+    internal static bool OvergangBlijftBijOnverwachteTerugweg(Baankaart kaart, int w, int y, Richting r, string sleutel)
+    {
+        bool Weg(Overgang x) => x.Van == w && x.Naar == y && x.Richting == r && x.GezienBijConfiguraties.All(k => k == sleutel);
+        var weg = kaart.Overgangen.Where(Weg).ToList();
+        if (weg.Count == 0) return false;
+        if (weg.Any(x => x.AantalKeer > 1)) return true;
+        return !kaart.Overgangen.Any(x => !Weg(x) && (x.Van == y || x.Naar == y));
     }
 
     /// <summary>BUG #105: de weg VOORUIT (in de rijrichting van de rit) van de laatste melder van <paramref name="rit"/> naar <paramref name="start"/>,
