@@ -921,6 +921,16 @@ public partial class BaanVerkenner
         {
             if (IsVolger(a)) continue;   // BUG #259: gaat mee met zijn meester
             bool wens = c.Bevat(a);
+            // Wat: een wissel waarvan de stand onbekend is en die (of zijn meeschakelende tweede wissel) bij een bezette melder ligt, wordt nu niet gestuurd maar uitgesteld tot de loc
+            // daar weg is. Waarom (BUG #356, Marco 26-10 15:21: "je laat de loc tot 2x toe ontsporen door onder het rijden de wissels te schakelen"; log 15:15:31-15:15:52): na het met
+            // de hand terugzetten van de loc vergeet de verkenner alle standen (#74) en stuurde daarna ALLE wissels opnieuw, ook 10 en 13 (kruiswissel bij 24) terwijl de loc op 24 stond.
+            var bijLoc356 = _monitor.Bezet.Count > 0 ? WisselsBijBezet(_kaart, _monitor.Bezet) : new HashSet<int>();
+            if (!_wisselStand.ContainsKey(a) && (bijLoc356.Contains(a) || _ins.GekoppeldeParen().Any(p => p.Meester == a && bijLoc356.Contains(p.Volger))))
+            {
+                _log.Waarschuwing($"Wissel {a} wordt nu NIET gestuurd: zijn stand is onbekend en hij ligt bij de melder waar de loc staat ({Lijst(_monitor.Bezet.OrderBy(x => x).ToList())}). Hij gaat pas om als de loc daar weg is (BUG #356, nog niet getest op de baan).");
+                _uitgesteldeWissels[a] = wens;
+                continue;
+            }
             if (KlemStandVerboden(a, wens) && !(_wisselStand.TryGetValue(a, out var nu320) && nu320 == wens))
             {
                 _log.Waarschuwing($"Wissel {a} wordt nu NIET naar {(wens ? "afbuigend" : "rechtdoor")} gezet: die stand gaf net klem met de loc op deze melder(s). Hij wordt omgezet zodra de loc daar weg is (BUG #320).");

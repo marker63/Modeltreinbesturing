@@ -3190,3 +3190,9 @@ gestuurde standen worden nu bewaard en bij hervatten overgenomen; daarna gaan al
 instellen en elk commando ging nog steeds 6 keer. Nu wel, met een test. (2) Dinamo voerde om 14:16 nog tientallen pulsen voor wissel 13 uit die de vorige sessie om 13:53 had gestuurd;
 programma herstarten maakt die wachtrij niet leeg. De verkenner wacht nu bij de start tot Dinamo 3 s lang niets meer terugmeldt (hoogstens 3 minuten). Sneller: Dinamo even uit/aan.
 (3) De melding "na 20 s nog niet teruggemeld" kwam ook als er na 4 s al werd gestopt; tekst gecorrigeerd.
+
+## BUG #356 – OPGELOST (nog niet getest op de baan): twee ontsporingen doordat wissels onder/vlak voor de rijdende loc schakelden
+(Marco 26-10 15:21, log 15:14-15:16, nog bug354.) (1) 15:14:44-15:14:53: wissel 2/1 werden gestuurd en de loc reed 3 s later weg; met de achterstand van #352 (6 pulsen per commando)
+schakelden ze pas tijdens de rit. Opgelost door #352/#355 (1 puls, en vóór elke rit wachten op de terugmelding). (2) 15:15:31-15:15:52: na het met de hand terugzetten vergeet de
+verkenner alle standen (#74) en stuurde daarna ALLE wissels opnieuw, ook 10 en 13 met de loc op 24 (kruiswissel). Nu wordt een wissel met onbekende stand die (of zijn meeschakelende
+tweede wissel) bij een bezette melder ligt, niet gestuurd maar uitgesteld tot de loc daar weg is.
