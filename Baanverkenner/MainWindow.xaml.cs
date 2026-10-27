@@ -998,6 +998,9 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Een veilige kopie van de huidige baankaart (ook tijdens een lopende verkenning).</summary>
+    /// <summary>De melders die nu bezet zijn volgens de lopende verkenning (leeg als er geen verkenning loopt); voor de schema-vensters die automatisch verversen.</summary>
+    private IReadOnlyCollection<int> HuidigBezet() => _verkenner?.BezetteMelders ?? (IReadOnlyCollection<int>)Array.Empty<int>();
+
     private Baankaart? HuidigeKaart()
     {
         string? json = _laatsteStatusJson;
@@ -1170,13 +1173,13 @@ public partial class MainWindow : Window
     private void Blokkenschema_Click(object sender, RoutedEventArgs e)
     {
         if (KaartOfMelding() is null) return;
-        new BlokkenschemaWindow(HuidigeKaart) { Owner = this }.Show();
+        new BlokkenschemaWindow(HuidigeKaart, HuidigBezet) { Owner = this }.Show();
     }
 
     private void Melderschema_Click(object sender, RoutedEventArgs e)
     {
         if (KaartOfMelding() is null) return;
-        new MelderschemaWindow(HuidigeKaart) { Owner = this }.Show();
+        new MelderschemaWindow(HuidigeKaart, HuidigBezet) { Owner = this }.Show();
     }
 
     private void RapportHtml_Click(object sender, RoutedEventArgs e)

@@ -154,6 +154,12 @@ public partial class BaanVerkenner
     public KennisRegister Kennis { get; } = new();
     private readonly VerkenLog _log;
     private readonly MelderMonitor _monitor;
+    /// <summary>Wat: de melders die nu bezet zijn (een kopie, veilig vanaf een ander venster op te vragen). Waarom: Marco 27-10 15:56: het melderschema en blokkenschema
+    /// tonen tijdens het rijden waar de loc staat, zodat hij vanaf zijn werkplek kan zien wat de verkenner doet.</summary>
+    public IReadOnlyCollection<int> BezetteMelders
+    {
+        get { try { return _monitor.Bezet; } catch { return Array.Empty<int>(); } }
+    }
     private readonly Func<string, string, Task<bool>> _vraag;
     private readonly VerkenStatus _status;
     private Baankaart _kaart => _status.Controle && _status.ControleKaart is { } ck ? ck : _status.Kaart;

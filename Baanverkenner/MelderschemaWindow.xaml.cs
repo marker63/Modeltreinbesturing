@@ -1,10 +1,11 @@
-using System.IO;
+﻿using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using Baanverkenner.Kern;
 
 namespace Baanverkenner;
@@ -13,13 +14,35 @@ namespace Baanverkenner;
 public partial class MelderschemaWindow : Window
 {
     private readonly Func<Baankaart?> _kaartBron;
+    private readonly Func<IReadOnlyCollection<int>> _bezetBron;
     private Melderschema? _schema;
+    // Wat: ververst het schema elke 2 s en kleurt de bezette melders rood. Waarom: Marco 27-10 15:56, hij wil vanaf zijn werkplek zien waar de loc rijdt.
+    private readonly DispatcherTimer _verversTimer = new() { Interval = TimeSpan.FromSeconds(2) };
+    private string _vorigeStand = "";
 
-    public MelderschemaWindow(Func<Baankaart?> kaartBron)
+    public MelderschemaWindow(Func<Baankaart?> kaartBron, Func<IReadOnlyCollection<int>>? bezetBron = null)
     {
         InitializeComponent();
         _kaartBron = kaartBron;
+        _bezetBron = bezetBron ?? (() => Array.Empty<int>());
         Teken();
+        _verversTimer.Tick += (_, _) => { if (AutoVerversen.IsChecked == true) VerversAlsNodig(); };
+        _verversTimer.Start();
+        Closed += (_, _) => _verversTimer.Stop();
+    }
+
+    /// <summary>Tekent alleen opnieuw als de kaart of de bezette melders veranderd zijn (anders knippert het scherm niet onnodig).</summary>
+    private void VerversAlsNodig()
+    {
+        try
+        {
+            var kaart = _kaartBron();
+            var bezet = _bezetBron();
+            string stand = $"{kaart?.Bijgewerkt:O}|{kaart?.Melders.Count}|{kaart?.Overgangen.Count}|{string.Join(",", bezet.OrderBy(x => x))}";
+            if (stand == _vorigeStand) return;
+            Teken();
+        }
+        catch { /* de kaart wordt net bewaard: volgende keer opnieuw */ }
     }
 
     private static Brush Kleur(string hex) => (SolidColorBrush)new BrushConverter().ConvertFromString(hex)!;
@@ -34,6 +57,9 @@ public partial class MelderschemaWindow : Window
             Tekenvlak.Children.Add(new TextBlock { Text = "Er is nog geen baankaart. Start eerst een verkenning.", Margin = new Thickness(20) });
             return;
         }
+        var bezet = _bezetBron().ToHashSet();
+        _vorigeStand = $"{kaart.Bijgewerkt:O}|{kaart.Melders.Count}|{kaart.Overgangen.Count}|{string.Join(",", bezet.OrderBy(x => x))}";
+        BezetTekst.Text = bezet.Count == 0 ? "Bezet nu: geen" : $"Bezet nu: melder {string.Join(", ", bezet.OrderBy(x => x))}";
         _schema = Melderschema.Maak(kaart);
         Tekenvlak.Width = _schema.Breedte;
         Tekenvlak.Height = _schema.Hoogte;
@@ -59,9 +85,11 @@ public partial class MelderschemaWindow : Window
         foreach (var kn in _schema.Knopen)
         {
             string rand = kn.Splitsing ? "#C27A1A" : "#1F6F5C", vul = kn.Splitsing ? "#FFF1DC" : "#E6F2EE";
+            bool isBezet = bezet.Contains(kn.Melder);
+            if (isBezet) { rand = "#C62828"; vul = "#FFCDD2"; }   // bezet: rood
             var paneel = new Border
             {
-                Width = Melderschema.KnoopB, Height = Melderschema.KnoopH, CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(2),
+                Width = Melderschema.KnoopB, Height = Melderschema.KnoopH, CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(isBezet ? 4 : 2),
                 Background = Kleur(vul), BorderBrush = Kleur(rand),
                 ToolTip = $"melder {kn.Melder}: {kn.AantalBuren} buren" + (kn.DinamoBlok is int bl ? $", Dinamo-blok {bl}" : ", Dinamo-blok onbekend"),
                 Child = new TextBlock { Text = kn.Melder.ToString(), FontSize = 12, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }

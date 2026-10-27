@@ -3196,3 +3196,8 @@ programma herstarten maakt die wachtrij niet leeg. De verkenner wacht nu bij de 
 schakelden ze pas tijdens de rit. Opgelost door #352/#355 (1 puls, en vóór elke rit wachten op de terugmelding). (2) 15:15:31-15:15:52: na het met de hand terugzetten vergeet de
 verkenner alle standen (#74) en stuurde daarna ALLE wissels opnieuw, ook 10 en 13 met de loc op 24 (kruiswissel). Nu wordt een wissel met onbekende stand die (of zijn meeschakelende
 tweede wissel) bij een bezette melder ligt, niet gestuurd maar uitgesteld tot de loc daar weg is.
+
+## BUG #357 – GEMAAKT (nog niet getest op de baan; het WPF-deel kan hier niet gecompileerd worden, alleen de syntaxis is gecontroleerd): melderschema en blokkenschema verversen zelf en tonen wat bezet is
+(Marco 27-10 15:56: "kan je in het melderdiagram en het blokkendiagram automatisch verversen en ook aangeven welke melders en blokken er op dat moment bezet zijn?") Beide vensters
+verversen elke 2 s (alleen als de kaart of de bezette melders veranderd zijn; uit te zetten met het vinkje). Bezette melders zijn rood, in het blokkenschema ook het blok en het
+meldervlakje; bovenin staat "Bezet nu: melder ... (Dinamo-blok ...)". Bron: de melders die de lopende verkenning nu bezet ziet.

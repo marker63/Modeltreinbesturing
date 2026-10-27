@@ -1,10 +1,11 @@
-using System.IO;
+﻿using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using Baanverkenner.Kern;
 
 namespace Baanverkenner;
@@ -13,14 +14,41 @@ namespace Baanverkenner;
 public partial class BlokkenschemaWindow : Window
 {
     private readonly Func<Baankaart?> _kaartBron;
+    private readonly Func<IReadOnlyCollection<int>> _bezetBron;
     private SchemaTekening? _tekening;
+    // Wat: ververst het schema elke 2 s en kleurt bezette melders en blokken rood. Waarom: Marco 27-10 15:56, hij wil vanaf zijn werkplek zien waar de loc rijdt.
+    private readonly DispatcherTimer _verversTimer = new() { Interval = TimeSpan.FromSeconds(2) };
+    private string _vorigeStand = "";
+    private HashSet<int> _bezet = new();
 
-    public BlokkenschemaWindow(Func<Baankaart?> kaartBron)
+    public BlokkenschemaWindow(Func<Baankaart?> kaartBron, Func<IReadOnlyCollection<int>>? bezetBron = null)
     {
         InitializeComponent();
         _kaartBron = kaartBron;
+        _bezetBron = bezetBron ?? (() => Array.Empty<int>());
         Teken();
+        _verversTimer.Tick += (_, _) => { if (AutoVerversen.IsChecked == true) VerversAlsNodig(); };
+        _verversTimer.Start();
+        Closed += (_, _) => _verversTimer.Stop();
     }
+
+    /// <summary>Tekent alleen opnieuw als de kaart of de bezette melders veranderd zijn.</summary>
+    private void VerversAlsNodig()
+    {
+        try
+        {
+            var kaart = _kaartBron();
+            var bezet = _bezetBron();
+            string stand = $"{kaart?.Bijgewerkt:O}|{kaart?.Melders.Count}|{kaart?.Overgangen.Count}|{string.Join(",", bezet.OrderBy(x => x))}";
+            if (stand == _vorigeStand) return;
+            Teken();
+        }
+        catch { /* de kaart wordt net bewaard: volgende keer opnieuw */ }
+    }
+
+    /// <summary>De meldernummers die in de tekst 'Melders' van een vak staan (bijv. "13 – 14").</summary>
+    private static IEnumerable<int> MeldersVan(SchemaVak v) =>
+        System.Text.RegularExpressions.Regex.Matches(v.Melders ?? "", @"\d+").Select(m => int.Parse(m.Value));
 
     private static Brush Kleur(string hex) => (SolidColorBrush)new BrushConverter().ConvertFromString(hex)!;
 
@@ -35,7 +63,11 @@ public partial class BlokkenschemaWindow : Window
             Tekenvlak.Children.Add(leeg);
             return;
         }
+        _bezet = _bezetBron().ToHashSet();
+        _vorigeStand = $"{kaart.Bijgewerkt:O}|{kaart.Melders.Count}|{kaart.Overgangen.Count}|{string.Join(",", _bezet.OrderBy(x => x))}";
         _tekening = SchemaTekening.Maak(kaart);
+        var bezetBlokken = _tekening.Vakken.Where(v => MeldersVan(v).Any(_bezet.Contains)).Select(v => v.Titel).ToList();
+        BezetTekst.Text = _bezet.Count == 0 ? "Bezet nu: geen" : $"Bezet nu: melder {string.Join(", ", _bezet.OrderBy(x => x))}" + (bezetBlokken.Count > 0 ? $" ({string.Join(", ", bezetBlokken)})" : "");
         Tekenvlak.Width = _tekening.Breedte;
         Tekenvlak.Height = _tekening.Hoogte;
         var lijnKleur = Kleur("#44506a");
@@ -67,6 +99,8 @@ public partial class BlokkenschemaWindow : Window
         {
             string vul = v.Soort == "splitsing" ? "#FFF1DC" : v.Soort == "onbekend" ? "#F4F4F4" : "#E6F2EE";
             string rand = v.Soort == "splitsing" ? "#C27A1A" : v.Soort == "onbekend" ? "#999999" : "#1F6F5C";
+            bool vakBezet = MeldersVan(v).Any(_bezet.Contains);
+            if (vakBezet) { vul = "#FFCDD2"; rand = "#C62828"; }   // bezet blok: rood
             var paneel = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             paneel.Children.Add(new TextBlock { Text = v.Titel, FontWeight = FontWeights.SemiBold, FontSize = 14, HorizontalAlignment = HorizontalAlignment.Center });
             paneel.Children.Add(new TextBlock { Text = "melders " + v.Melders + (v.Vorm == "kruis" ? " (kruiswissel)" : ""), FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center });
@@ -117,18 +151,18 @@ public partial class BlokkenschemaWindow : Window
                 Tekenvlak.Children.Add(kader);
             }
             foreach (var c in v.Chips)
-                Tekenvlak.Children.Add(Vlakje(c.X, c.Y, c.Melder.ToString(), rand, false));
+                Tekenvlak.Children.Add(Vlakje(c.X, c.Y, c.Melder.ToString(), _bezet.Contains(c.Melder) ? "#C62828" : rand, false, _bezet.Contains(c.Melder)));
         }
     }
 
     /// <summary>Een bezetmelder (klein vlakje met het nummer) op de rand van een vak.</summary>
-    private UIElement Vlakje(double x, double y, string tekst, string randKleur, bool rond)
+    private UIElement Vlakje(double x, double y, string tekst, string randKleur, bool rond, bool bezet = false)
     {
         double b = rond ? 22 : SchemaMelder.Breedte, h = rond ? 22 : SchemaMelder.Hoogte;
         var kader = new Border
         {
-            Width = b, Height = h, CornerRadius = new CornerRadius(rond ? 11 : 4), BorderThickness = new Thickness(1.5),
-            Background = Brushes.White, BorderBrush = Kleur(randKleur),
+            Width = b, Height = h, CornerRadius = new CornerRadius(rond ? 11 : 4), BorderThickness = new Thickness(bezet ? 3 : 1.5),
+            Background = bezet ? Kleur("#FF8A80") : Brushes.White, BorderBrush = Kleur(randKleur),
             Child = new TextBlock { Text = tekst, FontSize = 11, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }
         };
         Canvas.SetLeft(kader, x - b / 2);
