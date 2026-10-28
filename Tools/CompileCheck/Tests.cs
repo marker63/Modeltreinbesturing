@@ -1112,7 +1112,7 @@ public static class Tests
                 var echt = new HashSet<int> { 1, 2, 5, 6, 9, 10, 13, 14 };
                 var valse = k.Wissels.Where(w => w.Waarnemingen.Count > 0 && !echt.Contains(w.Adres)).Select(w => w.Adres).ToList();
                 Eis(valse.Count == 0, $"keerlus (start {start}) nachtwerk: geen valse wissels (nu {string.Join(",", valse)})");
-                Eis(r.Kortsluitingen <= 10, $"keerlus (start {start}) nachtwerk: hoogstens 10 kortsluitingen (nu {r.Kortsluitingen})");
+                Eis(r.Kortsluitingen <= 11, $"keerlus (start {start}) nachtwerk (#358: wissel 2+1 blijft staan bij de loc, kost soms 1 extra): hoogstens 11 kortsluitingen (nu {r.Kortsluitingen})");
                 Eis(k.Voltooid && k.Melders.All(m => m.DinamoBlok is not null), $"keerlus (start {start}) BUG #281/#282: de blokfase wordt afgemaakt, elke melder heeft een Dinamo-blok (zonder: {string.Join(",", k.Melders.Where(m => m.DinamoBlok is null).Select(m => m.Nummer))})");
                 if (start == 13)
                 {
@@ -3354,6 +3354,116 @@ public static class Tests
         return uit;
     }
 
+    /// <summary>Module 2 (27-10): dezelfde meting als <see cref="MarcoBench"/>, maar met <see cref="BaanVerkenner2"/>. MARCO2=1 draait alleen deze meting;
+    /// MARCO2_START (standaard 13), MARCO2_VARIANT (gewoon,streng,realistisch,vertraagd,uitval), MARCO_LOG = pad-voorvoegsel voor log en kaart.</summary>
+    internal static List<string> Marco2Bench(string? starts = null, string? varianten = null)
+    {
+        var uit = new List<string>();
+        var echt = new HashSet<int> { 1, 2, 5, 6, 9, 10, 13, 14 };
+        Baanverkenner.Kern.Simulatie.MiniworldBaan.EchteAansluiting = true;
+        try
+        {
+            foreach (var start in (starts ?? Environment.GetEnvironmentVariable("MARCO2_START") ?? "13").Split(',').Select(int.Parse))
+            foreach (var variant in (varianten ?? Environment.GetEnvironmentVariable("MARCO2_VARIANT") ?? "gewoon,streng,realistisch,vertraagd").Split(','))
+            {
+                Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan? uv = null;
+                Func<Baanverkenner.Kern.Simulatie.SimulatieBaan>? fabriek = variant switch
+                {
+                    "uitval" or "realistisch" => () => uv = new Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan { UitvalVanafCommando = 120, UitvalDuur = TimeSpan.FromSeconds(90), NegeerHelftBijKortsluiting = variant == "realistisch" },
+                    "vertraagd" or "vertraagd6" => () => uv = new Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan { VertraagdeUitvoering = true },
+                    _ => null
+                };
+                var sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(true, start, fabriek);
+                sim.BuurwisselHeftKruisKortsluitingOp = variant == "streng";
+                var simMeld = new List<(DateTime T, string S)>();
+                sim.StatusBericht += t => { if (t.Contains("KORTSLUITING") || t.Contains("met de hand")) simMeld.Add((sim.HuidigeSimTijd, "##SIM## " + t)); };
+                var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 14, DinamoBlokken = "1-12", KruisMotoren = "10+13", HoogsteMelder = 150,
+                    GekoppeldeWissels = "5+6,2+1", OmgekeerdAangesloten = "6", WisselHerhalingen = variant == "vertraagd6" ? 6 : 1 };
+                sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+                var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+                var log = new VerkenLog(klok);
+                var v = new BaanVerkenner2(sim, ins, klok, log, (kop, tekst) =>
+                {
+                    var m = System.Text.RegularExpressions.Regex.Match(tekst, @"met de hand op melder (\d+)");
+                    if (kop == "Loc terugzetten" && m.Success) sim.ZetLocOpMelder(int.Parse(m.Groups[1].Value));
+                    return Task.FromResult(true);
+                }, new VerkenStatus { Instellingen = ins });
+                using var cts = new CancellationTokenSource();
+                var t0 = klok.Nu;
+                klok.Getikt += nu => { if ((nu - t0).TotalHours > 12) cts.Cancel(); };
+                string einde = "klaar";
+                try { v.VoerUit(cts.Token).GetAwaiter().GetResult(); } catch (OperationCanceledException) { einde = "tijdslimiet"; } catch (Exception ex) { einde = "FOUT: " + ex.Message; Console.WriteLine(ex); }
+                var k = v.Kaart;
+                var regels = log.Regels.Select(x => x.Tekst).ToList();
+                var gevonden = k.Wissels.Where(w => w.Waarnemingen.Count > 0).Select(w => w.Adres).ToList();
+                string regel = $"MARCO2 start {start,3} {variant,-11}: {einde,-12} {(k.Voltooid ? "voltooid" : "NIET-voltooid"),-13} melders {k.Melders.Count,2}/23  met-blok {k.Melders.Count(m => m.DinamoBlok is not null),2}  wissels [{string.Join(",", gevonden.OrderBy(x => x))}]  valse {gevonden.Count(a => !echt.Contains(a))}  kortsl {v.Kennis.Kortsluitingen,2}  onder-loc {sim.OnderLocOmgezet,2}  gebruiker {regels.Count(x => x.Contains("Gebruiker heeft de loc"))}  zelf-ok {regels.Count(x => x.Contains("Zelf opgelost"))}  zelf-mis {regels.Count(x => x.Contains("Zelf oplossen lukte niet"))}  ritten {v.Kennis.Ritten}  proeven {v.Kennis.Experimenten}  zonder-effect [{string.Join(",", k.AdressenZonderEffect)}]  overgeslagen {v.Kennis.Overgeslagen.Count}  {(klok.Nu - t0).TotalMinutes:0} min";
+                if (uv is { VertraagdeUitvoering: true }) regel += $"  (langste achterstand Dinamo {uv.LangsteAchterstand.TotalSeconds:0} s)";
+                if (uv is { NegeerHelftBijKortsluiting: true } || uv is { UitvalVanafCommando: < 1000 }) regel += $"  (uitval: {uv!.GenegeerdeCommandos} genegeerd, bij kortsluiting {uv.GenegeerdBijKortsluiting})";
+                Console.WriteLine(regel);
+                uit.Add(regel);
+                if (Environment.GetEnvironmentVariable("MARCO_LOG") is { } pad && pad.Length > 0)
+                {
+                    var alle = log.Regels.Select(x => (T: x.Tijd, S: x.Tekst)).Concat(simMeld).OrderBy(x => x.T).ToList();
+                    System.IO.File.WriteAllLines($"{pad}_m2_{start}_{variant}.txt", alle.Select(x => x.T.ToString("HH:mm:ss.f") + "  " + x.S));
+                    System.IO.File.WriteAllText($"{pad}_m2_{start}_{variant}.json", v.Status.AlsJson());
+                    System.IO.File.WriteAllText($"{pad}_m2_{start}_{variant}_rapport.txt", Rapport.AlsTekst(k));
+                }
+            }
+        }
+        finally { Baanverkenner.Kern.Simulatie.MiniworldBaan.EchteAansluiting = false; }
+        return uit;
+    }
+
+    /// <summary>Module 2: elke <paramref name="minuten"/> minuten (simulatietijd) stoppen, de voortgang als JSON bewaren en met een NIEUWE BaanVerkenner2 hervatten
+    /// (zoals Marco het programma afsluit en opnieuw start). MARCO2_HERVAT=1 draait alleen deze meting; MARCO2_HERVAT_REALISTISCH=1 met de Dinamo-uitval.</summary>
+    internal static string Marco2HervatBench(double minuten = 40, int start = 13, bool realistisch = false)
+    {
+        var echt = new HashSet<int> { 1, 2, 5, 6, 9, 10, 13, 14 };
+        Baanverkenner.Kern.Simulatie.MiniworldBaan.EchteAansluiting = true;
+        try
+        {
+            var sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(true, start, realistisch
+                ? () => new Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan { UitvalVanafCommando = 120, UitvalDuur = TimeSpan.FromSeconds(90), NegeerHelftBijKortsluiting = true } : null);
+            var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 14, DinamoBlokken = "1-12", KruisMotoren = "10+13", HoogsteMelder = 150,
+                GekoppeldeWissels = "5+6,2+1", OmgekeerdAangesloten = "6", Module2 = true };
+            sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+            var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+            VerkenStatus? status = null;
+            var t0 = klok.Nu; int stops = 0, gebruiker = 0; var alleRegels = new List<string>();
+            BaanVerkenner2? v = null;
+            for (int ronde = 0; ronde < 40; ronde++)
+            {
+                var log = new VerkenLog(klok);
+                v = new BaanVerkenner2(sim, ins, klok, log, (kop, tekst) =>
+                {
+                    var m = System.Text.RegularExpressions.Regex.Match(tekst, @"met de hand op melder (\d+)");
+                    if (kop == "Loc terugzetten" && m.Success) sim.ZetLocOpMelder(int.Parse(m.Groups[1].Value));
+                    return Task.FromResult(true);
+                }, status);
+                using var cts = new CancellationTokenSource();
+                var rondeStart = klok.Nu;
+                Action<DateTime> tik = nu => { if ((nu - rondeStart).TotalMinutes > minuten || (nu - t0).TotalHours > 12) cts.Cancel(); };
+                klok.Getikt += tik;
+                bool klaar = false;
+                try { v.VoerUit(cts.Token).GetAwaiter().GetResult(); klaar = true; } catch (OperationCanceledException) { } catch (Exception ex) { alleRegels.Add("FOUT: " + ex); klaar = true; }
+                klok.Getikt -= tik;
+                alleRegels.AddRange(log.Regels.Select(x => x.Tijd.ToString("HH:mm:ss.f") + "  " + x.Tekst));
+                gebruiker += log.Regels.Count(x => x.Tekst.Contains("Gebruiker heeft de loc"));
+                if (klaar || (klok.Nu - t0).TotalHours > 12) break;
+                stops++;
+                status = VerkenStatus.VanJson(v.Status.AlsJson())!;   // zoals het bestand op schijf
+                klok.Wacht(TimeSpan.FromSeconds(60)).GetAwaiter().GetResult();   // Marco start het programma opnieuw
+            }
+            var k = v!.Kaart;
+            var gevonden = k.Wissels.Where(w => w.Waarnemingen.Count > 0).Select(w => w.Adres).ToList();
+            if (Environment.GetEnvironmentVariable("MARCO_LOG") is { } pad && pad.Length > 0) System.IO.File.WriteAllLines($"{pad}_m2_hervat_{start}{(realistisch ? "_r" : "")}.txt", alleRegels);
+            string regel = $"MARCO2-HERVAT start {start}{(realistisch ? " realistisch" : "")} elke {minuten:0} min: {stops} keer gestopt en hervat, {(k.Voltooid ? "voltooid" : "NIET-voltooid")}, melders {k.Melders.Count}/23, met-blok {k.Melders.Count(m => m.DinamoBlok is not null)}, wissels [{string.Join(",", gevonden.OrderBy(x => x))}], valse {gevonden.Count(a => !echt.Contains(a))}, kortsl {v.Kennis.Kortsluitingen}, onder-loc {sim.OnderLocOmgezet}, gebruiker {gebruiker}, zonder-effect [{string.Join(",", k.AdressenZonderEffect)}], {(klok.Nu - t0).TotalMinutes:0} min";
+            Console.WriteLine(regel);
+            return regel;
+        }
+        finally { Baanverkenner.Kern.Simulatie.MiniworldBaan.EchteAansluiting = false; }
+    }
+
     /// <summary>Nachtwerk 25/26-10: Marco stopt en hervat de verkenning vaak (25-10: zes keer). Deze meting stopt de verkenning elke <paramref name="minuten"/> minuten (simulatietijd),
     /// bewaart de voortgang als JSON, en hervat met een nieuwe verkenner op dezelfde (gesimuleerde) baan; de loc blijft staan waar hij stond. MARCO_HERVAT=1 draait alleen deze meting.</summary>
     internal static string MarcoHervatBench(double minuten = 40, int start = 13)
@@ -3669,6 +3779,8 @@ public static class Tests
         if (Environment.GetEnvironmentVariable("ALLEEN_308") == "1") { AlarmVoorTerugmeldingTest(); Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)"); return _fouten == 0 ? 0 : 1; }
         if (Environment.GetEnvironmentVariable("BENCH") == "1") { BenchTest(); return 0; }
         if (Environment.GetEnvironmentVariable("MARCO") == "1") { MarcoBench(); return 0; }
+        if (Environment.GetEnvironmentVariable("MARCO2") == "1") { Marco2Bench(); return 0; }
+        if (Environment.GetEnvironmentVariable("MARCO2_HERVAT") == "1") { Marco2HervatBench(double.Parse(Environment.GetEnvironmentVariable("MARCO_MIN") ?? "40"), realistisch: Environment.GetEnvironmentVariable("MARCO2_HERVAT_REALISTISCH") == "1"); return 0; }
         if (Environment.GetEnvironmentVariable("MARCO_HERVAT") == "1") { foreach (var mn in (Environment.GetEnvironmentVariable("MARCO_MIN") ?? "40").Split(',')) MarcoHervatBench(double.Parse(mn)); return 0; }
         if (Environment.GetEnvironmentVariable("ALLEEN_MATRIX") == "1") { StapMatrixTest(); Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)"); return _fouten == 0 ? 0 : 1; }
         if (Environment.GetEnvironmentVariable("ALLEEN_RONDRIT") == "1") { RondritTest(); Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)"); return _fouten == 0 ? 0 : 1; }
@@ -3783,6 +3895,14 @@ public static class Tests
             // Nachtwerk 25/26-10: elke 40 minuten stoppen en hervatten (Marco deed dat 25-10 zes keer); de loc staat dan ergens op de baan en de verkenner rijdt zelf terug (#330, #331)
             var h = MarcoHervatBench(40);
             Eis(h.Contains(" voltooid") && h.Contains("valse 0") && h.Contains("gebruiker 0"), "marco (stoppen en hervatten): voltooid, geen valse wissels, geen hulp nodig (" + h + ")");
+        }
+        {
+            // Module 2 (27/28-10): de nieuwe verkenner op Marco's aansluiting, gewoon en met de Dinamo-uitval, en met stoppen en hervatten
+            foreach (var r2 in Marco2Bench("13", "gewoon,realistisch"))
+                Eis(r2.Contains(" voltooid ") && r2.Contains("melders 23/23") && r2.Contains("valse 0") && r2.Contains("onder-loc  0") && r2.Contains("gebruiker 0") && r2.Contains("zonder-effect [3,4,7,8,11,12]"),
+                    "module 2: voltooid, alle melders, geen valse wissels, nooit een wissel onder de loc, geen hulp, alleen de niet bestaande adressen zonder effect (" + r2 + ")");
+            var h2 = Marco2HervatBench(40);
+            Eis(h2.Contains(" voltooid") && h2.Contains("valse 0") && h2.Contains("onder-loc 0") && h2.Contains("gebruiker 0"), "module 2 (stoppen en hervatten): voltooid, geen valse wissels, geen hulp (" + h2 + ")");
         }
         WachtendeAlarmOplossingTest();
         KlemStandOnthoudenTest();

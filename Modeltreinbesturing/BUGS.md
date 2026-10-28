@@ -3201,3 +3201,54 @@ tweede wissel) bij een bezette melder ligt, niet gestuurd maar uitgesteld tot de
 (Marco 27-10 15:56: "kan je in het melderdiagram en het blokkendiagram automatisch verversen en ook aangeven welke melders en blokken er op dat moment bezet zijn?") Beide vensters
 verversen elke 2 s (alleen als de kaart of de bezette melders veranderd zijn; uit te zetten met het vinkje). Bezette melders zijn rood, in het blokkenschema ook het blok en het
 meldervlakje; bovenin staat "Bezet nu: melder ... (Dinamo-blok ...)". Bron: de melders die de lopende verkenning nu bezet ziet.
+
+## BUG #358 – OPGELOST (nog niet getest op de baan): ontsporing op wissel 1, omdat de verkenner wissel 2+1 terugzette terwijl de loc op melder 12 stond
+(Marco 28-10 08:48, log 08:35:34-08:35:54.) De loc kwam met wissel 2+1 afbuigend op melder 12 aan. Elf seconden later zette de verkenner alles terug naar de basisstand,
+vóór de blokproef. Wissel 2 en 1 gingen naar rechtdoor, terwijl de loc op wissel 1 stond. Het voorste draaistel zat op de afbuigende tak en het achterste op de rechte tak.
+Daardoor ontstond een kortsluiting die met geen enkele wisselstand op te lossen was; de loc moest met de hand terug.
+De bestaande controles (#181/#356) zagen dit niet, omdat de kaart wissel 1 nog niet bij melder 12 kende.
+Oplossing: bij het terugzetten naar de basisstand blijven de wissels waarmee de laatste rit reed staan, zolang de loc nog op een melder staat waar die rit eindigde.
+Een meester wordt dan bewaakt via zijn volger. Ze gaan pas om als de loc daar weg is (zelfde uitstel als #271).
+In module 2 kan dit niet gebeuren: daar gaat een wissel van een overloopset (ook via de volger) nooit om als de loc op een melder van zijn wisselgebied staat.
+
+## BUG #359 – OPGELOST (nog niet getest op de baan): melderschema toonde de keerlus en de binnenring (blok 1 en 2) in een verkeerde volgorde
+(Marco 28-10 08:52.) De melders buiten de hoofdlus (129, 4, 11, 12, 1, 9, 10) werden naar buiten geduwd en tegen de bovenrand op één lijn gezet.
+Daardoor liepen lijnen door andere melders heen, en leek de volgorde 9 - 1 - 12 - 10 - 11 - 4. De kaart zelf was goed: 129-4-11-12-1-9-10-129 en 12-5.
+Oplossing: melders die aan de hoofdlus vastzitten maar er niet op liggen, krijgen hun plek met een veermodel. Buren trekken elkaar aan, alle melders duwen elkaar weg,
+en de hoofdlus blijft staan. Het tekenvlak groeit zo nodig mee. De tekening is vast: dezelfde kaart geeft dezelfde tekening. Losse trajecten houden hun eigen rij (#286).
+
+## BUG #360 – OPGELOST (nog niet getest op de baan): melding "alle adressen op rechtdoor" bij hervatten, terwijl er maar 3 commando's gingen
+(Marco 28-10 08:54, log 08:06:07.) Sinds #353 stuurde de verkenner bij hervatten alleen de wissels die volgens de bewaarde stand anders moesten (4, 5+6 en 10).
+Nu krijgen ook de wissels die al rechtdoor zouden staan het commando opnieuw. Hetzelfde commando nog eens sturen beweegt een wissel die al zo staat niet.
+Alleen de wissels bij de melder waar de loc staat worden overgeslagen; dat staat apart in de log.
+
+## BUG #361 – OPGELOST (nog niet getest op de baan): melderschema miste wisselstanden die wel bekend waren
+(Marco 28-10 08:57.) De labels bij de lijnen kwamen alleen uit splitsingen. Twee soorten wissels stonden er daardoor niet bij, al was de rit met die stand wel gereden:
+een wissel waarvan alleen een kortsluiting bekend was (wissel 2 voor 5 -> 12), en een wissel uit een wisselstraat (motor 10, wissel 14 bij 24 -> 8).
+Oplossing: per lijn komen er ook de standen uit de wisselstraten bij (alleen als er voor die overgang één eenduidig voorstel is).
+Een stand die alleen gereden is maar niet bewezen nodig, krijgt "(gereden)" erachter.
+
+## BUG #362 – OPGELOST (nog niet getest op de baan): wissel 1 (en 6) ontbraken in rapport en schema's
+(Marco 28-10 08:59.) Module 1 test de volger van een overloopset nooit los (#259), dus wissel 1 en 6 kregen geen enkele waarneming.
+In het bewaarde bestand, het rapport en de schema's krijgt de volger nu dezelfde waarnemingen als zijn meester. Bij een omgekeerd aangesloten wissel zijn rechtdoor en afbuigend dan andersom.
+Ze zijn herkenbaar aan "Schakelt mee met wissel ...". De verkenner zelf rekent er niet mee: bij het hervatten worden ze weggehaald.
+
+## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
+(Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
+Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:
+- **Eén bron van waarheid:** de gereden stappen (vanaf melder X door melder Y, met deze wisselstanden, uitkomst Z, doodlopend of kortsluiting). De baankaart wordt daar elke keer opnieuw uit opgebouwd.
+- **Navigeren:** alleen rijden wat al eens gelukt is.
+- **Adressen zoeken:** alle nog niet gevonden adressen tegelijk omzetten en een bekend stuk rijden. Gebeurt er iets anders, dan zoekt halveren uit welk adres het was. Het laatste adres wordt altijd nog alleen gereden: nooit concluderen door wegstrepen.
+- **Proef heen en terug:** na een proef rijdt de loc langs dezelfde weg terug, pas daarna gaan de proefwissels terug.
+- **Veiligheid:** een wissel gaat nooit om als de loc op een melder van zijn wisselgebied staat, ook niet via de volger. Een nog niet gevonden adres gaat alleen om als de loc netjes op een gewone melder staat (geen kruising).
+- **Kortsluiting:** eerst de proefwissels één voor één terug, dan langzaam terugrijden, dan wissels proberen. Pas na 10 minuten Marco vragen.
+- **Blokken:** bij elke parkeerplek een kort kruipcommando per blok, buurblokken eerst.
+
+Simulatie met Marco's aansluiting (start 13): voltooid, 23/23 melders, alle blokken, wissels 1, 2, 5, 6, 9, 10, 13 en 14, geen valse vondsten, nooit een wissel onder de loc, geen hulp nodig. Zonder effect: alleen 3, 4, 7, 8, 11 en 12.
+
+Metingen 28-10 (simulatie met Marco's aansluiting, module 1, versie bug363 vergeleken met bug357):
+- gewoon, streng, uitval, realistisch en vertraagd: voltooid, valse 0, onder-loc 0, gebruiker 0. Wissel 1 en 6 staan nu ook in de kaart (#362).
+- vertraagd6 (de oude instelling van 6 pulsen): onder-loc 1 en gebruiker 1 (was 2 en 0).
+- Stoppen en hervatten: onder-loc 0 en gebruiker 0 (was 0 en 0).
+- Stoppen en hervatten, realistisch: onder-loc 0 en gebruiker 1 (was 1 en 0).
+- Keerlustest: 11 in plaats van hoogstens 10 kortsluitingen. Wissel 2+1 blijft nu staan zolang de loc erbij staat (#358); dat kost daar één extra kortsluiting in plaats van een ontsporing. De grens in de test is 11 geworden.

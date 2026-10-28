@@ -85,6 +85,9 @@ public partial class BaanVerkenner
     private const int MaxStopPassen = 4;
 
     private readonly Dictionary<int, bool> _wisselStand = new();
+    /// <summary>BUG #358: de wisselstand waarmee de laatste rit reed en de melders waar die rit eindigde.</summary>
+    private Dictionary<int, bool>? _ritStand358;
+    private HashSet<int> _ritEind358 = new();
     private List<int> _laatsteKortsluitMelders = new();
 
     /// <summary>BUG #74: de ingangskant van de melder waar de loc nu staat: hij kwam vanaf <c>Via</c> op <c>Melder</c> aan, rijdend in
@@ -915,6 +918,19 @@ public partial class BaanVerkenner
             if (_monitor.Bezet.Contains(uls.P)) foreach (var a in uls.Adressen) onder.TryAdd(a, uls.P);
             else _uitwijkLaatStaan = null;
         }
+        // Wat: wissels waarmee de laatste rit reed blijven staan zolang de loc nog op de melder(s) staat waar die rit eindigde (ook de volger van een overloopset).
+        // Waarom (BUG #358, Marco 28-10 08:48, log 08:35:34-08:35:54): de loc kwam met wissel 2+1 afbuigend op melder 12 aan; 11 s later gingen 2 en 1 terug naar
+        // rechtdoor (terug naar de basisstand vóór de blokproef) terwijl de loc op wissel 1 stond: draaistellen op beide takken, ontsporing en kortsluiting die
+        // niet meer op te lossen was. De kaart kende wissel 1 nog niet bij melder 12, dus de bestaande controle (#181/#356) zag het niet.
+        // Alleen voor de volger van een overloopset (die krijgt nooit eigen waarnemingen, dus de kaart weet niet waar hij ligt); van een gewone wissel staat
+        // de plek in de kaart (zie WisselsBijBezet hierboven).
+        if (spaarOnderLoc && HuidigeAlarmBlokken().Count == 0 && _ritStand358 is { } rs && _ritEind358.Count > 0 && _monitor.Bezet.Any(_ritEind358.Contains))
+            foreach (var (a, st) in rs)
+            {
+                if (!(_wisselStand.TryGetValue(a, out var nu358) && nu358 == st && st != c.Bevat(a))) continue;
+                int meester = _ins.GekoppeldeParen().FirstOrDefault(p => p.Volger == a).Meester;
+                if (meester > 0) onder.TryAdd(meester, _monitor.Bezet.Where(_ritEind358.Contains).First());
+            }
         foreach (var pa in _kaart.OverloopPartnersVan(onder.Keys).ToList())
             if (_ins.WisselAdressen().Contains(pa)) onder.TryAdd(pa, onder.Values.First());
         foreach (var a in _ins.WisselAdressen())
@@ -1647,6 +1663,8 @@ public partial class BaanVerkenner
             {
                 _log.Waarschuwing($"De kortsluiting ging weg na het omzetten van wissel {a}, maar Dinamo heeft dat commando nog niet teruggemeld (dus waarschijnlijk nog niet uitgevoerd): een eerder, laat uitgevoerd commando haalde de kortsluiting weg. Niet aan wissel {a} toegeschreven (BUG #351, nog niet getest op de baan).");
                 // geen terugzet-commando: dat zou in een achterlopende Dinamo-wachtrij alleen nog een puls extra zijn
+                // BUG #358: de wissel kan wel omgegaan zijn (de loc staat er misschien nu op, zoals wissel 2/1 met de loc op 5/12): niet terugzetten zolang de loc daar staat
+                if (!oud) _klemOplossing[a] = (KlemMelders(bezet), _klok.Nu);
                 _kortsluitingGemeld = false;
                 return true;
             }
@@ -2062,7 +2080,10 @@ public partial class BaanVerkenner
         _ritMinDt = double.MaxValue; _ritMaxDt = 0;
         lock (_alarmSlot) _genegeerdeAlarmen.Clear();
         await WachtOpUitvoeringWissels();   // BUG #352
+        _ritStand358 = new Dictionary<int, bool>(_wisselStand);   // BUG #358: de stand waarmee deze rit reed
         var uitkomst = await RitUitvoeren(start, r, doel);
+        _monitor.Bijwerken();
+        _ritEind358 = _monitor.Bezet.ToHashSet();
         // BUG #164: een blokalarm dat binnenkwam terwijl de verkenner aan het stoppen was (en daarom genegeerd werd) is een echte kortsluiting als de rit eindigt
         // op een nieuwe plek of een onverwachte afwijking. Zo ontstaat hetzelfde kortsluitpunt als wanneer de melding een fractie eerder was gekomen.
         if (!doel.IsNavigatie && uitkomst.Einde is RitEinde.AfwijkingGevonden or RitEinde.Doodlopend)
@@ -3506,6 +3527,11 @@ public partial class BaanVerkenner
         if (bezet.Count == 0 || !bezet.Contains(van) || HuidigeAlarmBlokken().Count > 0) return null;
         var teOm = WisselsBijBezet(_kaart, bezet).Where(a => !Kruis.IsMotor(a) && _ins.WisselAdressen().Contains(a)
             && _wisselStand.TryGetValue(a, out var st) && st != cfg.Bevat(a)).OrderBy(a => a).ToList();
+        // BUG #358: ook de meester van een overloopset waarmee de vorige rit hier aankwam (de kaart weet niet waar de volger ligt; wissel 1 bij melder 12)
+        if (_ritStand358 is { } rs358 && bezet.Any(_ritEind358.Contains))
+            foreach (var (m358, _) in _ins.GekoppeldeParen())
+                if (!teOm.Contains(m358) && rs358.TryGetValue(m358, out var st358) && _wisselStand.TryGetValue(m358, out var nu358) && nu358 == st358 && st358 != cfg.Bevat(m358))
+                    teOm.Add(m358);
         if (teOm.Count == 0) return null;
         var nu = new Configuratie(_wisselStand.Where(kv => kv.Value).Select(kv => kv.Key).ToArray());
         var terug = _kaart.BekendeVolgende(van, r.Om(), nu).Where(x => !pad.Contains(x)).ToList();

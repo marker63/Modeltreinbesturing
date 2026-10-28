@@ -70,6 +70,10 @@ public class VerkenStatus
     /// <summary>BUG #74: de voltooide kaart wordt uitgebreid met een tweede, los traject: de volgende start bepaalt een nieuwe startmelder
     /// (waar de loc nu staat) en laat alles wat al gevonden is staan.</summary>
     public bool Uitbreiden { get; set; }
+    /// <summary>Module 2 (27-10): welke verkenner deze voortgang maakte (1 = oorspronkelijke, 2 = Baanverkenner module 2), zodat hervatten met dezelfde gebeurt.</summary>
+    public int Module { get; set; } = 1;
+    /// <summary>Module 2: alle kennis van de nieuwe verkenner (null bij module 1).</summary>
+    public Kennis2? Module2 { get; set; }
     /// <summary>BUG #104: 'Voltooide baan nogmaals checken' loopt. De verkenner werkt dan op <see cref="ControleKaart"/>; <see cref="Kaart"/>
     /// (de voltooide kaart) blijft ongewijzigd en wordt alleen aan het eind vergeleken.</summary>
     public bool Controle { get; set; }
@@ -145,7 +149,7 @@ public record VerkenVoortgang(
 /// 4. Kortsluitpunten oplossen met de wissels die inmiddels bekend zijn.
 /// 5. Adressen die nergens effect hadden apart vermelden, blokken voorstellen.
 /// </summary>
-public partial class BaanVerkenner
+public partial class BaanVerkenner : IBaanVerkenner
 {
     private readonly IHardwareInterface _hw;
     private readonly VerkenInstellingen _ins;
@@ -209,6 +213,8 @@ public partial class BaanVerkenner
     public BaanVerkenner(IHardwareInterface hw, VerkenInstellingen ins, IKlok klok, VerkenLog log,
         Func<string, string, Task<bool>> vraag, VerkenStatus? hervatVan = null)
     {
+        hervatVan?.Kaart.VerwijderVolgerWaarnemingen();   // BUG #362: alleen voor het bestand; de verkenner rekent zonder
+        hervatVan?.ControleKaart?.VerwijderVolgerWaarnemingen();
         _hw = hw;
         _klok = klok;
         _log = log;
@@ -313,7 +319,7 @@ public partial class BaanVerkenner
             if (hervat && _status.WisselStanden.Count > 0 && _wisselStand.Count == 0)
             {
                 foreach (var kv in _status.WisselStanden) _wisselStand[kv.Key] = kv.Value;
-                _log.Info($"Wisselstanden van vóór het stoppen overgenomen (afbuigend: {(_wisselStand.Any(kv => kv.Value) ? Lijst(_wisselStand.Where(kv => kv.Value).Select(kv => kv.Key).OrderBy(x => x).ToList()) : "geen")}); alleen wissels die anders moeten, worden gestuurd (BUG #353, nog niet getest op de baan).");
+                _log.Info($"Wisselstanden van vóór het stoppen overgenomen (afbuigend: {(_wisselStand.Any(kv => kv.Value) ? Lijst(_wisselStand.Where(kv => kv.Value).Select(kv => kv.Key).OrderBy(x => x).ToList()) : "geen")}); de wissels gaan zo meteen opnieuw naar hun stand, behalve die bij de melder waar de loc staat (BUG #353/#360, nog niet getest op de baan).");
             }
             // BUG #87: bewezen kortsluitoplossingen uit eerdere verkenningen meenemen.
             if (Voorkennis is { } lpo)
@@ -350,7 +356,23 @@ public partial class BaanVerkenner
             _log.Stap("Alle adressen in het bereik op rechtdoor zetten (commando gestuurd; de centrale meldt de werkelijke stand van de wisselmotoren niet terug).");
             await WachtTotDinamoUitgevoerd();   // BUG #355
             // BUG #353: bij hervatten met bekende standen alleen de wissels die anders staan, en niet onder de loc (anders 14 commando's achter elkaar, ook voor wissels waar de loc op staat)
-            if (hervat && _status.WisselStanden.Count > 0) await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);
+            if (hervat && _status.WisselStanden.Count > 0)
+            {
+                await ZetConfiguratie(Configuratie.Basis, spaarOnderLoc: true);
+                // Wat: ook de wissels die volgens de bewaarde stand al rechtdoor staan, krijgen het commando nog een keer; alleen niet die bij de melder waar
+                // de loc staat. Waarom (BUG #360, Marco 28-10 08:54: "je meldde dat je alle wissels op rechtdoor had gezet, maar ik zie de commando's niet in de
+                // log"): bij #353 gingen alleen de wissels die anders stonden. Staat er met de hand of na het uitzetten iets anders, dan klopte de melding niet.
+                // Hetzelfde commando nog eens sturen beweegt een wissel die al zo staat niet.
+                var bijLoc = _monitor.Bezet.Count > 0 ? WisselsBijBezet(_kaart, _monitor.Bezet) : new HashSet<int>();
+                var overgeslagen = new List<int>();
+                foreach (var a in _ins.WisselAdressen().Where(x => !IsVolger(x)))
+                {
+                    if (_wisselStand.TryGetValue(a, out var st) && st) continue;   // staat (bewust) afbuigend, al afgehandeld
+                    if (bijLoc.Contains(a) || _ins.GekoppeldeParen().Any(p => p.Meester == a && bijLoc.Contains(p.Volger))) { overgeslagen.Add(a); continue; }
+                    await ZetWissel(a, false, forceer: true);
+                }
+                if (overgeslagen.Count > 0) _log.Info($"Niet opnieuw gestuurd omdat de loc erbij staat: wissel {Lijst(overgeslagen)} (BUG #360).");
+            }
             else foreach (var a in _ins.WisselAdressen()) await ZetWissel(a, false, forceer: true);
 
             if (!hervat || (_status.Controle && _status.GeplandeOpdrachten.Count == 0))
@@ -3407,6 +3429,7 @@ public partial class BaanVerkenner
             if (!_kaart.Waarschuwingen.Contains(t)) _kaart.Waarschuwingen.Add(t);
         }
         BerekenAdressenZonderEffect();
+        _kaart.VulVolgerWaarnemingen(_ins.GekoppeldeParen(), _ins.OmgekeerdeWissels());   // BUG #362
         _kaart.VoorgesteldeBlokken = BlokVoorstel.Bereken(_kaart);
         _kaart.Wisselstraatvoorstellen = WisselstraatVoorstel.Bereken(_kaart);
         // BUG #188 (meting: 7 van 16 simulatieruns meldden 'voltooid' met 2-4 van de 21 melders, steeds met een melder zonder Dinamo-blok): een verkenning waarin nog een melder
@@ -3451,8 +3474,11 @@ public partial class BaanVerkenner
         _kaart.Bijgewerkt = _klok.Nu;
         _status.WisselStanden = new Dictionary<int, bool>(_wisselStand);   // BUG #353
         BerekenAdressenZonderEffect();
+        // BUG #362: in het bewaarde bestand (rapport, schema's) staan de volgers van de overloopsets erbij; de verkenner zelf rekent er niet mee
+        _kaart.VulVolgerWaarnemingen(_ins.GekoppeldeParen(), _ins.OmgekeerdeWissels());
         try { Bewaren?.Invoke(_status); }
         catch (Exception ex) { _log.Waarschuwing($"Voortgang bewaren mislukte: {ex.Message}"); }
+        finally { if (!_kaart.Voltooid) _kaart.VerwijderVolgerWaarnemingen(); }
     }
 
     private void MeldVoortgang()

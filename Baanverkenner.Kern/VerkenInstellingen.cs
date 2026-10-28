@@ -123,6 +123,8 @@ public class VerkenInstellingen
     /// rijcommando's naar ALLE blokken tot een kopspoor (dan keren) of een lus; daarna gaat steeds één wisselmotor om en wordt het traject opnieuw gereden tot een nieuwe melder, een lus
     /// of een kortsluiting. Een kruiswissel is een gewone wissel. Pas als alle melders met hun vervolgen bekend zijn, worden de Dinamo-blokken gezocht. Sluit 'Stap voor stap' uit.</summary>
     public bool Rondrit { get; set; }
+    /// <summary>Optie 7 (Marco 27-10): de verkenning doen met Baanverkenner module 2 (<see cref="BaanVerkenner2"/>) in plaats van module 1. Opties 5 en 6 gelden dan niet.</summary>
+    public bool Module2 { get; set; }
     /// <summary>BUG #175 (Marco 17-10 09:44): bij 'Stap voor stap' beginnen de proefritten één melder vóór de startmelder en rijdt de loc na de proef daar ook naartoe terug,
     /// zodat hij niet op de wissels bij de startmelder staat terwijl die omgezet worden en de wissels vóór de startmelder ook gemeten worden.</summary>
     public bool StapAanloop { get; set; } = true;

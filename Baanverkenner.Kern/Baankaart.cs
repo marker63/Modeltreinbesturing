@@ -992,6 +992,47 @@ public class Baankaart
         return res;
     }
 
+    /// <summary>Begin van de toelichting van een waarneming die alleen van de meester van een overloopset is overgenomen (BUG #362).</summary>
+    public const string VolgerMerk = "Schakelt mee met wissel ";
+
+    /// <summary>WAT: geeft de tweede wissel van elke overloopset (de volger) dezelfde waarnemingen als zijn meester, met rechtdoor en afbuigend omgedraaid
+    /// als precies één van beide omgekeerd is aangesloten. Eerder overgenomen waarnemingen worden eerst weggehaald.
+    /// WAAROM (BUG #362, Marco 28-10 08:59: "in het rapport mis je wissel 1 compleet"): module 1 test een volger nooit los, dus wissel 1 (en 6) kregen geen
+    /// enkele waarneming en ontbraken in rapport, melderschema en wisselstraten, terwijl ze op de baan altijd meeschakelen.</summary>
+    public void VulVolgerWaarnemingen(IEnumerable<(int Meester, int Volger)> paren, ISet<int> omgekeerd)
+    {
+        VerwijderVolgerWaarnemingen();
+        foreach (var (m, v) in paren)
+        {
+            var mw = Wissels.FirstOrDefault(x => x.Adres == m);
+            if (mw is null || mw.Waarnemingen.Count == 0) continue;
+            bool draai = omgekeerd.Contains(m) ^ omgekeerd.Contains(v);
+            var vw = Wissels.FirstOrDefault(x => x.Adres == v);
+            if (vw is null) { vw = new WisselVondst { Adres = v }; Wissels.Add(vw); Wissels.Sort((a, b) => a.Adres.CompareTo(b.Adres)); }
+            foreach (var o in mw.Waarnemingen.Where(o => !o.Toelichting.StartsWith(VolgerMerk)).ToList())
+            {
+                var c = new WisselWaarneming
+                {
+                    Soort = o.Soort, NaMelder = o.NaMelder, Via = o.Via, Richting = o.Richting, Configuratie = o.Configuratie,
+                    VolgendeBijRechtdoor = draai ? o.VolgendeBijAfbuigend : o.VolgendeBijRechtdoor,
+                    VolgendeBijAfbuigend = draai ? o.VolgendeBijRechtdoor : o.VolgendeBijAfbuigend,
+                    Toelichting = $"{VolgerMerk}{m} (overloopset{(draai ? ", omgekeerd aangesloten: rechtdoor en afbuigend andersom" : "")}). {o.Toelichting}"
+                };
+                if (draai && o.Soort == WaarnemingSoort.KortsluitingBijOmzetten) c.Soort = WaarnemingSoort.Splitsing;   // bij de volger is juist 'rechtdoor' de kortsluitstand
+                vw.Waarnemingen.Add(c);
+            }
+        }
+    }
+
+    /// <summary>BUG #362: haalt de overgenomen volger-waarnemingen weer weg (de verkenner zelf rekent alleen met de meesters).</summary>
+    public void VerwijderVolgerWaarnemingen()
+    {
+        var leeg = new List<WisselVondst>();
+        foreach (var w in Wissels)
+            if (w.Waarnemingen.RemoveAll(o => o.Toelichting.StartsWith(VolgerMerk)) > 0 && w.Waarnemingen.Count == 0) leeg.Add(w);
+        foreach (var w in leeg) Wissels.Remove(w);
+    }
+
     public void RegistreerKopspoor(int melder, Richting r, Configuratie c)
     {
         if (!Kopsporen.Any(k => k.Melder == melder && k.Richting == r))

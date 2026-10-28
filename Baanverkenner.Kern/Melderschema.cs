@@ -80,6 +80,27 @@ public class Melderschema
                         break;
                 }
             }
+        // Wat: ook de wisselstanden uit de wisselstraten (de standen waarmee een overgang echt gereden is) bij de lijnen zetten, voor elke wissel die op die
+        // lijn nog geen label heeft. Waarom (BUG #361, Marco 28-10 08:57: "ik mis in het melderschema nog enkele wisselstanden die je wel zou moeten weten"):
+        // de labels kwamen alleen uit splitsingen; een wissel waarvan alleen een kortsluiting bekend was (bijv. wissel 2 voor 5 -> 12) of een overloopwissel
+        // stond er niet bij, terwijl de rit met die stand wel gereden is. Alleen als er voor die overgang één eenduidig voorstel is.
+        try
+        {
+            var straten = k.Wisselstraatvoorstellen.Count > 0 ? k.Wisselstraatvoorstellen : WisselstraatVoorstel.Bereken(k);
+            foreach (var g in straten.GroupBy(v => (v.VanMelder, v.NaarMelder, v.Richting)))
+            {
+                if (g.Count() != 1) continue;
+                var v = g.First();
+                var sl = v.VanMelder < v.NaarMelder ? (v.VanMelder, v.NaarMelder) : (v.NaarMelder, v.VanMelder);
+                if (!randen.TryGetValue(sl, out var r)) continue;
+                foreach (var e in v.Eisen)
+                {
+                    if (r.Labels.Any(l => l.StartsWith($"W{e.Adres} "))) continue;
+                    r.Labels.Add($"W{e.Adres} {k.StandKort(e.Adres, e.Afbuigend)}{(e.Bron == EisBron.Aangenomen ? " (gereden)" : "")}");
+                }
+            }
+        }
+        catch { /* het schema mag nooit stuk gaan op de wisselstraten */ }
         s.Randen.AddRange(randen.Values.OrderBy(r => r.A).ThenBy(r => r.B));
 
         var buren = nummers.ToDictionary(n => n, n => new HashSet<int>());
@@ -150,6 +171,49 @@ public class Melderschema
             for (int i = 0; i < volgorde.Count; i++) pos[volgorde[i]] = (60 + i * stap, Hoogte - 40 - rij * 70);
             foreach (var m in volgorde) over.Remove(m);
             rij++;
+        }
+
+        // Wat: de melders die niet op de ring liggen (zijtakken, binnenring, keerlus) krijgen hun plek met een veermodel: buren trekken elkaar aan,
+        // alle melders duwen elkaar weg; de ring zelf blijft staan. Waarom (BUG #359, Marco 28-10 08:52): de keerlus 129-4-11-12-1-9-10 werd naar
+        // buiten geduwd en tegen de bovenrand gezet, allemaal op één lijn; de lijnen liepen dan door andere melders heen en de volgorde bij blok 1 en 2
+        // leek verkeerd (9-1-12-10-11-4). Vast aantal rondes, geen toeval: zelfde kaart = zelfde tekening.
+        // alleen melders die (via buren) aan de ring vastzitten; losse trajecten houden hun eigen rij (BUG #286)
+        var aanRing = new HashSet<int>(ring); var q359 = new Queue<int>(ring);
+        while (q359.Count > 0) foreach (var b in buren[q359.Dequeue()]) if (aanRing.Add(b)) q359.Enqueue(b);
+        var vrij = Knopen.Select(x => x.Melder).Where(m => !ring.Contains(m) && aanRing.Contains(m)).ToList();
+        if (vrij.Count > 0 && ring.Count >= 3)
+        {
+            const double kv = 110;
+            var alle = Knopen.Select(x => x.Melder).ToList();
+            for (int it = 0; it < 400; it++)
+            {
+                double max = 30 * (1 - it / 400.0) + 2;
+                foreach (var m in vrij)
+                {
+                    double fx = 0, fy = 0;
+                    foreach (var o in alle)
+                    {
+                        if (o == m) continue;
+                        double dx = pos[m].X - pos[o].X, dy = pos[m].Y - pos[o].Y, d2 = dx * dx + dy * dy;
+                        if (d2 < 1) { dx = 1 + (m % 7); dy = 1 + (o % 5); d2 = dx * dx + dy * dy; }
+                        double d = Math.Sqrt(d2), f = kv * kv / d;
+                        fx += dx / d * f; fy += dy / d * f;
+                    }
+                    foreach (var b in buren[m])
+                    {
+                        double dx = pos[b].X - pos[m].X, dy = pos[b].Y - pos[m].Y, d = Math.Max(1, Math.Sqrt(dx * dx + dy * dy)), f = d * d / kv;
+                        fx += dx / d * f; fy += dy / d * f;
+                    }
+                    double fl = Math.Sqrt(fx * fx + fy * fy);
+                    if (fl > max) { fx = fx / fl * max; fy = fy / fl * max; }
+                    pos[m] = (pos[m].X + fx, pos[m].Y + fy);
+                }
+            }
+            // alles binnen het tekenvlak schuiven (het vlak wordt zo nodig groter)
+            double minX = pos.Values.Min(p => p.X), minY = pos.Values.Min(p => p.Y), maxX = pos.Values.Max(p => p.X), maxY = pos.Values.Max(p => p.Y);
+            double sx = 80 - minX, sy = 60 - minY;
+            foreach (var m in alle) pos[m] = (pos[m].X + sx, pos[m].Y + sy);
+            Breedte = Math.Max(Breedte, maxX - minX + 160); Hoogte = Math.Max(Hoogte, maxY - minY + 130);
         }
 
         // alleen uit elkaar duwen wat te dicht op elkaar ligt (de ring blijft zo een ring); vast aantal rondes, geen toeval

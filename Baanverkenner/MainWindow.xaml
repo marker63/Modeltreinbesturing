@@ -123,6 +123,9 @@
 
                 <GroupBox Header="Werkwijze" Margin="0,0,0,10">
                     <StackPanel>
+                        <CheckBox x:Name="Module2Check" Margin="0,4,0,8" IsChecked="False" Checked="Module2_Checked">
+                            <TextBlock TextWrapping="Wrap" FontWeight="SemiBold" Text="7. Baanverkenner module 2 (nieuw): een compleet nieuwe verkenner volgens het stappenplan van 27-10. Eerst het geraamte met alle wissels rechtdoor, dan alle nog niet gevonden adressen tegelijk omzetten en met halveren uitzoeken welk adres iets doet, steeds heen en terug langs dezelfde weg; wissels nooit omzetten bij de loc; blokken bij elke parkeerplek. Zelfde baankaart, rapport en schema's. Opties 5 en 6 gelden dan niet. Een hervatting gebruikt altijd de module waarmee de verkenning begon. Nog niet getest op de baan."/>
+                        </CheckBox>
                         <CheckBox x:Name="StapVoorStapCheck" Margin="0,4" IsChecked="False" Checked="StapVoorStap_Checked">
                             <TextBlock TextWrapping="Wrap" Text="5. Stap voor stap verkennen: zet de loc midden in een blok; de verkenner rijdt steeds één melder en probeert de wissels één voor één. Trager, maar rustiger (nieuw, nog niet getest op de baan)."/>
                         </CheckBox>

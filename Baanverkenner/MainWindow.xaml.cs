@@ -59,7 +59,8 @@ public partial class MainWindow : Window
 
     private IHardwareInterface? _hw;
     private SimulatieBaan? _sim;
-    private BaanVerkenner? _verkenner;
+    /// <summary>De lopende verkenner: module 1 (<see cref="BaanVerkenner"/>) of module 2 (<see cref="BaanVerkenner2"/>), zie optie 7.</summary>
+    private IBaanVerkenner? _verkenner;
     private VerkenLog? _log;
     private CancellationTokenSource? _cts;
     private bool _bezig;
@@ -175,7 +176,8 @@ public partial class MainWindow : Window
         BasisHerhalenCheck.IsChecked = i.BasisritHerhalen;
         AutoSnelheidCheck.IsChecked = i.AutoSnelheid;
         StapVoorStapCheck.IsChecked = i.StapVoorStap && !i.Rondrit;
-        RondritCheck.IsChecked = i.Rondrit;
+        RondritCheck.IsChecked = i.Rondrit && !i.Module2;
+        Module2Check.IsChecked = i.Module2;
         StapAanloopCheck.IsChecked = i.StapAanloop;
         // BUG #178: de oude standaard (1 s) wordt de nieuwe (2 s); een bewuste andere waarde blijft staan
         StapDoorrijBox.Text = (Math.Abs(i.StapDoorrijSeconden - 1.0) < 0.001 ? 2.0 : i.StapDoorrijSeconden).ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -226,7 +228,8 @@ public partial class MainWindow : Window
             BasisritHerhalen = BasisHerhalenCheck.IsChecked == true,
             AutoSnelheid = AutoSnelheidCheck.IsChecked == true,
             StapVoorStap = StapVoorStapCheck.IsChecked == true && RondritCheck.IsChecked != true,
-            Rondrit = RondritCheck.IsChecked == true,
+            Rondrit = RondritCheck.IsChecked == true && Module2Check.IsChecked != true,
+            Module2 = Module2Check.IsChecked == true,
             StapAanloop = StapAanloopCheck.IsChecked == true,
             StapDoorrijSeconden = Getal(StapDoorrijBox, "Doorrijden na nieuwe melder", 0, 10)
         };
@@ -380,10 +383,19 @@ public partial class MainWindow : Window
     private void Rondrit_Checked(object sender, RoutedEventArgs e)
     {
         if (StapVoorStapCheck is not null) StapVoorStapCheck.IsChecked = false;
+        if (Module2Check is not null) Module2Check.IsChecked = false;
     }
 
     private void StapVoorStap_Checked(object sender, RoutedEventArgs e)
     {
+        if (RondritCheck is not null) RondritCheck.IsChecked = false;
+        if (Module2Check is not null) Module2Check.IsChecked = false;
+    }
+
+    /// <summary>Optie 7 (module 2) sluit optie 5 en 6 uit: module 2 heeft zijn eigen werkwijze.</summary>
+    private void Module2_Checked(object sender, RoutedEventArgs e)
+    {
+        if (StapVoorStapCheck is not null) StapVoorStapCheck.IsChecked = false;
         if (RondritCheck is not null) RondritCheck.IsChecked = false;
     }
 
@@ -620,6 +632,7 @@ public partial class MainWindow : Window
         VerkenInstellingen.NeemMeldingInstellingenOver(vast, scherm);   // BUG #244: o.a. wissel 6 omgekeerd aangesloten
         vast.StapVoorStap = scherm.StapVoorStap;
         vast.Rondrit = scherm.Rondrit;
+        vast.Module2 = scherm.Module2 && st.Module == 2;   // module 2: een hervatting blijft bij de module waarmee hij begon
         vast.StapAanloop = scherm.StapAanloop;
         vast.StapDoorrijSeconden = scherm.StapDoorrijSeconden;
         if (vast.LocStappen <= 28 && (vast.Verkensnelheid > vast.LocStappen || vast.Kruipsnelheid > vast.LocStappen))
@@ -681,21 +694,35 @@ public partial class MainWindow : Window
         if (hervat is not null)
             _log.Info($"Hervat vanaf opgeslagen voortgang ({hervat.AfgerondeOpdrachten} opdrachten al afgerond).");
 
-        _verkenner = new BaanVerkenner(hw, ins, klok, _log, VraagGebruiker, hervat)
+        // Module 2 (Marco 27-10): kiesbaar met optie 7; een hervatting gebruikt altijd de module waarmee de verkenning begon.
+        bool module2 = hervat is not null ? hervat.Module == 2 && !hervat.Controle : ins.Module2;   // 'baan checken' is (nog) alleen module 1
+        if (module2)
         {
-            VraagJaNee = VraagJaNeeGebruiker,
-            VraagWisselAdres = VraagAdresGebruiker
-        };
-        // Zelflerend: tijden uit eerdere verkenningen (of het meegeleverde beginprofiel) gebruiken en bijwerken.
-        var profiel = LeerProfiel.Laad(LeerprofielPad);
-        if (profiel.AantalMetingen == 0) profiel = LeerProfiel.Laad(LeerprofielZaadPad);
-        // BUG #62: blokhints uit het meegeleverde zaadprofiel aanvullen voor melders die het eigen profiel nog niet kent
-        foreach (var h in LeerProfiel.Laad(LeerprofielZaadPad).BlokHints)
-            if (profiel.BlokHint(h.Melder) is null) profiel.BlokHints.Add(new LeerProfiel.BlokHintItem { Melder = h.Melder, Blok = h.Blok });
-        _verkenner.Leerprofiel = profiel;
-        // BUG #84: Koploper-referentie (blok per melder, wisselstraatblokken 8/9); ontbreekt het bestand dan werkt alles als voorheen.
-        _verkenner.Referentie = KoploperReferentie.Laad(KoploperReferentiePad);
-        _verkenner.ProfielBijgewerkt = p => { try { p.Bewaar(LeerprofielPad); } catch { } };
+            _log.Info("Baanverkenner module 2 (nieuwe opzet volgens het stappenplan van 27-10).");
+            _verkenner = new BaanVerkenner2(hw, ins, klok, _log, VraagGebruiker, hervat)
+            {
+                Referentie = KoploperReferentie.Laad(KoploperReferentiePad)
+            };
+        }
+        else
+        {
+            var v1 = new BaanVerkenner(hw, ins, klok, _log, VraagGebruiker, hervat)
+            {
+                VraagJaNee = VraagJaNeeGebruiker,
+                VraagWisselAdres = VraagAdresGebruiker
+            };
+            // Zelflerend: tijden uit eerdere verkenningen (of het meegeleverde beginprofiel) gebruiken en bijwerken.
+            var profiel = LeerProfiel.Laad(LeerprofielPad);
+            if (profiel.AantalMetingen == 0) profiel = LeerProfiel.Laad(LeerprofielZaadPad);
+            // BUG #62: blokhints uit het meegeleverde zaadprofiel aanvullen voor melders die het eigen profiel nog niet kent
+            foreach (var h in LeerProfiel.Laad(LeerprofielZaadPad).BlokHints)
+                if (profiel.BlokHint(h.Melder) is null) profiel.BlokHints.Add(new LeerProfiel.BlokHintItem { Melder = h.Melder, Blok = h.Blok });
+            v1.Leerprofiel = profiel;
+            // BUG #84: Koploper-referentie (blok per melder, wisselstraatblokken 8/9); ontbreekt het bestand dan werkt alles als voorheen.
+            v1.Referentie = KoploperReferentie.Laad(KoploperReferentiePad);
+            v1.ProfielBijgewerkt = p => { try { p.Bewaar(LeerprofielPad); } catch { } };
+            _verkenner = v1;
+        }
         _verkenner.VoortgangGewijzigd += v => Dispatcher.InvokeAsync(() => ToonVoortgang(v));
         _verkenner.Bewaren = st =>
         {
