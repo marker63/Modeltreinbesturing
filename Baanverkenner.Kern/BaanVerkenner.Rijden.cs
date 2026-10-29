@@ -431,6 +431,33 @@ public partial class BaanVerkenner
 
     /// <summary>BUG #259: is dit adres de tweede wissel van een overloopset (schakelt alleen mee met zijn meester)?</summary>
     private bool IsVolger(int adres) => _ins.GekoppeldeParen().Any(p => p.Volger == adres);
+
+    /// <summary>BUG #363: de melders waar de loc bij het neerzetten niet van zijn plek kwam (klem of ontspoord). Zolang hij daar nog staat, gaan de motoren van de kruiswissel niet om.</summary>
+    private HashSet<int>? _locNietVerplaatst;
+    /// <summary>BUG #363: hoe vaak elke kruismotor al geprobeerd is terwijl de loc op <see cref="_locNietVerplaatst"/> vastzit.</summary>
+    private readonly Dictionary<int, int> _motorPogingenVast = new();
+
+    /// <summary>BUG #363: zit de loc vast bij deze melders (zie <see cref="_locNietVerplaatst"/>)?</summary>
+    private bool LocZitVast(IEnumerable<int> bezet) => _locNietVerplaatst != null && _locNietVerplaatst.SetEquals(bezet);
+
+    /// <summary>BUG #363: telt een poging met kruismotor <paramref name="a"/> terwijl de loc vastzit (daarna mag die motor daar niet meer).</summary>
+    private void TelMotorPoging(int a, IEnumerable<int> bezet)
+    {
+        if (Kruis.IsMotor(a) && LocZitVast(bezet)) _motorPogingenVast[a] = _motorPogingenVast.GetValueOrDefault(a) + 1;
+    }
+
+    /// <summary>WAT: mag motor <paramref name="a"/> van de kruiswissel nu NIET om? Dat is zo als de loc op de kruiswissel of bij een melder van die motor vastzit (bij het
+    /// neerzetten kwam hij daar niet van zijn plek) en die motor daar al een keer geprobeerd is.
+    /// WAAROM (BUG #363, Marco 29-10 11:54, log 10:59-11:07): na een kortsluiting bij het binnenrijden van melder 24 haalde wissel 10 omzetten de kortsluiting weg (dat mag en
+    /// werkt, #169/#305). Daarna kwam de loc niet meer van 24/129 af (ontspoord op de kruiswissel), maar het zelf oplossen bleef motor 10 en 13 steeds heen en terug zetten
+    /// onder die loc. Dat helpt niet en kan de loc verder laten ontsporen. Zit de loc vast, dan krijgt elke motor daar nog precies één poging (soms zit de loc klem en
+    /// maakt juist die motor hem vrij); daarna niet meer tot de loc ergens anders staat.</summary>
+    private bool KruisMotorBijLoc(int a, IEnumerable<int> bezet)
+    {
+        if (!Kruis.IsMotor(a)) return false;
+        var nu = bezet.ToHashSet();
+        return LocZitVast(nu) && _motorPogingenVast.GetValueOrDefault(a) >= 1 && (Kruis.OpKruis(nu) || WisselsBijBezet(_kaart, nu).Contains(a));
+    }
     private bool _volgerBezig;
 
     /// <summary>BUG #259 (Marco 20-10 18:23-18:33): wissel 5 en 6 zijn een overloopset en staan op de baan altijd hetzelfde; wissel 6 is omgekeerd aangesloten. Een volger wordt nooit los
@@ -1373,6 +1400,7 @@ public partial class BaanVerkenner
             if (bezet.OrderBy(x => x).SequenceEqual(bezetBijStart.OrderBy(x => x)) && !omdraaien)
             {
                 stilstaandePogingen++;
+                if (_locNietVerplaatst == null || !_locNietVerplaatst.SetEquals(bezet)) { _locNietVerplaatst = bezet.ToHashSet(); _motorPogingenVast.Clear(); }   // BUG #363: de loc rijdt hier niet weg (klem of ontspoord)
                 _log.Waarschuwing($"Neerzetten op melder {doel}: de loc is niet verplaatst (nog steeds bezet: {Lijst(bezet)}) na een poging met snelheid {stapNu}{(stilstaandePogingen < 3 ? "; de volgende poging krijgt iets meer snelheid" : "")}.");
             }
             else stilstaandePogingen = 0;
@@ -1752,9 +1780,13 @@ public partial class BaanVerkenner
             if (await Probeer(a, " (van een tak richting de samenvoeging bereden)")) return true;
 
         // stap 2: de wissels die van achteren bereden worden en bij de loc liggen, plus de kruismotoren als de loc op de kruiswissel staat: met toestemming
-        var verdachtEerst = achter.Where(a => bijLoc.Contains(a) && !bewezen.ContainsKey(a)).ToList();   // BUG #258
+        var verdachtEerst = achter.Where(a => bijLoc.Contains(a) && !bewezen.ContainsKey(a) && !KruisMotorBijLoc(a, bezet)).ToList();   // BUG #258, #363
         if (Kruis.OpKruis(bezet))
-            foreach (var m in KruisMotorenVolgorde(bezet)) if (!verdachtEerst.Contains(m)) verdachtEerst.Add(m);
+            foreach (var m in KruisMotorenVolgorde(bezet)) if (!verdachtEerst.Contains(m) && !KruisMotorBijLoc(m, bezet)) verdachtEerst.Add(m);
+        var motorenOverslaan = achter.Where(a => bijLoc.Contains(a)).Concat(Kruis.OpKruis(bezet) ? KruisMotorenVolgorde(bezet) : Enumerable.Empty<int>())
+            .Where(a => KruisMotorBijLoc(a, bezet)).Distinct().ToList();
+        if (motorenOverslaan.Count > 0)
+            _log.Info($"Motor {Lijst(motorenOverslaan)} van de kruiswissel wordt NIET geprobeerd: de loc zit vast op melder {Lijst(bezet.OrderBy(x => x).ToList())} bij de kruiswissel (kwam bij het neerzetten niet van zijn plek) en de motor is daar al geprobeerd; nog eens omzetten helpt niet en kan hem verder laten ontsporen (BUG #363).");
         var gevraagd = new HashSet<int>();
         // BUG #305 (Marco 25-10 10:05: zelflerend, eerst zelf oplossen, pas na 10 minuten de gebruiker): niet meer om toestemming vragen. Komt de loc van een tak richting de
         // samenvoeging, dan kan omzetten de kortsluiting juist opheffen (BUG #169).
@@ -1763,7 +1795,10 @@ public partial class BaanVerkenner
             _log.Info($"Wissel {string.Join(" en ", verdachtEerst)} ligt bij de loc (melder {string.Join(" en ", bezet.OrderBy(x => x))}), die van een tak richting de samenvoeging rijdt: de verkenner probeert ze zelf één voor één (zonder te vragen, BUG #305).");
             foreach (var a in verdachtEerst) gevraagd.Add(a);
             foreach (var a in verdachtEerst)
+            {
+                TelMotorPoging(a, bezet);   // BUG #363
                 if (await Probeer(a, " (ligt bij de loc, zelf geprobeerd)")) return true;
+            }
         }
 
         // stap 3: de overige wissels, behalve die van de samengevoegde kant (omzetten helpt daar niet) en die bij de loc

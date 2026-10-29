@@ -231,12 +231,14 @@ public partial class BaanVerkenner
     {
         var bezet = _monitor.Bezet;
         var bijLoc = WisselsBijBezet(_kaart, bezet).Where(a => _ins.WisselAdressen().Contains(a) && !IsVolger(a)).ToHashSet();
+        var motorenBijLoc = _ins.WisselAdressen().Where(a => KruisMotorBijLoc(a, bezet)).ToHashSet();   // BUG #363: nooit onder de loc op de kruiswissel
+        bijLoc.ExceptWith(motorenBijLoc);
         // BUG #315 (Marco 25-10 18:12: "ik zie achter elkaar zelf oplossen ronde x, maar ik hoor geen wissels schakelen"): in een verse verkenning kent de kaart bij melder 129 nog geen
         // wissels; er was dan niets te proberen en 28 rondes lang gebeurde er niets. Nu eerst de wissels bij de loc, dan de wissels die nu afbuigend staan (die zijn het meest verdacht),
         // dan alle andere; elke ronde één.
         var kandidaten = bijLoc.OrderBy(a => a)
-            .Concat(_ins.WisselAdressen().Where(a => !bijLoc.Contains(a) && !IsVolger(a) && _wisselStand.TryGetValue(a, out var af) && af).OrderBy(a => a))
-            .Concat(_ins.WisselAdressen().Where(a => !bijLoc.Contains(a) && !IsVolger(a) && !(_wisselStand.TryGetValue(a, out var af2) && af2)).OrderBy(a => a))
+            .Concat(_ins.WisselAdressen().Where(a => !bijLoc.Contains(a) && !motorenBijLoc.Contains(a) && !IsVolger(a) && _wisselStand.TryGetValue(a, out var af) && af).OrderBy(a => a))
+            .Concat(_ins.WisselAdressen().Where(a => !bijLoc.Contains(a) && !motorenBijLoc.Contains(a) && !IsVolger(a) && !(_wisselStand.TryGetValue(a, out var af2) && af2)).OrderBy(a => a))
             .ToList();
         // BUG #315: daarna combinaties. Om 12:19 haalde wissel 10 de kortsluiting na 14 -> 129 -> 24 pas weg terwijl wissel 5 afbuigend bleef (de stand van de rit); de zoekroutine had 5
         // eerst teruggezet en daarna elke andere wissel alleen geprobeerd. Zijn alle wissels los geprobeerd, dan nog eens elke wissel met de afbuigende wissels van de rit weer afbuigend.
@@ -248,9 +250,10 @@ public partial class BaanVerkenner
             {
                 string sleutelC = $"C{a}:{rs.Sleutel}:{string.Join(",", bezet.OrderBy(x => x))}";
                 if (!geprobeerd.Add(sleutelC)) continue;
-                foreach (var x in rs.Afbuigend.Where(x => _ins.WisselAdressen().Contains(x) && !IsVolger(x) && !(_wisselStand.TryGetValue(x, out var sx) && sx) && !KlemStandVerboden(x, true))) await ZetWissel(x, true);   // BUG #320
+                foreach (var x in rs.Afbuigend.Where(x => _ins.WisselAdressen().Contains(x) && !IsVolger(x) && !motorenBijLoc.Contains(x) && !(_wisselStand.TryGetValue(x, out var sx) && sx) && !KlemStandVerboden(x, true))) await ZetWissel(x, true);   // BUG #320
                 bool nuC = _wisselStand.TryGetValue(a, out var stc) && stc;
                 _log.Info($"Zelf oplossen: combinatie - wissel {Lijst(rs.Afbuigend.ToList())} afbuigend (de stand van de rit) met wissel {a} naar {(!nuC ? "afbuigend" : "rechtdoor")} (BUG #315).");
+                TelMotorPoging(a, bezet);   // BUG #363
                 await ZetWissel(a, !nuC);
                 for (int h = 1; h <= 10 && LaatsteCommandoTeruggemeld(a) == false && HuidigeAlarmBlokken().Count > 0; h++) { await Wacht(TimeSpan.FromSeconds(3)); await ZetWissel(a, !nuC, forceer: true); }
                 await Wacht(TimeSpan.FromSeconds(4));
@@ -271,6 +274,7 @@ public partial class BaanVerkenner
             _log.Info(bijLoc.Contains(a)
                 ? $"Zelf oplossen: wissel {a} bij de bezette melder ({Lijst(bezet)}) gaat naar {(!nu ? "afbuigend" : "rechtdoor")}; komt de loc van een zijtak naar de samenvoeging, dan kan dat de kortsluiting opheffen (BUG #169/#305)."
                 : $"Zelf oplossen: wissel {a} gaat naar {(!nu ? "afbuigend" : "rechtdoor")} (de kaart kent bij melder {Lijst(bezet)} nog geen wissel; {(nu ? "hij stond afbuigend, dus verdacht" : "volgende kandidaat")}, BUG #315).");
+            TelMotorPoging(a, bezet);   // BUG #363
             await ZetWissel(a, !nu);
             // BUG #315: tijdens een blijvende kortsluiting voert Dinamo een wisselcommando vaak niet uit (#301; 25-10 09:06, 10:26, 18:05). Dan het commando een halve minuut lang
             // elke 3 s opnieuw sturen: Dinamo zet de stroom zelf af en toe weer aan en voert het dan wel uit.

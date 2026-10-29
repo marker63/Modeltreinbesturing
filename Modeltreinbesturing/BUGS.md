@@ -3233,6 +3233,18 @@ Een stand die alleen gereden is maar niet bewezen nodig, krijgt "(gereden)" erac
 In het bewaarde bestand, het rapport en de schema's krijgt de volger nu dezelfde waarnemingen als zijn meester. Bij een omgekeerd aangesloten wissel zijn rechtdoor en afbuigend dan andersom.
 Ze zijn herkenbaar aan "Schakelt mee met wissel ...". De verkenner zelf rekent er niet mee: bij het hervatten worden ze weggehaald.
 
+## BUG #363 – OPGELOST (nog niet getest op de baan): zelf oplossen bleef de motoren van de kruiswissel omzetten onder een loc die vastzat
+(Marco 29-10 11:54: loc ontspoord op de kruiswissel; log 10:59-11:07.) Om 10:59:22 reed de loc achteruit van 21 melder 24 in (proefrit voor adres 12, wissel 10 afbuigend) en kreeg direct kortsluiting.
+Wissel 10 omzetten haalde de kortsluiting weg (zoals bedoeld, #169/#305). Daarna kwam de loc in vier pogingen niet meer van 24/129 af: hij stond toen waarschijnlijk al ontspoord
+(bij het binnenrijden met kortsluiting; Marco denkt mechanisch). Het zelf oplossen zette daarna van 11:01 tot 11:07 motor 10 en 13 nog vele keren heen en terug onder die loc.
+Dat helpt niet en kan de loc verder laten ontsporen.
+Oplossing: zodra de loc bij het neerzetten niet van zijn plek komt, krijgt elke motor van de kruiswissel bij die melders nog precies één poging (alarmzoeken, zelf oplossen
+en de combinaties van #315); daarna gaat hij daar niet meer om tot de loc ergens anders staat. Soms zit de loc klem en maakt juist die motor hem vrij, daarom niet nul pogingen.
+De eerste poging na een kortsluiting (voordat de loc vast blijkt) blijft gewoon toegestaan, die loste het hier juist op. In de log staat "wordt NIET geprobeerd ... (BUG #363)".
+Lukt het zonder niet, dan vraagt de verkenner na 10 minuten om hulp.
+Metingen 29-10 (vergeleken met bug363): alle MARCO-varianten, hervatten en hervatten realistisch precies gelijk; alle regressietests (ook module 2) OK.
+Een eerste versie die de motoren altijd oversloeg met de loc erbij (en een tweede die ze na "niet verplaatst" helemaal oversloeg) maakte de oude matrixtests slechter (start 5 en 17 niet voltooid); daarom deze smallere regel.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:
