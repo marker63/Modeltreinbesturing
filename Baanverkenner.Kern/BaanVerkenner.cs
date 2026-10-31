@@ -1874,6 +1874,7 @@ public partial class BaanVerkenner : IBaanVerkenner
         // verschilden: een kwart van alle ritten. Optie 6 vergelijkt toch alleen de melders onderling, een enkele basisrit volstaat.
         int aantal = _ins.BasisritHerhalen && !Stap && !Rondrit ? 2 : 1;
         var ritten = new List<RitResultaat>();
+        Configuratie? laatsteRijstand = null;
         for (int i = 0; i < aantal + 1; i++)
         {
             if (i == aantal && (ritten.Count < 2 || ritten[0].Reeks.SequenceEqual(ritten[1].Reeks))) break;
@@ -1896,8 +1897,39 @@ public partial class BaanVerkenner : IBaanVerkenner
             await TerugNaarMetControle(o, rit, rijstandBasis);
             ritten.Add(rit);
             eerste ??= rit;
+            laatsteRijstand = rijstandBasis;
             // Na een kortsluiting niet nog eens dezelfde kortsluiting opzoeken.
             if (rit.Einde == RitEinde.Kortsluiting) { stops = KortsluitStops(o.Configuratie, o.Richting); }
+        }
+        // WAT: eindigde de basisrit met een kortsluiting die tijdens het herstel opgelost is (een wissel haalde het alarm weg), dan wordt de basisrit nog één keer gereden mét die
+        // oplossing, zonder stop op dat punt. Komt de loc nu verder, dan is die langere rit de basis voor de proeven.
+        // WAAROM (BUG #364, Marco 31-10 09:14: "als je weet dat wissel 9 in een andere stand moet staan, dan juist even terug rijden en met de wissel in de juiste stand doorrijden en zo
+        // het vervolg ontdekken"; log 09:08-09:12): de basisrit 13, 5, 12, 11, 4, 129 kreeg kortsluiting na 129; wissel 9 afbuigend haalde die weg. Daarna reed elke proef (adres 3, 4,
+        // ...) met wissel 9 afbuigend weer tot melder 129 en stopte daar, omdat de basisrit daar ophield: heen en weer tussen 13 en 129 zonder ooit te zien wat er na 129 komt.
+        if (ritten.Count >= 1 && ritten[^1].Einde == RitEinde.Kortsluiting && ritten[^1].Reeks.Count >= 1 && !Stap && !_status.Controle && laatsteRijstand is not null)
+        {
+            var kort = ritten[^1];
+            var opgelost = _kaart.Kortsluitpunten.FirstOrDefault(k => k.Opgelost && !k.Opgegeven && k.Soort == KortsluitpuntSoort.Kortsluiting && k.NaMelder == kort.Reeks[^1]
+                                                                     && k.Richting == o.Richting && k.Configuratie.Equals(o.Configuratie) && k.OpgelostDoorAdres is int);
+            var rijstand364 = RijStand(o);
+            _monitor.Bijwerken();
+            if (opgelost is not null && !rijstand364.Equals(laatsteRijstand) && _monitor.Bezet.Count == 1 && _monitor.Bezet.Contains(o.Start) && HuidigeAlarmBlokken().Count == 0)
+            {
+                _log.Info($"Opdracht #{o.Id}: de basisrit eindigde met een kortsluiting na melder {kort.Reeks[^1]}, en die is opgelost met wissel {opgelost.OpgelostDoorAdres} " +
+                          $"{(opgelost.OpgelostMetAfbuigend == true ? "afbuigend" : "rechtdoor")}. De basisrit wordt nu met die stand opnieuw gereden ({rijstand364}) om te ontdekken wat er na melder {kort.Reeks[^1]} komt (BUG #364, nog niet getest op de baan).");
+                // Maar één melder voorbij het opgeloste punt: dat is genoeg om het vervolg te kennen, en zo rijdt de loc niet onbewaakt een stuk in dat nog niet verkend is
+                // (in de simulatie reed hij anders de keerlus rond en kwam met wissel 2 afbuigend klem op wissel 1). De rest ontdekken de gewone opdrachten.
+                var rit364 = await Rit(o.Start, o.Richting, new RitDoel { Configuratie = rijstand364, StopBijMelders = KortsluitStops(o.Configuratie, o.Richting), StaartWissels = true, MaxStappen = kort.Reeks.Count });
+                _log.Info($"Basisrit (met de oplossing): {Lijst(rit364.Reeks)} - einde: {EindeTekst(rit364.Einde)}.");
+                VerwerkEinde(o, rit364);
+                RegistreerAndereKant(o, rit364);
+                await TerugNaarMetControle(o, rit364, rijstand364);
+                if (rit364.Reeks.Count > kort.Reeks.Count && rit364.Reeks.Take(kort.Reeks.Count).SequenceEqual(kort.Reeks))
+                {
+                    _log.Vondst($"Opdracht #{o.Id}: met wissel {opgelost.OpgelostDoorAdres} {(opgelost.OpgelostMetAfbuigend == true ? "afbuigend" : "rechtdoor")} rijdt de loc verder dan melder {kort.Reeks[^1]}: {Lijst(rit364.Reeks)}. Deze rit is de basis voor de proeven (BUG #364).");
+                    ritten.Clear(); ritten.Add(rit364); eerste = rit364;
+                }
+            }
         }
         // BUG #314 (Marco 25-10 17:58: "de loc ontspoorde bij de 1e verkenning direct en daarna alleen maar heen en weer rijden tussen melder 13 en 14"; autolog 17:48:03): de eerste basisrit
         // met ALLE wissels rechtdoor gaf kortsluiting na 14 (ontsporing). Daarna stopte elke proef op 14 (bekend kortsluitpunt) en kreeg elk adres "geen verschil" (13 proeven, 6 minuten, niets
