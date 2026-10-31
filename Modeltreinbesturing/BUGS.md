@@ -3245,6 +3245,18 @@ Lukt het zonder niet, dan vraagt de verkenner na 10 minuten om hulp.
 Metingen 29-10 (vergeleken met bug363): alle MARCO-varianten, hervatten en hervatten realistisch precies gelijk; alle regressietests (ook module 2) OK.
 Een eerste versie die de motoren altijd oversloeg met de loc erbij (en een tweede die ze na "niet verplaatst" helemaal oversloeg) maakte de oude matrixtests slechter (start 5 en 17 niet voltooid); daarom deze smallere regel.
 
+## BUG #364 – NIET GELEVERD: basisrit opnieuw rijden met de opgeloste kortsluitstand
+(Marco 31-10 09:14: na de oplossing met wissel 9 reed elke proef weer tot 129 en terug.) De poging staat op tak `wip-bug364`; de metingen werden op uitval, realistisch en hervatten slechter
+(valse wissel 4, wissels onder de loc). Open punt.
+
+## BUG #365 – OPGELOST (nog niet getest op de baan): controle reed de binnenring en keerlus niet
+(Marco 31-10 14:02, controle 13:57: 27 verschillen; ook 28-10 09:08.) De controle reed alleen de basisrondes en de trajecten uit de kaart. De overgangen bij 129, 4, 11, 12, 1, 9 en 10 zijn
+met proefritten gevonden en worden geen traject; het enige traject daarheen eindigt met de kortsluiting na 129 en werd overgeslagen, omdat de lijst 'bekende oplossingen' leeg was terwijl
+kortsluitpunt #1 wel opgelost is (wissel 9 afbuigend). Oplossing: een opgelost kortsluitpunt telt als bekende oplossing, en daarna plant de controle ritten uit "alle ritten" van de kaart
+(met hun wisselstand) tot elke overgang uit de kaart gedekt is. Metingen: regressietests OK; de verkenning zelf is niet veranderd.
+Niet meegenomen: wissel 2 kon om 13:55:25 niet om omdat de loc op 13 stond (loc reed naar 12 in plaats van 16). Een oplossing (twee melders terug) maakte de metingen slechter
+(1 keer wissel onder de loc bij hervatten), dus die is niet geleverd. Open punt.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:

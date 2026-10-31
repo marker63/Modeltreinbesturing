@@ -900,7 +900,9 @@ public partial class BaanVerkenner : IBaanVerkenner
         foreach (var t in oud.Trajecten)
         {
             if (t.Reeks.Count < 2 || t.Einde == RitEinde.BekendKortsluitpunt) continue;
-            if (t.Einde == RitEinde.Kortsluiting && !oud.BekendeKortsluitOplossingen.Any(s => s.NaMelder == t.Reeks[^1] && s.Richting == t.Richting)) continue;
+            // BUG #365: een kortsluitpunt dat in de kaart opgelost is (wissel 9 afbuigend na 129) telt ook als bekende oplossing; die lijst was in de kaart van 31-10 leeg.
+            if (t.Einde == RitEinde.Kortsluiting && !oud.BekendeKortsluitOplossingen.Any(s => s.NaMelder == t.Reeks[^1] && s.Richting == t.Richting)
+                && !oud.Kortsluitpunten.Any(k => k.Opgelost && !k.Opgegeven && k.NaMelder == t.Reeks[^1] && k.Richting == t.Richting)) continue;
             var o = new Opdracht { Configuratie = t.Configuratie, Start = t.Start, Richting = t.Richting, Reden = "controle: traject uit de kaart" };
             if (_status.GeplandeOpdrachten.Contains(o.Sleutel)) continue;
             var route = ControleRoute(oud, t, oud.Trajecten, new HashSet<Traject>());
@@ -909,6 +911,47 @@ public partial class BaanVerkenner : IBaanVerkenner
             Plan(o);
             nieuw = true;
         }
+        if (!nieuw && !_controleRittenGepland) { _controleRittenGepland = true; nieuw = PlanControleRitten(); }
+        return nieuw;
+    }
+
+    private bool _controleRittenGepland;
+
+    /// <summary>WAT: plant in de controle ook ritten uit de lijst "alle ritten" van de kaart, voor overgangen die geen enkel traject dekt. Gekozen wordt steeds de rit die de meeste
+    /// nog niet gedekte overgangen rijdt, met de wisselstand waarmee hij toen gereden is.
+    /// WAAROM (BUG #365, Marco 31-10 14:02, controle 13:57; ook al 28-10 09:08): de controle reed alleen de basisrondes en twee trajecten. Alle 17 overgangen van de binnenring en
+    /// de keerlus (melder 129, 4, 11, 12, 1, 9, 10) stonden in de kaart maar werden "niet gereden": die zijn bij de verkenning met proefritten gevonden, en proefritten worden geen
+    /// traject. De wissels daar (1, 2, 5, 9, 10, 13, 14) werden daardoor ook niet opnieuw vastgesteld.</summary>
+    private bool PlanControleRitten()
+    {
+        var oud = _status.Kaart;
+        var volgers = _ins.GekoppeldeParen().Select(p => p.Volger).ToHashSet();
+        string Sl(int van, int naar, Richting r) => $"{van}>{naar}:{r}";
+        var gedekt = oud.Trajecten.SelectMany(t => Overgangen(t.Reeks, t.Richting)).ToHashSet();
+        var open = oud.Overgangen.Select(g => Sl(g.Van, g.Naar, g.Richting)).Where(x => !gedekt.Contains(x)).ToHashSet();
+        if (open.Count == 0) return false;
+        var kandidaten = oud.Ritten.Where(r => !r.Navigatie && !r.Onbetrouwbaar && r.Reeks.Count >= 2 && r.Einde != RitEinde.BekendKortsluitpunt
+                                               && (r.Einde != RitEinde.Kortsluiting || oud.Kortsluitpunten.Any(k => k.Opgelost && !k.Opgegeven && k.NaMelder == r.Reeks[^1] && k.Richting == r.Richting)))
+                                   .ToList();
+        bool nieuw = false;
+        while (open.Count > 0)
+        {
+            var beste = kandidaten.Select(r => (R: r, N: Overgangen(r.Reeks, r.Richting).Count(open.Contains))).Where(x => x.N > 0)
+                                  .OrderByDescending(x => x.N).ThenBy(x => x.R.Reeks.Count).ThenBy(x => x.R.Nr).Select(x => x.R).FirstOrDefault();
+            if (beste is null) break;
+            foreach (var x in Overgangen(beste.Reeks, beste.Richting)) open.Remove(x);
+            kandidaten.Remove(beste);
+            var cfg = new Configuratie(beste.Afbuigend.Where(a => !volgers.Contains(a)).ToArray());
+            var t = new Traject { Configuratie = cfg, Start = beste.Start, Richting = beste.Richting, Reeks = beste.Reeks.ToList(), Einde = beste.Einde };
+            var o = new Opdracht { Configuratie = cfg, Start = beste.Start, Richting = beste.Richting, Reden = $"controle: rit #{beste.Nr} uit de kaart (overgangen die geen traject dekt, BUG #365)" };
+            if (_status.GeplandeOpdrachten.Contains(o.Sleutel)) continue;
+            var route = ControleRoute(oud, t, oud.Trajecten, new HashSet<Traject>());
+            if (route is null) { _status.GeplandeOpdrachten.Add(o.Sleutel); _log.Info($"Controle: rit #{beste.Nr} vanaf melder {beste.Start} {beste.Richting.Tekst()} ({cfg}) kan niet bereikt worden over de bekende wegen; overgeslagen."); continue; }
+            o.Route = route;
+            Plan(o);
+            nieuw = true;
+        }
+        if (open.Count > 0) _log.Info($"Controle: voor {open.Count} overgang(en) is geen bruikbare rit in de kaart: {string.Join(", ", open.OrderBy(x => x))}.");
         return nieuw;
     }
 
