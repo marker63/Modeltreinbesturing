@@ -531,6 +531,9 @@ public class Baankaart
     /// <summary>BUG #181: lijst van overschreven vastgestelde feiten (blok van een melder, kruismelder, rijrichting, wissel omgezet onder de loc).</summary>
     public List<string> Overschrijvingen { get; set; } = new();
     public List<GeredenRit> Ritten { get; set; } = new();
+    /// <summary>BUG #370: per melder de Dinamo-blokken die een kortsluitmelding noemde terwijl de loc alleen op die melder stond (en Dinamo precies één blok meldde).
+    /// Reserve voor de blokfase: lukt de blokproef voor een melder niet (bijv. omdat de kortsluiting zelf de rijstroom wegneemt), dan volgt het blok hieruit.</summary>
+    public Dictionary<int, List<int>> BlokUitKortsluiting { get; set; } = new();
     /// <summary>BUG #104: uitkomsten van 'Voltooide baan nogmaals checken'. De kaart zelf blijft bij een controle ongewijzigd; dit zijn alleen de verslagen.</summary>
     public List<ControleVerslag> ControleVerslagen { get; set; } = new();
 

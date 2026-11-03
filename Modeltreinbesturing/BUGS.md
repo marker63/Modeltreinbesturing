@@ -3263,6 +3263,12 @@ gingen ze toch om: de kaart kent alleen waar wissel 2 ligt, niet waar zijn volge
 Twee pogingen (wachten tot de loc van alle melders van het uitstellen af is; of nog 2-3 melders verder) maakten de simulatie slechter (wissels onder de loc 2-6 keer, eerst 0): in de
 simulatie ligt wissel 1 kennelijk anders dan op de baan, zodat de simulatie dit geval niet laat zien. Niet geleverd.
 
+## BUG #370 – OPGELOST (nog niet getest op de baan): blok van melder 129 (kruiswissel) niet te vinden
+(Marco 03-11 17:17: "melder 129 hoort bij blok 9 maar dat kon je niet ontdekken"; log 17:07:30.) De blokproef voor 129 stopte steeds omdat Dinamo kortsluiting in blok 9 meldde:
+zonder rijstroom kan geen blok de loc laten rijden. Die melding zegt zelf al in welk blok de loc staat. Oplossing: staat de loc op precies één melder en meldt Dinamo kortsluiting in precies
+één blok, dan wordt dat onthouden (kaart: BlokUitKortsluiting). Lukt de blokproef niet en noemden alle meldingen hetzelfde blok, dan krijgt de melder dat blok.
+Metingen 03-11: alle MARCO-varianten, hervatten en regressietests gelijk aan bug365.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:

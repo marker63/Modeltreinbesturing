@@ -93,6 +93,7 @@ public partial class BaanVerkenner
             }
             BewaarNu();
         }
+        BlokkenUitKortsluiting();   // BUG #370
         var nog = _kaart.Melders.Where(m => m.DinamoBlok is null).Select(m => m.Nummer).OrderBy(x => x).ToList();
         _log.Info(nog.Count == 0 ? "Alle melders hebben nu een Dinamo-blok." : $"Geen Dinamo-blok gevonden voor melder {string.Join(", ", nog)}.");
     }

@@ -122,6 +122,28 @@ public partial class BaanVerkenner
 
     private int? BlokVan(int melder) => _kaart.Melders.FirstOrDefault(m => m.Nummer == melder)?.DinamoBlok;
 
+    /// <summary>WAT: onthoudt welk Dinamo-blok een kortsluitmelding noemt als de loc op precies één melder staat en Dinamo precies één blok meldt.
+    /// WAAROM (BUG #370, Marco 03-11 17:17: "melder 129 (het kruiswissel) hoort bij blok 9, maar dat kon je niet ontdekken"): de blokproef voor 129 stopte steeds omdat Dinamo
+    /// kortsluiting in blok 9 meldde (17:07:30, loc alleen op 129). Die melding zegt zelf al in welk blok de loc staat.</summary>
+    private void OnthoudBlokUitKortsluiting(IEnumerable<int> bezet, IReadOnlyCollection<int> alarmBlokken)
+    {
+        var b = bezet.Distinct().ToList();
+        if (b.Count != 1 || alarmBlokken.Count != 1) return;
+        if (!_kaart.BlokUitKortsluiting.TryGetValue(b[0], out var lijst)) _kaart.BlokUitKortsluiting[b[0]] = lijst = new List<int>();
+        lijst.Add(alarmBlokken.First());
+    }
+
+    /// <summary>BUG #370: de blokken van melders zonder blok invullen uit de kortsluitmeldingen, als die allemaal hetzelfde blok noemden.</summary>
+    private void BlokkenUitKortsluiting()
+    {
+        foreach (var m in _kaart.Melders.Where(x => x.DinamoBlok is null))
+        {
+            if (!_kaart.BlokUitKortsluiting.TryGetValue(m.Nummer, out var lijst) || lijst.Count == 0 || lijst.Distinct().Count() != 1) continue;
+            m.DinamoBlok = lijst[0];
+            _log.Vondst($"Melder {m.Nummer} hoort bij Dinamo-blok {lijst[0]}: de blokproef lukte niet, maar Dinamo meldde {lijst.Count} keer kortsluiting in blok {lijst[0]} terwijl de loc alleen op melder {m.Nummer} stond (BUG #370, nog niet getest op de baan).");
+        }
+    }
+
     // BUG #43: Dinamo meldt een kortsluiting ook PER BLOK (Block Alarm, zie IBlokAlarmBron),
     // en bij ons spoor gebeurde dat zonder dat het globale F-bit ooit gezet werd - de
     // Baanverkenner zag daardoor niets en wachtte 30 s (en draaide daarna een 17 minuten
@@ -1113,6 +1135,7 @@ public partial class BaanVerkenner
                     if (HuidigeAlarmBlokken().Count > 0 && _klok.Nu >= _negeerKortsluitingTot)
                     {
                         _log.Waarschuwing($"Dinamo meldt kortsluiting in blok {string.Join(" en ", HuidigeAlarmBlokken())}: zonder rijstroom kan geen enkel blok de loc laten rijden. De blokproef voor melder {melder} stopt; het ligt niet aan de blokkoppeling.");
+                        OnthoudBlokUitKortsluiting(_monitor.Bezet, HuidigeAlarmBlokken());   // BUG #370
                         await StuurNaarBlok(blok, r, 0);
                         await VolledigeStop();
                         return false;
@@ -3490,6 +3513,7 @@ public partial class BaanVerkenner
             : "";
         if (_laatsteKortsluitMelders.Count > 0) alarmTekst += $" Ook bezet op dat moment: melder {string.Join(" en ", _laatsteKortsluitMelders)} (daar zit de loc deels in)." ;
         _log.Waarschuwing($"KORTSLUITING/ONTSPORING vermoed na melder {x} ({res.Richting.Tekst()}): {reden}.{alarmTekst} Noodstop.");
+        OnthoudBlokUitKortsluiting(_monitor.Bezet.Append(x), _laatsteKortsluitBlokken);   // BUG #370
         // Nachtwerk 25/26-10 (simulatie met Marco's aansluiting, 12:44:12): de loc reed 10 -> 129 met wissel 5+6 afbuigend, kwam op melder 129 (daar liggen de tongen van wissel 6) en had
         // 0,5 s later kortsluiting. De kaart onthield toch "10 -> 129 gereden met 5 afbuigend", en de navigatie koos die stand daarna steeds weer (loc klem op 10). Een stand waarmee de loc
         // net een melder in reed en daar meteen kortsluiting kreeg, telt niet als gereden stand voor die overgang.
