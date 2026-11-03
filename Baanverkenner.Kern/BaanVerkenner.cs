@@ -1488,6 +1488,7 @@ public partial class BaanVerkenner : IBaanVerkenner
                 foreach (var (ex, st) in proefExtra) await ZetWissel(ex, st);
                 if (proefExtra.Count > 0)
                     _log.Info($"Adres {a} afbuigend gaf eerder kortsluiting; de proef rijdt met de bekende oplossing: {string.Join(", ", proefExtra.Select(x => $"{x.Adres} {(x.Afbuigend ? "afbuigend" : "rechtdoor")}"))}.");
+                _uitvallenBijProef = _uitvallen;   // BUG #367
                 var proef = await Rit(o.Start, o.Richting, new RitDoel
                 {
                     Configuratie = proefCfg,
@@ -1674,6 +1675,9 @@ public partial class BaanVerkenner : IBaanVerkenner
             // BUG #194: een stand die net het alarm wegnam (wissel 1 bij wissel 2) niet terugzetten zolang de loc nog op die melders staat
             if (!wens && nu && _klemOplossing.TryGetValue(adres, out var ko) && _monitor.Bezet.Any(ko.Melders.Contains) && (_klok.Nu - ko.Tijd).TotalMinutes < 10) { _proefAfwijkend.Add(adres); _klemAfwijkend.Add(adres); continue; }
             if (bijBezet.Contains(adres)) { _proefAfwijkend.Add(adres); continue; }   // ligt bij de melder waar de loc staat: niet onder de loc omzetten (de staartwissels regelt de rit zelf, #107)
+            // BUG #367 (simulatie met uitval 03-11 13:09:34): wissel 9 loste de kortsluiting tussen 4 en 129 op; de kaart kende hem niet als wissel bij 129, en hij ging hier
+            // met de loc op 129 terug naar rechtdoor. Een wissel die een kortsluiting bij deze melders oploste, ligt bij de loc.
+            if (LigtBijLocVolgensKortsluiting(adres, _monitor.Bezet)) { _proefAfwijkend.Add(adres); continue; }
             teDoen.Add((adres, wens));
         }
         foreach (var (adres, afb) in teDoen)
@@ -1917,6 +1921,7 @@ public partial class BaanVerkenner : IBaanVerkenner
         // verschilden: een kwart van alle ritten. Optie 6 vergelijkt toch alleen de melders onderling, een enkele basisrit volstaat.
         int aantal = _ins.BasisritHerhalen && !Stap && !Rondrit ? 2 : 1;
         var ritten = new List<RitResultaat>();
+        Configuratie? laatsteRijstand = null;
         for (int i = 0; i < aantal + 1; i++)
         {
             if (i == aantal && (ritten.Count < 2 || ritten[0].Reeks.SequenceEqual(ritten[1].Reeks))) break;
@@ -1939,8 +1944,39 @@ public partial class BaanVerkenner : IBaanVerkenner
             await TerugNaarMetControle(o, rit, rijstandBasis);
             ritten.Add(rit);
             eerste ??= rit;
+            laatsteRijstand = rijstandBasis;
             // Na een kortsluiting niet nog eens dezelfde kortsluiting opzoeken.
             if (rit.Einde == RitEinde.Kortsluiting) { stops = KortsluitStops(o.Configuratie, o.Richting); }
+        }
+        // WAT: eindigde de basisrit met een kortsluiting die tijdens het herstel opgelost is (een wissel haalde het alarm weg), dan wordt de basisrit nog één keer gereden mét die
+        // oplossing, zonder stop op dat punt. Komt de loc nu verder, dan is die langere rit de basis voor de proeven.
+        // WAAROM (BUG #364, Marco 31-10 09:14: "als je weet dat wissel 9 in een andere stand moet staan, dan juist even terug rijden en met de wissel in de juiste stand doorrijden en zo
+        // het vervolg ontdekken"; log 09:08-09:12): de basisrit 13, 5, 12, 11, 4, 129 kreeg kortsluiting na 129; wissel 9 afbuigend haalde die weg. Daarna reed elke proef (adres 3, 4,
+        // ...) met wissel 9 afbuigend weer tot melder 129 en stopte daar, omdat de basisrit daar ophield: heen en weer tussen 13 en 129 zonder ooit te zien wat er na 129 komt.
+        if (ritten.Count >= 1 && ritten[^1].Einde == RitEinde.Kortsluiting && ritten[^1].Reeks.Count >= 1 && !Stap && !_status.Controle && laatsteRijstand is not null)
+        {
+            var kort = ritten[^1];
+            var opgelost = _kaart.Kortsluitpunten.FirstOrDefault(k => k.Opgelost && !k.Opgegeven && k.Soort == KortsluitpuntSoort.Kortsluiting && k.NaMelder == kort.Reeks[^1]
+                                                                     && k.Richting == o.Richting && k.Configuratie.Equals(o.Configuratie) && k.OpgelostDoorAdres is int);
+            var rijstand364 = RijStand(o);
+            _monitor.Bijwerken();
+            if (opgelost is not null && !rijstand364.Equals(laatsteRijstand) && _monitor.Bezet.Count == 1 && _monitor.Bezet.Contains(o.Start) && HuidigeAlarmBlokken().Count == 0)
+            {
+                _log.Info($"Opdracht #{o.Id}: de basisrit eindigde met een kortsluiting na melder {kort.Reeks[^1]}, en die is opgelost met wissel {opgelost.OpgelostDoorAdres} " +
+                          $"{(opgelost.OpgelostMetAfbuigend == true ? "afbuigend" : "rechtdoor")}. De basisrit wordt nu met die stand opnieuw gereden ({rijstand364}) om te ontdekken wat er na melder {kort.Reeks[^1]} komt (BUG #364, nog niet getest op de baan).");
+                // Maar één melder voorbij het opgeloste punt: dat is genoeg om het vervolg te kennen, en zo rijdt de loc niet onbewaakt een stuk in dat nog niet verkend is
+                // (in de simulatie reed hij anders de keerlus rond en kwam met wissel 2 afbuigend klem op wissel 1). De rest ontdekken de gewone opdrachten.
+                var rit364 = await Rit(o.Start, o.Richting, new RitDoel { Configuratie = rijstand364, StopBijMelders = KortsluitStops(o.Configuratie, o.Richting), StaartWissels = true, MaxStappen = kort.Reeks.Count });
+                _log.Info($"Basisrit (met de oplossing): {Lijst(rit364.Reeks)} - einde: {EindeTekst(rit364.Einde)}.");
+                VerwerkEinde(o, rit364);
+                RegistreerAndereKant(o, rit364);
+                await TerugNaarMetControle(o, rit364, rijstand364);
+                if (rit364.Reeks.Count > kort.Reeks.Count && rit364.Reeks.Take(kort.Reeks.Count).SequenceEqual(kort.Reeks))
+                {
+                    _log.Vondst($"Opdracht #{o.Id}: met wissel {opgelost.OpgelostDoorAdres} {(opgelost.OpgelostMetAfbuigend == true ? "afbuigend" : "rechtdoor")} rijdt de loc verder dan melder {kort.Reeks[^1]}: {Lijst(rit364.Reeks)}. Deze rit is de basis voor de proeven (BUG #364).");
+                    ritten.Clear(); ritten.Add(rit364); eerste = rit364;
+                }
+            }
         }
         // BUG #314 (Marco 25-10 17:58: "de loc ontspoorde bij de 1e verkenning direct en daarna alleen maar heen en weer rijden tussen melder 13 en 14"; autolog 17:48:03): de eerste basisrit
         // met ALLE wissels rechtdoor gaf kortsluiting na 14 (ontsporing). Daarna stopte elke proef op 14 (bekend kortsluitpunt) en kreeg elk adres "geen verschil" (13 proeven, 6 minuten, niets
@@ -2299,8 +2335,20 @@ public partial class BaanVerkenner : IBaanVerkenner
     // Vergelijken: wat deed dit adres?
     // =====================================================================
 
+    /// <summary>BUG #367: aantal Dinamo-uitvallen in deze sessie, en de stand daarvan bij het begin van de lopende proef.</summary>
+    internal int _uitvallen;
+    private int _uitvallenBijProef = -1;
+
     private void Vergelijk(Opdracht o, RitResultaat basis, RitResultaat proef, int a)
     {
+        // WAT: viel Dinamo uit tijdens deze proef, dan zegt de proef niets over het proefadres.
+        // WAAROM (BUG #367, simulatie met Dinamo-uitval 03-11): de proef met adres 4 stopte tijdens de uitval op melder 12; na het herstel werd de kaart wel teruggezet, maar de proef
+        // werd daarna toch vergeleken: "wissel 4: na 12 afbuigend doodlopend", terwijl adres 4 op de baan niet bestaat.
+        if (_uitvallenBijProef >= 0 && _uitvallen != _uitvallenBijProef)
+        {
+            _log.Waarschuwing($"Proef met adres {a}: Dinamo viel tijdens deze proef uit; wat er in deze rit gebeurde wordt niet aan adres {a} toegeschreven (BUG #367).");
+            return;
+        }
         // BUG #208 (Marco 18-10 08:31: "wissel 11 kan ik fysiek niet vinden"; log 17-10 19:06-19:08): wissel 5 stond nog afbuigend (klemoplossing van 19:02) terwijl wissel 11 getest werd; 24 -> 14
         // met wissel 5 afbuigend geeft kortsluiting, en dat werd aan wissel 11 toegeschreven (het alarm ging weg toen wissel 5 rechtdoor ging, niet 11). Staat bij een proef met kortsluiting
         // een andere wissel dan de rijstand (niet terug te zetten), dan zegt de proef niets over het proefadres.
@@ -2774,7 +2822,9 @@ public partial class BaanVerkenner : IBaanVerkenner
     /// kaart een kortsluitoplossing met deze wissel kent direct na een bezette melder.</summary>
     private bool LigtBijLocVolgensKortsluiting(int adres, IReadOnlyCollection<int> bezet)
         => (_klemOplossing.TryGetValue(adres, out var ko) && bezet.Any(ko.Melders.Contains))
-           || _kaart.BekendeKortsluitOplossingen.Concat(_kaart.AlleKortsluitOplossingen()).Any(o => o.Adres == adres && bezet.Contains(o.NaMelder));
+           || _kaart.BekendeKortsluitOplossingen.Concat(_kaart.AlleKortsluitOplossingen()).Any(o => o.Adres == adres && bezet.Contains(o.NaMelder))
+           // BUG #367: ook de melder die bij de kortsluiting nog meer bezet was (de loc stond op de grens; de wissel ligt daartussen)
+           || _kaart.Kortsluitpunten.Any(k => k.Opgelost && !k.Opgegeven && k.OpgelostDoorAdres == adres && (bezet.Contains(k.NaMelder) || k.TweedeMelders.Any(bezet.Contains)));
 
     private async Task ZetWisselNaProef(int adres, bool afbuigend, bool oplossingWissel = false)
     {
