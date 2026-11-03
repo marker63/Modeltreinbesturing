@@ -3269,6 +3269,11 @@ zonder rijstroom kan geen blok de loc laten rijden. Die melding zegt zelf al in 
 één blok, dan wordt dat onthouden (kaart: BlokUitKortsluiting). Lukt de blokproef niet en noemden alle meldingen hetzelfde blok, dan krijgt de melder dat blok.
 Metingen 03-11: alle MARCO-varianten, hervatten en regressietests gelijk aan bug365.
 
+## BUG #371 – OPGELOST (nog niet getest op de baan): wissel 2 vooraf omgezet met de loc op de grens van 16 en 5
+(Log 03-11 17:16:50.) In een verkenningsrit zette de regel "bewezen oplossing gaat om voordat de loc er is" (#267) wissel 2 afbuigend terwijl de loc op melder 16 én 5 stond;
+5,5 s later kortsluiting. De controle "niet bij de loc" (#280) gold alleen voor navigaties. Oplossing: staat de loc op twee melders en ligt de wissel daarbij, dan gaat hij niet vooraf om
+(ook voor #260). Metingen 03-11: alles gelijk aan bug365.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:

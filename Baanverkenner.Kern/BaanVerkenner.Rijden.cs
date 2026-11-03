@@ -3206,6 +3206,10 @@ public partial class BaanVerkenner
         {
             if (doel.ProefAdres == a || Kruis.IsMotor(a) || IsVolger(a) || !_ins.WisselAdressen().Contains(a)) continue;
             if (doel.IsNavigatie && WisselsBijBezet(_kaart, _monitor.Bezet).Contains(a)) continue;   // #280: niet bij de loc
+            // WAT: staat de loc nog op twee melders (op de grens) en ligt de wissel bij die melders, dan niet omzetten: de loc staat dan waarschijnlijk op de wissel.
+            // WAAROM (BUG #371, log 03-11 17:16:50): in een verkenningsrit ging wissel 2 naar afbuigend met de loc op 16 én 5; 5,5 s later kortsluiting/ontsporing.
+            // De regel van #280 gold alleen voor navigaties.
+            if (_monitor.Bezet.Count > 1 && WisselsBijBezet(_kaart, _monitor.Bezet).Contains(a)) continue;
             if (VolgerOnderLoc(a) is not null) continue;   // #264
             _log.Info($"Melder {melder}: wissel {a} gaat naar {(afb ? "afbuigend" : "rechtdoor")} voordat de loc er is: een eerder opgelost kortsluitpunt bewees dat de komende stap die stand vraagt (BUG #267).");
             await ZetWissel(a, afb);
@@ -3216,6 +3220,7 @@ public partial class BaanVerkenner
         {
             if (doel.ProefAdres == a || Kruis.IsMotor(a) || IsVolger(a) || !_ins.WisselAdressen().Contains(a)) continue;
             if (doel.IsNavigatie && WisselsBijBezet(_kaart, _monitor.Bezet).Contains(a)) continue;   // #280: niet bij de loc
+            if (_monitor.Bezet.Count > 1 && WisselsBijBezet(_kaart, _monitor.Bezet).Contains(a)) continue;   // BUG #371
             _log.Info($"Melder {melder}: wissel {a} gaat naar rechtdoor voordat de loc er is: de kaart weet dat de loc daar verderop met wissel {a} afbuigend kortsluiting krijgt (bekende ingang, BUG #260).");
             await ZetWissel(a, false);
             cfg = cfg.MetStand(a, false);
