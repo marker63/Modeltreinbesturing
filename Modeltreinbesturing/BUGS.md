@@ -3257,6 +3257,12 @@ kortsluitpunt #1 wel opgelost is (wissel 9 afbuigend). Oplossing: een opgelost k
 Niet meegenomen: wissel 2 kon om 13:55:25 niet om omdat de loc op 13 stond (loc reed naar 12 in plaats van 16). Een oplossing (twee melders terug) maakte de metingen slechter
 (1 keer wissel onder de loc bij hervatten), dus die is niet geleverd. Open punt.
 
+## BUG #369 – OPEN: uitgestelde wissel 2 (+ volger 1) ging om met de loc nog op melder 11/12
+(Marco 03-11 16:22: "je schakelde wissel 1 onder de loc om"; log 16:21:54-16:22:15, versie bug365.) Wissel 2 en 9 werden uitgesteld met de loc op 11 (#271). Met de loc op 12 én 11
+gingen ze toch om: de kaart kent alleen waar wissel 2 ligt, niet waar zijn volger 1 ligt, en die lag onder de loc. Direct daarna kortsluiting na 12.
+Twee pogingen (wachten tot de loc van alle melders van het uitstellen af is; of nog 2-3 melders verder) maakten de simulatie slechter (wissels onder de loc 2-6 keer, eerst 0): in de
+simulatie ligt wissel 1 kennelijk anders dan op de baan, zodat de simulatie dit geval niet laat zien. Niet geleverd.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:
