@@ -3287,6 +3287,11 @@ Hervatten realistisch: onder-loc 1 en gebruiker 0 (was 0 en 1). De wissel onder 
 (Simulatie, stoppen en hervatten.) Melder 129 heeft aan beide kanten een wissel (6 en 9). Komt de loc er aan en stopt hij aan het verre eind, dan staat hij op wissel 9; de stand
 voor de volgende opdracht wordt daarna gezet zonder eerst van die wissel af te rijden (#181/#183 kijkt alleen naar een wissel ACHTER de loc). Kwam ook voor in bug371.
 
+## BUG #374 – OPGELOST (nog niet getest op de baan): controle kroop 9 minuten naar startmelder 129 en controleerde daarna bijna niets
+(Marco 04-11 08:46: controle met 62 verschillen; log 08:33-08:43.) Na de uitbreiding vanaf 129 was 129 de startmelder; de loc stond op 13 (de eerste startmelder). De controlekaart
+kent nog geen overgangen, dus de verkenner kroop melder voor melder de hele ring rond naar 129. De eerste rit daar liep op een kortsluiting en de controle stopte.
+Oplossing: een controle die nog niets gereden heeft, begint op een eerdere startmelder als de loc daar al staat. Regressietests OK (de verkenning zelf is niet veranderd).
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:

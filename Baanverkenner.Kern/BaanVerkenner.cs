@@ -584,6 +584,20 @@ public partial class BaanVerkenner : IBaanVerkenner
         {
             int s = _kaart.StartMelder;
             var bezetNu = _monitor.Bezet;
+            // WAT: een controle die nog niets gereden heeft, begint op de startmelder (of een eerdere startmelder) waar de loc al staat.
+            // WAAROM (BUG #374, Marco 04-11 08:46, controle met 62 verschillen; log 08:33-08:43): na de uitbreiding vanaf 129 was 129 de startmelder. De loc stond op 13 (de eerste
+            // startmelder). De controlekaart kent nog geen overgangen, dus de verkenner kroop 9 minuten melder voor melder de hele ring rond naar 129. Daarna liep de eerste rit
+            // vast op een kortsluiting en stopte de controle (#162): bijna niets gecontroleerd.
+            if (_status.Controle && _status.AfgerondeOpdrachten == 0 && _status.Wachtrij.Count == 0 && bezetNu.Count == 1 && bezetNu.First() != s
+                && _status.Kaart.EerdereStartMelders.Contains(bezetNu.First()))
+            {
+                int nieuw = bezetNu.First();
+                _log.Info($"Controle: de loc staat op melder {nieuw}, een eerdere startmelder van deze kaart; de controle begint daar in plaats van op melder {s} (BUG #374).");
+                _kaart.EerdereStartMelders.Remove(nieuw);
+                if (!_kaart.EerdereStartMelders.Contains(s)) _kaart.EerdereStartMelders.Add(s);
+                _kaart.StartMelder = nieuw;
+                return;
+            }
             if (!(bezetNu.Count == 1 && bezetNu.Contains(s)))
             {
                 // Nachtwerk 25/26-10 (Marco 25-10 10:05: "geen vragen meer om de loc steeds terug te zetten op de startmelder"): bij hervatten met de loc ergens anders op de baan rijdt de
