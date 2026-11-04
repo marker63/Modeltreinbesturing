@@ -1,4 +1,4 @@
-using Modeltreinbesturing.Hardware;
+﻿using Modeltreinbesturing.Hardware;
 
 namespace Baanverkenner.Kern;
 
@@ -409,7 +409,12 @@ public partial class BaanVerkenner2
             var t0 = _klok.Nu;
             StuurSnelheid(kruip, terug, new[] { b });
             bool bewogen = false;
-            var eind = _klok.Nu + TimeSpan.FromSeconds(Doorrij(m) + 3 + DinamoCyclus.TotalSeconds);
+            // BUG #377 (Marco 04-11 10:04, eerste rit met module 2 op de baan: "geen enkel blok liet de loc op melder 24/14/21 bewegen"): het wachten was de halve
+            // doorrijtijd bij verkensnelheid, maar de proef kruipt. Bij kruipsnelheid duurt dezelfde afstand veel langer, en na het parkeren staat de loc soms
+            // een hele melder van de vorige af. Nu: de hele melder bij kruipsnelheid, plus 3 s, hoogstens de ingestelde blokproeftijd.
+            double factor = Math.Max(1, _ins.Verkensnelheid) / (double)kruip;
+            double soloKruip = (_k.SoloTijd.TryGetValue(m, out var st377) && st377 > 0 ? st377 : 2 * Doorrij(m)) * factor;
+            var eind = _klok.Nu + TimeSpan.FromSeconds(Math.Min(Math.Max(10, _ins.BlokproefLangSeconden), soloKruip + 3) + DinamoCyclus.TotalSeconds);
             while (_klok.Nu < eind)
             {
                 await _klok.Wacht(Poll);

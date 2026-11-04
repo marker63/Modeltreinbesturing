@@ -3292,6 +3292,12 @@ voor de volgende opdracht wordt daarna gezet zonder eerst van die wissel af te r
 kent nog geen overgangen, dus de verkenner kroop melder voor melder de hele ring rond naar 129. De eerste rit daar liep op een kortsluiting en de controle stopte.
 Oplossing: een controle die nog niets gereden heeft, begint op een eerdere startmelder als de loc daar al staat. Regressietests OK (de verkenning zelf is niet veranderd).
 
+## BUG #377 – OPGELOST (nog niet getest op de baan): module 2 vond op de baan geen enkel Dinamo-blok
+(Marco 04-11 10:04, eerste rit met module 2; log 09:57-10:03, hardwarelog 09:57:03-09:58:25.) Elk blok kreeg 6,6 s "snelheid 5 achteruit"; de loc kwam in die tijd niet bij de vorige
+melder, dus bij 24, 14 en 21 "geen enkel blok liet de loc bewegen" (elke proef 1,5-2 minuten, blok onbekend). Het wachten was de halve doorrijtijd bij VERKENsnelheid, terwijl
+de proef KRUIPT (5 i.p.v. 12), en de decoder optrekt. Oplossing: wachten = de hele melder bij kruipsnelheid + 3 s (hoogstens de ingestelde blokproeftijd).
+Metingen module 2 (MARCO2 alle varianten, hervatten, hervatten realistisch): voltooid, 23/23, valse 0, onder-loc 0, gebruiker 0, zonder-effect [3,4,7,8,11,12]; 75-86 min (was 70-78).
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:
