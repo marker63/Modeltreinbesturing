@@ -3298,6 +3298,17 @@ melder, dus bij 24, 14 en 21 "geen enkel blok liet de loc bewegen" (elke proef 1
 de proef KRUIPT (5 i.p.v. 12), en de decoder optrekt. Oplossing: wachten = de hele melder bij kruipsnelheid + 3 s (hoogstens de ingestelde blokproeftijd).
 Metingen module 2 (MARCO2 alle varianten, hervatten, hervatten realistisch): voltooid, 23/23, valse 0, onder-loc 0, gebruiker 0, zonder-effect [3,4,7,8,11,12]; 75-86 min (was 70-78).
 
+## BUG #378 – OPGELOST (nog niet getest op de baan): module 2 stopte vanzelf toen de loc op de grens van 4 en 129 stond
+(Marco 04-11 10:24: "is nu vanzelf gestopt"; log 10:21:44-10:22:13.) Na het zelf oplossen (wissel 9) parkeerde de loc op de grens van 4 en 129. Elke taak faalde daarna meteen
+("de loc staat niet netjes op één melder"), werd twee keer geprobeerd en overgeslagen; binnen 0,1 s was de verkenning klaar met 11 melders zonder blok.
+Oplossing: staat de loc vóór een taak niet netjes op één melder, dan eerst netjes parkeren (eerst terug, dan vooruit).
+
+## BUG #379 – OPGELOST (nog niet getest op de baan): module 2 draaide de rijrichting steeds om bij 12 en 11 (keerlus)
+(Log 04-11 10:17-10:20.) De route 4 -> 11 -> 12 werd achteruit gereden; de proef reed daarna vooruit van 12 naar 11, precies zoals gepland (die stap kende de kaart uit een terugrit).
+Terugritten telden niet mee bij de controle "rijdt de loc andersom dan gedacht", dus de verkenner draaide alle richtingen om: drie keer heen en weer tot de taak werd overgeslagen.
+Oplossing: een stap die al eens zo gereden is (ook als terugrit) bevestigt de richting.
+Metingen module 2 voor #377-#379: alle varianten en hervatten gelijk (voltooid, 23/23, valse 0, onder-loc 0, gebruiker 0).
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:

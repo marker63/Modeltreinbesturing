@@ -201,7 +201,10 @@ public partial class BaanVerkenner2
             int vorigeM = res.Reeks[^1];
             bool tegen = _k.Stappen.Any(x => !x.Terug && x.Melder == n && x.Richting == h && x.Uitkomst == vorigeM)
                          || _k.Stappen.Any(x => !x.Terug && x.Melder == vorigeM && x.Richting == h.Om() && x.Uitkomst == n);
-            bool mee = _k.Stappen.Any(x => !x.Terug && x.Melder == vorigeM && x.Richting == h && x.Uitkomst == n);
+            // BUG #379 (Marco 04-11 10:17-10:20): de route 4 -> 11 -> 12 werd achteruit gereden; daarna reed de proef vooruit van 12 naar 11, precies zoals de planning dacht
+            // (die stap was bekend uit een terugrit). Omdat terugritten hier niet meetelden, zag de verkenner een "omgedraaide loc" en draaide alle richtingen om; drie keer heen en
+            // weer, tot de taak werd overgeslagen. Een stap die al eens zo gereden is (ook als terugrit), bevestigt de richting.
+            bool mee = _k.Stappen.Any(x => x.Melder == vorigeM && x.Richting == h && x.Uitkomst == n);
             if (tegen && !mee)
             {
                 _k.Omgedraaid = !_k.Omgedraaid;

@@ -1,4 +1,4 @@
-using Modeltreinbesturing.Hardware;
+﻿using Modeltreinbesturing.Hardware;
 
 namespace Baanverkenner.Kern;
 
@@ -122,6 +122,19 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                 _token.ThrowIfCancellationRequested();
                 await PauzeMoment();
                 _onbereikbaar = 0;
+                // WAT: staat de loc niet netjes op één melder (op de grens van twee, of op geen enkele), dan eerst netjes parkeren.
+                // WAAROM (BUG #378, Marco 04-11 10:22, eerste rit met module 2): na het zelf oplossen bij 4/129 bleef de loc op de grens staan. Elke taak faalde
+                // daarna meteen ("de loc staat niet netjes op één melder"), werd twee keer geprobeerd en overgeslagen: binnen 0,1 s stopte de hele verkenning.
+                _monitor.Bijwerken();
+                if (_monitor.Bezet.Count != 1 && !Kortsluiting())
+                {
+                    _log.Info($"De loc staat niet netjes op één melder ({(_monitor.Bezet.Count == 0 ? "geen melder bezet" : string.Join(" en ", _monitor.Bezet.OrderBy(x => x)))}): eerst netjes parkeren (BUG #378, nog niet getest op de baan).");
+                    try { await Herparkeer(_k.LocRichting.Om(), alleBlokken: true); } catch (PlanFout) { }
+                    _monitor.Bijwerken();
+                    if (_monitor.Bezet.Count != 1) { try { await Herparkeer(_k.LocRichting, alleBlokken: true); } catch (PlanFout) { } }
+                    _monitor.Bijwerken();
+                    if (_monitor.Bezet.Count == 1) _k.LocMelder = _monitor.Bezet.First();
+                }
                 var taak = KiesTaak();
                 if (taak is null)
                 {
