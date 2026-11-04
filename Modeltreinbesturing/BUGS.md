@@ -3257,7 +3257,7 @@ kortsluitpunt #1 wel opgelost is (wissel 9 afbuigend). Oplossing: een opgelost k
 Niet meegenomen: wissel 2 kon om 13:55:25 niet om omdat de loc op 13 stond (loc reed naar 12 in plaats van 16). Een oplossing (twee melders terug) maakte de metingen slechter
 (1 keer wissel onder de loc bij hervatten), dus die is niet geleverd. Open punt.
 
-## BUG #369 – OPEN: uitgestelde wissel 2 (+ volger 1) ging om met de loc nog op melder 11/12
+## BUG #369 – OPGELOST DOOR #372: uitgestelde wissel 2 (+ volger 1) ging om met de loc nog op melder 11/12
 (Marco 03-11 16:22: "je schakelde wissel 1 onder de loc om"; log 16:21:54-16:22:15, versie bug365.) Wissel 2 en 9 werden uitgesteld met de loc op 11 (#271). Met de loc op 12 én 11
 gingen ze toch om: de kaart kent alleen waar wissel 2 ligt, niet waar zijn volger 1 ligt, en die lag onder de loc. Direct daarna kortsluiting na 12.
 Twee pogingen (wachten tot de loc van alle melders van het uitstellen af is; of nog 2-3 melders verder) maakten de simulatie slechter (wissels onder de loc 2-6 keer, eerst 0): in de
@@ -3273,6 +3273,19 @@ Metingen 03-11: alle MARCO-varianten, hervatten en regressietests gelijk aan bug
 (Log 03-11 17:16:50.) In een verkenningsrit zette de regel "bewezen oplossing gaat om voordat de loc er is" (#267) wissel 2 afbuigend terwijl de loc op melder 16 én 5 stond;
 5,5 s later kortsluiting. De controle "niet bij de loc" (#280) gold alleen voor navigaties. Oplossing: staat de loc op twee melders en ligt de wissel daarbij, dan gaat hij niet vooraf om
 (ook voor #260). Metingen 03-11: alles gelijk aan bug365.
+
+## BUG #372 – OPGELOST (nog niet getest op de baan): wissel 2+1 te laat omgezet, met de loc al op wissel 1 (vervangt open punt #369)
+(Marco 03-11 16:22: "je schakelde wissel 1 onder de loc om"; log 16:21:28-16:22:15.) De rit 129 -> 4 -> 11 reed toevallig met wissel 2 afbuigend; die stap komt niet langs wissel 2 of 1.
+Regel #358 (wissels van de vorige rit blijven staan zolang de loc op de eindmelder staat) hield wissel 2 daarom vast op 11. Voor de rit 11 -> 12 -> 1 moest hij rechtdoor; dat werd
+uitgesteld (#271) en gebeurde pas toen 11 vrij was, terwijl de loc al bijna aan het eind van 12 was: op wissel 1. Op 11 had hij veilig om gekund (melder 12 ligt ertussen).
+Oplossing: #358 houdt de meester van een overloopset alleen vast als de laatste stap van de vorige rit die stand echt vroeg (de kaart kent die stap niet met de andere stand).
+Metingen 04-11 (vergeleken met bug371): gewoon/streng/uitval/vertraagd 8 kortsluitingen (was 11), realistisch 10 (was 15), verder 0 fouten; vertraagd6 gelijk (onder-loc 1).
+Stoppen en hervatten elke 40 min: onder-loc 1 (was 0); elke 30 min: voltooid en onder-loc 1 (was NIET voltooid, onder-loc 2); 50 en 60 min: 0 (gelijk), minder kortsluitingen.
+Hervatten realistisch: onder-loc 1 en gebruiker 0 (was 0 en 1). De wissel onder de loc bij hervatten is #373 (bestond al, zie de 30 min-meting van bug371).
+
+## BUG #373 – OPEN: wissel 9 omgezet met de loc aan het verre eind van melder 129
+(Simulatie, stoppen en hervatten.) Melder 129 heeft aan beide kanten een wissel (6 en 9). Komt de loc er aan en stopt hij aan het verre eind, dan staat hij op wissel 9; de stand
+voor de volgende opdracht wordt daarna gezet zonder eerst van die wissel af te rijden (#181/#183 kijkt alleen naar een wissel ACHTER de loc). Kwam ook voor in bug371.
 
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)

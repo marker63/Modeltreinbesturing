@@ -88,6 +88,20 @@ public partial class BaanVerkenner
     /// <summary>BUG #358: de wisselstand waarmee de laatste rit reed en de melders waar die rit eindigde.</summary>
     private Dictionary<int, bool>? _ritStand358;
     private HashSet<int> _ritEind358 = new();
+    /// <summary>BUG #372: de laatste stap (van, naar, richting) van de vorige rit.</summary>
+    private (int Van, int Naar, Richting R)? _ritLaatsteStap372;
+
+    /// <summary>WAT: was de stand <paramref name="st"/> van wissel <paramref name="meester"/> nodig voor de laatste stap van de vorige rit? Nee als de kaart die stap ook met de andere stand kent.
+    /// WAAROM (BUG #372, Marco 03-11 16:22: "je schakelde wissel 1 onder de loc om"; log 16:21:28-16:22:15): de rit 129 -> 4 -> 11 reed toevallig met wissel 2 afbuigend (die stap komt
+    /// nergens langs wissel 2 of 1). Regel #358 hield wissel 2 daarom vast zolang de loc op 11 stond. Zo ging hij pas om toen de loc al bijna bij wissel 1 was (rit 11 -> 12 -> 1), met
+    /// de loc op wissel 1. Op 11 had hij veilig om gekund. #358 geldt nu alleen als de laatste stap die stand echt vroeg.</summary>
+    private bool StandNodigVoorLaatsteStap(int meester, bool st)
+    {
+        if (_ritLaatsteStap372 is not { } ls) return true;
+        var og = _kaart.Overgangen.FirstOrDefault(o => o.Van == ls.Van && o.Naar == ls.Naar && o.Richting == ls.R);
+        if (og is null || og.GezienBijConfiguraties.Count == 0) return true;
+        return !og.GezienBijConfiguraties.Any(k => Configuratie.VanSleutel(k).Bevat(meester) != st);
+    }
     private List<int> _laatsteKortsluitMelders = new();
 
     /// <summary>BUG #74: de ingangskant van de melder waar de loc nu staat: hij kwam vanaf <c>Via</c> op <c>Melder</c> aan, rijdend in
@@ -978,6 +992,7 @@ public partial class BaanVerkenner
             {
                 if (!(_wisselStand.TryGetValue(a, out var nu358) && nu358 == st && st != c.Bevat(a))) continue;
                 int meester = _ins.GekoppeldeParen().FirstOrDefault(p => p.Volger == a).Meester;
+                if (meester > 0 && rs.TryGetValue(meester, out var stM) && !StandNodigVoorLaatsteStap(meester, stM)) continue;   // BUG #372
                 if (meester > 0) onder.TryAdd(meester, _monitor.Bezet.Where(_ritEind358.Contains).First());
             }
         foreach (var pa in _kaart.OverloopPartnersVan(onder.Keys).ToList())
@@ -2142,6 +2157,7 @@ public partial class BaanVerkenner
         var uitkomst = await RitUitvoeren(start, r, doel);
         _monitor.Bijwerken();
         _ritEind358 = _monitor.Bezet.ToHashSet();
+        _ritLaatsteStap372 = uitkomst.Reeks.Count >= 2 ? (uitkomst.Reeks[^2], uitkomst.Reeks[^1], r) : null;   // BUG #372
         // BUG #164: een blokalarm dat binnenkwam terwijl de verkenner aan het stoppen was (en daarom genegeerd werd) is een echte kortsluiting als de rit eindigt
         // op een nieuwe plek of een onverwachte afwijking. Zo ontstaat hetzelfde kortsluitpunt als wanneer de melding een fractie eerder was gekomen.
         if (!doel.IsNavigatie && uitkomst.Einde is RitEinde.AfwijkingGevonden or RitEinde.Doodlopend)
