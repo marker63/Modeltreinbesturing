@@ -59,6 +59,19 @@ public partial class BaanVerkenner
             MeldVoortgang();
             _proefPogingen[doel] = _proefPogingen.GetValueOrDefault(doel) + 1;
             _monitor.Bijwerken();
+            // WAT: staat de loc op de grens van twee melders, dan eerst naar één van die twee kruipen (de melder die het dichtst bij het doel ligt).
+            // WAAROM (BUG #375, simulatie met stoppen en hervatten 04-11, blokfase 15:34-15:40): de loc stond op de grens van 24 en 129. Elke navigatie zag de andere van die twee meteen
+            // als "onverwacht" en na drie herkansingen per melder (#282) bleven 4, 11, 17 en 25 zonder blok: verkenning niet voltooid.
+            if (_monitor.Bezet.Count == 2 && HuidigeAlarmBlokken().Count == 0)
+            {
+                var twee = _monitor.Bezet.ToList();
+                int Afst(int m) => Afstanden(_kaart, m).TryGetValue(doel, out var d) ? d : 999;
+                int naar = twee.OrderBy(Afst).ThenBy(m => m).First(), ander = twee.First(m => m != naar);
+                var r375 = _kaart.Ritten.LastOrDefault()?.Richting ?? Richting.Vooruit;
+                _log.Info($"Blok zoeken: de loc staat op de grens van melder {ander} en {naar}; eerst naar melder {naar} (BUG #375, nog niet getest op de baan).");
+                try { await Nastellen(naar, r375, achter: ander); } catch (NavigatieFout) { }
+                _monitor.Bijwerken();
+            }
             var bezetVoor = _monitor.Bezet.ToHashSet();
             try
             {

@@ -613,6 +613,7 @@ public partial class BaanVerkenner
     /// kortsluiting-oplossing en een valse 'onverwachte terugweg'. Bevindingen sinds de eerste ontbrekende terugmelding worden uit de kaart gehaald.</summary>
     private void TerugNaarVoorUitval(string reden)
     {
+        _uitvallen++;   // BUG #367
         _onbetrouwbaar = false;
         if (_kaartVoorUitval is null) return;
         try
