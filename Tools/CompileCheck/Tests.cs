@@ -3733,6 +3733,27 @@ public static class Tests
         Eis(BaanVerkenner.OvergangBlijftBijOnverwachteTerugweg(k2, 14, 129, Richting.Vooruit, "5"), "#339: een overgang die al vaker gereden is, blijft");
     }
 
+    /// <summary>BUG #382: spookmelder 268 tussen 25 en 17 (Marco 05-11) wordt herkend en verwijderd; echte melders niet.</summary>
+    static void SpookmelderTest()
+    {
+        var k = new Baanverkenner.Kern.Kennis2();
+        var t = new DateTime(2026, 11, 5);
+        k.Leg(26, 25, Richting.Vooruit, new[] { 6 }, 268, t);
+        k.Leg(25, 268, Richting.Vooruit, new[] { 6 }, 17, t);
+        k.Leg(26, 25, Richting.Vooruit, new[] { 6 }, 17, t);
+        k.Leg(25, 17, Richting.Vooruit, new[] { 6 }, 8, t);
+        k.Leg(17, 8, Richting.Vooruit, new[] { 6 }, 15, t);
+        Eis(k.ZoekSpook() == 268, "spookmelder 268 herkend (#382)");
+        k.VerwijderSpook(268);
+        Eis(!k.Melders.Contains(268) && k.Stappen.Any(s => s.Melder == 25 && s.Uitkomst == 17), "spookmelder 268 uit de kennis, 25 -> 17 blijft (#382)");
+        Eis(k.ZoekSpook() is null, "geen echte melder als spook (#382)");
+        var k2 = new Baanverkenner.Kern.Kennis2();
+        k2.Leg(26, 25, Richting.Vooruit, new[] { 6 }, 268, t);
+        k2.Leg(26, 25, Richting.Vooruit, new[] { 5, 6 }, 17, t);   // andere stand: dat is een wissel, geen spook
+        k2.Leg(25, 268, Richting.Vooruit, new[] { 6 }, 17, t);
+        Eis(k2.ZoekSpook() is null, "andere wisselstand: geen spook (#382)");
+    }
+
     static void Eis(bool ok, string tekst) { Console.WriteLine((ok ? "OK    " : "FOUT  ") + tekst); if (!ok) _fouten++; }
     // BUG #196-#199 (log 17-10 20:05): wissel 5 na melder 14, melderschema, onverwachte-terugwegregel
     static void Log2005Test()
@@ -3783,6 +3804,7 @@ public static class Tests
         if (Environment.GetEnvironmentVariable("MARCO2") == "1") { Marco2Bench(); return 0; }
         if (Environment.GetEnvironmentVariable("MARCO2_HERVAT") == "1") { Marco2HervatBench(double.Parse(Environment.GetEnvironmentVariable("MARCO_MIN") ?? "40"), realistisch: Environment.GetEnvironmentVariable("MARCO2_HERVAT_REALISTISCH") == "1"); return 0; }
         if (Environment.GetEnvironmentVariable("MARCO_HERVAT") == "1") { foreach (var mn in (Environment.GetEnvironmentVariable("MARCO_MIN") ?? "40").Split(',')) MarcoHervatBench(double.Parse(mn)); return 0; }
+        if (Environment.GetEnvironmentVariable("ALLEEN_382") == "1") { SpookmelderTest(); Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)"); return _fouten == 0 ? 0 : 1; }
         if (Environment.GetEnvironmentVariable("ALLEEN_MATRIX") == "1") { StapMatrixTest(); Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)"); return _fouten == 0 ? 0 : 1; }
         if (Environment.GetEnvironmentVariable("ALLEEN_RONDRIT") == "1") { RondritTest(); Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)"); return _fouten == 0 ? 0 : 1; }
         if (Environment.GetEnvironmentVariable("RONDRIT") == "1") { RondritBench(); return 0; }

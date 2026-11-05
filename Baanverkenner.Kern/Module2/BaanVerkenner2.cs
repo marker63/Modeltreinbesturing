@@ -79,6 +79,20 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         _adressen = ins.WisselAdressen().Where(a => !_paren.Any(p => p.Volger == a)).ToList();
         // Zelfde melderbewaking als module 1: ontdenderen, flikkerende en vastzittende melders herkennen (BUG #262/#306).
         _monitor = new MelderMonitor(klok, () => _ins.OntdenderMs, m => _k.Melders.Contains(m));
+        foreach (var sp in _k.Spookmelders) _monitor.MarkeerSpook(sp);   // BUG #382
+    }
+
+    /// <summary>BUG #382: spookmelders opsporen en uit de kennis en de kaart halen.</summary>
+    private void RuimSpookmeldersOp()
+    {
+        while (_k.ZoekSpook() is int sp)
+        {
+            _log.Vondst($"Melder {sp} is geen echte melder: de loc reed met dezelfde wisselstand ook zonder melder {sp} van de melder ervoor naar de melder erna. Melder {sp} wordt voortaan genegeerd (BUG #382, nog niet getest op de baan).");
+            _k.VerwijderSpook(sp);
+            _monitor.MarkeerSpook(sp);
+            _status.Kaart.Melders.RemoveAll(x => x.Nummer == sp);
+            if (_k.LocMelder == sp) _k.LocMelder = 0;
+        }
     }
 
     // ================================================================ bediening vanuit het venster
@@ -122,6 +136,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                 _token.ThrowIfCancellationRequested();
                 await PauzeMoment();
                 _onbereikbaar = 0;
+                RuimSpookmeldersOp();   // BUG #382
                 // WAT: staat de loc niet netjes op één melder (op de grens van twee, of op geen enkele), dan eerst netjes parkeren.
                 // WAAROM (BUG #378, Marco 04-11 10:22, eerste rit met module 2): na het zelf oplossen bij 4/129 bleef de loc op de grens staan. Elke taak faalde
                 // daarna meteen ("de loc staat niet netjes op één melder"), werd twee keer geprobeerd en overgeslagen: binnen 0,1 s stopte de hele verkenning.
@@ -275,6 +290,9 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             bezet = _monitor.Bezet.ToList();
             if (bezet.Count == 0) { await Herparkeer(Richting.Achteruit, alleBlokken: true); bezet = _monitor.Bezet.ToList(); }
             if (bezet.Count == 0) throw new InvalidOperationException("De loc is op geen enkele melder te vinden. Zet de loc op een melder en start opnieuw.");
+            // BUG #383 (log 05-11 10:51): de kruiprit begon "vanaf" de bewaarde melder (30), maar de loc stond daar niet meer; daardoor gold 30 als 'kwam van' en plande hij
+            // 14 -> 30 (omkeren), wat meteen misging. Waar de loc vandaan kwam is na zo'n kruiprit onbekend.
+            if (bezet.Count == 1) { _k.LocMelder = bezet[0]; _k.LocVia = 0; }
         }
         if (_hervat && bezet.Count == 1 && bezet[0] == _k.LocMelder)
         {

@@ -3320,6 +3320,17 @@ Metingen module 2: alle varianten gelijk (voltooid, 23/23, valse 0, onder-loc 0,
 ## BUG #381 – OPEN: module 2 test na hervatten soms de overgang 24 -> 129 niet voor de adressen zonder effect
 (Simulatie.) Daardoor blijft "adressen zonder effect" leeg; de wissels en melders zijn wel compleet.
 
+## BUG #382 – OPGELOST (nog niet getest op de baan): module 2 stopte steeds met "nog NIET af" door spookmelder 268
+(Marco 05-11 10:12: "melder 268 bestaat echt niet"; 10:52: "al tig keer gestopt met de mededeling dat ik de loc weer op melder 13 moet zetten".) Dinamo meldt ingang 268 bezet tussen
+25 en 17 (en flikkert ook zonder loc). Module 2 legde 268 vast als melder; de taak "Dinamo-blok van 268 bepalen" kon nooit lukken, dus na wat heen en weer rijden stopte de verkenning
+als niet af (log 10:28-10:30 en 10:51-10:52). Oplossing: reed de loc met precies dezelfde wisselstand ook zonder melder X van de melder ervoor naar de melder erna (a -> X -> b én a -> b),
+dan is X geen echte melder: hij gaat uit de kennis en de kaart en wordt voortaan genegeerd (ook na hervatten). Niets hard gecodeerd voor 268. Test: spookmelder (#382).
+
+## BUG #383 – OPGELOST (nog niet getest op de baan): na hervatten met de loc op een andere plek dacht module 2 dat hij van de bewaarde melder kwam
+(Log 05-11 10:51.) De bewaarde plek was 30; de loc stond ergens anders. De kruiprit "vanaf 30" vond 14, en 30 gold als 'kwam van': de route 14 -> 30 (omkeren) ging meteen mis
+en de verkenning stopte. Na zo'n kruiprit is nu onbekend waar de loc vandaan kwam.
+Metingen module 2: gelijk aan bug380.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:

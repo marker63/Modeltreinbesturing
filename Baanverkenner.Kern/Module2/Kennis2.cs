@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace Baanverkenner.Kern;
 
@@ -321,6 +321,42 @@ public class Kennis2
     }
 
     /// <summary>Alle melders die ooit gezien zijn.</summary>
+    /// <summary>BUG #382: melders die als spook herkend zijn (geen echte sectie); bewaard zodat een hervatting ze ook negeert.</summary>
+    public List<int> Spookmelders { get; set; } = new();
+
+    /// <summary>WAT: zoekt een melder X die tussen a en b ligt (a -> X -> b), terwijl de loc met precies dezelfde wisselstand ook rechtstreeks van a naar b reed.
+    /// Een echte melder kan de loc niet overslaan; dan is X een spook (Dinamo-ingang die zonder sectie bezet raakt).
+    /// WAAROM (BUG #382, Marco 05-11 10:12/10:52): melder 268 bestaat niet, maar Dinamo meldde hem tussen 25 en 17. Module 2 legde hem als melder vast; de taak "blok van 268
+    /// bepalen" kon nooit lukken, en de verkenning stopte steeds met "nog NIET af".</summary>
+    public int? ZoekSpook()
+    {
+        foreach (var x in Stappen.Where(s => !s.Afgeleid && s.Uitkomst > 0 && s.Via > 0))
+        {
+            int a = x.Via, m = x.Melder, b = x.Uitkomst;
+            if (Spookmelders.Contains(m)) continue;
+            var naarM = Stappen.Where(s => !s.Afgeleid && s.Melder == a && s.Richting == x.Richting && s.Uitkomst == m).ToList();
+            var naarB = Stappen.Where(s => !s.Afgeleid && s.Melder == a && s.Richting == x.Richting && s.Uitkomst == b).ToList();
+            if (naarM.Any(s1 => naarB.Any(s2 => s1.Stand.SequenceEqual(s2.Stand)))) return m;
+        }
+        return null;
+    }
+
+    /// <summary>BUG #382: haalt een spookmelder uit alle waarnemingen; a -> X -> b wordt a -> b.</summary>
+    public void VerwijderSpook(int m)
+    {
+        if (!Spookmelders.Contains(m)) Spookmelders.Add(m);
+        foreach (var s in Stappen.Where(s => s.Uitkomst == m).ToList())
+        {
+            var verder = Stappen.FirstOrDefault(t => t.Melder == m && t.Via == s.Melder && t.Richting == s.Richting && t.Uitkomst > 0 && t.Uitkomst != m);
+            if (verder is not null && !Stappen.Any(t => t != s && t.Melder == s.Melder && t.Via == s.Via && t.Richting == s.Richting && t.Uitkomst == verder.Uitkomst && t.Stand.SequenceEqual(s.Stand)))
+                s.Uitkomst = verder.Uitkomst;
+            else Stappen.Remove(s);
+        }
+        Stappen.RemoveAll(s => s.Melder == m);
+        foreach (var s in Stappen.Where(s => s.Via == m)) s.Via = 0;
+        SoloTijd.Remove(m);
+    }
+
     [JsonIgnore] public IEnumerable<int> Melders => Stappen.Select(s => s.Melder).Concat(Stappen.Where(s => s.Uitkomst > 0).Select(s => s.Uitkomst)).Concat(Stappen.Where(s => s.Via > 0).Select(s => s.Via)).Distinct();
 
     /// <summary>Alle overgangen (melderparen) die ooit gereden zijn.</summary>

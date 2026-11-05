@@ -130,6 +130,12 @@ public class MelderMonitor
         get { lock (_slot) return _stabiel.Where(kv => kv.Value).Select(kv => kv.Key).ToHashSet(); }
     }
 
+    /// <summary>BUG #382: een melder die de verkenner als 'spook' herkent (geen echte sectie), voortaan negeren zoals een flikkeraar.</summary>
+    public void MarkeerSpook(int melder)
+    {
+        lock (_slot) { _flikkeraars.Add(melder); _stabiel.Remove(melder); }
+    }
+
     public bool IsBezet(int melder)
     {
         lock (_slot) return _stabiel.TryGetValue(melder, out var s) && s;
