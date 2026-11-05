@@ -484,6 +484,21 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         var kandidaten = verschil.ToList();
         int? uitkomstLos = null;   // uitkomst met alleen de gevonden kandidaat omgezet (als die proef gedaan is)
         int proeven = 0;
+        bool aGezien = false;   // BUG #380: kwam de eerste uitkomst in deze ronde nog terug?
+
+        // WAT: rijdt de stap met precies stand A nog steeds naar de eerste uitkomst? Zo niet, dan was die oude waarneming niet (meer) betrouwbaar: vergeten, geen wissel.
+        // WAAROM (BUG #380, Marco 05-11, module 2 op de baan, log 08:34-08:36): de stap 29 -> 21 achteruit was eens naar 129 gegaan en later naar 24. Bij het halveren gaf ELKE
+        // proef 24, dus kwam steeds de eerste helft "schuldig" uit: adres 4, 10 en 12 werden na elkaar als wissel gevonden (4 en 12 bestaan niet). Stand A zelf werd nooit
+        // opnieuw gereden.
+        async Task<bool> EersteUitkomstKlopt()
+        {
+            _log.Stap($"Controle: de eerste uitkomst ({StapUitkomst.Tekst(a.Uitkomst)}) nog eens met precies die stand.");
+            var u0 = await Proef(t.Via, t.Melder, t.Richting, new Dictionary<int, bool>(basis), herstel: new Dictionary<int, bool>());
+            if (u0 is null || u0.Value == a.Uitkomst) return true;
+            _log.Waarschuwing($"Stap {t.Via} -> {t.Melder} ({t.Richting.Tekst()}): met dezelfde stand als toen nu {StapUitkomst.Tekst(u0.Value)} in plaats van {StapUitkomst.Tekst(a.Uitkomst)}. De oude waarneming wordt vergeten; geen wissel toegeschreven (BUG #380, nog niet getest op de baan).");
+            _k.Stappen.Remove(a);
+            return false;
+        }
         while (kandidaten.Count > 1 && proeven < 8)
         {
             var helft = kandidaten.Take(kandidaten.Count / 2).ToList();
@@ -495,10 +510,11 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             var u = await Proef(t.Via, t.Melder, t.Richting, stand, herstel: a.Uitkomst > 0 ? new Dictionary<int, bool>(basis) : new Dictionary<int, bool>());
             if (u is null) return false;
             if (u.Value != a.Uitkomst) { kandidaten = helft; uitkomstLos = helft.Count == 1 ? u : null; }
-            else { kandidaten = kandidaten.Except(helft).ToList(); uitkomstLos = null; }
+            else { kandidaten = kandidaten.Except(helft).ToList(); uitkomstLos = null; aGezien = true; }
         }
         if (kandidaten.Count != 1) return false;
         int adres = kandidaten[0];
+        if (proeven >= 2 && !aGezien && !await EersteUitkomstKlopt()) return true;
         if (uitkomstLos is null)
         {
             // Nooit 'door wegstrepen' concluderen: het laatste adres eerst alléén omgezet rijden. Verandert er dan niets, dan kwam het verschil door een

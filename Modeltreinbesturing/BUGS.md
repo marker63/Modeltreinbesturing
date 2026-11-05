@@ -3309,6 +3309,17 @@ Terugritten telden niet mee bij de controle "rijdt de loc andersom dan gedacht",
 Oplossing: een stap die al eens zo gereden is (ook als terugrit) bevestigt de richting.
 Metingen module 2 voor #377-#379: alle varianten en hervatten gelijk (voltooid, 23/23, valse 0, onder-loc 0, gebruiker 0).
 
+## BUG #380 – OPGELOST (nog niet getest op de baan): module 2 vond valse wissels 4 en 12 (en 10) bij 29 -> 21
+(Marco 05-11, module 2 op de baan; log 08:07-08:36.) De stap 29 -> 21 achteruit was eens naar 129 gegaan en later naar 24. Bij het halveren gaf ELKE proef 24, dus kwam steeds de
+eerste helft "schuldig" uit: adres 4, 10 en 12 werden na elkaar als wissel gevonden; 4 en 12 bestaan op de baan niet. Stand A zelf werd nooit opnieuw gereden.
+Oplossing: gaven twee of meer proeven allemaal de tweede uitkomst, dan eerst stand A precies opnieuw rijden. Komt de eerste uitkomst niet terug, dan wordt die oude waarneming vergeten
+en geen wissel toegeschreven.
+Metingen module 2: alle varianten gelijk (voltooid, 23/23, valse 0, onder-loc 0, gebruiker 0, zonder-effect [3,4,7,8,11,12]). Hervatten elke 40 min: zonder-effect [] (overgang
+24 -> 129 niet getest voor de adressen zonder effect); dat gebeurt in bug379 ook al bij hervatten elke 30 min (open punt #381). Hervatten realistisch en elke 50 min gelijk.
+
+## BUG #381 – OPEN: module 2 test na hervatten soms de overgang 24 -> 129 niet voor de adressen zonder effect
+(Simulatie.) Daardoor blijft "adressen zonder effect" leeg; de wissels en melders zijn wel compleet.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:

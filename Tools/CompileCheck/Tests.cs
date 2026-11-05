@@ -3457,6 +3457,7 @@ public static class Tests
             var k = v!.Kaart;
             var gevonden = k.Wissels.Where(w => w.Waarnemingen.Count > 0).Select(w => w.Adres).ToList();
             if (Environment.GetEnvironmentVariable("MARCO_LOG") is { } pad && pad.Length > 0) System.IO.File.WriteAllLines($"{pad}_m2_hervat_{start}{(realistisch ? "_r" : "")}.txt", alleRegels);
+            if (Environment.GetEnvironmentVariable("MARCO2_DEBUG") == "1") Console.WriteLine("ONGETEST adres 3: " + string.Join(" ", v.Kennis.GerichteOvergangen.Where(p => !v.Kennis.IsGetest(3, p.Van, p.Naar)).Select(p => $"{p.Van}>{p.Naar}")));
             string regel = $"MARCO2-HERVAT start {start}{(realistisch ? " realistisch" : "")} elke {minuten:0} min: {stops} keer gestopt en hervat, {(k.Voltooid ? "voltooid" : "NIET-voltooid")}, melders {k.Melders.Count}/23, met-blok {k.Melders.Count(m => m.DinamoBlok is not null)}, wissels [{string.Join(",", gevonden.OrderBy(x => x))}], valse {gevonden.Count(a => !echt.Contains(a))}, kortsl {v.Kennis.Kortsluitingen}, onder-loc {sim.OnderLocOmgezet}, gebruiker {gebruiker}, zonder-effect [{string.Join(",", k.AdressenZonderEffect)}], {(klok.Nu - t0).TotalMinutes:0} min";
             Console.WriteLine(regel);
             return regel;
