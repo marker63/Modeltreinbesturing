@@ -141,6 +141,14 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                 // WAAROM (BUG #378, Marco 04-11 10:22, eerste rit met module 2): na het zelf oplossen bij 4/129 bleef de loc op de grens staan. Elke taak faalde
                 // daarna meteen ("de loc staat niet netjes op één melder"), werd twee keer geprobeerd en overgeslagen: binnen 0,1 s stopte de hele verkenning.
                 _monitor.Bijwerken();
+                // BUG #387: staat er nog een kortsluiting (bijv. na een afwijkende rit die op de grens van 4 en 129 eindigde), dan eerst die opheffen; anders faalde
+                // elke taak meteen en stopte de verkenning als niet af (simulatie met Marco's voortgang van 08-11).
+                if (Kortsluiting())
+                {
+                    _log.Waarschuwing("Er staat nog een kortsluiting: eerst opheffen (BUG #387, nog niet getest op de baan).");
+                    await HerstelKortsluiting(new Dictionary<int, bool>(), _k.LocRichting);
+                    _monitor.Bijwerken();
+                }
                 if (_monitor.Bezet.Count != 1 && !Kortsluiting())
                 {
                     _log.Info($"De loc staat niet netjes op één melder ({(_monitor.Bezet.Count == 0 ? "geen melder bezet" : string.Join(" en ", _monitor.Bezet.OrderBy(x => x)))}): eerst netjes parkeren (BUG #378, nog niet getest op de baan).");
@@ -163,8 +171,13 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                 MeldVoortgang();
                 _log.Stap($"Taak: {taak.Omschrijving}.");
                 bool gelukt;
+                _nietNetjes387 = false;
                 try { gelukt = await VoerTaakUit(taak); }
                 catch (PlanFout pf) { _log.Waarschuwing($"Taak '{taak.Omschrijving}' lukt nu niet: {pf.Message}"); gelukt = false; }
+                // BUG #387: mislukte de taak alleen omdat de loc op de grens van twee melders stond, dan eerst netjes parkeren (begin van de lus) en niet als poging tellen
+                // (hoogstens 5 keer achter elkaar, zodat het geen eindeloze lus wordt).
+                if (!gelukt && _nietNetjes387 && _nietNetjesAchterElkaar++ < 5) { _log.Info("De taak lukte niet omdat de loc op de grens van twee melders staat: eerst netjes parkeren, dan opnieuw (BUG #387)."); continue; }
+                if (gelukt) _nietNetjesAchterElkaar = 0;
                 if (!gelukt)
                 {
                     int n = _k.Mislukt[taak.Sleutel] = _k.Mislukt.GetValueOrDefault(taak.Sleutel) + 1;
@@ -365,6 +378,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         return null;
     }
     private int _onbereikbaar;
+    private int _nietNetjesAchterElkaar;
     /// <summary>Tegenspraken die met alle verschillende adressen (ook al gevonden wissels) uitgezocht worden.</summary>
     private readonly HashSet<string> _tegenspraakBreed = new();
 

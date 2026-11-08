@@ -502,6 +502,9 @@ public partial class BaanVerkenner2
 
     /// <summary>WAT: mag adres a nu omgezet worden? Een gevonden wissel niet als de loc op een melder van zijn wisselgebied staat (ook dat van zijn volger);
     /// een nog niet gevonden adres alleen als de loc netjes op één melder staat. WAAROM: nooit een wissel onder de loc omzetten (ontsporing, Marco 26-10 15:21).</summary>
+    /// <summary>BUG #387: een taak mislukte alleen omdat de loc op een grens stond; dat telt niet als mislukte poging (de hoofdlus parkeert eerst netjes).</summary>
+    private bool _nietNetjes387;
+
     private bool Veilig(int a, IReadOnlyCollection<int> bezet, out string reden)
     {
         reden = "";
@@ -513,7 +516,7 @@ public partial class BaanVerkenner2
             if (raak.Count > 0) { reden = $"de loc staat op melder {string.Join("/", raak)}, waar wissel {a} ligt"; return false; }
             return true;
         }
-        if (bezet.Count != 1) { reden = $"de loc staat niet netjes op één melder ({string.Join("/", bezet)})"; return false; }
+        if (bezet.Count != 1) { reden = $"de loc staat niet netjes op één melder ({string.Join("/", bezet)})"; _nietNetjes387 = true; return false; }
         if (!ProefPlek(bezet.First())) { reden = $"melder {bezet.First()} is een kruising of te kort om daar een nog niet gevonden adres om te zetten"; return false; }
         return true;
     }
@@ -524,6 +527,15 @@ public partial class BaanVerkenner2
         _monitor.Bijwerken();
         var bezet = _monitor.Bezet.ToList();
         var nodig = stand.Where(kv => _adressen.Contains(kv.Key) && Fysiek(kv.Key) != kv.Value).ToList();
+        // BUG #387 (simulatie met Marco's voortgang van 08-11): de loc stond na een kortsluitherstel op de grens van 129 en 4. Elke taak faalde daardoor binnen dezelfde
+        // tiende seconde ("niet netjes op één melder"), werd overgeslagen, en de verkenning stopte als niet af. Eerst netjes op één melder gaan staan en dan opnieuw kijken.
+        if (nodig.Count > 0 && bezet.Count == 2 && !Kortsluiting())
+        {
+            try { await Herparkeer(_k.LocRichting.Om(), alleBlokken: true); } catch (PlanFout) { }
+            _monitor.Bijwerken();
+            bezet = _monitor.Bezet.ToList();
+            if (bezet.Count == 1) _k.LocMelder = bezet[0];
+        }
         foreach (var (a, _) in nodig)
             if (!Veilig(a, bezet, out var waarom))
             {

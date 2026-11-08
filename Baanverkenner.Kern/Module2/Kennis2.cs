@@ -301,7 +301,24 @@ public class Kennis2
         foreach (var g in kand.GroupBy(s => string.Join(",", rel.OrderBy(a => a).Select(a => s.Stand.Contains(a) ? "A" : "R"))))
         {
             var uit = g.Select(s => s.Uitkomst).Distinct().ToList();
-            if (uit.Count != 1) continue;   // tegenstrijdig: er is nog een onbekende wissel van invloed
+            if (uit.Count != 1)
+            {
+                // tegenstrijdig: er is nog een onbekende wissel van invloed. WAT: toch een weg aanbieden, met de hele stand van een stap die wél doorreed (alle adressen
+                // waarin hij verschilt van de stappen met een andere uitkomst horen bij de eis). WAAROM (BUG #387, Marco 08-11 11:26: "ik heb al vele malen de verkenning moeten
+                // uitbreiden terwijl je gewoon zelf verder had kunnen gaan"; log 10:42-10:44): 14 -> 24 reed met de basisstand naar 21, maar met een stand waarin 4, 7, 8, 10, 11,
+                // 13 en 14 om stonden gaf het kortsluiting. Die twee vielen in dezelfde groep, dus kende de planning geen enkele weg voorbij 24 meer; de loc pendelde tussen 13, 5 en 14
+                // en de verkenning stopte als "niet af".
+                foreach (var goed in g.Where(x => x.Uitkomst > 0).OrderByDescending(x => x.Aantal))
+                {
+                    var anders = g.Where(x => x.Uitkomst != goed.Uitkomst).ToList();
+                    var verschil = anders.SelectMany(x => x.Stand.Union(goed.Stand).Except(x.Stand.Intersect(goed.Stand))).Distinct().ToList();
+                    var eis = rel.Union(verschil).Distinct().ToDictionary(a => a, a => goed.Stand.Contains(a));
+                    if (verschil.Count == 0 || anders.Any(x => eis.All(e => x.Stand.Contains(e.Key) == e.Value))) continue;
+                    if (res.Any(x => x.Item1 == goed.Uitkomst)) continue;
+                    res.Add((goed.Uitkomst, eis, true, goed.Aantal));
+                }
+                continue;
+            }
             var s0 = g.First();
             res.Add((uit[0], rel.ToDictionary(a => a, a => s0.Stand.Contains(a)), terugval, g.Sum(x => x.Aantal)));
         }

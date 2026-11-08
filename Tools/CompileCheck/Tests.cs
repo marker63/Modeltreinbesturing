@@ -3428,7 +3428,7 @@ public static class Tests
                 GekoppeldeWissels = "5+6,2+1", OmgekeerdAangesloten = "6", Module2 = true };
             sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
             var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
-            VerkenStatus? status = null;
+            VerkenStatus? status = Environment.GetEnvironmentVariable("MARCO2_STATUS") is { Length: > 0 } sp ? VerkenStatus.VanJson(System.IO.File.ReadAllText(sp)) : null;   // hervatten vanaf Marco's echte voortgang
             var t0 = klok.Nu; int stops = 0, gebruiker = 0; var alleRegels = new List<string>();
             BaanVerkenner2? v = null;
             for (int ronde = 0; ronde < 40; ronde++)

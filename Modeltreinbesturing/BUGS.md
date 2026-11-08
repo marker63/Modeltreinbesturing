@@ -3348,6 +3348,18 @@ Oplossing: alleen een stap tussen twee melders die de loc in DEZE rit zelf berei
 melder verandert de rijrichting niet meer en die eerste stap wordt niet vastgelegd.
 Metingen module 2: alle varianten en hervatten gelijk.
 
+## BUG #387 – OPGELOST (nog niet getest op de baan): module 2 stopte steeds als "niet af" terwijl hij zelf verder had gekund
+(Marco 08-11 11:26: "ik heb nu al vele malen de verkenning moeten uitbreiden terwijl je gewoon zelf verder had kunnen gaan"; log 10:42-10:44.) Nagebootst met Marco's echte voortgang
+(MARCO2_HERVAT=1 MARCO2_STATUS=<voortgang.json>). Drie oorzaken:
+1. 14 -> 24 reed met de basisstand naar 21, maar met een stand waarin 4, 7, 8, 10, 11, 13 en 14 om stonden gaf het kortsluiting. Die vielen in dezelfde groep van "relevante" wissels, dus
+   kende de planning geen enkele weg voorbij 24: de loc pendelde 13 - 5 - 14 en stopte. Nu biedt de planning bij zo'n tegenstrijdigheid toch de weg aan, met de hele stand van de stap die
+   wél doorreed.
+2. Een rit eindigde met een kortsluiting op de grens van 4 en 129; de hoofdlus deed daar niets mee, elke taak faalde in dezelfde tiende seconde en werd overgeslagen. Nu eerst de
+   kortsluiting opheffen.
+3. Een taak die alleen mislukt omdat de loc op een grens staat, telt niet meer als mislukte poging (eerst netjes parkeren, dan opnieuw).
+Met Marco's voortgang in de simulatie: voltooid, 23/23 melders met blok, gebruiker 0 (was: niet af na 3 minuten). Wissel 3 en 12 staan nog als valse vondst in die voortgang (van vóór #380).
+Metingen module 2: alle varianten en hervatten (40 en 30 min, realistisch) gelijk.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:
