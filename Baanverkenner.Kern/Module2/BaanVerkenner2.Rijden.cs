@@ -50,6 +50,8 @@ public partial class BaanVerkenner2
         public RitEinde2 Einde;
         public int? AfwijkingIndex;
         public List<double> Seconden = new();
+        /// <summary>BUG #386: de eerste stap paste niet bij de kaart en de plek van de loc aan het begin was niet zeker: die stap niet vastleggen.</summary>
+        public bool EersteStapOnzeker;
     }
 
     private bool _kortStatus;
@@ -212,6 +214,15 @@ public partial class BaanVerkenner2
             // (die stap was bekend uit een terugrit). Omdat terugritten hier niet meetelden, zag de verkenner een "omgedraaide loc" en draaide alle richtingen om; drie keer heen en
             // weer, tot de taak werd overgeslagen. Een stap die al eens zo gereden is (ook als terugrit), bevestigt de richting.
             bool mee = _k.Stappen.Any(x => x.Melder == vorigeM && x.Richting == h && x.Uitkomst == n);
+            // BUG #386 (Marco 08-11 10:01: "je blijft maar problemen rapporteren met de rijrichting"; log 09:49-09:56): elke keer was het de EERSTE melder van een rit, direct na
+            // een kortsluitherstel, "netjes op één melder"-kruipen of 30 s stilstaan. Dan staat de loc op een grens en is niet zeker op welke melder hij echt begon; de afwijkende
+            // eerste melder zegt dan niets over de rijrichting. Alleen een stap tussen twee melders die de loc in DEZE rit zelf bereikte, telt nog als bewijs van een omgedraaide loc.
+            if (tegen && !mee && res.Reeks.Count == 1)
+            {
+                res.EersteStapOnzeker = true;
+                _log.Info($"Melder {n} paste niet bij de rijrichting vanaf melder {vorigeM}; de loc stond waarschijnlijk niet (alleen) op melder {vorigeM}. Rijrichting blijft zoals hij was; deze stap wordt niet vastgelegd (BUG #386, nog niet getest op de baan).");
+                tegen = false;
+            }
             if (tegen && !mee)
             {
                 _k.Omgedraaid = !_k.Omgedraaid;
@@ -380,7 +391,7 @@ public partial class BaanVerkenner2
     private void LegRitVast(RitOpdracht2 op, RitUitslag2 res, int startVia, bool terug, List<int> stand, Richting h, int draaiIndex)
     {
         var r = res.Reeks;
-        for (int i = 1; i < r.Count; i++)
+        for (int i = res.EersteStapOnzeker ? 2 : 1; i < r.Count; i++)
         {
             // bleek de loc halverwege andersom te rijden (keerlus), dan hebben de stappen daarvóór nog de oude kaartrichting; bij de eerste stap is alles de nieuwe
             var hi = draaiIndex > 1 && i < draaiIndex ? h.Om() : h;

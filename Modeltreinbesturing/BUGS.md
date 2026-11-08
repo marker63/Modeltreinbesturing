@@ -3340,6 +3340,14 @@ de melder en de overgang direct in de kaart (hoogstens elke 5 s bewaard, zodat m
 (Marco 08-11 09:31.) Nu staat bij elke wijziging in het logboek "Rijstroom: snelheid 12 vooruit naar blok 3, 4" (of "alle (...)" als het blok nog onbekend is).
 Metingen module 2 voor #384/#385: alle varianten en hervatten gelijk.
 
+## BUG #386 – OPGELOST (nog niet getest op de baan): module 2 draaide steeds de rijrichting om bij 14, 129 en 24
+(Marco 08-11 10:01: "je blijft maar problemen rapporteren met de rijrichting"; log 09:49:12, 09:50:20, 09:54:13, 09:55:49.) Elke keer was het de EERSTE melder van een rit, direct na
+een kortsluitherstel, een "netjes op één melder"-kruiprit of 30 s stilstand. De loc stond dan op een grens; de verkenner dacht dat hij op 14 stond terwijl hij (ook) op 129 of 24 stond.
+De afwijkende eerste melder werd gelezen als "loc omgedraaid", en alle richtingen gingen om (vier keer in zeven minuten).
+Oplossing: alleen een stap tussen twee melders die de loc in DEZE rit zelf bereikte, telt als bewijs voor een omgedraaide loc (zo herkent hij de keerlus nog steeds). Een afwijkende eerste
+melder verandert de rijrichting niet meer en die eerste stap wordt niet vastgelegd.
+Metingen module 2: alle varianten en hervatten gelijk.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:
