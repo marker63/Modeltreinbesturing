@@ -658,6 +658,9 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                     $"{k.AdressenZonderEffect.Count} adressen zonder effect, {_k.Ritten} ritten, {_k.Kortsluitingen} kortsluitingen.");
     }
 
+    /// <summary>BUG #384: laatste keer dat de kaart tijdens een rit bewaard is (hoogstens elke 5 s).</summary>
+    private DateTime _laatsteLiveBewaard = DateTime.MinValue;
+
     private void BewaarNu()
     {
         try { ProjecteerKaart(); } catch (Exception ex) { _log.Waarschuwing($"Kaart bijwerken mislukte: {ex.Message}"); }

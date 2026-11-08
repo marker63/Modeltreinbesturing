@@ -85,6 +85,8 @@ public partial class BaanVerkenner2
         return res;
     }
 
+    private string _laatsteVoeding385 = "";
+
     private bool DecoderVooruit(Richting r) => (r == Richting.Vooruit) ^ _k.Omgedraaid;
 
     /// <summary>WAT: stuurt het rijcommando naar de blokken (zonder te wachten; Dinamo verwerkt ze één per 200 ms).</summary>
@@ -92,7 +94,12 @@ public partial class BaanVerkenner2
     {
         _decoderVooruit = DecoderVooruit(r);
         _huidigeStap = stap;
-        foreach (var b in blokken)
+        var lijst385 = blokken.ToList();
+        // BUG #385 (Marco 08-11 09:31: "ik zie niet in de logfile welk blok van spanning voorzien wordt"): zoals module 1 in het logboek zetten naar welke blokken het rijcommando
+        // gaat, alleen als dat verandert (anders bij elke herhaling dezelfde regel).
+        string tekst385 = $"snelheid {stap} {r.Tekst()} naar blok {(lijst385.Count == AlleBlokken().Count() && lijst385.Count > 1 ? "alle (" + string.Join(", ", lijst385.OrderBy(x => x)) + ")" : string.Join(", ", lijst385.OrderBy(x => x)))}";
+        if (tekst385 != _laatsteVoeding385) { _laatsteVoeding385 = tekst385; _log.Rijden($"  Rijstroom: {tekst385}."); }
+        foreach (var b in lijst385)
         {
             _hw.ZetLocSnelheid(_ins.LocAdres, stap, _decoderVooruit, b, _ins.LocStappen);
             if (stap > 0) _gestuurd.Add(b);
@@ -213,9 +220,28 @@ public partial class BaanVerkenner2
                 omgedraaidInRit = true;
                 draaiIndex = res.Reeks.Count;   // index die n zo krijgt
             }
-            res.Seconden.Add((tijd - binnenTijd).TotalSeconds * snelheid / verken);
+            double naSec = (tijd - binnenTijd).TotalSeconds;
+            res.Seconden.Add(naSec * snelheid / verken);
             binnenTijd = tijd;
             res.Reeks.Add(n);
+            // BUG #384 (Marco 08-11 09:29): net als in module 1 elke nieuwe melder in het logboek, met blok en tijd sinds de vorige melder.
+            int? blok384 = _status.Kaart.Melders.FirstOrDefault(x => x.Nummer == n)?.DinamoBlok;
+            _log.Rijden($"  melder {n}{(blok384 is int b384 ? $" (blok {b384})" : "")} bezet (na {naSec:0.0} s)");
+            // BUG #384: ook het melderschema meteen laten zien wat er gereden wordt (de kaart wordt na de rit weer netjes uit de kennis opgebouwd).
+            try
+            {
+                var kaart384 = _status.Kaart;
+                kaart384.Melder(n);
+                if (res.Reeks.Count >= 2 && res.Reeks[^2] > 0)
+                    kaart384.RegistreerOvergang(res.Reeks[^2], n, h, new Configuratie(_k.Standen.Where(kv => kv.Value).Select(kv => kv.Key).ToArray()), null);
+                if (_klok.Nu - _laatsteLiveBewaard > TimeSpan.FromSeconds(5))
+                {
+                    _laatsteLiveBewaard = _klok.Nu;
+                    kaart384.Bijgewerkt = _klok.Nu;
+                    Bewaren?.Invoke(_status);
+                }
+            }
+            catch (Exception ex) { _log.Waarschuwing($"Kaart tijdens de rit bijwerken mislukte: {ex.Message}"); }
             if (omgedraaidInRit) { res.AfwijkingIndex ??= res.Reeks.Count - 1; parkeren = true; }
             int idx = res.Reeks.Count - 2;   // index in 'verwacht'
             if (idx < verwacht.Count)
@@ -314,6 +340,9 @@ public partial class BaanVerkenner2
         }
         if (res.Einde == RitEinde2.Geparkeerd && res.Reeks.Count > op.Max) res.Einde = RitEinde2.Maximum;
         _log.Rijden($"Rit klaar ({res.Einde}): {string.Join(", ", res.Reeks)}.");
+        // BUG #384 (Marco 08-11 09:29: "het melderschema wordt niet gevuld in de eerste rit"): de kaart (waar het melderschema en het blokkenschema uit tekenen) werd alleen bij
+        // het bewaren na een hele taak opgebouwd, en de eerste ronde is één lange taak. Nu na elke rit bewaren (zoals module 1 na elke opdracht).
+        BewaarNu();
         if (!op.NietVastleggen) LegRitVast(op, res, startVia, terug, stand, h, draaiIndex);
         // waar staat de loc nu?
         bool gewisseld = h != _k.LocRichting;

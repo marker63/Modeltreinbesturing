@@ -3331,6 +3331,15 @@ dan is X geen echte melder: hij gaat uit de kennis en de kaart en wordt voortaan
 en de verkenning stopte. Na zo'n kruiprit is nu onbekend waar de loc vandaan kwam.
 Metingen module 2: gelijk aan bug380.
 
+## BUG #384 – OPGELOST (nog niet getest op de baan): module 2 liet de melders niet zien tijdens een rit
+(Marco 08-11 09:29: "in de logfiles zie ik niet welke bezetmelders er actief worden in de eerste ronde, en ook het melderschema wordt niet gevuld in de eerste rit".) Module 2 schreef
+alleen "Rit klaar: ..." en bouwde de kaart pas na een hele taak op (de eerste ronde is één lange taak). Nu: elke nieuwe melder in het logboek ("melder 14 (blok 2) bezet (na 3,2 s)"),
+de melder en de overgang direct in de kaart (hoogstens elke 5 s bewaard, zodat melderschema en blokkenschema meelopen), en na elke rit de kaart opnieuw uit de kennis.
+
+## BUG #385 – OPGELOST (nog niet getest op de baan): module 2 liet niet zien welk blok rijstroom kreeg
+(Marco 08-11 09:31.) Nu staat bij elke wijziging in het logboek "Rijstroom: snelheid 12 vooruit naar blok 3, 4" (of "alle (...)" als het blok nog onbekend is).
+Metingen module 2 voor #384/#385: alle varianten en hervatten gelijk.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:
