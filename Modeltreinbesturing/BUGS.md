@@ -3389,6 +3389,15 @@ uit de keerlus; (2) de logregel heet nu "Keerlus gereden ... de loc rijdt gewoon
 Metingen: met Marco's voortgang van 12:39 (loc op 12 en op 10) en van 14:02 (loc op 29) voltooid, 23/23 met blok, valse 0, onder-loc 0, gebruiker 0; alle module 2-varianten
 en hervatten gelijk aan #389.
 
+## BUG #391 – OPGELOST (nog niet getest op de baan): melder 129 als spookmelder weggegooid, en een valse wissel 14 bij melder 29
+(Marco 09-11 15:43, volledige ronde module 2 13:58-14:57 met versie 389: zelf door de keerlus gereden, gebruiker 0, maar 22 in plaats van 23 melders.) (1) Om 14:45:55 begon
+een rit op de grens van 129 en 10 (reeks 129, 10, 24); de eerste stap was onzeker (#386), maar de stap "10 -> 24" werd toch vastgelegd. Daarmee leek 129 overbodig (10 -> 129 en
+10 -> 24 met dezelfde stand) en gooide #382 melder 129 weg. Nu: bij een onzekere eerste stap pas vastleggen vanaf de derde melder (zonder herkomst), en een melder waar de loc
+minstens 1 s alleen op stond, is nooit een spookmelder (268 was 0,2 s bezet). (2) "Adres 14 na melder 29: rechtdoor -> 30, afbuigend -> 268" bleef staan nadat 268 als
+spookmelder was weggegooid. Nu worden bij het weggooien van een spookmelder de vondsten die erop steunden opnieuw bekeken; geven beide standen dan hetzelfde, dan vervalt de vondst.
+Metingen: spookmeldertest OK; met Marco's voortgang (12:39 loc op 12 en 10, 14:02 loc op 29) voltooid, 23/23, valse 0, onder-loc 0, gebruiker 0; alle module 2-varianten en
+hervatten gelijk aan #390. De simulatie bootst het aanraken van 10 op de grens niet na: het weggooien van 129 zelf is daarom niet in de simulatie te zien geweest.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:

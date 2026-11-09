@@ -393,12 +393,14 @@ public partial class BaanVerkenner2
     private void LegRitVast(RitOpdracht2 op, RitUitslag2 res, int startVia, bool terug, List<int> stand, Richting h, int draaiIndex)
     {
         var r = res.Reeks;
-        for (int i = res.EersteStapOnzeker ? 2 : 1; i < r.Count; i++)
+        // BUG #391: bij een onzekere eerste stap is ook de tweede melder twijfelachtig (log 14:45:55: rit 129, 10, 24 gaf de stap "10 -> 24", terwijl de loc van 129
+        // naar 24 reed en 10 alleen even aanraakte). Daarom pas vastleggen vanaf de derde melder, zonder herkomst.
+        for (int i = res.EersteStapOnzeker ? 3 : 1; i < r.Count; i++)
         {
             // bleek de loc halverwege andersom te rijden (keerlus), dan hebben de stappen daarvóór nog de oude kaartrichting; bij de eerste stap is alles de nieuwe
             var hi = draaiIndex > 1 && i < draaiIndex ? h.Om() : h;
             bool eersteTerug = i == 1 && terug && draaiIndex != 1;
-            int via = i >= 2 ? r[i - 2] : (eersteTerug || draaiIndex == 1 ? 0 : startVia);
+            int via = res.EersteStapOnzeker && i == 3 ? 0 : i >= 2 ? r[i - 2] : (eersteTerug || draaiIndex == 1 ? 0 : startVia);
             _k.Leg(via, r[i - 1], hi, stand, r[i], _klok.Nu, terug: eersteTerug, seconden: i - 1 < res.Seconden.Count ? res.Seconden[i - 1] : 0);
         }
         if (res.Einde is RitEinde2.Kortsluiting or RitEinde2.Doodlopend)

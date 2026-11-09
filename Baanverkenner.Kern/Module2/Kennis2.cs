@@ -351,6 +351,9 @@ public class Kennis2
         {
             int a = x.Via, m = x.Melder, b = x.Uitkomst;
             if (Spookmelders.Contains(m)) continue;
+            // BUG #391 (Marco 09-11, ronde 13:58-14:57): melder 129 (de kruiswissel) werd als spookmelder weggegooid na één verkeerd vastgelegde stap (10 -> 24 bij een rit
+            // die op de grens van 129 en 10 begon). Een melder waar de loc minstens een seconde alleen op stond, bestaat echt (268 was maar 0,2 s bezet).
+            if (SoloTijd.TryGetValue(m, out var solo) && solo >= 1.0) continue;
             var naarM = Stappen.Where(s => !s.Afgeleid && s.Melder == a && s.Richting == x.Richting && s.Uitkomst == m).ToList();
             var naarB = Stappen.Where(s => !s.Afgeleid && s.Melder == a && s.Richting == x.Richting && s.Uitkomst == b).ToList();
             if (naarM.Any(s1 => naarB.Any(s2 => s1.Stand.SequenceEqual(s2.Stand)))) return m;
@@ -372,6 +375,25 @@ public class Kennis2
         Stappen.RemoveAll(s => s.Melder == m);
         foreach (var s in Stappen.Where(s => s.Via == m)) s.Via = 0;
         SoloTijd.Remove(m);
+        // BUG #391: een wisselvondst die op de spookmelder steunde, opnieuw bekijken (log 14:13: "adres 14 na melder 29: rechtdoor -> 30, afbuigend -> 268"; zonder 268
+        // gaan beide standen naar 30, dus is adres 14 daar helemaal geen wissel). Geeft de vondst daarna in beide standen hetzelfde, dan vervalt hij.
+        foreach (var v in Vondsten.ToList())
+        {
+            var sleutel = Sleutel(v.Via, v.Melder, v.Richting);
+            bool weg = v.Melder == m || v.Via == m;
+            if (!weg && (v.Rechtdoor == m || v.Afbuigend == m))
+            {
+                var st = Stappen.Where(x => x.Melder == v.Melder && x.Richting == v.Richting && (x.Via == v.Via || x.Via == 0) && x.Uitkomst != m).ToList();
+                int? Uit(bool afb) { var u = st.Where(x => x.Stand.Contains(v.Adres) == afb).Select(x => x.Uitkomst).Distinct().ToList(); return u.Count == 1 ? u[0] : null; }
+                if (v.Rechtdoor == m) v.Rechtdoor = Uit(false);
+                if (v.Afbuigend == m) v.Afbuigend = Uit(true);
+                weg = v.Rechtdoor is null && v.Afbuigend is null || v.Rechtdoor is int x1 && v.Afbuigend == x1;
+            }
+            if (!weg) continue;
+            Vondsten.Remove(v);
+            if (Relevant.TryGetValue(sleutel, out var l)) { l.Remove(v.Adres); if (l.Count == 0) Relevant.Remove(sleutel); }
+        }
+        foreach (var k in Relevant.Keys.ToList()) { var (via, mm, _) = Ontleed(k); if (via == m || mm == m) Relevant.Remove(k); }
     }
 
     [JsonIgnore] public IEnumerable<int> Melders => Stappen.Select(s => s.Melder).Concat(Stappen.Where(s => s.Uitkomst > 0).Select(s => s.Uitkomst)).Concat(Stappen.Where(s => s.Via > 0).Select(s => s.Via)).Distinct();
