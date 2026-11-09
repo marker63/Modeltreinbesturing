@@ -168,8 +168,14 @@ public partial class BaanVerkenner2
     /// WAAROM: alle soorten ritten (navigeren, verkennen, proef, terug) gebruiken dezelfde regels; dat voorkomt dat het ene soort rit iets anders doet dan
     /// het andere (bij module 1 een bron van veel fouten).
     /// </summary>
+    /// <summary>WAT: de werkwijze van Marco (09-11 17:23): bij verkennen na elke nieuwe melder meteen stoppen en daar de blokproef doen, dan pas verder.
+    /// Met MARCO2_OUD=1 (alleen in de simulatie) de oude werkwijze, om te vergelijken. (Ook geprobeerd: de wisseltest over 1-2 secties en eerst alles bij de nieuwe sectie
+    /// uitzoeken; dat maakte de simulatie veel slechter (11/23 melders of 113 min) en is daarom niet overgenomen.)</summary>
+    internal static bool W3a => Environment.GetEnvironmentVariable("MARCO2_OUD") != "1";
+
     internal async Task<RitUitslag2> Rijd(RitOpdracht2 op)
     {
+        var bekendVoor394 = _k.Melders.ToHashSet();
         var h = op.Richting;
         bool omgedraaidInRit = false;
         int draaiIndex = -1;
@@ -272,6 +278,9 @@ public partial class BaanVerkenner2
                 int extra = idx - verwacht.Count + 1;
                 if (op.ExtraStappen > 0 && extra >= op.ExtraStappen) parkeren = true;
                 if (op.Verkennen && (_k.Voorspel(res.Reeks[^2], n, h, Fysiek) is not null || LusGesloten(res.Reeks))) parkeren = true;
+                // BUG #394 (werkwijze van Marco, 09-11 17:23): bij verkennen stoppen op de eerste nieuwe melder (of een melder waarvan het blok nog onbekend is). Daar volgt
+                // meteen de blokproef (begin van de takenlus); daarna rijdt de verkenning verder.
+                if (op.Verkennen && W3a && (!bekendVoor394.Contains(n) || (_hw.LocCommandoVereistBlok && !_k.Blokken.ContainsKey(n)))) parkeren = true;
                 if (!op.Verkennen && op.ExtraStappen == 0) parkeren = true;
             }
             if (res.Reeks.Count > op.Max) parkeren = true;
@@ -518,7 +527,8 @@ public partial class BaanVerkenner2
         {
             var raak = bezet.Where(zone.Contains).ToList();
             if (raak.Count > 0) { reden = $"de loc staat op melder {string.Join("/", raak)}, waar wissel {a} ligt"; return false; }
-            return true;
+            // BUG #395: een zone die alleen uit een opgeheven kortsluiting komt (adres nog niet als wissel gevonden): de gewone eisen voor een nog niet gevonden adres blijven gelden
+            if (_k.IsGevonden(a) || Volgers(a, false).Any(v => _k.IsGevonden(v.Volger))) return true;
         }
         if (bezet.Count != 1) { reden = $"de loc staat niet netjes op één melder ({string.Join("/", bezet)})"; _nietNetjes387 = true; return false; }
         if (!ProefPlek(bezet.First())) { reden = $"melder {bezet.First()} is een kruising of te kort om daar een nog niet gevonden adres om te zetten"; return false; }
@@ -646,7 +656,17 @@ public partial class BaanVerkenner2
             {
                 bool oud = Fysiek(a);
                 await ZetAdres(a, !oud);
-                if (await WachtOpGeenKortsluiting(TimeSpan.FromSeconds(3))) { _log.Info($"Zelf opgelost: wissel {a} omzetten hief de kortsluiting op."); return true; }
+                if (await WachtOpGeenKortsluiting(TimeSpan.FromSeconds(3)))
+                {
+                    _log.Info($"Zelf opgelost: wissel {a} omzetten hief de kortsluiting op.");
+                    // BUG #395: deze wissel ligt dus onder of vlak bij de loc. Niet terugzetten zolang de loc op deze melder(s) staat (simulatie: wissel 14 hief de kortsluiting
+                    // op melder 8 op; de volgende proef zette hem meteen terug, met de loc nog op 8 = omgezet onder de loc).
+                    _monitor.Bijwerken();
+                    var bij = _k.ExtraZone.TryGetValue(a, out var h395) ? h395 : _k.ExtraZone[a] = new HashSet<int>();
+                    bij.UnionWith(_monitor.Bezet);
+                    if (_k.LocMelder > 0) bij.Add(_k.LocMelder);
+                    return true;
+                }
                 await ZetAdres(a, oud);
                 if (_klok.Nu - t0 >= ZelfZoekenMaximaal) break;
             }

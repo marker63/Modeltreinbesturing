@@ -3406,6 +3406,25 @@ zonder één rijcommando. Oplossing: (1) bij een controle tellen bezette melders
 controlekaart is dan nog leeg en de weg naar de startmelder is niet bekend; (3) twee melders bezet op een kruising staat nu in het logboek in plaats van stil te wachten.
 Metingen module 1 (alle varianten, hervatten, regressietests 0 fouten) gelijk aan #391. De controle zelf heeft geen simulatie: dit deel is alleen op de log van 15:43 gebaseerd.
 
+## BUG #393 – OPGELOST (nog niet getest op de baan): melder 24 en 14 (bij de kruiswissel) toch als spookmelder weggegooid
+(Marco 09-11 17:23, verkenning 15:56-17:13 met versie 391: "je mist compleet blok 1 en 2".) Om 16:37 werd melder 24 en om 17:00 melder 14 weggegooid: de loc rijdt zo snel over
+die korte melders dat de tijd alleen op de melder onder 1 s bleef, dus de bescherming uit #391 werkte niet. Zonder 24 en 14 klopte de weg naar 129 niet meer en kwam de loc de
+binnenring (blok 1 en 2) niet meer in. Nu: een melder met een gevonden Dinamo-blok, of waar de loc stil en als enige bezette melder op stond, is nooit een spookmelder.
+
+## BUG #394 – OPGELOST (nog niet getest op de baan): werkwijze van Marco: bij verkennen meteen stoppen op elke nieuwe melder en daar de blokproef doen
+(Marco 09-11 17:23-17:31: rijspanning op alle blokken, stilzetten zodra er nog maar één melder bezet is, daar meteen de blokproef, dan de volgende melder; wissels per sectie
+heen en weer testen.) Overgenomen: bij verkennen stopt de loc op de eerste nieuwe melder (of een melder met onbekend blok) en doet daar meteen de blokproef, daarna gaat
+de verkenning verder. Ook: een taak die mislukte maar onderweg iets nieuws vond, telt niet als mislukte poging en eerder overgeslagen taken mogen dan weer.
+Ook geprobeerd en NIET overgenomen (simulatie veel slechter): de wisseltest over één of twee secties in plaats van over een lang stuk (113 min in plaats van 61, onder-loc 1),
+en eerst alles bij de nieuwe sectie uitzoeken voor verder verkennen (11/23 melders, onder-loc 2; samen: na 720 min niet af). Bij één of twee secties heen en weer
+wordt elke sectie apart getest; over een lang stuk tegelijk gaat het juist veel sneller, de halveringsproef vindt daarna in een paar ritten welk adres het was.
+Simulatie: verse verkenning 61 min (was 77), alles voltooid, 23/23, valse 0, onder-loc 0, gebruiker 0, zonder-effect [3,4,7,8,11,12].
+
+## BUG #395 – OPGELOST (nog niet getest op de baan): wissel terugzetten terwijl de loc er nog op stond, na een opgeheven kortsluiting
+(Simulatie met stoppen en hervatten elke 30 min.) Het omzetten van wissel 14 hief een kortsluiting op met de loc op melder 8; de volgende proef zette 14 meteen terug, met de loc
+nog op 8 (omgezet onder de loc). Nu: hief een wissel een kortsluiting op, dan horen de melders waar de loc toen stond bij de zone van die wissel (Kennis2.ExtraZone): daar
+wordt hij niet omgezet en de planning houdt er rekening mee. Simulatie elke 30 min: onder-loc 0 (was 1), voltooid, 23/23.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:

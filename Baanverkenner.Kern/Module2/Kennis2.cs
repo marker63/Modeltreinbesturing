@@ -227,6 +227,7 @@ public class Kennis2
     public HashSet<int> Zone(int adres)
     {
         var res = new HashSet<int>();
+        if (ExtraZone.TryGetValue(adres, out var extra)) res.UnionWith(extra);   // BUG #395
         foreach (var (sleutel, adressen) in Relevant)
         {
             if (!adressen.Contains(adres)) continue;
@@ -340,6 +341,11 @@ public class Kennis2
     /// <summary>Alle melders die ooit gezien zijn.</summary>
     /// <summary>BUG #382: melders die als spook herkend zijn (geen echte sectie); bewaard zodat een hervatting ze ook negeert.</summary>
     public List<int> Spookmelders { get; set; } = new();
+    /// <summary>BUG #393: melders waar de loc stil en als enige bezette melder op stond: die bestaan echt en zijn nooit een spookmelder.</summary>
+    public HashSet<int> Echt { get; set; } = new();
+    /// <summary>BUG #395: per adres de melders waarop de loc stond toen het omzetten van dat adres een kortsluiting ophief: daar ligt de wissel (onder de loc).
+    /// Hoort bij de zone van die wissel, zodat hij daar nooit wordt omgezet en de planning er rekening mee houdt.</summary>
+    public Dictionary<int, HashSet<int>> ExtraZone { get; set; } = new();
 
     /// <summary>WAT: zoekt een melder X die tussen a en b ligt (a -> X -> b), terwijl de loc met precies dezelfde wisselstand ook rechtstreeks van a naar b reed.
     /// Een echte melder kan de loc niet overslaan; dan is X een spook (Dinamo-ingang die zonder sectie bezet raakt).
@@ -354,6 +360,9 @@ public class Kennis2
             // BUG #391 (Marco 09-11, ronde 13:58-14:57): melder 129 (de kruiswissel) werd als spookmelder weggegooid na één verkeerd vastgelegde stap (10 -> 24 bij een rit
             // die op de grens van 129 en 10 begon). Een melder waar de loc minstens een seconde alleen op stond, bestaat echt (268 was maar 0,2 s bezet).
             if (SoloTijd.TryGetValue(m, out var solo) && solo >= 1.0) continue;
+            // BUG #393 (Marco 09-11 17:23, verkenning 15:56-17:13 met versie 391): ook melder 24 en 14 (bij de kruiswissel) werden weggegooid; de loc reed er zo snel overheen
+            // dat de tijd alleen op de melder korter was dan 1 s. Een melder met een gevonden Dinamo-blok, of waar de loc stil en alleen op stond, bestaat altijd echt.
+            if (Blokken.ContainsKey(m) || Echt.Contains(m)) continue;
             var naarM = Stappen.Where(s => !s.Afgeleid && s.Melder == a && s.Richting == x.Richting && s.Uitkomst == m).ToList();
             var naarB = Stappen.Where(s => !s.Afgeleid && s.Melder == a && s.Richting == x.Richting && s.Uitkomst == b).ToList();
             if (naarM.Any(s1 => naarB.Any(s2 => s1.Stand.SequenceEqual(s2.Stand)))) return m;

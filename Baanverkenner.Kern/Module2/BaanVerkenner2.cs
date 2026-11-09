@@ -158,6 +158,9 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                     _monitor.Bijwerken();
                     if (_monitor.Bezet.Count == 1) _k.LocMelder = _monitor.Bezet.First();
                 }
+                if (_monitor.Bezet.Count == 1 && !Kortsluiting()) _k.Echt.Add(_monitor.Bezet.First());   // BUG #393: de loc staat stil en alleen op deze melder
+                // BUG #394 (werkwijze van Marco): staat de loc netjes op een melder waarvan het blok nog onbekend is, dan daar meteen de blokproef.
+                if (W3a && _monitor.Bezet.Count == 1 && !Kortsluiting() && _k.LocMelder == _monitor.Bezet.First()) await BlokProefAlsNodig();
                 var taak = KiesTaak();
                 if (taak is null)
                 {
@@ -172,13 +175,19 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                 _log.Stap($"Taak: {taak.Omschrijving}.");
                 bool gelukt;
                 _nietNetjes387 = false;
+                int meldersVoor394 = _k.Melders.Count(), stappenVoor394 = _k.Stappen.Count(x => !x.Afgeleid);
                 try { gelukt = await VoerTaakUit(taak); }
                 catch (PlanFout pf) { _log.Waarschuwing($"Taak '{taak.Omschrijving}' lukt nu niet: {pf.Message}"); gelukt = false; }
                 // BUG #387: mislukte de taak alleen omdat de loc op de grens van twee melders stond, dan eerst netjes parkeren (begin van de lus) en niet als poging tellen
                 // (hoogstens 5 keer achter elkaar, zodat het geen eindeloze lus wordt).
                 if (!gelukt && _nietNetjes387 && _nietNetjesAchterElkaar++ < 5) { _log.Info("De taak lukte niet omdat de loc op de grens van twee melders staat: eerst netjes parkeren, dan opnieuw (BUG #387)."); continue; }
                 if (gelukt) { _nietNetjesAchterElkaar = 0; _andereAannameGeprobeerd = false; }
-                if (!gelukt)
+                // BUG #394: mislukte de taak maar is er onderweg iets nieuws gevonden (een nieuwe melder of overgang), dan telt het niet als mislukte poging, en mogen
+                // eerder overgeslagen taken weer: met de nieuwe kennis is er vaak wel een weg (simulatie: "verkennen na melder 5" werd overgeslagen omdat de route twee keer
+                // ergens anders uitkwam, daarna bleef de hele buitenring onverkend).
+                bool nieuws394 = _k.Melders.Count() > meldersVoor394 || _k.Stappen.Count(x => !x.Afgeleid) > stappenVoor394 + 1;
+                if (nieuws394 && _k.Overgeslagen.Count > 0) { _k.Overgeslagen.Clear(); _k.Mislukt.Clear(); }
+                if (!gelukt && !nieuws394)
                 {
                     int n = _k.Mislukt[taak.Sleutel] = _k.Mislukt.GetValueOrDefault(taak.Sleutel) + 1;
                     if (n >= 2 && !_k.Overgeslagen.Contains(taak.Sleutel))
