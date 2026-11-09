@@ -518,6 +518,16 @@ public partial class BaanVerkenner2
     /// <summary>BUG #387: een taak mislukte alleen omdat de loc op een grens stond; dat telt niet als mislukte poging (de hoofdlus parkeert eerst netjes).</summary>
     private bool _nietNetjes387;
 
+    /// <summary>BUG #395/#397: het omzetten of terugzetten van wissel a hief een kortsluiting op, dus ligt a onder of vlak bij de loc: de melders waar de loc nu staat
+    /// horen voortaan bij de zone van a (daar wordt a niet meer omgezet; simulatie met start op 25: 864 keer wissel 10 omgezet met de loc op 24).</summary>
+    private void OnthoudOnderLoc395(int a)
+    {
+        _monitor.Bijwerken();
+        var bij = _k.ExtraZone.TryGetValue(a, out var h395) ? h395 : _k.ExtraZone[a] = new HashSet<int>();
+        bij.UnionWith(_monitor.Bezet);
+        if (_k.LocMelder > 0) bij.Add(_k.LocMelder);
+    }
+
     private bool Veilig(int a, IReadOnlyCollection<int> bezet, out string reden)
     {
         reden = "";
@@ -637,7 +647,7 @@ public partial class BaanVerkenner2
         foreach (var (a, v) in terug.Where(kv => Fysiek(kv.Key) != kv.Value).ToList())
         {
             await ZetAdres(a, v);
-            if (await WachtOpGeenKortsluiting(TimeSpan.FromSeconds(2))) { _log.Info($"Zelf opgelost: wissel {a} terugzetten hief de kortsluiting op."); return true; }
+            if (await WachtOpGeenKortsluiting(TimeSpan.FromSeconds(2))) { _log.Info($"Zelf opgelost: wissel {a} terugzetten hief de kortsluiting op."); OnthoudOnderLoc395(a); return true; }
         }
         // 2. langzaam terugrijden (van het puntstuk af)
         for (int poging = 0; poging < 2; poging++)
@@ -661,10 +671,7 @@ public partial class BaanVerkenner2
                     _log.Info($"Zelf opgelost: wissel {a} omzetten hief de kortsluiting op.");
                     // BUG #395: deze wissel ligt dus onder of vlak bij de loc. Niet terugzetten zolang de loc op deze melder(s) staat (simulatie: wissel 14 hief de kortsluiting
                     // op melder 8 op; de volgende proef zette hem meteen terug, met de loc nog op 8 = omgezet onder de loc).
-                    _monitor.Bijwerken();
-                    var bij = _k.ExtraZone.TryGetValue(a, out var h395) ? h395 : _k.ExtraZone[a] = new HashSet<int>();
-                    bij.UnionWith(_monitor.Bezet);
-                    if (_k.LocMelder > 0) bij.Add(_k.LocMelder);
+                    OnthoudOnderLoc395(a);
                     return true;
                 }
                 await ZetAdres(a, oud);

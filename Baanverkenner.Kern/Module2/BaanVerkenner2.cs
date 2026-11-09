@@ -311,6 +311,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             await Herparkeer(Richting.Vooruit, alleBlokken: true);
             bezet = _monitor.Bezet.ToList();
             if (bezet.Count == 0) { await Herparkeer(Richting.Achteruit, alleBlokken: true); bezet = _monitor.Bezet.ToList(); }
+            if (bezet.Count == 0) bezet = await ZoekLoc396();
             if (bezet.Count == 0) throw new InvalidOperationException("De loc is op geen enkele melder te vinden. Zet de loc op een melder en start opnieuw.");
             // BUG #383 (log 05-11 10:51): de kruiprit begon "vanaf" de bewaarde melder (30), maar de loc stond daar niet meer; daardoor gold 30 als 'kwam van' en plande hij
             // 14 -> 30 (omkeren), wat meteen misging. Waar de loc vandaan kwam is na zo'n kruiprit onbekend.
@@ -339,6 +340,43 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         }
         if (_status.Kaart.StartMelder == 0) _status.Kaart.StartMelder = _k.LocMelder;
         _log.Info($"De loc staat op melder {_k.LocMelder}.");
+    }
+
+    /// <summary>WAT: de loc zoeken als na twee korte kruipritten nog geen melder bezet is: om beurten vooruit en achteruit, elke keer langer en (elke twee pogingen) iets
+    /// sneller, tot er een melder verandert; hoogstens 10 minuten (zelf oplossen, BUG #305). WAAROM (BUG #396, Marco 09-11 17:50: "deze versie vindt de hele loc niet"):
+    /// bij een nieuwe verkenning stond de loc nog op melder 25, maar Dinamo meldt alleen wijzigingen, dus het programma wist dat niet. Twee keer 22 s kruipen bleef binnen
+    /// melder 25 (een lange melder), er veranderde niets en de verkenning stopte met "de loc is op geen enkele melder te vinden".</summary>
+    private async Task<List<int>> ZoekLoc396()
+    {
+        var eind = _klok.Nu + TimeSpan.FromMinutes(10);
+        for (int n = 1; _klok.Nu < eind; n++)
+        {
+            _token.ThrowIfCancellationRequested();
+            var r = n % 2 == 1 ? Richting.Vooruit : Richting.Achteruit;
+            int v = BaanVerkenner.ZoekKruipSnelheid(Math.Max(1, _ins.Kruipsnelheid), _ins.Verkensnelheid, n + 2);
+            var duur = TimeSpan.FromSeconds(Math.Min(90, 20 + 15 * n));
+            _log.Info($"Loc zoeken, poging {n}: {r.Tekst()} met snelheid {v}, hoogstens {duur.TotalSeconds:0} s, tot er een melder verandert (BUG #396, nog niet getest op de baan).");
+            _monitor.Bijwerken();
+            var t0 = _klok.Nu;
+            StuurSnelheid(v, r, AlleBlokken());
+            bool veranderd = false;
+            while (_klok.Nu - t0 < duur)
+            {
+                await _klok.Wacht(Poll);
+                if (Kortsluiting()) break;
+                if (_monitor.Bijwerken().Any(x => x.Tijd >= t0) || _monitor.Bezet.Count > 0) { veranderd = true; break; }
+            }
+            await Stop();
+            _monitor.Bijwerken();
+            if (Kortsluiting()) { await HerstelKortsluiting(new Dictionary<int, bool>(), r); _monitor.Bijwerken(); }
+            if (veranderd || _monitor.Bezet.Count > 0)
+            {
+                if (_monitor.Bezet.Count != 1) { try { await Herparkeer(r, alleBlokken: true); } catch (PlanFout) { } }
+                var b = _monitor.Bezet.ToList();
+                if (b.Count > 0) { _log.Vondst($"Loc gevonden: melder {string.Join(", ", b)} (BUG #396)."); return b; }
+            }
+        }
+        return new List<int>();
     }
 
     // ================================================================ taken kiezen (wat is nu het nuttigst?)
@@ -609,6 +647,11 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                     _k.Overgeslagen.Add("U|" + Kennis2.Sleutel(t.Via, t.Melder, t.Richting));
                 _log.Waarschuwing($"Het verschil bij {t.Via} -> {t.Melder} ({t.Richting.Tekst()}) komt niet door één adres maar door een combinatie; de waarneming met {StapUitkomst.Tekst(b.Uitkomst)} (adressen {string.Join(",", b.Stand)} afbuigend) wordt vergeten.");
                 _k.Stappen.Remove(b);
+                // BUG #397 (simulatie met de loc op 25 bij de start: 12 uur lang dezelfde lus): de dekkingsrit zette steeds weer alle open adressen tegelijk om over dit stuk,
+                // de kruiswissel gaf dan door een combinatie (9 en 10 samen) kortsluiting, de proef vond geen los adres en vergat de waarneming, en zo eindeloos. Nu gelden de
+                // adressen die hier verschilden een groep: een dekkingsrit die over dit stuk komt, zet er hoogstens één van om (zo wordt elk apart getest, niet meer samen).
+                var stukken397 = _k.Stappen.Where(x => x.Melder == t.Melder && x.Richting == t.Richting && x.Uitkomst > 0).Select(x => (t.Melder, x.Uitkomst)).Append((t.Via, t.Melder)).Distinct().ToList();
+                foreach (var (van, naar) in stukken397) _k.NietSamen.Add($"{string.Join(",", alleVerschil.OrderBy(x => x))}|{van}>{naar}");
                 return true;
             }
             uitkomstLos = u1;

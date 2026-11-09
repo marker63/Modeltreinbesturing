@@ -3425,6 +3425,25 @@ Simulatie: verse verkenning 61 min (was 77), alles voltooid, 23/23, valse 0, ond
 nog op 8 (omgezet onder de loc). Nu: hief een wissel een kortsluiting op, dan horen de melders waar de loc toen stond bij de zone van die wissel (Kennis2.ExtraZone): daar
 wordt hij niet omgezet en de planning houdt er rekening mee. Simulatie elke 30 min: onder-loc 0 (was 1), voltooid, 23/23.
 
+## BUG #396 – OPGELOST (nog niet getest op de baan): "deze versie vindt de hele loc niet"
+(Marco 09-11 17:50, log 17:49.) Bij een nieuwe verkenning stond de loc nog op melder 25, maar Dinamo meldt alleen wijzigingen, dus het programma wist dat niet. Twee keer 22 s
+kruipen (snelheid 5) bleef binnen melder 25, er veranderde niets, en de verkenning stopte met "de loc is op geen enkele melder te vinden". Nu: daarna om beurten vooruit en
+achteruit, elke keer langer (tot 90 s) en elke twee pogingen iets sneller, tot er een melder verandert; hoogstens 10 minuten. Simulatie: MARCO2_STIL=1 (Dinamo meldt bij de
+start niet dat de loc al op een melder staat).
+
+## BUG #397 – OPGELOST (nog niet getest op de baan): eindeloze lus bij de kruiswissel als de verkenning niet op 13 begint
+(Simulatie met de loc op 25 of 29 bij de start, ook in versie 392: na 12 uur niet af, 16 melders, blok 1 en 2 niet gevonden - hetzelfde beeld als Marco's rit van 15:56.) Een
+dekkingsrit zette alle open adressen tegelijk om over 21 -> 24; wissel 9 en 10 samen gaven op de kruiswissel kortsluiting, elk apart niet. De proef vond geen los adres, vergat
+de waarneming, en de volgende dekkingsrit deed precies hetzelfde. Nu: de adressen die daar samen kortsluiting gaven, vormen een groep (Kennis2.NietSamen); een dekkingsrit over
+dat stuk zet er hoogstens één van om. Ook: hief het TERUGzetten van een wissel een kortsluiting op, dan hoort de melder van de loc ook bij de zone van die wissel (#395).
+
+## BUG #398 – OPGELOST (nog niet getest op de baan): loc opgesloten in de binnenring na een proef
+(Simulatie met start op 17.) De loc kwam bij een proef via 24 op 129. Voor de terugweg 129 -> 24 zette de planning wissel 10 en 11 (toen nog niet gevonden) al op 129 terug,
+waardoor 129 -> 24 kortsluiting gaf; daarna raakte de loc in de keerlus en vond hij de weg eruit niet meer (wissel 10, 13, 14 niet gevonden). Nu: bij omkeren geldt ook de stand
+van de nog niet gevonden adressen waarmee de loc kwam (zachte eis: lukt het zetten niet, dan vervalt hij), en proefstanden gaan pas terug als de loc echt terug is waar hij hoort.
+Simulatie (verse verkenning, gewoon): start 13: 61 min, 5: 50, 10: 61, 17: 166, 25: 160, 25 zonder melding bij de start: 188; overal voltooid, 23/23, alle 8 wissels, valse 0,
+onder-loc 0, gebruiker 0. (Versie 392: start 25 en 29 na 12 uur niet af.) Open punt: vanaf 17 en 25 duurt het nog lang (100-150 kortsluitingen bij de kruiswissel).
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:

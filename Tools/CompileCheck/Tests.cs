@@ -3375,6 +3375,8 @@ public static class Tests
                 };
                 var sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(true, start, fabriek);
                 sim.BuurwisselHeftKruisKortsluitingOp = variant == "streng";
+                // BUG #396: MARCO2_STIL=1 = Dinamo meldt bij de start niet dat de loc al op een melder staat (alleen wijzigingen)
+                if (Environment.GetEnvironmentVariable("MARCO2_STIL") == "1") sim.StatusOpvraagbaar = false;
                 var simMeld = new List<(DateTime T, string S)>();
                 sim.StatusBericht += t => { if (t.Contains("KORTSLUITING") || t.Contains("met de hand")) simMeld.Add((sim.HuidigeSimTijd, "##SIM## " + t)); };
                 var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 14, DinamoBlokken = "1-12", KruisMotoren = "10+13", HoogsteMelder = 150,

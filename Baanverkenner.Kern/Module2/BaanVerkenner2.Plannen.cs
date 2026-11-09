@@ -22,6 +22,8 @@ public partial class BaanVerkenner2
         public bool Omkeer;
         /// <summary>De eis komt niet van een rit vanaf deze ingang zelf, maar van een andere ingang aan dezelfde kant (terugval): niet zeker nodig.</summary>
         public bool Zacht;
+        /// <summary>BUG #398: adressen in de eis die niet zeker nodig zijn (nog niet gevonden adressen bij omkeren): lukt het zetten niet, dan vervalt die eis.</summary>
+        public HashSet<int> ZachtAdressen = new();
         public override string ToString() => $"{Van}->{Naar} ({H.Tekst()}{(Omkeer ? ", omkeren" : "")}{(Eis.Count > 0 ? ", " + string.Join(" ", Eis.Select(e => $"{e.Key}{(e.Value ? "A" : "R")}")) : "")})";
     }
 
@@ -67,8 +69,15 @@ public partial class BaanVerkenner2
         if (t.Via > 0)
         {
             // omkeren: terug naar Via, door dezelfde knoop; eis = de stand waarmee eerder van Via naar M gereden is
-            var eis = EisVoorOvergang(t.Via, t.M, t.H);
-            yield return (new Toestand(t.Via, t.M, t.H.Om()), new PlanStap { Van = t.M, Naar = t.Via, H = t.H.Om(), Eis = eis ?? new(), Omkeer = true }, 4);
+            var eis = EisVoorOvergang(t.Via, t.M, t.H) ?? new();
+            // BUG #398 (simulatie met start op 17, en met de loc op 25 zonder melding bij de start): de terugweg 129 -> 24 klopt alleen met de stand waarmee de loc
+            // kwam, ook voor nog niet gevonden adressen (wissel 10 en 11). Anders zette de planning die al op 129 terug en sloot de loc zich op in de binnenring.
+            // Die extra eis is zacht: lukt het zetten niet, dan vervalt hij.
+            var zacht = new HashSet<int>();
+            var kom = _k.Stappen.Where(x => x.Melder == t.Via && x.Richting == t.H && x.Uitkomst == t.M).OrderByDescending(x => x.Aantal).FirstOrDefault();
+            if (kom is not null)
+                foreach (var a in _adressen.Where(a => !_k.IsGevonden(a) && !eis.ContainsKey(a) && kom.Stand.Contains(a))) { eis[a] = true; zacht.Add(a); }
+            yield return (new Toestand(t.Via, t.M, t.H.Om()), new PlanStap { Van = t.M, Naar = t.Via, H = t.H.Om(), Eis = eis, Omkeer = true, ZachtAdressen = zacht }, 4);
         }
     }
 
@@ -155,7 +164,7 @@ public partial class BaanVerkenner2
                     // BUG #389 (Marco 09-11 12:39: "ik moet nog steeds iedere keer de loc verplaatsen terwijl hij er naar toe kan rijden"): de stap is vanaf deze
                     // ingang nooit gereden (de eis is geleend van een andere ingang). Kan de wissel nergens veilig om, dan rijdt de loc met de huidige stand door
                     // en kijkt waar hij uitkomt; komt hij ergens anders uit, dan wordt dat vastgelegd en opnieuw gepland (kortsluiting wordt gewoon hersteld).
-                    if (!stappen[i].Zacht) return null;
+                    if (!stappen[i].Zacht && !stappen[i].ZachtAdressen.Contains(a)) return null;
                     zachtGeschrapt.Add(a);
                     continue;
                 }
@@ -396,7 +405,10 @@ public partial class BaanVerkenner2
             _log.Vondst($"Proef {via} -> {m} ({r.Tekst()}): {StapUitkomst.Tekst(uitkomst.Value)}.");
             // proefstanden van nog niet gevonden adressen terug (de loc staat nu een melder voor de knoop)
             var basis = _adressen.Where(a => !_k.IsGevonden(a) && Fysiek(a) != BasisStand(a)).ToDictionary(a => a, a => BasisStand(a));
-            if (basis.Count > 0 && ProefPlek(_k.LocMelder)) await ZetStand(basis, "proef terug");
+            // BUG #398 (simulatie met start op 17): de terugrit kwam ergens anders uit (21 -> 24 -> 129 in plaats van 14); de proefstanden (10, 11) gingen toen op 129 terug,
+            // waarna de weg terug (129 -> 24) niet meer klopte en de loc in de binnenring opgesloten raakte. Alleen terugzetten als de loc echt terug is waar hij hoort.
+            bool terugGoed = _k.LocMelder == reeks[Math.Clamp(viaIndex, 0, reeks.Count - 1)];
+            if (basis.Count > 0 && ProefPlek(_k.LocMelder) && terugGoed) await ZetStand(basis, "proef terug");
             return uitkomst;
         }
         return null;
@@ -463,9 +475,11 @@ public partial class BaanVerkenner2
         if (open.Count == 0) yield break;
         var kaart = Dijkstra();
         var ritten = new List<(DekkingRit Rit, double Score)>();
+        bool dbg = Environment.GetEnvironmentVariable("MARCO2_DEBUG") == "1";
         foreach (var (s, kost) in kaart.Kosten.OrderBy(kv => kv.Value).Take(60))
         {
             var rit = SimuleerDekking(s, open);
+            if (dbg) _log.Info($"DEBUG dekking vanaf {s.M}<{s.Via}{s.H}: {(rit is null ? "geen (" + _dekkingWaarom + ")" : $"winst {rit.Winst} pad {string.Join("-", rit.Pad)}")}");
             if (rit is null || rit.Winst == 0) continue;
             ritten.Add((rit, rit.Winst / (double)(kost + rit.Pad.Count + 6)));
         }
@@ -473,6 +487,7 @@ public partial class BaanVerkenner2
         foreach (var (rit, _) in ritten.OrderByDescending(x => x.Score).Take(5)) yield return rit;
     }
 
+    private string _dekkingWaarom = "";
     private DekkingRit? SimuleerDekking(Toestand s, List<int> open)
     {
         var rit = new DekkingRit { Start = s, Pad = { s.M } };
@@ -489,18 +504,32 @@ public partial class BaanVerkenner2
             if (!gebruikt.Add(sleutel)) break;
             t = new Toestand(keuze.Uitkomst, t.M, t.H);
         }
-        if (rit.Pad.Count < 2) return null;
+        if (rit.Pad.Count < 2) { _dekkingWaarom = "pad te kort"; return null; }
         var adressen = new HashSet<int>();
+        // BUG #397: adressen die op een stuk van deze rit samen met een ander adres kortsluiting gaven, gaan in deze rit niet om
+        var nietSamen = new HashSet<int>();
+        var stukken = Enumerable.Range(1, rit.Pad.Count - 1).Select(i => $"{rit.Pad[i - 1]}>{rit.Pad[i]}").ToHashSet();
+        foreach (var g in _k.NietSamen)
+        {
+            var delen = g.Split('|');
+            if (!stukken.Contains(delen[1])) continue;
+            var (van, naar) = (int.Parse(delen[1].Split('>')[0]), int.Parse(delen[1].Split('>')[1]));
+            var groep = delen[0].Split(',').Select(int.Parse).Where(open.Contains).ToList();
+            // hoogstens één van de groep: die op deze rit nog het meest te testen heeft (een die al ergens anders uit de groep weg moest, telt niet)
+            int? houd = groep.Where(a => !nietSamen.Contains(a))
+                .OrderByDescending(a => Enumerable.Range(1, rit.Pad.Count - 1).Count(i => !_k.IsGetest(a, rit.Pad[i - 1], rit.Pad[i]))).Cast<int?>().FirstOrDefault();
+            foreach (var a in groep) if (a != houd) nietSamen.Add(a);
+        }
         for (int i = 1; i < rit.Pad.Count; i++)
-            foreach (var a in open) if (!_k.IsGetest(a, rit.Pad[i - 1], rit.Pad[i])) { adressen.Add(a); rit.Winst++; }
+            foreach (var a in open) if (!nietSamen.Contains(a) && !_k.IsGetest(a, rit.Pad[i - 1], rit.Pad[i])) { adressen.Add(a); rit.Winst++; }
         // de nog niet gevonden adressen gaan op de startplek om: dat moet een geschikte plek zijn (geen kruising, niet te kort)
-        if (!ProefPlek(s.M)) return null;
+        if (!ProefPlek(s.M)) { _dekkingWaarom = "geen proefplek"; return null; }
         // de wissels die de rit nodig heeft, moeten op de startplek veilig om te zetten zijn
         foreach (var (a, v) in rit.Eis)
         {
             if (Fysiek(a) == v) continue;
             var zone = _k.Zone(a);
-            if (zone.Contains(s.M)) return null;
+            if (zone.Contains(s.M)) { _dekkingWaarom = $"wissel {a} ligt hier"; return null; }
         }
         rit.Adressen = adressen.OrderBy(a => a).ToList();
         rit.Sleutel = $"D|{s.M}|{s.Via}|{s.H}|{string.Join(",", rit.Pad)}|{string.Join(",", rit.Adressen)}";
