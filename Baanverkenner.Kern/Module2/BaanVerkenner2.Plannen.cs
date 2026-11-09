@@ -20,6 +20,8 @@ public partial class BaanVerkenner2
         public Richting H;
         public Dictionary<int, bool> Eis = new();
         public bool Omkeer;
+        /// <summary>De eis komt niet van een rit vanaf deze ingang zelf, maar van een andere ingang aan dezelfde kant (terugval): niet zeker nodig.</summary>
+        public bool Zacht;
         public override string ToString() => $"{Van}->{Naar} ({H.Tekst()}{(Omkeer ? ", omkeren" : "")}{(Eis.Count > 0 ? ", " + string.Join(" ", Eis.Select(e => $"{e.Key}{(e.Value ? "A" : "R")}")) : "")})";
     }
 
@@ -39,6 +41,7 @@ public partial class BaanVerkenner2
         public List<PlanStap> Stappen = new();
         public List<Been> Benen = new();
         public int Kosten;
+        public string? Zacht;
         public override string ToString() => Stappen.Count == 0 ? "de loc staat al goed" : string.Join(", ", Stappen);
     }
 
@@ -59,7 +62,7 @@ public partial class BaanVerkenner2
         foreach (var g in _k.Mogelijkheden(t.Via, t.M, t.H).Where(x => x.Uitkomst > 0).GroupBy(x => x.Uitkomst))
         {
             var (uit, eis, terugval, _) = g.OrderBy(x => x.Eis.Count(e => Fysiek(e.Key) != e.Value)).ThenByDescending(x => x.Aantal).First();
-            yield return (new Toestand(uit, t.M, t.H), new PlanStap { Van = t.M, Naar = uit, H = t.H, Eis = eis }, terugval ? 3 : 1);
+            yield return (new Toestand(uit, t.M, t.H), new PlanStap { Van = t.M, Naar = uit, H = t.H, Eis = eis, Zacht = terugval }, terugval ? 3 : 1);
         }
         if (t.Via > 0)
         {
@@ -81,7 +84,7 @@ public partial class BaanVerkenner2
     }
 
     /// <summary>WAT: kortste routes (in stappen, omkeren telt zwaarder) vanaf de huidige plek (of <paramref name="vanaf"/>) naar alle bereikbare toestanden.</summary>
-    private DijkstraKaart Dijkstra(Toestand? vanaf = null)
+    private DijkstraKaart Dijkstra(Toestand? vanaf = null, HashSet<(Toestand, int, Richting)>? verboden = null)
     {
         var kaart = new DijkstraKaart { Start = vanaf ?? Hier };
         var rij = new PriorityQueue<Toestand, int>();
@@ -93,6 +96,7 @@ public partial class BaanVerkenner2
             if (k > 400) break;
             foreach (var (n, stap, c) in Buren(t))
             {
+                if (verboden is not null && verboden.Contains((t, stap.Naar, stap.H))) continue;
                 int nk = k + c;
                 if (kaart.Kosten.TryGetValue(n, out var oud) && oud <= nk) continue;
                 kaart.Kosten[n] = nk;
@@ -121,6 +125,7 @@ public partial class BaanVerkenner2
         var cur = _adressen.ToDictionary(a => a, a => Fysiek(a));
         var laatst = new Dictionary<int, int>();
         var zetten = new Dictionary<int, Dictionary<int, bool>>();
+        var zachtGeschrapt = new List<int>();
         int Plek(int p) => p == 0 ? start.M : stappen[p - 1].Naar;
         bool VeiligOp(int p, int a)
         {
@@ -136,7 +141,7 @@ public partial class BaanVerkenner2
             int? keuze = null;
             for (int p = lo; p <= hi; p++) if (breekpunten.Contains(p) && VeiligOp(p, a)) { keuze = p; break; }
             if (keuze is null) for (int p = lo; p <= hi; p++) if (VeiligOp(p, a)) { keuze = p; break; }
-            if (keuze is not int q) { _planFout = $"wissel {a} kan tussen stap {lo} en {hi} ({string.Join(",", Enumerable.Range(lo, hi - lo + 1).Select(Plek))}) nergens veilig om (route vanaf {start.M}: {string.Join(", ", stappen)})"; return false; }
+            if (keuze is not int q) { _planFoutStap = hi; _planFout = $"wissel {a} kan tussen stap {lo} en {hi} ({string.Join(",", Enumerable.Range(lo, hi - lo + 1).Select(Plek))}) nergens veilig om (route vanaf {start.M}: {string.Join(", ", stappen)})"; return false; }
             if (!zetten.TryGetValue(q, out var z)) zetten[q] = z = new Dictionary<int, bool>();
             z[a] = v; cur[a] = v;
             return true;
@@ -145,7 +150,15 @@ public partial class BaanVerkenner2
             foreach (var (a, v) in stappen[i].Eis)
             {
                 if (!cur.ContainsKey(a)) continue;
-                if (cur[a] != v && !Plaats(a, v, laatst.TryGetValue(a, out var l) ? l + 1 : 0, i)) return null;
+                if (cur[a] != v && !Plaats(a, v, laatst.TryGetValue(a, out var l) ? l + 1 : 0, i))
+                {
+                    // BUG #389 (Marco 09-11 12:39: "ik moet nog steeds iedere keer de loc verplaatsen terwijl hij er naar toe kan rijden"): de stap is vanaf deze
+                    // ingang nooit gereden (de eis is geleend van een andere ingang). Kan de wissel nergens veilig om, dan rijdt de loc met de huidige stand door
+                    // en kijkt waar hij uitkomt; komt hij ergens anders uit, dan wordt dat vastgelegd en opnieuw gepland (kortsluiting wordt gewoon hersteld).
+                    if (!stappen[i].Zacht) return null;
+                    zachtGeschrapt.Add(a);
+                    continue;
+                }
                 laatst[a] = i;
             }
         if (extraAanEind is not null)
@@ -163,6 +176,7 @@ public partial class BaanVerkenner2
             if (!zetten.TryGetValue(0, out var z0)) zetten[0] = z0 = new Dictionary<int, bool>();
             z0.TryAdd(a, BasisStand(a));
         }
+        if (zachtGeschrapt.Count > 0) plan.Zacht = $"wissel {string.Join(", ", zachtGeschrapt.Distinct())} blijft staan (kan onderweg nergens veilig om; die stap is vanaf deze kant nog nooit gereden)";
         // benen maken
         var grenzen = new SortedSet<int>(zetten.Keys) { 0 };
         for (int i = 0; i < stappen.Count; i++) if (stappen[i].Omkeer) grenzen.Add(i);
@@ -180,6 +194,7 @@ public partial class BaanVerkenner2
     }
 
     private string _planFout = "";
+    private int _planFoutStap = -1;
     private readonly Dictionary<Toestand, DijkstraKaart> _omwegCache = new();
     private int _omwegCacheVoor = -1;
 
@@ -188,8 +203,26 @@ public partial class BaanVerkenner2
     private Plan? PlanNaar(DijkstraKaart kaart, Toestand doel, IReadOnlyDictionary<int, bool>? extraAanEind = null)
     {
         if (!kaart.Kosten.TryGetValue(doel, out var kost)) return null;
-        var p = MaakPlan(kaart.Start, Pad(kaart, doel), doel, kost, extraAanEind);
+        _planFoutStap = -1;
+        var pad = Pad(kaart, doel);
+        var p = MaakPlan(kaart.Start, pad, doel, kost, extraAanEind);
         if (p is not null) return p;
+        // BUG #389: de kortste route vraagt soms een wisselomzetting die nergens veilig kan (wissel 10 moet tussen 129->24 (10A) en 24->14 (10R)
+        // om terwijl de loc in de zone van de kruiswissel staat). Dijkstra kijkt niet naar standen, dus dan de stap die de onmogelijke omzetting
+        // vraagt verbieden en opnieuw zoeken (hoogstens 6 keer). Zo rijdt de loc zelf een andere weg in plaats van Marco te vragen hem te verplaatsen.
+        var verboden = new HashSet<(Toestand, int, Richting)>();
+        for (int poging = 0; poging < 6 && _planFoutStap >= 0 && _planFoutStap < pad.Count; poging++)
+        {
+            int i = _planFoutStap;
+            var voor = i == 0 ? kaart.Start : new Toestand(pad[i - 1].Naar, pad[i - 1].Van, pad[i - 1].H);
+            if (!verboden.Add((voor, pad[i].Naar, pad[i].H))) break;
+            var k3 = Dijkstra(kaart.Start, verboden);
+            if (!k3.Kosten.TryGetValue(doel, out var kost3)) break;
+            _planFoutStap = -1;
+            pad = Pad(k3, doel);
+            p = MaakPlan(kaart.Start, pad, doel, kost3, extraAanEind);
+            if (p is not null) return p;
+        }
         if (_omwegCacheVoor != _k.Stappen.Count + _k.Relevant.Count * 1000) { _omwegCache.Clear(); _omwegCacheVoor = _k.Stappen.Count + _k.Relevant.Count * 1000; }
         foreach (var (s, ks) in kaart.Kosten.Where(kv => kv.Value is >= 1 and <= 16).OrderBy(kv => kv.Value).Take(14))
         {
@@ -237,6 +270,7 @@ public partial class BaanVerkenner2
     {
         if (!Hier.Equals(plan.Start)) { _log.Info("De loc staat niet meer waar het plan begon; opnieuw plannen."); return false; }
         if (plan.Stappen.Count > 0) _log.Stap($"Route: {plan}.");
+        if (plan.Zacht is not null) _log.Info($"Op deze route: {plan.Zacht}. De loc rijdt door en kijkt waar hij uitkomt (BUG #389, nog niet getest op de baan).");
         foreach (var been in plan.Benen)
         {
             if (been.Zetten.Count > 0 && !await ZetStand(been.Zetten, "route")) return false;

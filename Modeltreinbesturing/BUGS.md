@@ -3370,6 +3370,16 @@ horen niet in de kaart en houden de verkenning niet meer "niet af".
 Met Marco's voortgang in de simulatie: voltooid, 23/23 met blok, gebruiker 0 (was: niet af na 1 minuut); daarbij 1 keer een wissel onder de loc in die nagebootste situatie.
 Metingen module 2: alle varianten en hervatten gelijk (onder-loc 0).
 
+## BUG #389 – OPGELOST (nog niet getest op de baan): module 2 stopte nog steeds met "zet de loc op melder ..." terwijl hij er zelf heen kon rijden
+(Marco 09-11 12:39: "ik moet nog steeds iedere keer de loc verplaatsen terwijl hij er naar toe kan rijden, dit kost erg veel tijd".) Nagebootst met Marco's voortgang van 12:39 en
+de loc op 12: alle taken "niet te plannen", met als reden "wissel 10 kan nergens veilig om". De enige bekende weg uit de binnenring was 129 -> 24 (wissel 10 afbuigend) en dan
+24 -> 14, en voor die laatste stap leende de planning de stand van een rit vanaf de andere kant (21 -> 24 -> 14, wissel 10 rechtdoor). Wissel 10 had dan op melder 24 om
+gemoeten, midden in de kruiswissel: dat mag niet, dus was er geen plan en vroeg het scherm om de loc te verplaatsen.
+Oplossing: (1) is een stap vanaf deze kant nog nooit gereden (de stand is geleend van een andere ingang) en kan de wissel nergens veilig om, dan rijdt de loc met de huidige stand
+door en kijkt waar hij uitkomt (dat wordt vastgelegd, daarna opnieuw gepland; een kortsluiting wordt gewoon hersteld); (2) lukt een route verder niet, dan wordt de stap die
+de onmogelijke omzetting vraagt verboden en een andere route gezocht (hoogstens 6 keer). In het logboek: "Op deze route: wissel ... blijft staan ...".
+Met Marco's voortgang in de simulatie: voltooid, 23/23 met blok, valse 0, onder-loc 0, gebruiker 0 (was: niet af na 2 minuten).
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:
