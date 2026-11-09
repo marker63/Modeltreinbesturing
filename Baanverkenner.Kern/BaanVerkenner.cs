@@ -583,16 +583,22 @@ public partial class BaanVerkenner : IBaanVerkenner
         if (hervat)
         {
             int s = _kaart.StartMelder;
+            // WAT: bij een controle tellen melders die niet in de voltooide kaart staan niet mee (zoals spookmelder 268), zolang er ook een echte melder bezet is.
+            // WAAROM (BUG #392, Marco 09-11 15:43-15:53, controle met versie 390): Dinamo meldde 27 en 268 bezet (268 bestaat niet; module 2 had hem al als spookmelder
+            // weggegooid). Met twee melders bezet op een "kruising" deed het zelf oplossen 10 minuten lang (150 rondes) helemaal niets en vroeg daarna om hulp.
+            if (_status.Controle) NegeerMeldersBuitenKaart();
             var bezetNu = _monitor.Bezet;
             // WAT: een controle die nog niets gereden heeft, begint op de startmelder (of een eerdere startmelder) waar de loc al staat.
             // WAAROM (BUG #374, Marco 04-11 08:46, controle met 62 verschillen; log 08:33-08:43): na de uitbreiding vanaf 129 was 129 de startmelder. De loc stond op 13 (de eerste
             // startmelder). De controlekaart kent nog geen overgangen, dus de verkenner kroop 9 minuten melder voor melder de hele ring rond naar 129. Daarna liep de eerste rit
             // vast op een kortsluiting en stopte de controle (#162): bijna niets gecontroleerd.
+            // BUG #392: niet alleen op een eerdere startmelder, maar op elke melder van de voltooide kaart: de loc hoeft voor een controle niet eerst naar de startmelder
+            // (de controlekaart is nog leeg, dus de weg ernaartoe is niet bekend en de loc kroop er melder voor melder heen of kwam er helemaal niet).
             if (_status.Controle && _status.AfgerondeOpdrachten == 0 && _status.Wachtrij.Count == 0 && bezetNu.Count == 1 && bezetNu.First() != s
-                && _status.Kaart.EerdereStartMelders.Contains(bezetNu.First()))
+                && (_status.Kaart.EerdereStartMelders.Contains(bezetNu.First()) || _status.Kaart.Melders.Any(x => x.Nummer == bezetNu.First())))
             {
                 int nieuw = bezetNu.First();
-                _log.Info($"Controle: de loc staat op melder {nieuw}, een eerdere startmelder van deze kaart; de controle begint daar in plaats van op melder {s} (BUG #374).");
+                _log.Info($"Controle: de loc staat op melder {nieuw} van deze kaart; de controle begint daar in plaats van op melder {s} (BUG #374/#392).");
                 _kaart.EerdereStartMelders.Remove(nieuw);
                 if (!_kaart.EerdereStartMelders.Contains(s)) _kaart.EerdereStartMelders.Add(s);
                 _kaart.StartMelder = nieuw;

@@ -3398,6 +3398,14 @@ spookmelder was weggegooid. Nu worden bij het weggooien van een spookmelder de v
 Metingen: spookmeldertest OK; met Marco's voortgang (12:39 loc op 12 en 10, 14:02 loc op 29) voltooid, 23/23, valse 0, onder-loc 0, gebruiker 0; alle module 2-varianten en
 hervatten gelijk aan #390. De simulatie bootst het aanraken van 10 op de grens niet na: het weggooien van 129 zelf is daarom niet in de simulatie te zien geweest.
 
+## BUG #392 – OPGELOST (nog niet getest op de baan): "Voltooide baan nogmaals checken" deed 10 minuten niets en vroeg daarna om hulp
+(Marco 09-11 15:54, versie 390, log 15:43-15:53.) Dinamo meldde 27 en 268 bezet. 268 bestaat niet (module 2 had hem al als spookmelder weggegooid, maar Dinamo bleef hem als
+bezet melden). Twee melders bezet op wat module 1 als kruising ziet: geen enkele stap van het zelf oplossen (#305) deed dan iets, 150 rondes lang zonder één regel in het logboek en
+zonder één rijcommando. Oplossing: (1) bij een controle tellen bezette melders die niet in de voltooide kaart staan niet mee, zolang er ook een melder van de kaart bezet is;
+(2) een controle die nog niets gereden heeft, begint op elke melder van de voltooide kaart waar de loc netjes op staat (was: alleen een eerdere startmelder, #374), want de
+controlekaart is dan nog leeg en de weg naar de startmelder is niet bekend; (3) twee melders bezet op een kruising staat nu in het logboek in plaats van stil te wachten.
+Metingen module 1 (alle varianten, hervatten, regressietests 0 fouten) gelijk aan #391. De controle zelf heeft geen simulatie: dit deel is alleen op de log van 15:43 gebaseerd.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:

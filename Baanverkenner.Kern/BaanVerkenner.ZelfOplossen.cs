@@ -60,6 +60,20 @@ public partial class BaanVerkenner
         finally { _zelfOplossenBezig = false; }
     }
 
+    /// <summary>WAT: bij een controle: bezette melders die niet in de voltooide kaart staan, voortaan negeren (zoals een flikkeraar), als er ook een melder van de
+    /// kaart bezet is. WAAROM (BUG #392): een spookmelder (268) die bij Dinamo 'bezet' bleef hangen, hield de controle 10 minuten stil.</summary>
+    private void NegeerMeldersBuitenKaart()
+    {
+        _monitor.Bijwerken();
+        var bezet = _monitor.Bezet;
+        if (_status.Kaart.Melders.Count == 0) return;
+        var onbekend = bezet.Where(m => !_status.Kaart.Melders.Any(x => x.Nummer == m)).ToList();
+        if (onbekend.Count == 0 || onbekend.Count == bezet.Count) return;
+        foreach (var m in onbekend) _monitor.MarkeerSpook(m);
+        _monitor.Bijwerken();
+        _log.Info($"Controle: melder {Lijst(onbekend)} staat niet in de voltooide kaart en telt niet mee; de loc staat op melder {Lijst(_monitor.Bezet)} (BUG #392, nog niet getest op de baan).");
+    }
+
     private static string EersteRegel(string t) => t.Split('\n')[0];
 
     private async Task<bool> ZelfOplossenRonde(int doel, int ronde, HashSet<string> onderLocGeprobeerd)
@@ -82,9 +96,13 @@ public partial class BaanVerkenner
             }
         }
         await Wacht(TimeSpan.FromSeconds(1));
+        if (_status.Controle) NegeerMeldersBuitenKaart();   // BUG #392
         _monitor.Bijwerken();
         var bezet = _monitor.Bezet;
         if (bezet.Count == 1 && bezet.Contains(doel)) return true;
+        // BUG #392: twee melders bezet op een kruising: geen van de stappen hieronder doet dan iets. Niet meer stil 10 minuten wachten, maar het in het logboek zeggen.
+        if (bezet.Count == 2 && Kruis.OpKruis(bezet) && ronde % 20 == 1)
+            _log.Info($"Zelf oplossen, ronde {ronde}: melder {Lijst(bezet)} zijn allebei bezet (kruising); wachten tot een van beide vrij is (BUG #392, nog niet getest op de baan).");
 
         // (3) op de grens van twee melders (de loc is niet langer dan een melder): doorkruipen naar één melder
         if (bezet.Count == 2 && !Kruis.OpKruis(bezet))
