@@ -227,7 +227,9 @@ public partial class BaanVerkenner2
             {
                 _k.Omgedraaid = !_k.Omgedraaid;
                 h = h.Om();
-                _log.Vondst($"De loc rijdt andersom dan gedacht (van melder {vorigeM} naar {n} is volgens de kaart {h.Tekst()}): rijrichtingen worden vanaf nu omgedraaid (keerlus of omgedraaide loc).");
+                // BUG #390 (Marco 09-11 14:03): de loc zelf draait nooit om. Wat hier gebeurt: de loc heeft de keerlus (129 - 4 - 11 - 12 - 1 - 9 - 10 - 129) gereden en rijdt
+                // daarna met dezelfde decoderrichting de andere kant op over de baan. De kaartrichting (vooruit/achteruit) wordt daarom vanaf hier gespiegeld.
+                _log.Vondst($"Keerlus gereden: van melder {vorigeM} naar {n} is volgens de kaart {h.Tekst()}. De loc rijdt gewoon door in dezelfde decoderrichting; alleen de kaartrichting wordt vanaf nu gespiegeld.");
                 omgedraaidInRit = true;
                 draaiIndex = res.Reeks.Count;   // index die n zo krijgt
             }

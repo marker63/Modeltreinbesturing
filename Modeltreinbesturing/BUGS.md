@@ -3380,6 +3380,15 @@ door en kijkt waar hij uitkomt (dat wordt vastgelegd, daarna opnieuw gepland; ee
 de onmogelijke omzetting vraagt verboden en een andere route gezocht (hoogstens 6 keer). In het logboek: "Op deze route: wissel ... blijft staan ...".
 Met Marco's voortgang in de simulatie: voltooid, 23/23 met blok, valse 0, onder-loc 0, gebruiker 0 (was: niet af na 2 minuten).
 
+## BUG #390 – OPGELOST (nog niet getest op de baan): module 2 meldde "de loc rijdt andersom" en gokte op een omgedraaide loc
+(Marco 09-11 14:03: "hoe kan het nou dat je vindt dat de loc andersom rijdt, dat is echt onmogelijk".) De loc draait nooit om. Wat er wel gebeurt: de keerlus
+129 - 4 - 11 - 12 - 1 - 9 - 10 - 129. De loc rijdt die in één decoderrichting rond en komt daarna van de andere kant op hetzelfde stuk baan (hardwarelog 14:00-14:02:
+4 - 11 - 12 - 1 - 9 - 10 - 129 - 24 - 21 - 29, alles in één richting). Module 2 noteert per melder vooruit/achteruit en spiegelt die kaartrichting na de keerlus; het logboek
+noemde dat ten onrechte "de loc rijdt andersom". Oplossing: (1) de gok uit #388 ("andere aanname over de stand van de loc") is uitgezet, de planning vindt sinds #389 zelf de weg
+uit de keerlus; (2) de logregel heet nu "Keerlus gereden ... de loc rijdt gewoon door in dezelfde decoderrichting; alleen de kaartrichting wordt vanaf nu gespiegeld".
+Metingen: met Marco's voortgang van 12:39 (loc op 12 en op 10) en van 14:02 (loc op 29) voltooid, 23/23 met blok, valse 0, onder-loc 0, gebruiker 0; alle module 2-varianten
+en hervatten gelijk aan #389.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:

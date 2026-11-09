@@ -376,7 +376,9 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         // "niet te plannen" stopte de verkenning als niet af, en dan vraagt het scherm om de loc op de startmelder te zetten.
         if (onbereikbaar.Count > 0 && Environment.GetEnvironmentVariable("MARCO2_DEBUG") == "1")
             _log.Info($"DEBUG bereikbaar vanaf {Hier}: {string.Join(" ", Dijkstra().Kosten.Keys.Select(x => $"{x.M}<{x.Via}{(x.H == Richting.Vooruit ? "V" : "A")}").Distinct().OrderBy(x => x))}");
-        if (onbereikbaar.Count > 0 && !_andereAannameGeprobeerd)
+        // BUG #390 (Marco 09-11 14:03: "hoe kan het nou dat je vindt dat de loc andersom rijdt, dat is echt onmogelijk"): de loc draait nooit om. Deze gok is daarom
+        // uitgezet; sinds #389 vindt de planning zelf de weg uit de keerlus (129 -> 24 -> 21).
+        if (onbereikbaar.Count > 0 && !_andereAannameGeprobeerd && false)
         {
             _andereAannameGeprobeerd = true;
             _k.Omgedraaid = !_k.Omgedraaid;
