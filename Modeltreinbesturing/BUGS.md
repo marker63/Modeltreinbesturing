@@ -3360,6 +3360,16 @@ Metingen module 2: alle varianten en hervatten gelijk.
 Met Marco's voortgang in de simulatie: voltooid, 23/23 melders met blok, gebruiker 0 (was: niet af na 3 minuten). Wissel 3 en 12 staan nog als valse vondst in die voortgang (van vóór #380).
 Metingen module 2: alle varianten en hervatten (40 en 30 min, realistisch) gelijk.
 
+## BUG #388 – OPGELOST (nog niet getest op de baan): module 2 kwam niet meer uit de binnenring/keerlus en stopte als "niet af"
+(Marco 09-11 12:03: "je vraagt nog steeds om de loc op een bepaalde melder te zetten, terwijl je er gewoon zelf naar toe kan rijden"; log 09:26-09:28, 12:01-12:03.) Nagebootst met
+Marco's voortgang en de loc op 10 (MARCO2_START=10). De kennis kende rond 10, 129, 4, 11, 12, 1, 9 alleen de binnenring; elke uitgang (129 -> 24, 12 -> 5) was nog nooit gereden
+of gaf kortsluiting, en "uitweg zoeken" gebeurde alleen als er vanaf die melder helemaal geen doorgang bekend was. Na zes keer "niet te plannen" stopte de verkenning en vroeg het scherm
+om de loc op de startmelder te zetten. Oplossing: (1) zit de loc in een deel waar hij volgens de kennis niet uit kan terwijl er elders nog melders zijn, dan ook daar een uitweg zoeken;
+(2) is niets te plannen, één keer de andere aanname over de stand van de loc (omgedraaid) proberen; (3) melders die alleen even bezet waren tijdens een kortsluiting (137, 138: 0,2 s)
+horen niet in de kaart en houden de verkenning niet meer "niet af".
+Met Marco's voortgang in de simulatie: voltooid, 23/23 met blok, gebruiker 0 (was: niet af na 1 minuut); daarbij 1 keer een wissel onder de loc in die nagebootste situatie.
+Metingen module 2: alle varianten en hervatten gelijk (onder-loc 0).
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:

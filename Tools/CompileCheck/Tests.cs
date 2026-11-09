@@ -3802,7 +3802,7 @@ public static class Tests
         if (Environment.GetEnvironmentVariable("BENCH") == "1") { BenchTest(); return 0; }
         if (Environment.GetEnvironmentVariable("MARCO") == "1") { MarcoBench(); return 0; }
         if (Environment.GetEnvironmentVariable("MARCO2") == "1") { Marco2Bench(); return 0; }
-        if (Environment.GetEnvironmentVariable("MARCO2_HERVAT") == "1") { Marco2HervatBench(double.Parse(Environment.GetEnvironmentVariable("MARCO_MIN") ?? "40"), realistisch: Environment.GetEnvironmentVariable("MARCO2_HERVAT_REALISTISCH") == "1"); return 0; }
+        if (Environment.GetEnvironmentVariable("MARCO2_HERVAT") == "1") { Marco2HervatBench(double.Parse(Environment.GetEnvironmentVariable("MARCO_MIN") ?? "40"), start: int.Parse(Environment.GetEnvironmentVariable("MARCO2_START") ?? "13"), realistisch: Environment.GetEnvironmentVariable("MARCO2_HERVAT_REALISTISCH") == "1"); return 0; }
         if (Environment.GetEnvironmentVariable("MARCO_HERVAT") == "1") { foreach (var mn in (Environment.GetEnvironmentVariable("MARCO_MIN") ?? "40").Split(',')) MarcoHervatBench(double.Parse(mn)); return 0; }
         if (Environment.GetEnvironmentVariable("ALLEEN_382") == "1") { SpookmelderTest(); Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)"); return _fouten == 0 ? 0 : 1; }
         if (Environment.GetEnvironmentVariable("ALLEEN_MATRIX") == "1") { StapMatrixTest(); Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)"); return _fouten == 0 ? 0 : 1; }

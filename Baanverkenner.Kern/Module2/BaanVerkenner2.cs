@@ -177,7 +177,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                 // BUG #387: mislukte de taak alleen omdat de loc op de grens van twee melders stond, dan eerst netjes parkeren (begin van de lus) en niet als poging tellen
                 // (hoogstens 5 keer achter elkaar, zodat het geen eindeloze lus wordt).
                 if (!gelukt && _nietNetjes387 && _nietNetjesAchterElkaar++ < 5) { _log.Info("De taak lukte niet omdat de loc op de grens van twee melders staat: eerst netjes parkeren, dan opnieuw (BUG #387)."); continue; }
-                if (gelukt) _nietNetjesAchterElkaar = 0;
+                if (gelukt) { _nietNetjesAchterElkaar = 0; _andereAannameGeprobeerd = false; }
                 if (!gelukt)
                 {
                     int n = _k.Mislukt[taak.Sleutel] = _k.Mislukt.GetValueOrDefault(taak.Sleutel) + 1;
@@ -370,6 +370,27 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             }
             if (beste is not null) return beste;
         }
+        // WAT: is er niets te plannen, probeer dan één keer de andere aanname over hoe de loc staat (omgedraaid of niet). De eerste rit controleert dat meteen (#379/#386).
+        // WAAROM (BUG #388, Marco 09-11 12:03: "je vraagt nog steeds om de loc op een bepaalde melder te zetten, terwijl je er gewoon zelf naar toe kan rijden"; log 09:26-09:28 en
+        // 12:01-12:03): na de keerlus stond de loc volgens de kennis "omgedraaid". Vanaf 10, 129, 4, 11 en 1 vond de planning geen enkele weg naar de buitenring meer; na zes keer
+        // "niet te plannen" stopte de verkenning als niet af, en dan vraagt het scherm om de loc op de startmelder te zetten.
+        if (onbereikbaar.Count > 0 && Environment.GetEnvironmentVariable("MARCO2_DEBUG") == "1")
+            _log.Info($"DEBUG bereikbaar vanaf {Hier}: {string.Join(" ", Dijkstra().Kosten.Keys.Select(x => $"{x.M}<{x.Via}{(x.H == Richting.Vooruit ? "V" : "A")}").Distinct().OrderBy(x => x))}");
+        if (onbereikbaar.Count > 0 && !_andereAannameGeprobeerd)
+        {
+            _andereAannameGeprobeerd = true;
+            _k.Omgedraaid = !_k.Omgedraaid;
+            _k.LocRichting = _k.LocRichting.Om();
+            _k.LocVia = 0;
+            _omwegCache.Clear();
+            _log.Info($"Vanaf melder {_k.LocMelder} is niets te plannen; ik probeer de andere aanname over de stand van de loc (omgedraaid: {(_k.Omgedraaid ? "ja" : "nee")}) (BUG #388, nog niet getest op de baan).");
+            var opnieuw = KiesTaak();
+            if (opnieuw is not null) return opnieuw;
+            _k.Omgedraaid = !_k.Omgedraaid;
+            _k.LocRichting = _k.LocRichting.Om();
+            _omwegCache.Clear();
+            return null;
+        }
         if (onbereikbaar.Count > 0)
         {
             _log.Info($"Nog {onbereikbaar.Count} taak/taken die vanaf melder {_k.LocMelder} nu niet te plannen zijn: {string.Join("; ", onbereikbaar.Take(4))}{(onbereikbaar.Count > 4 ? " …" : "")}. Laatste reden: {_planFout}.");
@@ -379,6 +400,8 @@ public partial class BaanVerkenner2 : IBaanVerkenner
     }
     private int _onbereikbaar;
     private int _nietNetjesAchterElkaar;
+    /// <summary>BUG #388: al geprobeerd met de andere aanname over de stand van de loc (wordt teruggezet zodra een taak lukt).</summary>
+    private bool _andereAannameGeprobeerd;
     /// <summary>Tegenspraken die met alle verschillende adressen (ook al gevonden wissels) uitgezocht worden.</summary>
     private readonly HashSet<string> _tegenspraakBreed = new();
 
@@ -402,11 +425,16 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                             yield return new Taak { Soort = soort, Sleutel = $"V|{m}|{r}", Melder = m, Richting = r, Omschrijving = $"verkennen wat er na melder {m} komt ({r.Tekst()})" };
                 break;
             case Soort.Uitweg:
+                // BUG #388: zit de loc in een deel van de baan waar hij volgens de kennis niet uit kan (bijv. de binnenring met de keerlus, terwijl de buitenring wel bekend is),
+                // dan ook een uitweg zoeken bij kortsluitingen in dat deel, ook als er vanaf die melder al een andere doorgang bekend is.
+                var bereik388 = Dijkstra().Kosten.Keys.Select(x => x.M).ToHashSet();
+                bool afgesneden388 = _k.Melders.Any(m => !bereik388.Contains(m) && !_k.Spookmelders.Contains(m));
                 foreach (var g in _k.Stappen.Where(s => !s.Afgeleid && !s.Terug && s.Via > 0 && s.Uitkomst == StapUitkomst.Kortsluiting).GroupBy(s => s.IngangSleutel))
                 {
                     var s0 = g.First();
                     // alleen als er vanuit deze melder in deze richting nog géén enkele doorgang bekend is
-                    if (_k.Stappen.Any(s => s.Melder == s0.Melder && s.Richting == s0.Richting && s.Uitkomst != StapUitkomst.Kortsluiting)) continue;
+                    if (_k.Stappen.Any(s => s.Melder == s0.Melder && s.Richting == s0.Richting && s.Uitkomst != StapUitkomst.Kortsluiting)
+                        && !(afgesneden388 && bereik388.Contains(s0.Melder))) continue;
                     yield return new Taak { Soort = soort, Sleutel = "U|" + g.Key, Via = s0.Via, Melder = s0.Melder, Richting = s0.Richting, A = s0,
                         Omschrijving = $"een uitweg zoeken na melder {s0.Melder} ({s0.Richting.Tekst()}): daar gaf elke stand tot nu toe kortsluiting" };
                 }

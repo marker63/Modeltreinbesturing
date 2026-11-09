@@ -1,4 +1,4 @@
-namespace Baanverkenner.Kern;
+﻿namespace Baanverkenner.Kern;
 
 // =====================================================================================================================
 //  MODULE 2 - de baankaart opbouwen uit de kennis (zelfde formaat als module 1)
@@ -32,6 +32,10 @@ public partial class BaanVerkenner2
         var k = _status.Kaart;
         k.Programma = "Baanverkenner module 2";
         k.Overgangen.Clear(); k.Doorgangen.Clear(); k.Wissels.Clear(); k.Kopsporen.Clear(); k.Kortsluitpunten.Clear();
+        // BUG #388 (log 09-11 09:19): melder 137 en 138 werden alleen even bezet tijdens een kortsluiting (0,2 s, geen echte sectie). Ze kwamen via het live bijwerken (#384) in
+        // de kaart en hielden de verkenning "niet af". Alleen melders die in de vastgelegde stappen voorkomen, horen in de kaart.
+        var echt388 = _k.Melders.ToHashSet();
+        k.Melders.RemoveAll(m => !echt388.Contains(m.Nummer));
         foreach (var m in _k.Melders) k.Melder(m).DinamoBlok = _k.Blokken.TryGetValue(m, out var b) ? b : null;
         if (k.StartMelder == 0) k.StartMelder = _k.LocMelder;
 
