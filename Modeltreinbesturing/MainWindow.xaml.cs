@@ -748,6 +748,11 @@ public partial class MainWindow : Window
             // Bewust GEEN MetLoginToegang hier - programma afsluiten (en dus een backup
             // laten maken) is geen bouwscherm-actie, dat moet iedereen kunnen doen.
             _baanoverzichtKijkWindow.ProgrammaAfsluitenGevraagd += () => Close();
+            // Menu Account (Marco 10-11): wachtwoord wijzigen vraagt eerst de gewone login; een nieuwe baan beginnen kan bewust ZONDER login (wachtwoord vergeten:
+            // anders kom je nergens meer bij). Het opgeslagen bestand van de huidige baan wordt daarbij niet aangeraakt. Via BeginInvoke, omdat Nieuw het kijkscherm
+            // sluit en opnieuw opent: dat mag niet midden in de klik van dat kijkscherm zelf gebeuren.
+            _baanoverzichtKijkWindow.WachtwoordWijzigenGevraagd += () => MetLoginToegang(() => WachtwoordWijzigen(_baanoverzichtKijkWindow ?? (Window)this));
+            _baanoverzichtKijkWindow.NieuweBaanGevraagd += () => Dispatcher.BeginInvoke(new Action(() => NieuwProject(_baanoverzichtKijkWindow ?? (Window)this)));
             _baanoverzichtKijkWindow.AlleTreinenGaanRijdenGevraagd += AlleTreinenGaanRijden;
             _baanoverzichtKijkWindow.AlleTreinenOpstellenGevraagd += AlleTreinenOpstellen;
             _baanoverzichtKijkWindow.AlleTreinenStoppenGevraagd += AlleTreinenStoppenOpBestemming;
@@ -1405,6 +1410,19 @@ public partial class MainWindow : Window
     /// <summary>Alleen een BEHEERDER (niet elke ingelogde bouwscherm-gebruiker) mag hier
     /// komen - vereist dus eerst een login (als er nog geen actieve sessie is), en
     /// controleert daarna expliciet IsAdmin.</summary>
+    private void WachtwoordWijzigen_Click(object sender, RoutedEventArgs e) => MetLoginToegang(() => WachtwoordWijzigen(this));
+
+    /// <summary>WAT: laat de ingelogde gebruiker zijn eigen wachtwoord wijzigen (huidig wachtwoord + twee keer het nieuwe).
+    /// WAAROM (Marco 10-11): er was geen menu om het wachtwoord te wijzigen. Vergeten wachtwoord: zie het menu Account in het kijkscherm (nieuwe baan).</summary>
+    private void WachtwoordWijzigen(Window eigenaar)
+    {
+        if (_ingelogdeGebruiker is null) return;
+        var dialoog = new WachtwoordWijzigenDialog(_gebruikersBeheerder, _ingelogdeGebruiker) { Owner = eigenaar };
+        if (dialoog.ShowDialog() == true)
+            MessageBox.Show(eigenaar, "Het wachtwoord is gewijzigd. Sla de baan op (Bestand -> Opslaan in het blokkenschema), anders geldt na het herstarten weer het oude wachtwoord.",
+                "Modeltreinbesturing", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
     private void GebruikersBeheren_Click(object sender, RoutedEventArgs e)
     {
         MetLoginToegang(() =>
@@ -1804,10 +1822,17 @@ public partial class MainWindow : Window
         }
     }
 
-    private void Nieuw_Click(object sender, RoutedEventArgs e)
+    private void Nieuw_Click(object sender, RoutedEventArgs e) => NieuwProject(this);
+
+    /// <summary>WAT: begint een nieuwe, lege baan en vraagt meteen om de eerste beheerder (naam en wachtwoord).
+    /// WAAROM: vanuit het blokkenschema (Bestand -> Nieuw) en sinds Marco 10-11 ook vanuit het kijkscherm (menu Account) zonder in te loggen, voor als het
+    /// wachtwoord vergeten is. Het opgeslagen bestand van de huidige baan blijft op schijf staan; pas bij Opslaan kies je waar de nieuwe baan komt.</summary>
+    private void NieuwProject(Window eigenaar)
     {
-        var vraag = MessageBox.Show(this,
-            "Nieuw project beginnen? Alles wat nu open staat (blokken, baanontwerp, wisselstraten, routes) gaat verloren als je het nog niet hebt opgeslagen.",
+        bool vanuitKijkscherm = !ReferenceEquals(eigenaar, this);
+        var vraag = MessageBox.Show(eigenaar,
+            "Nieuw project beginnen? Alles wat nu open staat (blokken, baanontwerp, wisselstraten, routes) gaat verloren als je het nog niet hebt opgeslagen."
+            + (vanuitKijkscherm ? "\n\nHet opgeslagen bestand van de huidige baan blijft gewoon op schijf staan. Je maakt hierna meteen een nieuwe beheerder met een nieuw wachtwoord aan." : ""),
             "Nieuw project", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
         if (vraag != MessageBoxResult.Yes) return;
 
@@ -1862,8 +1887,12 @@ public partial class MainWindow : Window
         // anders is er straks helemaal geen account meer dat toegang tot de bouwschermen
         // kan geven. Het kijkscherm zelf heeft hier niets mee te maken, dat blijft vrij
         // toegankelijk.
-        var eersteBeheerderDialoog = new NieuwAccountDialog(_gebruikersBeheerder, verplichtBeheerder: true) { Owner = this };
-        eersteBeheerderDialoog.ShowDialog();
+        // Eigenaar: vanuit het kijkscherm het (opnieuw geopende) kijkscherm, want dit venster (blokkenschema) is dan verborgen.
+        Window dialoogEigenaar = vanuitKijkscherm ? (_baanoverzichtKijkWindow ?? (Window)this) : this;
+        var eersteBeheerderDialoog = new NieuwAccountDialog(_gebruikersBeheerder, verplichtBeheerder: true) { Owner = dialoogEigenaar };
+        if (eersteBeheerderDialoog.ShowDialog() == true && vanuitKijkscherm)
+            MessageBox.Show(dialoogEigenaar, "De nieuwe baan is klaar en de beheerder is aangemaakt. Log in via Bouwschermen en sla de baan op onder een nieuwe naam (Bestand -> Opslaan).",
+                "Modeltreinbesturing", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void Laden_Click(object sender, RoutedEventArgs e)

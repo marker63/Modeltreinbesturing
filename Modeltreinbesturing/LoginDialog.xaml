@@ -10,6 +10,7 @@
         <TextBox x:Name="NaamBox" Margin="0,0,0,10"/>
         <TextBlock Text="Wachtwoord:" Margin="0,0,0,4"/>
         <PasswordBox x:Name="WachtwoordBox" Margin="0,0,0,10" KeyDown="WachtwoordBox_KeyDown"/>
+        <TextBlock Margin="0,0,0,10"><Hyperlink Click="Vergeten_Click">Wachtwoord vergeten?</Hyperlink></TextBlock>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="Inloggen" Padding="10,4" Margin="0,0,8,0" Click="Inloggen_Click" IsDefault="True"/>
             <Button Content="Annuleren" Padding="10,4" IsCancel="True"/>

@@ -50,6 +50,7 @@
                 <MenuItem Header="Geleerde reistijden wissen..." Click="GeleerdeReistijdenWissen_Click" ToolTip="Wist Blok.GeleerdeReistijdSeconden voor alle blokken - gebruik dit als een eerdere, afwijkende meting (bijv. van vóór een software-update) een veiligheidsdrempel te kort heeft gemaakt."/>
                 <Separator/>
                 <MenuItem Header="Gebruikers beheren..." Click="GebruikersBeheren_Click"/>
+                <MenuItem Header="Eigen wachtwoord wijzigen..." Click="WachtwoordWijzigen_Click"/>
             </MenuItem>
             <MenuItem Header="_Geselecteerd blok">
                 <MenuItem Header="Loc plaatsen" Click="LocPlaatsen_Click"/>

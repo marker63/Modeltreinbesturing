@@ -55,6 +55,12 @@
                 <MenuItem Header="Baanontwerp (bewerken)" Click="OpenBaanontwerpBewerken_Click"/>
                 <MenuItem Header="Treinroutes" Click="OpenTreinroutesVanuitKijkscherm_Click"/>
             </MenuItem>
+            <MenuItem Header="_Account">
+                <MenuItem Header="Wachtwoord wijzigen..." Click="WachtwoordWijzigenVanuitKijkscherm_Click"
+                          ToolTip="Eerst inloggen met het huidige wachtwoord, daarna een nieuw wachtwoord kiezen."/>
+                <MenuItem Header="Nieuwe baan beginnen (met nieuwe beheerder)..." Click="NieuweBaanVanuitKijkscherm_Click"
+                          ToolTip="Kan zonder inloggen, bijvoorbeeld als je je wachtwoord vergeten bent. Het opgeslagen bestand van de huidige baan blijft op schijf staan."/>
+            </MenuItem>
             <MenuItem Header="Incidenten en wijzigingen" Click="OnderhoudVanuitKijkscherm_Click"
                       ToolTip="Bekijk de onderhoudslog per object, of meld zelf een incident/wijziging - geen inloggen nodig."/>
             <MenuItem Header="Dashboard" Click="DashboardVanuitKijkscherm_Click"/>

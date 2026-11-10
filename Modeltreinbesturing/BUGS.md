@@ -3444,6 +3444,13 @@ van de nog niet gevonden adressen waarmee de loc kwam (zachte eis: lukt het zett
 Simulatie (verse verkenning, gewoon): start 13: 61 min, 5: 50, 10: 61, 17: 166, 25: 160, 25 zonder melding bij de start: 188; overal voltooid, 23/23, alle 8 wissels, valse 0,
 onder-loc 0, gebruiker 0. (Versie 392: start 25 en 29 na 12 uur niet af.) Open punt: vanaf 17 en 25 duurt het nog lang (100-150 kortsluitingen bij de kruiswissel).
 
+## BUG #399 – OPGELOST (nog niet getest, het WPF-deel kan hier niet gecompileerd worden): geen menu om een wachtwoord te wijzigen of zonder inloggen een nieuwe baan te maken
+(Marco 10-11 16:05: wachtwoord vergeten, geen menu meer om een nieuwe baan te maken.) "Bestand -> Nieuw" zat alleen in het blokkenschema, en daarvoor moet je inloggen. Nu:
+(1) kijkscherm, nieuw menu Account: "Wachtwoord wijzigen..." (na inloggen) en "Nieuwe baan beginnen (met nieuwe beheerder)..." (zonder inloggen; het opgeslagen bestand van de
+oude baan blijft op schijf staan, opslaan gaat altijd via de opslaan-dialoog); (2) blokkenschema, Beheren -> "Eigen wachtwoord wijzigen..."; (3) Gebruikers beheren: knop
+"Wachtwoord..." om het wachtwoord van een account opnieuw in te stellen (beheerder); (4) inlogscherm: "Wachtwoord vergeten?" met uitleg. Nieuw venster WachtwoordWijzigenDialog,
+GebruikersBeheerder.WijzigWachtwoord, Help bijgewerkt.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:

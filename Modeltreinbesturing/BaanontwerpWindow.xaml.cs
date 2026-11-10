@@ -87,6 +87,9 @@ public partial class BaanontwerpWindow : Window
     /// ooit open hebt gehad. Roept via MainWindow gewoon Close() aan, precies zoals
     /// Bestand -> Programma afsluiten dat daar al deed.</summary>
     public Action? ProgrammaAfsluitenGevraagd;
+    /// <summary>Kijkscherm, menu Account (Marco 10-11): wachtwoord wijzigen (na inloggen) en een nieuwe baan beginnen zonder inloggen.</summary>
+    public Action? WachtwoordWijzigenGevraagd;
+    public Action? NieuweBaanGevraagd;
 
     /// <summary>De drie kijkscherm-knoppen (Go/Opstellen/Stop) - werken op ALLE treinen
     /// tegelijk, dus geen parameters nodig; MainWindow verzorgt de daadwerkelijke uitvoering
@@ -663,6 +666,10 @@ public partial class BaanontwerpWindow : Window
     private void OpenTreinroutesVanuitKijkscherm_Click(object sender, RoutedEventArgs e) => TreinroutesGevraagd?.Invoke();
 
     private void ProgrammaAfsluiten_Click(object sender, RoutedEventArgs e) => ProgrammaAfsluitenGevraagd?.Invoke();
+
+    private void WachtwoordWijzigenVanuitKijkscherm_Click(object sender, RoutedEventArgs e) => WachtwoordWijzigenGevraagd?.Invoke();
+
+    private void NieuweBaanVanuitKijkscherm_Click(object sender, RoutedEventArgs e) => NieuweBaanGevraagd?.Invoke();
 
     private void OnderhoudVanuitKijkscherm_Click(object sender, RoutedEventArgs e)
     {

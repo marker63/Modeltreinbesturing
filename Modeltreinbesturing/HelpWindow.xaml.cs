@@ -361,7 +361,11 @@ public partial class HelpWindow : Window
             "Bij het aanmaken van een nieuwe database (Bestand -> Nieuw) wordt meteen gevraagd om de eerste (echte) beheerder aan te maken - een database zonder minstens één beheerder kan niet, anders zou niemand ooit nog een account kunnen toevoegen.",
             "### Inloggen",
             "Zodra je vanuit het kijkscherm een bouwscherm probeert te openen (via het menu 'Bouwschermen'), verschijnt er een inlogscherm. Je hoeft dit maar één keer per sessie te doen - daarna blijf je ingelogd totdat je het programma afsluit.",
-            "Wachtwoorden worden nooit als platte tekst bewaard, alleen een veilige hash (PBKDF2 met een eigen willekeurige salt per account)."
+            "Wachtwoorden worden nooit als platte tekst bewaard, alleen een veilige hash (PBKDF2 met een eigen willekeurige salt per account).",
+            "### Wachtwoord wijzigen of vergeten",
+            "- Wachtwoord wijzigen: in het kijkscherm via Account -> Wachtwoord wijzigen, of in het blokkenschema via Beheren -> Eigen wachtwoord wijzigen. Daarna de baan opslaan.",
+            "- Een beheerder kan het wachtwoord van elk account opnieuw instellen via Beheren -> Gebruikers beheren -> Wachtwoord...",
+            "- Wachtwoord vergeten: het is niet terug te halen. Via het kijkscherm, Account -> Nieuwe baan beginnen (met nieuwe beheerder), kun je zonder inloggen een nieuwe baan met een nieuwe beheerder beginnen; het opgeslagen bestand van de oude baan blijft op schijf staan."
         }),
 
         new Onderwerp("Sneltoetsen", new[]

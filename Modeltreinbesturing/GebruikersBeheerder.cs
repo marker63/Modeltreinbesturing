@@ -50,6 +50,16 @@ public class GebruikersBeheerder
         return CryptographicOperations.FixedTimeEquals(berekendeHash, opgeslagenHash) ? gebruiker : null;
     }
 
+    /// <summary>WAT: geeft een bestaand account een nieuw wachtwoord (nieuwe salt en hash, het oude wachtwoord werkt daarna niet meer).
+    /// WAAROM (Marco 10-11): er was geen menu om een wachtwoord te wijzigen.</summary>
+    public void WijzigWachtwoord(Gebruiker gebruiker, string nieuwWachtwoord)
+    {
+        var saltBytes = RandomNumberGenerator.GetBytes(16);
+        var hashBytes = Rfc2898DeriveBytes.Pbkdf2(nieuwWachtwoord, saltBytes, 100_000, HashAlgorithmName.SHA256, 32);
+        gebruiker.WachtwoordSalt = Convert.ToBase64String(saltBytes);
+        gebruiker.WachtwoordHash = Convert.ToBase64String(hashBytes);
+    }
+
     public void VerwijderGebruiker(Gebruiker gebruiker) => Gebruikers.Remove(gebruiker);
 
     public void Reset() => Gebruikers.Clear();

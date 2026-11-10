@@ -1,0 +1,22 @@
+<Window x:Class="Modeltreinbesturing.WachtwoordWijzigenDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Wachtwoord wijzigen" Width="360" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+    <!-- Marco 10-11: venster om een wachtwoord te wijzigen (eigen account: met het huidige wachtwoord; een beheerder voor een ander account: zonder). -->
+    <StackPanel Margin="16">
+        <TextBlock x:Name="UitlegTekst" TextWrapping="Wrap" Margin="0,0,0,14"/>
+        <StackPanel x:Name="HuidigPaneel">
+            <TextBlock Text="Huidig wachtwoord:" Margin="0,0,0,4"/>
+            <PasswordBox x:Name="HuidigBox" Margin="0,0,0,12"/>
+        </StackPanel>
+        <TextBlock Text="Nieuw wachtwoord:" Margin="0,0,0,4"/>
+        <PasswordBox x:Name="NieuwBox" Margin="0,0,0,12"/>
+        <TextBlock Text="Nieuw wachtwoord herhalen:" Margin="0,0,0,4"/>
+        <PasswordBox x:Name="HerhaalBox" Margin="0,0,0,16"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Wijzigen" Padding="10,4" Margin="0,0,8,0" Click="Wijzigen_Click" IsDefault="True"/>
+            <Button Content="Annuleren" Padding="10,4" IsCancel="True"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

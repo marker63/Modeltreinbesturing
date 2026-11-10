@@ -53,5 +53,19 @@ public partial class GebruikersBeherenDialog : Window
         VulLijst();
     }
 
+    /// <summary>Marco 10-11: een beheerder kan het wachtwoord van een account opnieuw instellen (bijvoorbeeld als iemand het vergeten is).
+    /// Voor het eigen account wordt eerst het huidige wachtwoord gevraagd.</summary>
+    private void Wachtwoord_Click(object sender, RoutedEventArgs e)
+    {
+        if (GebruikersLijst.SelectedItem is not Gebruiker gebruiker)
+        {
+            MessageBox.Show(this, "Selecteer eerst een account.", "Modeltreinbesturing", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        var dialoog = new WachtwoordWijzigenDialog(_gebruikersBeheerder, gebruiker, huidigVragen: gebruiker == _huidigeGebruiker) { Owner = this };
+        if (dialoog.ShowDialog() == true)
+            MessageBox.Show(this, $"Het wachtwoord van '{gebruiker.Naam}' is gewijzigd. Vergeet niet de baan op te slaan.", "Modeltreinbesturing", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
     private void Sluiten_Click(object sender, RoutedEventArgs e) => Close();
 }

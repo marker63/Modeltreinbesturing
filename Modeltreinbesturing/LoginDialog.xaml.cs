@@ -21,6 +21,16 @@ public partial class LoginDialog : Window
         if (e.Key == Key.Enter) Inloggen_Click(sender, new RoutedEventArgs());
     }
 
+    /// <summary>Marco 10-11: uitleg wat je kunt doen als je het wachtwoord vergeten bent (het wachtwoord zelf is nergens terug te halen, alleen een hash wordt bewaard).</summary>
+    private void Vergeten_Click(object sender, RoutedEventArgs e)
+    {
+        MessageBox.Show(this,
+            "Een vergeten wachtwoord is niet terug te halen: het programma bewaart alleen een versleutelde controlewaarde, nooit het wachtwoord zelf.\n\n"
+            + "Wat wel kan: in het kijkscherm, menu Account -> 'Nieuwe baan beginnen (met nieuwe beheerder)'. Dat kan zonder inloggen; het opgeslagen bestand van de huidige baan "
+            + "blijft op schijf staan. Weet je wel het wachtwoord van een ander beheerdersaccount, log daarmee in en wijzig het via Beheren -> Gebruikers beheren.",
+            "Wachtwoord vergeten", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
     private void Inloggen_Click(object sender, RoutedEventArgs e)
     {
         var gebruiker = _gebruikersBeheerder.Verifieer(NaamBox.Text.Trim(), WachtwoordBox.Password);
