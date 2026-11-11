@@ -38,11 +38,17 @@ public class HardwareBeheerder
     /// aansluitende Redraw() toont altijd de actuele, juiste stand.</summary>
     public event Action? WisselStandGewijzigd;
 
+    /// <summary>BUG #400: doorgeven van een kortsluiting PER Dinamo-blok (IBlokAlarmBron). Werd in het hoofdprogramma nergens gebruikt: bij een kortsluiting
+    /// tijdens een rit bleef de loc gewoon snelheid krijgen. Komt op de achtergrondthread binnen (zie IBlokAlarmBron).</summary>
+    public event Action<int, bool>? BlokAlarmGewijzigd;
+    private void DoorgevenBlokAlarm(int blok, bool actief) => BlokAlarmGewijzigd?.Invoke(blok, actief);
+
     public HardwareBeheerder()
     {
         _wachtrijTimer.Tick += (_, _) => VerwerkVolgendeCommando();
         Huidige.StatusBericht += DoorsturenNaarLog;
         Huidige.KortsluitingStatusGewijzigd += DoorgevenKortsluitingStatus;
+        if (Huidige is IBlokAlarmBron bron) bron.BlokAlarmGewijzigd += DoorgevenBlokAlarm;
     }
 
     /// <summary>StatusBericht-meldingen (bijv. "dit commando is nog niet geïmplementeerd
@@ -143,9 +149,11 @@ public class HardwareBeheerder
     {
         Huidige.StatusBericht -= DoorsturenNaarLog;
         Huidige.KortsluitingStatusGewijzigd -= DoorgevenKortsluitingStatus;
+        if (Huidige is IBlokAlarmBron oudeBron) oudeBron.BlokAlarmGewijzigd -= DoorgevenBlokAlarm;
         Huidige = nieuw;
         Huidige.StatusBericht += DoorsturenNaarLog;
         Huidige.KortsluitingStatusGewijzigd += DoorgevenKortsluitingStatus;
+        if (Huidige is IBlokAlarmBron nieuweBron) nieuweBron.BlokAlarmGewijzigd += DoorgevenBlokAlarm;
         HardwareGewijzigd?.Invoke();
     }
 

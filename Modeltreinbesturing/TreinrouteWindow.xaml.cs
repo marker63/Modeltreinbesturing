@@ -1159,6 +1159,7 @@ public partial class TreinrouteWindow : Window
                 // initialiseren (dat de software-Stand met de fysieke stand synchroniseert)
                 // des te belangrijker: alleen dan is deze vergelijking betrouwbaar.
                 bool moetSchakelen = forceer || wissel.Stand != wisselInfo.GewensteStand;
+                if (moetSchakelen) OnthoudGeschakeld(wissel);   // BUG #400
                 wissel.Stand = wisselInfo.GewensteStand;
                 if (wissel.GekoppeldeOverloopwissel != null) wissel.GekoppeldeOverloopwissel.Stand = wisselInfo.GewensteStand;
                 if (!moetSchakelen) continue;
@@ -1217,6 +1218,7 @@ public partial class TreinrouteWindow : Window
             // ECHTE standwijziging, nooit "voor de zekerheid" een wissel opnieuw aansturen
             // die al goed staat - dat kan een trein die er nog overheen rijdt raken.
             bool moetSchakelen = forceer || wissel.Stand != benodigdeStand;
+            if (moetSchakelen) OnthoudGeschakeld(wissel);   // BUG #400
             wissel.Stand = benodigdeStand;
             if (wissel.GekoppeldeOverloopwissel != null) wissel.GekoppeldeOverloopwissel.Stand = benodigdeStand;
             if (!moetSchakelen) continue;
@@ -1442,6 +1444,7 @@ public partial class TreinrouteWindow : Window
             {
                 var wissel = ActueleWissel(wisselInfo.Wissel);
                 bool moetSchakelen = forceer || wissel.Stand != wisselInfo.GewensteStand;
+                if (moetSchakelen) OnthoudGeschakeld(wissel);   // BUG #400
                 wissel.Stand = wisselInfo.GewensteStand;
                 // Overloopwissel: de gekoppelde partner altijd meebewegen, ook tijdens
                 // automatisch ingestelde wisselstraten - net als een echte fysieke koppeling.
@@ -3696,6 +3699,37 @@ public partial class TreinrouteWindow : Window
     /// blok terecht komt waar deze niet hoort te zijn laat het programma een waarschuwend
     /// geluid horen en activeert een noodstop. Alle treinen komen dan acuut tot
     /// stilstand." (bron: praktijkervaring van een Koploper-gebruiker).</summary>
+    /// <summary>BUG #400: de wissels die de ritlogica de laatste tijd heeft omgezet, met hun stand van daarvoor en het tijdstip.</summary>
+    private readonly List<(Wissel Wissel, WisselStand Oud, DateTime Tijd)> _recentGeschakeld = new();
+
+    private void OnthoudGeschakeld(Wissel wissel)
+    {
+        _recentGeschakeld.RemoveAll(x => (DateTime.Now - x.Tijd).TotalSeconds > 30 || ReferenceEquals(x.Wissel, wissel));
+        _recentGeschakeld.Add((wissel, wissel.Stand, DateTime.Now));
+    }
+
+    /// <summary>WAT: zet de wissels die in de laatste paar seconden voor een kortsluiting zijn omgezet, terug in hun vorige stand (scherm en baan).
+    /// WAAROM (BUG #400, Marco 11-11 08:43, log 08:38): de rit van blok 4 naar het volgende blok zette wissel 14 om terwijl de loc nog op melder 8 stond,
+    /// waar die wissel ligt; dat gaf kortsluiting in blok 4. Zo'n wissel terugzetten heft de kortsluiting meestal op (net als in de Baanverkenner).
+    /// Geeft de teruggezette adressen terug.</summary>
+    public List<int> ZetRecenteWisselsTerug(TimeSpan venster)
+    {
+        var terug = new List<int>();
+        var grens = DateTime.Now - venster;
+        foreach (var (wissel, oud, tijd) in _recentGeschakeld.Where(x => x.Tijd >= grens).OrderByDescending(x => x.Tijd).ToList())
+        {
+            if (wissel.Stand == oud) continue;
+            wissel.Stand = oud;
+            if (wissel.GekoppeldeOverloopwissel != null) wissel.GekoppeldeOverloopwissel.Stand = oud;
+            bool afbuigend = oud == WisselStand.Afbuigend;
+            _hardwareBeheerder.StuurWisselCommando(wissel.Adres, wissel.OmgekeerdePolariteit ? !afbuigend : afbuigend);
+            if (wissel.GekoppeldeOverloopwissel is { } ov) _hardwareBeheerder.StuurWisselCommando(ov.Adres, ov.OmgekeerdePolariteit ? !afbuigend : afbuigend);
+            terug.Add(wissel.Adres);
+        }
+        _recentGeschakeld.RemoveAll(x => x.Tijd >= grens);
+        return terug;
+    }
+
     public void VoerNoodstopUit(string? reden = null)
     {
         // Het hardware-signaal altijd sturen, ook als de software geen enkele trein als

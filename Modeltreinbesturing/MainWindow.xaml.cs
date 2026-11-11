@@ -105,6 +105,24 @@ public partial class MainWindow : Window
             }));
         };
 
+        // BUG #400 (Marco 11-11 08:43, log 08:38): Dinamo meldde "KORTSLUITING in blok 4", maar het programma deed er niets mee en bleef de loc 27 s lang
+        // snelheid geven tot de rit vastliep. Nu: bij een kortsluiting in een blok meteen een noodstop (alle treinen stil, zoals Koploper), daarna de wissels die
+        // in de laatste 3 seconden voor de rit zijn omgezet terugzetten (zo'n wissel lag meestal onder de loc). De rit start niet vanzelf weer.
+        _hardwareBeheerder.BlokAlarmGewijzigd += (blok, actief) =>
+        {
+            if (!actief) return;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                string reden = $"kortsluiting in Dinamo-blok {blok}";
+                if (_treinrouteWindow != null) _treinrouteWindow.VoerNoodstopUit(reden);
+                else _hardwareBeheerder.Huidige.Noodstop();
+                var terug = _treinrouteWindow?.ZetRecenteWisselsTerug(TimeSpan.FromSeconds(3)) ?? new List<int>();
+                HardwareCommunicatieLog.Log("Info", $"NOODSTOP: {reden}." + (terug.Count > 0
+                    ? $" Wissel(s) {string.Join(", ", terug)} vlak daarvoor omgezet en nu teruggezet (lag waarschijnlijk onder de loc). Controleer de baan en start de rit opnieuw."
+                    : " Controleer de baan en start de rit opnieuw.") + " (BUG #400)");
+            }));
+        };
+
         // Automatisch de meest recente backup laden bij het opstarten, zodat je nooit
         // zelf aan Opslaan hoeft te denken - puur een vangnet, dus als het laden om wat
         // voor reden dan ook mislukt (bijv. een beschadigd backup-bestand), gaat het

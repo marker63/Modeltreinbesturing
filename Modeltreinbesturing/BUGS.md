@@ -3451,6 +3451,14 @@ oude baan blijft op schijf staan, opslaan gaat altijd via de opslaan-dialoog); (
 "Wachtwoord..." om het wachtwoord van een account opnieuw in te stellen (beheerder); (4) inlogscherm: "Wachtwoord vergeten?" met uitleg. Nieuw venster WachtwoordWijzigenDialog,
 GebruikersBeheerder.WijzigWachtwoord, Help bijgewerkt.
 
+## BUG #400 – OPGELOST (nog niet getest, het WPF-deel kan hier niet gecompileerd worden): kortsluiting tijdens een rit werd genegeerd, loc bleef snelheid krijgen
+(Marco 11-11 08:43: "de trein reed van blok 3 naar blok 4 maar staat daar nu vast", hardwarelog 08:38.) De loc kwam in blok 4 (melder 15, daarna 8). Voor de volgende stap
+zette de rit wissel 5 rechtdoor en wissel 14 afbuigend terwijl de loc nog op melder 8 stond, waar wissel 14 ligt; om 08:38:29 meldde Dinamo "KORTSLUITING in blok 4". Het
+hoofdprogramma deed niets met die melding per blok (IBlokAlarmBron werd alleen door de Baanverkenner gebruikt) en gaf de loc nog 27 s snelheid, tot de rit na 30 s
+vastliep op "melder 24 niet ontvangen". Nu: HardwareBeheerder.BlokAlarmGewijzigd; bij een kortsluiting meteen een noodstop van alle treinen, en de wissels die de rit in
+de laatste 3 s heeft omgezet worden teruggezet (scherm en baan), met een regel in het hardwarelog. Open punt: het geïmporteerde blokkenschema van die baan klopt niet
+(melder 24 hoort bij blok 3, 4 en 7 tegelijk; melder 8, waar wissel 14 ligt, is stopmelder van blok 4), zie het antwoord aan Marco.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:
