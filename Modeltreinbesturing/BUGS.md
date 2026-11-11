@@ -3459,6 +3459,17 @@ vastliep op "melder 24 niet ontvangen". Nu: HardwareBeheerder.BlokAlarmGewijzigd
 de laatste 3 s heeft omgezet worden teruggezet (scherm en baan), met een regel in het hardwarelog. Open punt: het geïmporteerde blokkenschema van die baan klopt niet
 (melder 24 hoort bij blok 3, 4 en 7 tegelijk; melder 8, waar wissel 14 ligt, is stopmelder van blok 4), zie het antwoord aan Marco.
 
+## BUG #401 – OPGELOST (nog niet getest op de baan): import voegde melder 8 (waar wissel 14 achter ligt) toe aan Marco's blok 4
+(Marco 11-11 08:52: hele baan en de import nalopen.) Marco's eigen blok 4 is 24-16-15 (testbaan-v24-plus-3naar7-fix.json); de import (BLOKKENSCHEMA.md §2, mijn eigen voorstel,
+niet van Marco) voegde melder 8 toe. Rit 3 -> 4 -> 3 (de lus via wissel 14 afbuigend, kruiswissel en wissel 5, zonder keren) reed daardoor door tot op melder 8; de keuze voor 3
+viel pas daar en zette wissel 14 om terwijl de loc er al op/bij was -> kortsluiting (#400). Nu voegt de import een melder waar volgens de kaart direct een wissel achter ligt
+(KortsluitingBijOmzetten na die melder) niet meer toe aan een bestaand blok, maar meldt hem. Marco krijgt een project waarin blok 4 weer zijn eigen indeling heeft
+(baan_2026-11-11_blok4-zoals-origineel.json, ook de door de import ingevulde rijrichting 4 -> 3 'vooruit' weer leeg: 4 -> 3 is een voorwaartse lus, geen kering).
+Open punten: (a) de import vult rijrichtingen in uit de kaart; 4 -> 3 werd 'vooruit' (afgeleid van 16 -> 5), terwijl Marco's 4 -> 3 de lus via wissel 14 is: de import moet een
+relatie met een eigen wisselstraat van Marco niet uit een andere overgang afleiden. (b) Kaart van 10-11 15:51 (module 2): valse wissels 3 en 4 ("na 129: rechtdoor 21, afbuigend 24":
+melder 24 werd overgeslagen) en oude melders 133, 136, 143, 144 (pendelbaan van 10-10) staan nog in de kaart. Opgeruimd: de oude bestanden Modeltreinbesturing/Baanverkenner/voor_import/*.json zaten in de repo en dus in elke zip (Marco importeerde daardoor per
+ongeluk een oude kaart van 09-11); uit de repo gehaald en in .gitignore.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:

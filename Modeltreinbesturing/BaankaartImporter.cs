@@ -141,12 +141,20 @@ public class BaankaartImporter
             }
             else
             {
+                // BUG #401 (Marco 11-11 08:43, rit van 3 naar 4 bleef staan): melder 8 werd zo aan Marco's bestaande blok 4 (24-16-15) toegevoegd, als laatste
+                // melder. De loc stopte daardoor óp melder 8, waar wissel 14 ligt (kaart: "kortsluiting na melder 8 bij wissel 14 afbuigend"), en de wisselstraat
+                // 4 -> 3 zette wissel 14 om onder de loc. Een melder waar volgens de kaart een wissel direct achter ligt, wordt daarom niet aan een BESTAAND blok
+                // toegevoegd (wel gemeld): Marco's eigen indeling blijft leidend.
+                var wisselMelders = nieuw.Where(m => kaart.Wissels.Any(w => w.Waarnemingen.Any(x => x.Soort == WaarnemingSoort.KortsluitingBijOmzetten && x.NaMelder == m))).ToList();
+                foreach (var m in wisselMelders)
+                    res.Meldingen.Add(new BaanControleMelding("Waarschuwing", $"Melder {m} hoort bij Dinamo-blok {nummer}, maar direct achter die melder ligt een wissel (adres {string.Join(", ", kaart.Wissels.Where(w => w.Waarnemingen.Any(x => x.Soort == WaarnemingSoort.KortsluitingBijOmzetten && x.NaMelder == m)).Select(w => w.Adres))}). Niet aan het bestaande blok {nummer} toegevoegd: een loc die daar stopt, staat op de wissel. Voeg hem zelf toe als dat toch de bedoeling is."));
+                nieuw = nieuw.Except(wisselMelders).ToList();
                 foreach (var m in nieuw)
                 {
                     bestaandBlok.Bezetmeldpunten.Add(new Bezetmeldpunt { MeldernNummer = m, Rol = BezetmeldpuntRol.Voorblok });
                     res.ToegevoegdeMelders.Add((bestaandBlok, m));
                 }
-                res.Meldingen.Add(new BaanControleMelding("Info", $"Bestaand blok {nummer}: melder(s) {string.Join(", ", nieuw)} toegevoegd (stond(en) er nog niet in)."));
+                if (nieuw.Count > 0) res.Meldingen.Add(new BaanControleMelding("Info", $"Bestaand blok {nummer}: melder(s) {string.Join(", ", nieuw)} toegevoegd (stond(en) er nog niet in)."));
             }
             bestaand = ProjectBlokkenPerMelder();
         }

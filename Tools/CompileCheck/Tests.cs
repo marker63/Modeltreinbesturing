@@ -3667,6 +3667,19 @@ public static class Tests
         if (!string.IsNullOrEmpty(uit)) File.WriteAllText(uit, lp.AlsJson());
     }
 
+    /// <summary>BUG #401: melder 8 (wissel 14 ligt er direct achter) niet toevoegen aan Marco's bestaande blok 4 (24-16-15).</summary>
+    static void WisselMelderImportTest()
+    {
+        var k = Laad("baankaart_module2_2026-11-10_1551.json");
+        var bb = new BlokBeheerder();
+        Blok B(int nr, params int[] m) { var b = new Blok { Nummer = nr }; foreach (var x in m) b.Bezetmeldpunten.Add(new Bezetmeldpunt { MeldernNummer = x }); bb.Blokken.Add(b); return b; }
+        B(1, 1, 9, 10); B(2, 4, 11, 12); B(3, 14, 13, 5, 24); var b4 = B(4, 24, 16, 15); B(5, 17, 25, 26); B(6, 27, 28, 20); B(7, 21, 29, 30, 24);
+        var res = new BaankaartImporter().Importeer(k, bb);
+        Eis(!b4.Bezetmeldpunten.Any(p => p.MeldernNummer == 8), "BUG #401: melder 8 niet aan bestaand blok 4 toegevoegd");
+        Eis(res.Meldingen.Any(m => m.Omschrijving.Contains("Melder 8 hoort bij Dinamo-blok 4")), "BUG #401: melding over melder 8");
+        Eis(!bb.Blokken.Any(b => b.Nummer == 8), "BUG #401: geen eigen blok voor overloopmelder 24");
+    }
+
     static void GeslaagdeRitTest()
     {
         var k = Laad("baankaart_pendel_2026-10-10_1138_geslaagd.json");
@@ -3853,6 +3866,7 @@ public static class Tests
 
         PendelTest();
         GeslaagdeRitTest();
+        WisselMelderImportTest();
         OverloopTest();
         AfbuigendeTakTerugTest();
         OmgekeerdeOvergangTest();
