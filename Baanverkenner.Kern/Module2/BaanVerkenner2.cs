@@ -175,6 +175,17 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                         continue;
                     }
                 }
+                // WAT: staat de loc netjes op één melder, maar is dat niet de melder waar de verkenner hem denkt, dan geldt de melder die bezet is.
+                // WAAROM (BUG #407, Marco 12-11 14:55): na "26, 25, 268" dacht de verkenner dat de loc op 268 stond, maar alleen melder 25 was bezet. Elke taak
+                // wilde vanaf 268 plannen, het omzetten werd bij 25 geweigerd ("kruising of te kort"), en binnen een seconde waren 10 taken overgeslagen: NIET af.
+                if (_monitor.Bezet.Count == 1 && !Kortsluiting() && _monitor.Bezet.First() != _k.LocMelder && _syncAchterElkaar407++ < 3)
+                {
+                    int echt = _monitor.Bezet.First();
+                    _log.Info($"De loc staat op melder {echt}, niet op {_k.LocMelder}: vanaf nu wordt vanaf melder {echt} gepland (BUG #407, nog niet getest op de baan).");
+                    _k.LocVia = 0;   // van welke kant hij kwam is niet zeker
+                    _k.LocMelder = echt;
+                }
+                else if (_monitor.Bezet.Count == 1 && _monitor.Bezet.First() == _k.LocMelder) _syncAchterElkaar407 = 0;
                 if (_monitor.Bezet.Count == 1 && !Kortsluiting()) _k.Echt.Add(_monitor.Bezet.First());   // BUG #393: de loc staat stil en alleen op deze melder
                 // BUG #394 (werkwijze van Marco): staat de loc netjes op een melder waarvan het blok nog onbekend is, dan daar meteen de blokproef.
                 if (W3a && _monitor.Bezet.Count == 1 && !Kortsluiting() && _k.LocMelder == _monitor.Bezet.First()) await BlokProefAlsNodig();
@@ -551,6 +562,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
     private int _onbereikbaar;
     /// <summary>BUG #404: de laatste taak faalde doordat een wissel op de plek van de loc niet om mocht.</summary>
     private bool _nietHier404;
+    private int _syncAchterElkaar407;   // BUG #407: hoogstens 3 keer achter elkaar de plaats bijstellen (geen eindeloze lus)
     private bool _herkansing404;
     /// <summary>BUG #402: tekst als de loc kwijt is (dan is de verkenning nooit voltooid).</summary>
     private string? _locKwijt402;

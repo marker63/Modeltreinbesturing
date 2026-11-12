@@ -3509,6 +3509,13 @@ onder een stilstaande loc kan verschuiven; standaard zelf oplossen (#305). Simul
 - Blijft open: de loc raakt rond 129/10/24 (overloop en keerlus) telkens onzichtbaar (vandaag 4 keer). Niet na te bootsen in de simulatie.
 Simulatie module 2 (alle varianten, hervatten, start 5 en 17): gelijk aan #405.
 
+## BUG #407 – OPGELOST (nog niet getest op de baan): verkenner dacht dat de loc op 268 stond, terwijl melder 25 bezet was
+(Logcontrole 12-11, hervatting 14:43, gestopt 14:55 als NIET af met 10 overgeslagen taken.) Na de rit "26, 25, 268" (melder 268 kort bezet, de loc bleef
+stilstaan) dacht de verkenner dat de loc op 268 stond, maar alleen melder 25 was bezet. Elke taak plande vanaf 268, het omzetten werd bij 25 geweigerd
+("kruising of te kort") en binnen een seconde waren alle taken overgeslagen. Nu: staat de loc netjes op één melder die niet de verwachte is, dan wordt vanaf
+die melder gepland (hoogstens 3 keer achter elkaar). Melder 268 is nieuw (na 25, met wissel 9/10 omgezet); of het een echte melder is moet de baan laten zien.
+Simulatie module 2 (alle varianten, hervatten realistisch, start 5, 10 en 17): gelijk aan #406.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:
