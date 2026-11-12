@@ -542,12 +542,12 @@ public partial class BaanVerkenner2
         if (zone.Count > 0)
         {
             var raak = bezet.Where(zone.Contains).ToList();
-            if (raak.Count > 0) { reden = $"de loc staat op melder {string.Join("/", raak)}, waar wissel {a} ligt"; return false; }
+            if (raak.Count > 0) { reden = $"de loc staat op melder {string.Join("/", raak)}, waar wissel {a} ligt"; _nietHier404 = true; return false; }
             // BUG #395: een zone die alleen uit een opgeheven kortsluiting komt (adres nog niet als wissel gevonden): de gewone eisen voor een nog niet gevonden adres blijven gelden
             if (_k.IsGevonden(a) || Volgers(a, false).Any(v => _k.IsGevonden(v.Volger))) return true;
         }
         if (bezet.Count != 1) { reden = $"de loc staat niet netjes op één melder ({string.Join("/", bezet)})"; _nietNetjes387 = true; return false; }
-        if (!ProefPlek(bezet.First())) { reden = $"melder {bezet.First()} is een kruising of te kort om daar een nog niet gevonden adres om te zetten"; return false; }
+        if (!ProefPlek(bezet.First())) { reden = $"melder {bezet.First()} is een kruising of te kort om daar een nog niet gevonden adres om te zetten"; _nietHier404 = true; return false; }
         return true;
     }
 

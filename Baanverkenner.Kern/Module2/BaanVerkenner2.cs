@@ -192,12 +192,17 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                 _log.Stap($"Taak: {taak.Omschrijving}.");
                 bool gelukt;
                 _nietNetjes387 = false;
+                _nietHier404 = false;
                 int meldersVoor394 = _k.Melders.Count(), stappenVoor394 = _k.Stappen.Count(x => !x.Afgeleid);
                 try { gelukt = await VoerTaakUit(taak); }
                 catch (PlanFout pf) { _log.Waarschuwing($"Taak '{taak.Omschrijving}' lukt nu niet: {pf.Message}"); gelukt = false; }
                 // BUG #387: mislukte de taak alleen omdat de loc op de grens van twee melders stond, dan eerst netjes parkeren (begin van de lus) en niet als poging tellen
                 // (hoogstens 5 keer achter elkaar, zodat het geen eindeloze lus wordt).
                 if (!gelukt && _nietNetjes387 && _nietNetjesAchterElkaar++ < 5) { _log.Info("De taak lukte niet omdat de loc op de grens van twee melders staat: eerst netjes parkeren, dan opnieuw (BUG #387)."); continue; }
+                // BUG #404: mislukte de taak alleen omdat een wissel op de plek van de loc niet om mocht (kruising, te korte melder), dan eerst een stukje bekende baan
+                // verder rijden en opnieuw, in plaats van de taak als mislukt te tellen (hoogstens 5 keer achter elkaar).
+                if (!gelukt && _nietHier404 && _nietHierAchterElkaar404++ < 5 && await RijdStukjeVerder()) { _log.Info("De taak lukte niet omdat een wissel hier niet om mag: eerst een stukje verder rijden, dan opnieuw (BUG #404)."); continue; }
+                if (gelukt) _nietHierAchterElkaar404 = 0;
                 if (gelukt) { _nietNetjesAchterElkaar = 0; _andereAannameGeprobeerd = false; }
                 // BUG #394: mislukte de taak maar is er onderweg iets nieuws gevonden (een nieuwe melder of overgang), dan telt het niet als mislukte poging, en mogen
                 // eerder overgeslagen taken weer: met de nieuwe kennis is er vaak wel een weg (simulatie: "verkennen na melder 5" werd overgeslagen omdat de route twee keer
@@ -267,6 +272,12 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             // BUG #352: elk datagram is een aparte puls; één keer sturen is genoeg (Dinamo meldt terug als de puls gegeven is).
             puls.WisselHerhalingen = Math.Max(1, _ins.WisselHerhalingen);
             foreach (var m in KruisMotoren()) puls.ZetPulsTijd(m, _ins.KruisPulsTijd);
+        }
+        // BUG #404: bij hervatten krijgen eerder overgeslagen taken een nieuwe kans (Marco's voortgang van 09:20 had er 8, allemaal binnen een halve seconde mislukt)
+        if (_hervat && (_k.Overgeslagen.Count > 0 || _k.Mislukt.Count > 0))
+        {
+            _log.Info($"Hervat: {_k.Overgeslagen.Count} eerder overgeslagen taak/taken krijgen een nieuwe kans (BUG #404).");
+            _k.Overgeslagen.Clear(); _k.Mislukt.Clear();
         }
         await WachtTotDinamoRustig();
         await BepaalPlek();
@@ -477,6 +488,9 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         return null;
     }
     private int _onbereikbaar;
+    /// <summary>BUG #404: de laatste taak faalde doordat een wissel op de plek van de loc niet om mocht.</summary>
+    private bool _nietHier404;
+    private int _nietHierAchterElkaar404;
     /// <summary>BUG #402: tekst als de loc kwijt is (dan is de verkenning nooit voltooid).</summary>
     private string? _locKwijt402;
     private int _nietNetjesAchterElkaar;
@@ -762,7 +776,9 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         ProjecteerKaart();
         var k = _status.Kaart;
         var zonderBlok = _hw.LocCommandoVereistBlok ? k.Melders.Where(m => m.DinamoBlok is null).Select(m => m.Nummer).OrderBy(x => x).ToList() : new List<int>();
-        k.Voltooid = zonderBlok.Count == 0 && _locKwijt402 is null && _onbereikbaar == 0;
+        // BUG #404: ook niet voltooid als er taken zijn overgeslagen (09:20:48: alle taken binnen een halve seconde twee keer mislukt en overgeslagen, toch "voltooid")
+        k.Voltooid = zonderBlok.Count == 0 && _locKwijt402 is null && _onbereikbaar == 0 && _k.Overgeslagen.Count == 0;
+        if (_k.Overgeslagen.Count > 0) _log.Waarschuwing($"De verkenning is nog NIET af: {_k.Overgeslagen.Count} taak/taken zijn overgeslagen (BUG #404).");
         // BUG #402: niet voltooid als de loc kwijt is of als er nog taken zijn die niet te plannen waren
         if (_locKwijt402 is not null && !k.Waarschuwingen.Contains(_locKwijt402)) k.Waarschuwingen.Add(_locKwijt402);
         if (_onbereikbaar > 0)

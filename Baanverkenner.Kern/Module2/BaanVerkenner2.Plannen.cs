@@ -141,7 +141,12 @@ public partial class BaanVerkenner2
             var zone = _k.Zone(a);
             foreach (var (v, _) in Volgers(a, false)) zone.UnionWith(_k.Zone(v));
             if (zone.Count == 0) return ProefPlek(Plek(p));   // nog niet gevonden: alleen op een geschikte plek (netjes op één melder, geen kruising)
-            return !zone.Contains(Plek(p)) && !(p == 0 && _monitor.Bezet.Any(zone.Contains));
+            if (zone.Contains(Plek(p)) || (p == 0 && _monitor.Bezet.Any(zone.Contains))) return false;
+            // BUG #404 (Marco 12-11 09:25: "voltooid, maar maar 1 wissel"): een nog niet gevonden adres met alleen een zone uit een opgeheven kortsluiting (#395)
+            // gold hier als veilig, maar bij het zetten (Veilig) gelden voor zo'n adres de gewone eisen (geen kruising, netjes op één melder). Het plan zette wissel 9
+            // op melder 24 (de kruiswissel), het zetten weigerde, en zo faalden om 09:20:48 binnen een halve seconde alle taken. Nu dezelfde eis als bij het zetten.
+            if (!_k.IsGevonden(a) && !Volgers(a, false).Any(v => _k.IsGevonden(v.Volger))) return ProefPlek(Plek(p));
+            return true;
         }
         bool Plaats(int a, bool v, int lo, int hi)
         {
