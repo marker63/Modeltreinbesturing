@@ -3531,6 +3531,24 @@ Open: rond 129 kan de loc met rijstroom op alleen blok 9 vaak niet weg ("lijkt s
 Koploper de keerlus/sectiescheiding daar aanstuurt.
 Simulatie module 2 (alle varianten, hervatten realistisch, start 5, 10 en 17): gelijk aan #408.
 
+## BUG #410 – GEMAAKT (nog niet getest op de baan): loc vast op een sectiescheiding, nu nagebootst in de simulatie en zelf opgelost
+(Nachtwerk 12/13-11, na Marco 16:21 "daar zit ook een sectiescheiding waardoor hij vaak in 2 secties staat".)
+- Simulatie: nieuwe instelling SimulatieBaan.Sectiescheidingen (MiniworldBaan: blok 1/2 bij 12-1 en blok 2/9 bij 4-129), meten met MARCO2_SCHEIDING=1
+  (kans MARCO2_SCHEIDING_KANS, standaard 0,35). Komt de loc daar met de wielen in beide blokken tot stilstand, dan ziet geen melder hem en rijdt hij alleen
+  weer weg als de twee blokken tegengestelde rijcommando's krijgen; met hetzelfde commando naar beide of alle blokken blijft hij staan (zoals op de baan gezien).
+  Met de versie van #409 liep de simulatie dan precies zo vast als bij Marco (start 5, 10, 13, 17: NIET af).
+- Zoeken per blok (#408) uitgebreid: na de bekende blokken rond de melder ook het blok van de loc tegen elk ander blok (het blok van de buurmelder kan nog onbekend
+  zijn, in de simulatie 4 naast 129). Wat werkte wordt per melder onthouden (Kennis2.BlokTruc) en de volgende keer als eerste geprobeerd.
+- Valse "doodlopend" (12-11 16:24 na 129): kwam de loc geen melder verder terwijl al bekend is waar hij met deze stand uitkomt, dan niet vastleggen maar eerst
+  rijstroom per blok proberen.
+Simulatie met sectiescheiding: start 5, 10, 13 en 25 voltooid (23/23, 8 wissels, valse 0, onder-loc 0), ook met kans 0,7 (gewoon en realistisch).
+Start 17 met sectiescheiding: de loc komt steeds los, maar daarna een lus (zie #411). Zonder sectiescheiding: alle varianten, hervatten en start 5, 10, 17, 25 gelijk aan #409.
+
+## BUG #411 – OPEN: lus bij 29 -> 21 -> 24 -> 129 (kruiswissel, combinatie 9+10), simulatie met sectiescheiding start 17
+De dekkingsrit rijdt 21 -> 24 -> 129 met 9 en 10 afbuigend, de kruiswissel geeft kortsluiting, de proef concludeert "combinatie" en vergeet de kortsluiting,
+en de volgende dekkingsrit doet hetzelfde (349 keer). Geprobeerd: de waarneming de tweede keer laten staan. Dat maakte start 17 en 25 zonder scheiding veel
+slechter (720 min), dus weer uitgezet. Nog op te lossen.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:

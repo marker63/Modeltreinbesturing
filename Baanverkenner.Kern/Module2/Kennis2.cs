@@ -348,6 +348,9 @@ public class Kennis2
     public Dictionary<int, HashSet<int>> ExtraZone { get; set; } = new();
     /// <summary>BUG #397: "a,b,c|van>naar": van deze adressen hoogstens één omzetten in een dekkingsrit die over dit stuk komt (samen gaven ze daar kortsluiting).</summary>
     public HashSet<string> NietSamen { get; set; } = new();
+    /// <summary>BUG #410: per melder de rijstroom-truc die de loc daar weer liet rijden ("blok,richting" of "blok,richting,tweede blok"),
+    /// geleerd tijdens het zoeken per blok (#408). Wordt de volgende keer als eerste geprobeerd.</summary>
+    public Dictionary<int, string> BlokTruc { get; set; } = new();
 
     /// <summary>WAT: zoekt een melder X die tussen a en b ligt (a -> X -> b), terwijl de loc met precies dezelfde wisselstand ook rechtstreeks van a naar b reed.
     /// Een echte melder kan de loc niet overslaan; dan is X een spook (Dinamo-ingang die zonder sectie bezet raakt).

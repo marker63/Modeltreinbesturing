@@ -3373,7 +3373,10 @@ public static class Tests
                     "vertraagd" or "vertraagd6" => () => uv = new Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan { VertraagdeUitvoering = true },
                     _ => null
                 };
+                Baanverkenner.Kern.Simulatie.MiniworldBaan.Sectiescheidingen = Environment.GetEnvironmentVariable("MARCO2_SCHEIDING") == "1";   // BUG #410
                 var sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(true, start, fabriek);
+                Baanverkenner.Kern.Simulatie.MiniworldBaan.Sectiescheidingen = false;
+                if (double.TryParse(Environment.GetEnvironmentVariable("MARCO2_SCHEIDING_KANS"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var kansVast)) sim.KansVastOpGrens = kansVast;
                 sim.BuurwisselHeftKruisKortsluitingOp = variant == "streng";
                 // BUG #396: MARCO2_STIL=1 = Dinamo meldt bij de start niet dat de loc al op een melder staat (alleen wijzigingen)
                 if (Environment.GetEnvironmentVariable("MARCO2_STIL") == "1") sim.StatusOpvraagbaar = false;
@@ -3398,7 +3401,7 @@ public static class Tests
                 var k = v.Kaart;
                 var regels = log.Regels.Select(x => x.Tekst).ToList();
                 var gevonden = k.Wissels.Where(w => w.Waarnemingen.Count > 0).Select(w => w.Adres).ToList();
-                string regel = $"MARCO2 start {start,3} {variant,-11}: {einde,-12} {(k.Voltooid ? "voltooid" : "NIET-voltooid"),-13} melders {k.Melders.Count,2}/23  met-blok {k.Melders.Count(m => m.DinamoBlok is not null),2}  wissels [{string.Join(",", gevonden.OrderBy(x => x))}]  valse {gevonden.Count(a => !echt.Contains(a))}  kortsl {v.Kennis.Kortsluitingen,2}  onder-loc {sim.OnderLocOmgezet,2}  gebruiker {regels.Count(x => x.Contains("Gebruiker heeft de loc"))}  zelf-ok {regels.Count(x => x.Contains("Zelf opgelost"))}  zelf-mis {regels.Count(x => x.Contains("Zelf oplossen lukte niet"))}  ritten {v.Kennis.Ritten}  proeven {v.Kennis.Experimenten}  zonder-effect [{string.Join(",", k.AdressenZonderEffect)}]  overgeslagen {v.Kennis.Overgeslagen.Count}  {(klok.Nu - t0).TotalMinutes:0} min";
+                string regel = $"MARCO2 start {start,3} {variant,-11}: {einde,-12} {(k.Voltooid ? "voltooid" : "NIET-voltooid"),-13} melders {k.Melders.Count,2}/23  met-blok {k.Melders.Count(m => m.DinamoBlok is not null),2}  wissels [{string.Join(",", gevonden.OrderBy(x => x))}]  valse {gevonden.Count(a => !echt.Contains(a))}  kortsl {v.Kennis.Kortsluitingen,2}  onder-loc {sim.OnderLocOmgezet,2}  gebruiker {regels.Count(x => x.Contains("Gebruiker heeft de loc"))}  zelf-ok {regels.Count(x => x.Contains("Zelf opgelost"))}  zelf-mis {regels.Count(x => x.Contains("Zelf oplossen lukte niet"))}  ritten {v.Kennis.Ritten}  proeven {v.Kennis.Experimenten}  zonder-effect [{string.Join(",", k.AdressenZonderEffect)}]  overgeslagen {v.Kennis.Overgeslagen.Count}  {(klok.Nu - t0).TotalMinutes:0} min{(sim.Sectiescheidingen.Count > 0 ? $"  vast-op-grens {sim.KeerVastOpGrens}" : "")}";
                 if (uv is { VertraagdeUitvoering: true }) regel += $"  (langste achterstand Dinamo {uv.LangsteAchterstand.TotalSeconds:0} s)";
                 if (uv is { NegeerHelftBijKortsluiting: true } || uv is { UitvalVanafCommando: < 1000 }) regel += $"  (uitval: {uv!.GenegeerdeCommandos} genegeerd, bij kortsluiting {uv.GenegeerdBijKortsluiting})";
                 Console.WriteLine(regel);

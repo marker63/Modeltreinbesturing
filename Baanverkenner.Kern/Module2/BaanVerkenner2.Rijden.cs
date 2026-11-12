@@ -427,6 +427,21 @@ public partial class BaanVerkenner2
         bool locKwijt = res.Einde == RitEinde2.Doodlopend && _monitor.Bezet.Count == 0;
         if (locKwijt)
             _log.Waarschuwing($"Na melder {r[^1]} ({h.Tekst()}) is geen enkele melder meer bezet: de loc is kwijt, dit wordt NIET als doodlopend vastgelegd (BUG #402).");
+        // WAT: is de loc in deze rit geen melder verder gekomen, terwijl al bekend is waar hij met deze wisselstand uitkomt, dan is het geen doodlopend spoor
+        // maar kon de loc niet weg. Niet vastleggen; daarna probeert de verkenner de rijstroom per blok (#408).
+        // WAAROM (BUG #410, Marco 12-11 16:24): "na melder 129 (vooruit) komt geen nieuwe melder: doodlopend", terwijl 129 vooruit met wissel 9 rechtdoor al vaak
+        // naar 24 was gereden. De loc stond op de sectiescheiding en kreeg alleen rijstroom van blok 9.
+        if (!locKwijt && res.Einde == RitEinde2.Doodlopend && r.Count == 1)
+        {
+            int viaD = terug ? 0 : startVia;
+            var bekend = _k.Voorspel(viaD, r[0], h, a => stand.Contains(a));
+            if (bekend is { Uitkomst: > 0 } vb)
+            {
+                locKwijt = true;
+                _nietWeg410 = r[0];
+                _log.Waarschuwing($"De loc kwam niet weg van melder {r[0]} ({h.Tekst()}), terwijl hij met deze wisselstand al eens naar melder {vb.Uitkomst} reed: niet als doodlopend vastgelegd, eerst rijstroom per blok proberen (BUG #410, nog niet getest op de baan).");
+            }
+        }
         if (!locKwijt && res.Einde is RitEinde2.Kortsluiting or RitEinde2.Doodlopend)
         {
             int via = r.Count >= 2 ? r[^2] : (terug ? 0 : startVia);

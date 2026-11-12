@@ -137,6 +137,22 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
     private int _kortCommandoTeller;
     private DateTime? _kortMeldTijd;
     private bool _bewegend;
+    /// <summary>BUG #410 (Marco 12-11 16:21: "daar zit ook een sectiescheiding waardoor hij vaak in 2 secties staat"): blokparen (klein, groot) met een
+    /// sectiescheiding waarop de loc kan vastlopen. Komt de loc daar tot stilstand met de wielen in beide blokken, dan ziet (met kans
+    /// <see cref="KansVastOpGrens"/>) geen melder hem meer en rijdt hij alleen weer weg als de twee blokken TEGENGESTELDE rijcommando's krijgen
+    /// (zo gezien op de baan: met hetzelfde commando naar beide blokken, of naar alle blokken, bleef hij staan). Nagebootst gedrag, niet de natuurkunde.</summary>
+    public HashSet<(int, int)> Sectiescheidingen { get; } = new();
+    public double KansVastOpGrens { get; set; } = 0.35;
+    public int KeerVastOpGrens { get; private set; }
+    private readonly Dictionary<int, (int Stap, bool Vooruit)> _perBlok = new();
+    private bool _vastOpGrens, _stondStilOpGrens;
+    private (int, int)? GrensOnderLoc()
+    {
+        if (Sectiescheidingen.Count == 0) return null;
+        var bl = BlokkenVanLoc();
+        foreach (var p in Sectiescheidingen) if (bl.Contains(p.Item1) && bl.Contains(p.Item2)) return p;
+        return null;
+    }
     /// <summary>Alleen voor tests (BUG #57): (melder waar het midden van de loc staat, blok, vooruit)-combinaties waarvoor een rijcommando met snelheid > 0 niets doet (waarde = hoe vaak het commando verloren gaat; daarna werkt het weer).</summary>
     public Dictionary<(int Melder, int Blok, bool Vooruit), int> GeblokkeerdeCommandos { get; } = new();
     /// <summary>Meldt kortsluiting via KortsluitingStatusGewijzigd (zoals Dinamo's F-bit).</summary>
@@ -375,6 +391,7 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
         if (decoderAdres != _locAdres) return;
         if (DinamoGedrag && !BlokkenVanLoc().Contains(blokNummer)) return; // komt niet aan
         if (DinamoGedrag && _element is Sectie huidig && stap > 0 && VerliesCommando((huidig.Melder, blokNummer, vooruit))) return; // test: dit commando gaat verloren
+        _perBlok[blokNummer] = (Math.Max(0, stap), vooruit);   // BUG #410
         if (KortsluitBijCommando is { } kc && stap > 0 && blokNummer == kc.Blok && ++_kortCommandoTeller == kc.Nummer)
         {
             _kortMeldTijd = (_vorigeTik ?? DateTime.Now) + TimeSpan.FromMilliseconds(600);
@@ -505,6 +522,29 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
     {
         if (_element is null) return;
         bool fBit = DinamoGedrag && nu < _fBitTot;
+        // BUG #410: vastlopen op een sectiescheiding (zie Sectiescheidingen)
+        if (Sectiescheidingen.Count > 0)
+        {
+            var g = GrensOnderLoc();
+            if (g is null) { _vastOpGrens = false; _stondStilOpGrens = false; }
+            else
+            {
+                if (fBit || _decoderStap == 0)
+                {
+                    if (!_stondStilOpGrens && !_vastOpGrens && _toeval.NextDouble() < KansVastOpGrens) { _vastOpGrens = true; KeerVastOpGrens++; BijwerkenMelders(false); }
+                    _stondStilOpGrens = true;
+                }
+                if (_vastOpGrens)
+                {
+                    var a = _perBlok.GetValueOrDefault(g.Value.Item1); var b = _perBlok.GetValueOrDefault(g.Value.Item2);
+                    if (fBit || !(a.Stap > 0 && b.Stap > 0 && a.Vooruit != b.Vooruit)) { _bewegend = false; return; }
+                    int eb = _element is Sectie es ? es.Blok : ((Wissel)_element).Blok;
+                    var c = eb == g.Value.Item2 ? b : a;
+                    _decoderVooruit = c.Vooruit; _decoderStap = Math.Max(1, c.Stap);
+                    _aangestuurd.Clear(); foreach (var ob in BlokkenVanLoc()) _aangestuurd.Add(ob);   // beide kanten krijgen rijstroom
+                }
+            }
+        }
         if (fBit || _decoderStap == 0) { _bewegend = false; return; }
         // Echte Dinamo (gezien op de baan, BUG #34/#57): een rijcommando gaat via een blok. Zodra de loc
         // helemaal uit dat blok is, komt er geen commando meer aan en blijft hij stilstaan.
@@ -655,6 +695,7 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
         var res = new HashSet<int>();
         if (_kortsluiting && MeldersBevrorenBijKortsluiting && _bevroren is not null) return new HashSet<int>(_bevroren);
         if (_kortsluiting || _element is null) return res; // geen spanning = geen stroomdetectie
+        if (_vastOpGrens) return res;   // BUG #410: vast op de sectiescheiding, geen stroom = geen detectie
         if (_element is Sectie s && s.Melder > 0) res.Add(s.Melder);
         if (_element is Wissel kw && kw.Melder > 0) res.Add(kw.Melder);
         if (_spookTot is not null) res.Add(_spookMelder);

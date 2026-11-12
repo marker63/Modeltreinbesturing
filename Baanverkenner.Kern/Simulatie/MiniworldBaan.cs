@@ -27,6 +27,10 @@ public static class MiniworldBaan
     /// Altijd met de keerlus. Tot nu toe draaide geen enkele volledige simulatie met deze aansluiting en Marco's instellingen (5+6, 2+1, 6 omgekeerd).</summary>
     public static bool EchteAansluiting { get; set; }
 
+    /// <summary>BUG #410: sectiescheidingen waarop de loc kan vastlopen (blok 1/2 bij 12-1 en blok 2/9 bij 4-129), zie SimulatieBaan.Sectiescheidingen.
+    /// Standaard uit; meten met MARCO2_SCHEIDING=1.</summary>
+    public static bool Sectiescheidingen { get; set; }
+
     public static SimulatieBaan Maak(bool omzettenOnderLocGeeftKortsluiting = true, int startMelder = 13, Func<SimulatieBaan>? fabriek = null)
     {
         var b = fabriek?.Invoke() ?? new SimulatieBaan();
@@ -93,6 +97,7 @@ public static class MiniworldBaan
         b.Verbind(s8, B, s15, A); b.Verbind(s15, B, s16, A);
 
         var start = new[] { s13, s14, s21, s29, s30, s20, s27, s28, s26, s25, s17, s8, s15, s16, s5, s129, s10, s4, s11, s12 }.Concat(keerlus ? new[] { s1!, s9! } : Array.Empty<SimulatieBaan.Sectie>()).First(x => x.Melder == startMelder);
+        if (Sectiescheidingen && keerlus) { b.Sectiescheidingen.Add((1, 2)); b.Sectiescheidingen.Add((2, 9)); }
         b.PlaatsLoc(start, start.Lengte / 2, +1);
         return b;
     }

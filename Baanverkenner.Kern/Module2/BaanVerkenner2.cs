@@ -178,6 +178,13 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                 // WAT: staat de loc netjes op één melder, maar is dat niet de melder waar de verkenner hem denkt, dan geldt de melder die bezet is.
                 // WAAROM (BUG #407, Marco 12-11 14:55): na "26, 25, 268" dacht de verkenner dat de loc op 268 stond, maar alleen melder 25 was bezet. Elke taak
                 // wilde vanaf 268 plannen, het omzetten werd bij 25 geweigerd ("kruising of te kort"), en binnen een seconde waren 10 taken overgeslagen: NIET af.
+                // BUG #410: kwam de loc niet weg (geen doodlopend spoor), dan eerst de rijstroom per blok proberen
+                if (_nietWeg410 > 0)
+                {
+                    _nietWeg410 = 0;
+                    await ZoekPerBlok408(alleenBijVerandering: true);
+                    _monitor.Bijwerken();
+                }
                 if (_monitor.Bezet.Count == 1 && !Kortsluiting() && _monitor.Bezet.First() != _k.LocMelder && _syncAchterElkaar407++ < 3)
                 {
                     int echt = _monitor.Bezet.First();
@@ -492,7 +499,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
     /// WAAROM (BUG #408, Marco 12-11 16:21: "daar zit ook een sectiescheiding waardoor hij vaak in 2 secties staat"): om 15:35 stond de loc op de grens van
     /// melder 12 (blok 2) en melder 1 (blok 1). Met hetzelfde rijcommando naar blok 1 en 2 werden melder 1 én 12 vrij en reed de loc niet meer, ook niet met
     /// rijstroom op alle blokken. Over de scheiding kan het commando in de twee blokken elkaar tegenwerken; één blok alleen (of tegengesteld) kan hem weer laten rijden.</summary>
-    private async Task<List<int>> ZoekPerBlok408()
+    private async Task<List<int>> ZoekPerBlok408(bool alleenBijVerandering = false)
     {
         if (!_hw.LocCommandoVereistBlok) return new List<int>();
         var melders = new List<int> { _k.LocMelder };
@@ -507,6 +514,25 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         var pogingen = new List<(int blok, Richting r, int? tweede)>();
         foreach (var b in blokken) foreach (var r in new[] { Richting.Achteruit, Richting.Vooruit }) pogingen.Add((b, r, null));
         for (int i = 0; i < blokken.Count; i++) for (int j = 0; j < blokken.Count; j++) if (i != j) pogingen.Add((blokken[i], Richting.Vooruit, blokken[j]));
+        // BUG #410: daarna het blok van de loc tegen elk ander blok (het blok van de buurmelder kan nog onbekend zijn)
+        // (ook als er wel twee bekend zijn: in de simulatie lag de scheiding bij 129 tegen blok 2 van melder 4, waarvan het blok nog niet bekend was)
+        foreach (var ander in AlleBlokken().Where(x => !blokken.Contains(x)))
+            {
+                pogingen.Add((blokken[0], Richting.Vooruit, ander));
+                pogingen.Add((ander, Richting.Vooruit, blokken[0]));
+            }
+        // BUG #410: wat hier eerder werkte als eerste proberen
+        if (_k.BlokTruc.TryGetValue(_k.LocMelder, out var truc))
+        {
+            var d = truc.Split(',');
+            if (d.Length >= 2 && int.TryParse(d[0], out var tb) && Enum.TryParse<Richting>(d[1], out var tr))
+            {
+                (int, Richting, int?) eerst = (tb, tr, d.Length > 2 && int.TryParse(d[2], out var t2) ? t2 : null);
+                pogingen.Remove(eerst); pogingen.Insert(0, eerst);
+                _log.Info($"Bij melder {_k.LocMelder} werkte eerder: {truc} (BUG #410).");
+            }
+        }
+        int startMelder = _k.LocMelder;
         foreach (var (b, r, tweede) in pogingen)
         {
             _token.ThrowIfCancellationRequested();
@@ -519,13 +545,14 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             {
                 await _klok.Wacht(Poll);
                 if (Kortsluiting()) break;
-                if (_monitor.Bijwerken().Any(x => x.Tijd >= t0) || _monitor.Bezet.Count > 0) { gezien = true; break; }
+                if (_monitor.Bijwerken().Any(x => x.Tijd >= t0) || (!alleenBijVerandering && _monitor.Bezet.Count > 0)) { gezien = true; break; }
             }
             await Stop();
             _monitor.Bijwerken();
             if (Kortsluiting()) { await HerstelKortsluiting(new Dictionary<int, bool>(), r); _monitor.Bijwerken(); }
-            if (gezien || _monitor.Bezet.Count > 0)
+            if (gezien || (!alleenBijVerandering && _monitor.Bezet.Count > 0))
             {
+                _k.BlokTruc[startMelder] = tweede is int t3 ? $"{b},{r},{t3}" : $"{b},{r}";
                 string wat = tweede is int t ? $"blok {b} {r.Tekst()} en blok {t} {r.Om().Tekst()}" : $"alleen blok {b} {r.Tekst()}";
                 _log.Vondst($"Loc weer gezien met rijstroom op {wat}: melder {string.Join(", ", _monitor.Bezet)} (BUG #408).");
                 if (_monitor.Bezet.Count != 1) { try { await Herparkeer(r, alleBlokken: true); } catch (PlanFout) { } }
@@ -619,7 +646,9 @@ public partial class BaanVerkenner2 : IBaanVerkenner
     private int _onbereikbaar;
     /// <summary>BUG #404: de laatste taak faalde doordat een wissel op de plek van de loc niet om mocht.</summary>
     private bool _nietHier404;
-    private int _syncAchterElkaar407;   // BUG #407: hoogstens 3 keer achter elkaar de plaats bijstellen (geen eindeloze lus)
+    private int _syncAchterElkaar407;
+    internal int _nietWeg410;
+    private readonly Dictionary<string, int> _combinatie411 = new();   // BUG #411: hoe vaak per stap de conclusie 'combinatie' viel   // BUG #410: melder waar de loc niet weg kwam (geen doodlopend), 0 = niets   // BUG #407: hoogstens 3 keer achter elkaar de plaats bijstellen (geen eindeloze lus)
     private bool _herkansing404;
     /// <summary>BUG #402: tekst als de loc kwijt is (dan is de verkenning nooit voltooid).</summary>
     private string? _locKwijt402;
@@ -820,8 +849,19 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                 _k.Mislukt["U|" + Kennis2.Sleutel(t.Via, t.Melder, t.Richting)] = _k.Mislukt.GetValueOrDefault("U|" + Kennis2.Sleutel(t.Via, t.Melder, t.Richting)) + 1;
                 if (_k.Mislukt["U|" + Kennis2.Sleutel(t.Via, t.Melder, t.Richting)] >= 2 && !_k.Overgeslagen.Contains("U|" + Kennis2.Sleutel(t.Via, t.Melder, t.Richting)))
                     _k.Overgeslagen.Add("U|" + Kennis2.Sleutel(t.Via, t.Melder, t.Richting));
-                _log.Waarschuwing($"Het verschil bij {t.Via} -> {t.Melder} ({t.Richting.Tekst()}) komt niet door één adres maar door een combinatie; de waarneming met {StapUitkomst.Tekst(b.Uitkomst)} (adressen {string.Join(",", b.Stand)} afbuigend) wordt vergeten.");
-                _k.Stappen.Remove(b);
+                // WAT: de tweede keer dezelfde combinatie bij dezelfde stap: de waarneming NIET meer vergeten. Er zijn dan twee uitkomsten voor (bijna) dezelfde
+                // stand, en dan gebruikt de routeplanner deze stap met die stand niet meer om te navigeren.
+                // WAAROM (BUG #411, simulatie met sectiescheiding, start 17: 349 keer dezelfde lus): de dekkingsrit reed 21 -> 24 -> 129 met 9 en 10 afbuigend,
+                // de kruiswissel gaf kortsluiting, de proef concludeerde "combinatie" en vergat de kortsluiting, en de volgende dekkingsrit deed precies hetzelfde.
+                string sleutel411 = "U|" + Kennis2.Sleutel(t.Via, t.Melder, t.Richting);
+                _combinatie411[sleutel411] = _combinatie411.GetValueOrDefault(sleutel411) + 1;
+                if (_combinatie411[sleutel411] >= 2 && false)   // BUG #411: uitgezet, maakte start 17 en 25 (zonder scheiding) veel slechter (720 min)
+                    _log.Waarschuwing($"Het verschil bij {t.Via} -> {t.Melder} ({t.Richting.Tekst()}) komt weer door een combinatie; de waarneming met {StapUitkomst.Tekst(b.Uitkomst)} (adressen {string.Join(",", b.Stand)} afbuigend) blijft nu staan, zodat deze stap met die stand niet meer gepland wordt (BUG #411).");
+                else
+                {
+                    _log.Waarschuwing($"Het verschil bij {t.Via} -> {t.Melder} ({t.Richting.Tekst()}) komt niet door één adres maar door een combinatie; de waarneming met {StapUitkomst.Tekst(b.Uitkomst)} (adressen {string.Join(",", b.Stand)} afbuigend) wordt vergeten.");
+                    _k.Stappen.Remove(b);
+                }
                 // BUG #397 (simulatie met de loc op 25 bij de start: 12 uur lang dezelfde lus): de dekkingsrit zette steeds weer alle open adressen tegelijk om over dit stuk,
                 // de kruiswissel gaf dan door een combinatie (9 en 10 samen) kortsluiting, de proef vond geen los adres en vergat de waarneming, en zo eindeloos. Nu gelden de
                 // adressen die hier verschilden een groep: een dekkingsrit die over dit stuk komt, zet er hoogstens één van om (zo wordt elk apart getest, niet meer samen).
