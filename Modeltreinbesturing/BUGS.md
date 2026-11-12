@@ -3470,6 +3470,15 @@ relatie met een eigen wisselstraat van Marco niet uit een andere overgang afleid
 melder 24 werd overgeslagen) en oude melders 133, 136, 143, 144 (pendelbaan van 10-10) staan nog in de kaart. Opgeruimd: de oude bestanden Modeltreinbesturing/Baanverkenner/voor_import/*.json zaten in de repo en dus in elke zip (Marco importeerde daardoor per
 ongeluk een oude kaart van 09-11); uit de repo gehaald en in .gitignore.
 
+## BUG #402 – OPGELOST (nog niet getest op de baan): verkenning "voltooid" na 17 minuten terwijl de loc kwijt was
+(Marco 12-11 08:42: "de voltooide verkenning klopt totaal niet, de duur is ook verdacht kort 17 minuten".) Module 2, 08:23-08:40: buitenring goed (16 melders met blok).
+Om 08:34 de wisseltest met alle adressen omgezet: 14 -> 129 (wissel 5). Na de blokproef op 129 reed de loc vooruit: 14 vrij (08:35:57), 129 vrij (08:35:59), daarna
+geen enkele melder meer bezet. De loc bewoog niet meer, ook niet met rijstroom op alle blokken. Het programma legde "doodlopend" vast in beide richtingen van 129 en rondde af
+als VOLTOOID (17 melders, 0 wissels). Nu: (1) is er na een rit geen enkele melder meer bezet, dan wordt dat niet als doodlopend vastgelegd; (2) aan het begin van de takenlus
+wordt de loc dan eerst gezocht (#396, hoogstens 10 minuten); lukt dat niet, dan stopt de verkenning als NIET af met "loc kwijt na melder X"; (3) blijven er taken over die
+niet te plannen zijn, dan is de verkenning niet voltooid. Simulatie: alle starts (13, 5, 10, 17, 25), varianten en hervatten gelijk aan #398.
+Open: waar stond de loc om 08:40 (ontspoord, zonder stroom op de kruiswissel)? Mogelijk moet de wisseltest de kruiswissel 10+13 niet samen met alle andere adressen omzetten.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:
