@@ -157,6 +157,23 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                     if (_monitor.Bezet.Count != 1) { try { await Herparkeer(_k.LocRichting, alleBlokken: true); } catch (PlanFout) { } }
                     _monitor.Bijwerken();
                     if (_monitor.Bezet.Count == 1) _k.LocMelder = _monitor.Bezet.First();
+                    // BUG #402 (Marco 12-11 08:42: "de voltooide verkenning klopt totaal niet, 17 minuten"): na een rit met alle adressen omgezet verdween de loc voorbij
+                    // melder 129 (129 en 14 vrij, daarna geen enkele melder meer). Het programma noemde dat "doodlopend" in beide richtingen en rondde af als VOLTOOID,
+                    // met 17 melders en 0 wissels. Nu: is er geen enkele melder bezet, dan de loc zoeken (#396, hoogstens 10 minuten); lukt dat niet, dan stoppen als
+                    // NIET af met de melding dat de loc kwijt is.
+                    if (_monitor.Bezet.Count == 0 && !Kortsluiting())
+                    {
+                        _log.Waarschuwing($"De loc is na melder {_k.LocMelder} op geen enkele melder meer te zien: zoeken (BUG #402, nog niet getest op de baan).");
+                        var gevonden = await ZoekLoc396();
+                        if (gevonden.Count == 0)
+                        {
+                            _locKwijt402 = $"De loc is na melder {_k.LocMelder} kwijtgeraakt (geen enkele melder bezet, ook niet na 10 minuten zoeken). Kijk of de loc ontspoord is of op een stuk zonder stroom staat, zet hem op een melder en hervat.";
+                            _log.Waarschuwing(_locKwijt402);
+                            break;
+                        }
+                        if (gevonden.Count == 1) _k.LocMelder = gevonden[0];
+                        continue;
+                    }
                 }
                 if (_monitor.Bezet.Count == 1 && !Kortsluiting()) _k.Echt.Add(_monitor.Bezet.First());   // BUG #393: de loc staat stil en alleen op deze melder
                 // BUG #394 (werkwijze van Marco): staat de loc netjes op een melder waarvan het blok nog onbekend is, dan daar meteen de blokproef.
@@ -448,6 +465,8 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         return null;
     }
     private int _onbereikbaar;
+    /// <summary>BUG #402: tekst als de loc kwijt is (dan is de verkenning nooit voltooid).</summary>
+    private string? _locKwijt402;
     private int _nietNetjesAchterElkaar;
     /// <summary>BUG #388: al geprobeerd met de andere aanname over de stand van de loc (wordt teruggezet zodra een taak lukt).</summary>
     private bool _andereAannameGeprobeerd;
@@ -731,7 +750,15 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         ProjecteerKaart();
         var k = _status.Kaart;
         var zonderBlok = _hw.LocCommandoVereistBlok ? k.Melders.Where(m => m.DinamoBlok is null).Select(m => m.Nummer).OrderBy(x => x).ToList() : new List<int>();
-        k.Voltooid = zonderBlok.Count == 0;
+        k.Voltooid = zonderBlok.Count == 0 && _locKwijt402 is null && _onbereikbaar == 0;
+        // BUG #402: niet voltooid als de loc kwijt is of als er nog taken zijn die niet te plannen waren
+        if (_locKwijt402 is not null && !k.Waarschuwingen.Contains(_locKwijt402)) k.Waarschuwingen.Add(_locKwijt402);
+        if (_onbereikbaar > 0)
+        {
+            var w402 = $"De verkenning is nog NIET af: {_onbereikbaar} taak/taken konden vanaf melder {_k.LocMelder} niet gepland worden (BUG #402).";
+            if (!k.Waarschuwingen.Contains(w402)) k.Waarschuwingen.Add(w402);
+            _log.Waarschuwing(w402);
+        }
         if (zonderBlok.Count > 0)
         {
             var w = $"De verkenning is nog NIET af: van melder {string.Join(", ", zonderBlok)} is het Dinamo-blok niet bepaald.";

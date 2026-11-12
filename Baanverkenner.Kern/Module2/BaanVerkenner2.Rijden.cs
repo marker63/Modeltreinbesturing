@@ -412,7 +412,13 @@ public partial class BaanVerkenner2
             int via = res.EersteStapOnzeker && i == 3 ? 0 : i >= 2 ? r[i - 2] : (eersteTerug || draaiIndex == 1 ? 0 : startVia);
             _k.Leg(via, r[i - 1], hi, stand, r[i], _klok.Nu, terug: eersteTerug, seconden: i - 1 < res.Seconden.Count ? res.Seconden[i - 1] : 0);
         }
-        if (res.Einde is RitEinde2.Kortsluiting or RitEinde2.Doodlopend)
+        // BUG #402: "doodlopend" alleen vastleggen als de loc nog op de laatste melder staat; is geen enkele melder meer bezet, dan is de loc kwijt (ontspoord,
+        // stuk zonder stroom, of een stuk zonder melder) en zegt dat niets over het spoor.
+        _monitor.Bijwerken();
+        bool locKwijt = res.Einde == RitEinde2.Doodlopend && _monitor.Bezet.Count == 0;
+        if (locKwijt)
+            _log.Waarschuwing($"Na melder {r[^1]} ({h.Tekst()}) is geen enkele melder meer bezet: de loc is kwijt, dit wordt NIET als doodlopend vastgelegd (BUG #402).");
+        if (!locKwijt && res.Einde is RitEinde2.Kortsluiting or RitEinde2.Doodlopend)
         {
             int via = r.Count >= 2 ? r[^2] : (terug ? 0 : startVia);
             _k.Leg(via, r[^1], h, stand, res.Einde == RitEinde2.Kortsluiting ? StapUitkomst.Kortsluiting : StapUitkomst.Doodlopend, _klok.Nu, terug: r.Count == 1 && terug);
