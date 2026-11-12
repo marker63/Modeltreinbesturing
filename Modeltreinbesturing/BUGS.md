@@ -3500,6 +3500,15 @@ wissel daar geeft het weer stroom. Nu: bij het zoeken van de loc, na de basissta
 één voor één omzetten, na elke omzetting 8 s achteruit en 8 s vooruit kruipen; ziet een melder de loc weer, dan blijft die stand staan. Aan Marco gemeld (10:09) dat een tong
 onder een stilstaande loc kan verschuiven; standaard zelf oplossen (#305). Simulatie: gewoon, realistisch, start 25 zonder melding bij de start en hervatten gelijk aan #404.
 
+## BUG #406 – OPGELOST (nog niet getest op de baan): na een kortsluiting verkeerde plaats van de loc, valse "wissel 3 gaf stroom"
+(Logcontrole 12-11 13:21, verkenning van 12:24, gestopt 13:13 "loc kwijt na melder 24".)
+- 12:59: na de kortsluiting na melder 24 reed de parkeerrit door naar melder 10 ("24, 10"); daarna was even geen melder bezet. De verkenner zette de plaats dan
+  terug op 24 en plande vanaf 24 terwijl de loc bij 10 stond: de volgende rit liep vast en de loc raakte kwijt. Nu blijft de plaats waar de parkeerrit de loc het laatst zag.
+- 12:58: "Met wissel 3 omgezet kreeg de loc weer stroom". Wissel 3 bestaat op de baan niet; de loc verscheen op melder 10 in plaats van 129, hij was dus al aan het
+  rijden op een stuk zonder melder. Nu alleen een vondst als dezelfde melder terugkomt, anders een gewone melding.
+- Blijft open: de loc raakt rond 129/10/24 (overloop en keerlus) telkens onzichtbaar (vandaag 4 keer). Niet na te bootsen in de simulatie.
+Simulatie module 2 (alle varianten, hervatten, start 5 en 17): gelijk aan #405.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:

@@ -378,9 +378,18 @@ public partial class BaanVerkenner2
             // de volgende rit de andere kant op is dan een gewone omkeer naar Via (zeker, ook in een Engelse wissel: de loc rijdt zijn eigen spoor terug).
             int m = _k.LocMelder, via = _k.LocVia;
             await Herparkeer(h.Om());
+            // WAT: waar de parkeerrit de loc het laatst zag (de rit zelf werkt de plaats bij). WAAROM (BUG #406, Marco 12-11 13:00): de parkeerrit na de
+            // kortsluiting bij melder 24 eindigde op melder 10 ("24, 10"), daarna was even geen melder bezet. Dan werd de plaats teruggezet op 24 en plande
+            // de verkenner vanaf 24 terwijl de loc bij 10 stond: de volgende rit liep vast en de loc raakte kwijt.
+            int naPark = _k.LocMelder, naParkVia = _k.LocVia;
             _monitor.Bijwerken();
             var na = _monitor.Bezet.ToList();
             if (na.Count == 1 && na[0] == via && via > 0) { _k.LocMelder = via; _k.LocVia = m; _k.LocRichting = h.Om(); }
+            else if (na.Count == 0 && naPark != m && naPark > 0)
+            {
+                _k.LocMelder = naPark; _k.LocVia = naParkVia == naPark ? m : naParkVia; _k.LocRichting = h.Om();
+                _log.Info($"Na de kortsluiting reed de loc bij het netjes parkeren door naar melder {naPark}; daar staat hij nu (BUG #406, nog niet getest op de baan).");
+            }
             else { _k.LocMelder = m; _k.LocVia = via; _k.LocRichting = h; }
             return res;
         }

@@ -434,7 +434,13 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                         if (Kortsluiting()) { await HerstelKortsluiting(new Dictionary<int, bool>(), r2); _monitor.Bijwerken(); }
                         if (gezien || _monitor.Bezet.Count > 0)
                         {
-                            _log.Vondst($"Met wissel {a} omgezet kreeg de loc weer stroom (BUG #405).");
+                            // BUG #406 (12-11 12:58): bij "wissel 3" verscheen melder 10 in plaats van 129, maar wissel 3 bestaat op de baan niet. De loc was dus
+                            // al gaan rijden (hij had stroom, alleen op een stuk zonder melder). Alleen als dezelfde melder terugkomt wijst het op de wissel.
+                            var gezienM = _monitor.Bezet.ToList();
+                            if (gezienM.Contains(_k.LocMelder))
+                                _log.Vondst($"Met wissel {a} omgezet kreeg de loc weer stroom op melder {_k.LocMelder} (BUG #405).");
+                            else
+                                _log.Info($"Loc weer gezien op melder {string.Join(", ", gezienM)} (was {_k.LocMelder}) tijdens het proberen van wissel {a}: de loc was al aan het rijden op een stuk zonder melder, dus niet door deze wissel (BUG #406).");
                             if (_monitor.Bezet.Count != 1) { try { await Herparkeer(r2, alleBlokken: true); } catch (PlanFout) { } }
                             var b2 = _monitor.Bezet.ToList();
                             if (b2.Count > 0) return b2;
