@@ -420,6 +420,7 @@ public partial class BaanVerkenner2
             bool eersteTerug = i == 1 && terug && draaiIndex != 1;
             int via = res.EersteStapOnzeker && i == 3 ? 0 : i >= 2 ? r[i - 2] : (eersteTerug || draaiIndex == 1 ? 0 : startVia);
             _k.Leg(via, r[i - 1], hi, stand, r[i], _klok.Nu, terug: eersteTerug, seconden: i - 1 < res.Seconden.Count ? res.Seconden[i - 1] : 0);
+            _gereden412?.Add((r[i - 1], r[i], hi));   // BUG #412: voor de controle (welke overgangen zijn gereden)
         }
         // BUG #402: "doodlopend" alleen vastleggen als de loc nog op de laatste melder staat; is geen enkele melder meer bezet, dan is de loc kwijt (ontspoord,
         // stuk zonder stroom, of een stuk zonder melder) en zegt dat niets over het spoor.

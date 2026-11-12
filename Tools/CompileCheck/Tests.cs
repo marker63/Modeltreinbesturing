@@ -3406,6 +3406,25 @@ public static class Tests
                 if (uv is { NegeerHelftBijKortsluiting: true } || uv is { UitvalVanafCommando: < 1000 }) regel += $"  (uitval: {uv!.GenegeerdeCommandos} genegeerd, bij kortsluiting {uv.GenegeerdBijKortsluiting})";
                 Console.WriteLine(regel);
                 uit.Add(regel);
+                // BUG #412: MARCO2_CONTROLE=1 = na de verkenning 'Voltooide baan nogmaals checken' op dezelfde simulatie (de loc staat waar de verkenning eindigde)
+                if (Environment.GetEnvironmentVariable("MARCO2_CONTROLE") == "1" && k.Voltooid)
+                {
+                    var st412 = VerkenStatus.VanJson(v.Status.AlsJson())!;
+                    st412.VoorControle(klok.Nu);
+                    var log412 = new VerkenLog(klok);
+                    var v412 = new BaanVerkenner2(sim, ins, klok, log412, (kop, tekst) => Task.FromResult(true), st412);
+                    int onderVoor = sim.OnderLocOmgezet; var t412 = klok.Nu; string einde412 = "klaar";
+                    using var cts412 = new CancellationTokenSource();
+                    klok.Getikt += nu => { if ((nu - t412).TotalHours > 6) cts412.Cancel(); };
+                    try { v412.VoerUit(cts412.Token).GetAwaiter().GetResult(); } catch (OperationCanceledException) { einde412 = "tijdslimiet"; } catch (Exception ex) { einde412 = "FOUT: " + ex.Message; Console.WriteLine(ex); }
+                    var vs = v412.Kaart.ControleVerslagen.LastOrDefault();
+                    var alleVs = v412.Kaart.ControleVerslagen.Skip(k.ControleVerslagen.Count).ToList();
+                    string regel412 = $"MARCO2-CONTROLE start {start,3} {variant,-11}: {einde412}  {(alleVs.Count == 0 ? "geen verslag" : string.Join("  >>  ", alleVs.Select(x => x.Samenvatting)))}  onder-loc {sim.OnderLocOmgezet - onderVoor}  {(klok.Nu - t412).TotalMinutes:0} min" + (vs is { Verschillen: true } ? "  | " + string.Join(" | ", vs.Regels) : "");
+                    Console.WriteLine(regel412);
+                    uit.Add(regel412);
+                    if (Environment.GetEnvironmentVariable("MARCO_LOG") is { } pad412 && pad412.Length > 0)
+                        System.IO.File.WriteAllLines($"{pad412}_m2_{start}_{variant}_controle.txt", log412.Regels.Select(x => x.Tijd.ToString("HH:mm:ss.f") + "  " + x.Tekst));
+                }
                 if (Environment.GetEnvironmentVariable("MARCO_LOG") is { } pad && pad.Length > 0)
                 {
                     var alle = log.Regels.Select(x => (T: x.Tijd, S: x.Tekst)).Concat(simMeld).OrderBy(x => x.T).ToList();

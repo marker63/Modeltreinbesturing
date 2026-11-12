@@ -3572,3 +3572,18 @@ Metingen 28-10 (simulatie met Marco's aansluiting, module 1, versie bug363 verge
 - Stoppen en hervatten: onder-loc 0 en gebruiker 0 (was 0 en 0).
 - Stoppen en hervatten, realistisch: onder-loc 0 en gebruiker 1 (was 1 en 0).
 - Keerlustest: 11 in plaats van hoogstens 10 kortsluitingen. Wissel 2+1 blijft nu staan zolang de loc erbij staat (#358); dat kost daar één extra kortsluiting in plaats van een ontsporing. De grens in de test is 11 geworden.
+
+## BUG #412 – GEMAAKT (nog niet getest op de baan): 'Voltooide baan nogmaals checken' voor een baan van module 2
+(Marco 12-11 08:29: "bij een voltooide baan nogmaals checken alle fouten gelijk opgelost ... alles moet gereden zijn en er mogen geen kortsluitmeldingen meer
+gezien worden, je weet dan al hoe een wissel ligt". Eerder, 09-11 15:54: de controle deed niets; die liep altijd met module 1, die de trajecten van module 2 niet kent.)
+- Een baan die met module 2 verkend is, wordt nu ook met module 2 gecontroleerd (Baanverkenner/MainWindow, niet gecompileerd hier).
+- De controle rijdt elke bekende overgang (melder naar melder, per richting) één keer, met dezelfde routeplanner als de verkenning en de bekende
+  wisselstanden. De wissels voorbij de doelmelder worden alvast goed gezet voor een bekende vervolgstap, zodat het doorkruipen na aankomst geen
+  kortsluiting geeft (simulatie: 10 - 129 - 24 vooruit gaf eerst kortsluiting op wissel 14).
+- Kortsluiting, afwijking of niet te bereiken = fout in de kaart. Zijn er fouten, dan lost de verkenning ze meteen zelf op en volgt een tweede controle.
+  Het verslag (x van y overgangen, kortsluitingen, wat niet gereden is en waarom) staat in het rapport bij 'Controles van de baan'.
+- Meten: MARCO2=1 MARCO2_CONTROLE=1 (na de verkenning een controle op dezelfde simulatie).
+Simulatie: start 13 (alle varianten), 5, 17 en 17 met sectiescheiding: 52 van 52 overgangen, 0 kortsluitingen, 9-12 min. Start 10: eerste controle vond 15
+kortsluitingen (de kaart had bij de kruiswissel motor 10 en 13 verwisseld), de verkenning loste dat op, tweede controle 0 kortsluitingen; 2 overgangen
+(24 -> 129 in gespiegelde kaartrichting na de keerlus) niet te bereiken. Start 25: 32 van 48, de binnenring achter de keerlus is in die kaart niet te bereiken
+(open punt). Verkenning zelf (zonder controle) en hervatten (MARCO2_HERVAT zonder MARCO2!) gelijk aan of beter dan #411.

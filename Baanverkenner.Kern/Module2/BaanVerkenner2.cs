@@ -129,6 +129,16 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         try
         {
             await Voorbereiden();
+            // BUG #412: 'Voltooide baan nogmaals checken' met module 2
+            // Klopt alles, dan is de controle klaar. Zijn er fouten (kortsluiting, afwijking, niet te bereiken), dan lost de gewone verkenning ze meteen op
+            // (de nieuwe waarnemingen geven tegenspraak-taken) en daarna volgt een tweede controle.
+            bool naControle412 = false;
+            if (_status.Controle)
+            {
+                if (await Controle412()) { BewaarNu(); return; }
+                _log.Stap("Controle: er zijn fouten gevonden; de verkenning lost ze nu zelf op en controleert daarna opnieuw (BUG #412, nog niet getest op de baan).");
+                naControle412 = true;
+            }
             int taken = 0;
             int verplaatst = 0;
             while (taken++ < MaxTaken)
@@ -249,6 +259,12 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             }
             Afronden();
             BewaarNu();
+            if (naControle412)
+            {
+                _status.Controle = true;
+                await Controle412(tweede: true);
+                BewaarNu();
+            }
         }
         catch (OperationCanceledException)
         {

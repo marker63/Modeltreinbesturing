@@ -695,7 +695,9 @@ public partial class MainWindow : Window
             _log.Info($"Hervat vanaf opgeslagen voortgang ({hervat.AfgerondeOpdrachten} opdrachten al afgerond).");
 
         // Module 2 (Marco 27-10): kiesbaar met optie 7; een hervatting gebruikt altijd de module waarmee de verkenning begon.
-        bool module2 = hervat is not null ? hervat.Module == 2 && !hervat.Controle : ins.Module2;   // 'baan checken' is (nog) alleen module 1
+        // BUG #412: 'Voltooide baan nogmaals checken' van een met module 2 verkende baan gebruikt nu ook module 2 (eigen controle: alle bekende overgangen rijden
+        // met de bekende wisselstanden; fouten worden meteen opgelost en daarna volgt een tweede controle). Niet gecompileerd hier (WPF).
+        bool module2 = hervat is not null ? hervat.Module == 2 && (!hervat.Controle || hervat.Module2 is not null) : ins.Module2;
         if (module2)
         {
             _log.Info("Baanverkenner module 2 (nieuwe opzet volgens het stappenplan van 27-10).");
@@ -765,7 +767,9 @@ public partial class MainWindow : Window
             if (controleRit)
             {
                 FaseTekst.Text = "Controle voltooid";
-                BezigTekst.Text = "De bestaande kaart is ongewijzigd; het verslag staat in het rapport.";
+                BezigTekst.Text = verkenner is BaanVerkenner2
+                    ? "Gevonden fouten zijn meteen opgelost en daarna opnieuw gecontroleerd (BUG #412); het verslag staat in het rapport."
+                    : "De bestaande kaart is ongewijzigd; het verslag staat in het rapport.";
                 ToonResultaat(verkenner.Status);
                 var vs = verkenner.Kaart.ControleVerslagen.LastOrDefault();
                 if (vs is null) MessageBox.Show(this, "De controle is voltooid.", "Controle klaar", MessageBoxButton.OK, MessageBoxImage.Information);
