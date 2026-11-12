@@ -3544,10 +3544,14 @@ Simulatie module 2 (alle varianten, hervatten realistisch, start 5, 10 en 17): g
 Simulatie met sectiescheiding: start 5, 10, 13 en 25 voltooid (23/23, 8 wissels, valse 0, onder-loc 0), ook met kans 0,7 (gewoon en realistisch).
 Start 17 met sectiescheiding: de loc komt steeds los, maar daarna een lus (zie #411). Zonder sectiescheiding: alle varianten, hervatten en start 5, 10, 17, 25 gelijk aan #409.
 
-## BUG #411 – OPEN: lus bij 29 -> 21 -> 24 -> 129 (kruiswissel, combinatie 9+10), simulatie met sectiescheiding start 17
-De dekkingsrit rijdt 21 -> 24 -> 129 met 9 en 10 afbuigend, de kruiswissel geeft kortsluiting, de proef concludeert "combinatie" en vergeet de kortsluiting,
-en de volgende dekkingsrit doet hetzelfde (349 keer). Geprobeerd: de waarneming de tweede keer laten staan. Dat maakte start 17 en 25 zonder scheiding veel
-slechter (720 min), dus weer uitgezet. Nog op te lossen.
+## BUG #411 – OPGELOST (simulatie; nog niet getest op de baan): lus bij 21 -> 24 -> 129 (dekkingsrit door dezelfde melder van twee kanten)
+Simulatie met sectiescheiding, start 17: 349 keer dezelfde lus. De dekkingsrit 21 - 24 - 129 - 10 - 9 - 1 - 12 - 11 - 4 - 129 - 10 zette wissel 9 afbuigend
+voor 4 -> 129, maar daardoor gaf 24 -> 129 kortsluiting; de proef concludeerde "combinatie", vergat de kortsluiting en de volgende dekkingsrit deed hetzelfde.
+Nu: met één wisselstand rijdt een dekkingsrit niet twee keer door dezelfde melder naar dezelfde opvolger als hij er de tweede keer van een andere voorganger
+binnenkomt (dan moet een wissel anders staan); de rit stopt vóór die tweede keer.
+Twee andere pogingen (de waarneming laten staan; omzetten pas na het stuk) maakten start 17/25 slechter en zijn niet gebruikt.
+Simulatie zonder sectiescheiding: alle varianten voltooid, 23/23, 8 wissels, valse 0, onder-loc 0; start 13 59 min (was 61), 5 58 min (was 50, maar nu
+zonder-effect [3,4,7,8,11,12]), 10 60 min (1 overgeslagen), 17 155 min (was 171), 25 168 min (was 166). Met sectiescheiding: start 5, 10, 13, 17 en 25 voltooid.
 
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)

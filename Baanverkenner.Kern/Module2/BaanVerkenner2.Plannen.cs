@@ -494,12 +494,31 @@ public partial class BaanVerkenner2
         var rit = new DekkingRit { Start = s, Pad = { s.M } };
         var t = s;
         var gebruikt = new HashSet<string>();
+        var eisVanStap411 = new List<List<int>>();   // per stap de eisen die die stap als eerste toevoegde (BUG #411)
         for (int stap = 0; stap < 25; stap++)
         {
             var opties = _k.Mogelijkheden(t.Via, t.M, t.H).Where(o => o.Uitkomst > 0 && o.Eis.All(e => !rit.Eis.TryGetValue(e.Key, out var v) || v == e.Value)).ToList();
             if (opties.Count == 0) break;
             var keuze = opties.OrderByDescending(o => open.Count(a => !_k.IsGetest(a, t.M, o.Uitkomst))).ThenByDescending(o => o.Aantal).First();
             var sleutel = $"{t.M}>{keuze.Uitkomst}";
+            // WAT: met één wisselstand kan de loc niet twee keer door dezelfde melder naar dezelfde opvolger rijden als hij er de tweede keer van een
+            // andere voorganger binnenkomt: dan komt hij via een ander been van een wissel binnen, en die wissel moet daarvoor anders staan. De rit
+            // stopt dan vóór die tweede keer.
+            // WAAROM (BUG #411, simulatie met sectiescheiding, start 17: 349 keer dezelfde lus): de dekkingsrit 21 - 24 - 129 - 10 - ... - 4 - 129 - 10 zette
+            // wissel 9 afbuigend voor 4 -> 129, maar daarmee gaf 24 -> 129 kortsluiting; zo eindeloos.
+            int nu411 = rit.Pad.Count - 1;
+            bool tweedeKeer411 = false;
+            for (int k = 1; k < nu411; k++)
+                if (rit.Pad[k] == t.M && rit.Pad[k + 1] == keuze.Uitkomst && rit.Pad[k - 1] != rit.Pad[nu411 - 1]) tweedeKeer411 = true;
+            if (tweedeKeer411)
+            {
+                // de laatste stap (binnenkomen van de andere kant) weer weghalen, met de eisen die alleen die stap had
+                rit.Pad.RemoveAt(nu411);
+                if (eisVanStap411.Count > 0) foreach (var a in eisVanStap411[^1]) rit.Eis.Remove(a);
+                break;
+            }
+            var nieuw411 = keuze.Eis.Keys.Where(a => !rit.Eis.ContainsKey(a)).ToList();
+            eisVanStap411.Add(nieuw411);
             foreach (var (a, v) in keuze.Eis) rit.Eis[a] = v;
             rit.Pad.Add(keuze.Uitkomst);
             if (!gebruikt.Add(sleutel)) break;
