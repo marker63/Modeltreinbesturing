@@ -392,6 +392,9 @@ public partial class BaanVerkenner2 : IBaanVerkenner
     private async Task<List<int>> ZoekLoc396()
     {
         var eind = _klok.Nu + TimeSpan.FromMinutes(10);
+        // BUG #408: eerst per blok proberen (de loc staat waarschijnlijk op een sectiescheiding)
+        var perBlok = await ZoekPerBlok408();
+        if (perBlok.Count > 0) return perBlok;
         for (int n = 1; _klok.Nu < eind; n++)
         {
             _token.ThrowIfCancellationRequested();
@@ -474,6 +477,55 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                 if (_monitor.Bezet.Count != 1) { try { await Herparkeer(r, alleBlokken: true); } catch (PlanFout) { } }
                 var b = _monitor.Bezet.ToList();
                 if (b.Count > 0) { _log.Vondst($"Loc gevonden: melder {string.Join(", ", b)} (BUG #396)."); return b; }
+            }
+        }
+        return new List<int>();
+    }
+
+    /// <summary>WAT: de loc zoeken door de rijstroom per blok te geven: eerst elk blok rond de laatste melder alleen (beide richtingen), daarna twee blokken
+    /// tegelijk in tegengestelde richting. Na elke poging even kijken of een melder de loc weer ziet.
+    /// WAAROM (BUG #408, Marco 12-11 16:21: "daar zit ook een sectiescheiding waardoor hij vaak in 2 secties staat"): om 15:35 stond de loc op de grens van
+    /// melder 12 (blok 2) en melder 1 (blok 1). Met hetzelfde rijcommando naar blok 1 en 2 werden melder 1 én 12 vrij en reed de loc niet meer, ook niet met
+    /// rijstroom op alle blokken. Over de scheiding kan het commando in de twee blokken elkaar tegenwerken; één blok alleen (of tegengesteld) kan hem weer laten rijden.</summary>
+    private async Task<List<int>> ZoekPerBlok408()
+    {
+        if (!_hw.LocCommandoVereistBlok) return new List<int>();
+        var melders = new List<int> { _k.LocMelder };
+        if (_k.LocVia > 0) melders.Add(_k.LocVia);
+        foreach (var r0 in new[] { Richting.Vooruit, Richting.Achteruit }) foreach (var b in _k.KantBuren(_k.LocMelder, r0)) if (!melders.Contains(b)) melders.Add(b);
+        var blokken = new List<int>();
+        foreach (var m in melders) if (_k.Blokken.TryGetValue(m, out var bl) && !blokken.Contains(bl)) blokken.Add(bl);
+        if (blokken.Count == 0) return new List<int>();
+        blokken = blokken.Take(3).ToList();
+        _log.Waarschuwing($"De loc staat waarschijnlijk op een sectiescheiding bij melder {_k.LocMelder}: rijstroom per blok proberen (blok {string.Join(", ", blokken)}) (BUG #408, nog niet getest op de baan).");
+        int v = BaanVerkenner.ZoekKruipSnelheid(Math.Max(1, _ins.Kruipsnelheid), _ins.Verkensnelheid, 3);
+        var pogingen = new List<(int blok, Richting r, int? tweede)>();
+        foreach (var b in blokken) foreach (var r in new[] { Richting.Achteruit, Richting.Vooruit }) pogingen.Add((b, r, null));
+        for (int i = 0; i < blokken.Count; i++) for (int j = 0; j < blokken.Count; j++) if (i != j) pogingen.Add((blokken[i], Richting.Vooruit, blokken[j]));
+        foreach (var (b, r, tweede) in pogingen)
+        {
+            _token.ThrowIfCancellationRequested();
+            _monitor.Bijwerken();
+            var t0 = _klok.Nu;
+            StuurSnelheid(v, r, new[] { b });
+            if (tweede is int b2) StuurSnelheid(v, r.Om(), new[] { b2 });
+            bool gezien = false;
+            while (_klok.Nu - t0 < TimeSpan.FromSeconds(6))
+            {
+                await _klok.Wacht(Poll);
+                if (Kortsluiting()) break;
+                if (_monitor.Bijwerken().Any(x => x.Tijd >= t0) || _monitor.Bezet.Count > 0) { gezien = true; break; }
+            }
+            await Stop();
+            _monitor.Bijwerken();
+            if (Kortsluiting()) { await HerstelKortsluiting(new Dictionary<int, bool>(), r); _monitor.Bijwerken(); }
+            if (gezien || _monitor.Bezet.Count > 0)
+            {
+                string wat = tweede is int t ? $"blok {b} {r.Tekst()} en blok {t} {r.Om().Tekst()}" : $"alleen blok {b} {r.Tekst()}";
+                _log.Vondst($"Loc weer gezien met rijstroom op {wat}: melder {string.Join(", ", _monitor.Bezet)} (BUG #408).");
+                if (_monitor.Bezet.Count != 1) { try { await Herparkeer(r, alleBlokken: true); } catch (PlanFout) { } }
+                var res = _monitor.Bezet.ToList();
+                if (res.Count > 0) return res;
             }
         }
         return new List<int>();

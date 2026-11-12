@@ -3516,6 +3516,14 @@ stilstaan) dacht de verkenner dat de loc op 268 stond, maar alleen melder 25 was
 die melder gepland (hoogstens 3 keer achter elkaar). Melder 268 is nieuw (na 25, met wissel 9/10 omgezet); of het een echte melder is moet de baan laten zien.
 Simulatie module 2 (alle varianten, hervatten realistisch, start 5, 10 en 17): gelijk aan #406.
 
+## BUG #408 – GEMAAKT (nog niet getest op de baan, niet na te bootsen in de simulatie): loc kwijt op de sectiescheiding 12/1
+(Logcontrole 12-11, verkenning 14:56, gestopt 15:47. Marco 16:21: "hij blijft niet staan, maar let wel op daar zit ook een sectiescheiding waardoor hij vaak in
+2 secties staat".) Hardwarelog 15:35: na de blokproef stond de loc op de grens van melder 12 (blok 2) en 1 (blok 1); met "snelheid 5 achteruit" naar blok 1 en 2
+werden melder 1 en 12 allebei vrij en reed de loc niet meer, ook niet met rijstroom op alle blokken. Mijn eerdere vermoeden (dood puntstuk) klopt niet.
+Nu: bij het zoeken van de loc eerst rijstroom per blok: elk blok rond de laatste melder alleen (achteruit en vooruit), daarna twee blokken tegelijk in
+tegengestelde richting, steeds 6 s. Pas daarna het gewone zoeken (#396), de basisstand (#403) en de wissels (#405).
+Simulatie module 2 (alle varianten, hervatten realistisch, start 5, 10 en 25 zonder melding bij de start): gelijk aan #407.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:
