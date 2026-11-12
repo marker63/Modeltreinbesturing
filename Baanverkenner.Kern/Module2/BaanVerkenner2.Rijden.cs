@@ -543,8 +543,10 @@ public partial class BaanVerkenner2
         {
             var raak = bezet.Where(zone.Contains).ToList();
             if (raak.Count > 0) { reden = $"de loc staat op melder {string.Join("/", raak)}, waar wissel {a} ligt"; _nietHier404 = true; return false; }
-            // BUG #395: een zone die alleen uit een opgeheven kortsluiting komt (adres nog niet als wissel gevonden): de gewone eisen voor een nog niet gevonden adres blijven gelden
-            if (_k.IsGevonden(a) || Volgers(a, false).Any(v => _k.IsGevonden(v.Volger))) return true;
+            // BUG #404 (Marco 12-11 09:25: "voltooid, maar maar 1 wissel"): is bekend waar de wissel ligt (ook als dat alleen uit een opgeheven kortsluiting komt, #395),
+            // dan is elke andere plek veilig, net als in de planning (VeiligOp). In #395 gold hier daarna nog de eis "geen kruising"; de planning wist dat niet, zette
+            // wissel 9 op melder 24 (de kruiswissel) in het plan, het zetten weigerde, en om 09:20:48 faalden zo binnen een halve seconde alle taken.
+            return true;
         }
         if (bezet.Count != 1) { reden = $"de loc staat niet netjes op één melder ({string.Join("/", bezet)})"; _nietNetjes387 = true; return false; }
         if (!ProefPlek(bezet.First())) { reden = $"melder {bezet.First()} is een kruising of te kort om daar een nog niet gevonden adres om te zetten"; _nietHier404 = true; return false; }

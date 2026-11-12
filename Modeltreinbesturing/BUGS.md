@@ -3484,6 +3484,15 @@ Open: waar stond de loc om 08:40 (ontspoord, zonder stroom op de kruiswissel)? M
 Met de proefstand (alle adressen omgezet) lag het stuk van de kruiswissel waar de loc stond zonder stroom, dus kon hij niet weg en was hij onzichtbaar. Nu: bij het zoeken
 van de loc (#396/#402) gaan na twee vergeefse pogingen alle omgezette wissels terug in de basisstand (de loc staat stil en er loopt geen stroom), daarna wordt verder gezocht.
 
+## BUG #404 – OPGELOST (nog niet getest op de baan): "voltooid" met maar 1 wissel; alle taken binnen een halve seconde overgeslagen
+(Marco 12-11 09:25.) Om 09:20:48 stond de loc op melder 24 (de kruiswissel). De planning plaatste het omzetten van wissel 9 op 24 (wissel 9 had door #395 een zone, en
+voor een wissel met een zone gold elke plek buiten die zone als veilig), maar het zetten zelf eiste daarna nog "geen kruising" (ook #395). Elke taak faalde daardoor meteen,
+twee keer, en werd overgeslagen: 8 taken in een halve seconde, en toch "voltooid". Nu: (1) het zetten gebruikt dezelfde regel als de planning (bekende zone: elke andere plek is
+veilig); (2) niet voltooid als er na de herkansing meer dan 2 taken overgeslagen zijn; (3) aan het eind krijgen overgeslagen taken nog één kans; (4) bij hervatten krijgen
+overgeslagen taken een nieuwe kans. Geprobeerd en weer weggehaald: na zo'n mislukking eerst een stukje verder rijden (simulatie vanaf 17: na 720 min niet af).
+Simulatie: alle starts, varianten en hervatten gelijk aan #403. Hervatten vanaf Marco's voortgang van 09:20 (loc op 21): voltooid maar 720 min en een valse wissel 11: die
+voortgang is beschadigd (8 overgeslagen taken, kennis uit mislukte proeven); beter een nieuwe verkenning beginnen.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:
