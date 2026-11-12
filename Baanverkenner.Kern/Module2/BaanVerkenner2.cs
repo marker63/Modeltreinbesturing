@@ -404,6 +404,45 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             // BUG #403 (Marco 12-11 08:47: de loc stond op melder 129, terwijl Dinamo 129 als vrij meldde): een melder ziet de loc alleen als er stroom loopt. Met
             // de proefstand (alle adressen omgezet) lag het stuk van de kruiswissel waar de loc stond zonder stroom: de loc kon niet weg en was voor Dinamo
             // onzichtbaar. Na twee vergeefse pogingen daarom alle wissels terug in de basisstand (de loc staat stil en er loopt geen stroom), daarna verder zoeken.
+            // BUG #405 (Marco 12-11, 08:35 bij 129, 09:33 bij 129 en 10:35 bij 10, telkens ook in de basisstand): de loc stond zonder stroom op een stuk zonder melder
+            // (het puntstuk van wissel 5/6 bij de overloop en de keerlus). Zoeken met rijstroom helpt dan niet: alleen een wissel daar geeft het stuk weer stroom.
+            // Daarom na de basisstand de wissels die bij de laatste melder van de loc horen, één voor één omzetten; na elke omzetting kort heen en weer kruipen.
+            // Geeft dat een melder, dan blijft die stand staan. De loc staat stil en er loopt geen stroom (een kleine kans dat een tong onder een stilstaande loc
+            // verschuift blijft, gemeld aan Marco 12-11 10:09).
+            if (!veranderd && _monitor.Bezet.Count == 0 && n == 3)
+            {
+                var kandidaten = KandidatenStroom405(_k.LocMelder);
+                _log.Waarschuwing($"De loc staat waarschijnlijk zonder stroom bij melder {_k.LocMelder}: wissel {string.Join(", ", kandidaten)} één voor één omzetten tot hij weer stroom krijgt (BUG #405, nog niet getest op de baan).");
+                foreach (var a in kandidaten)
+                {
+                    bool oud = Fysiek(a);
+                    await ZetAdres(a, !oud);
+                    foreach (var r2 in new[] { Richting.Achteruit, Richting.Vooruit })
+                    {
+                        _monitor.Bijwerken();
+                        var t1 = _klok.Nu;
+                        StuurSnelheid(BaanVerkenner.ZoekKruipSnelheid(Math.Max(1, _ins.Kruipsnelheid), _ins.Verkensnelheid, 3), r2, AlleBlokken());
+                        bool gezien = false;
+                        while (_klok.Nu - t1 < TimeSpan.FromSeconds(8))
+                        {
+                            await _klok.Wacht(Poll);
+                            if (Kortsluiting()) break;
+                            if (_monitor.Bijwerken().Any(x => x.Tijd >= t1) || _monitor.Bezet.Count > 0) { gezien = true; break; }
+                        }
+                        await Stop();
+                        _monitor.Bijwerken();
+                        if (Kortsluiting()) { await HerstelKortsluiting(new Dictionary<int, bool>(), r2); _monitor.Bijwerken(); }
+                        if (gezien || _monitor.Bezet.Count > 0)
+                        {
+                            _log.Vondst($"Met wissel {a} omgezet kreeg de loc weer stroom (BUG #405).");
+                            if (_monitor.Bezet.Count != 1) { try { await Herparkeer(r2, alleBlokken: true); } catch (PlanFout) { } }
+                            var b2 = _monitor.Bezet.ToList();
+                            if (b2.Count > 0) return b2;
+                        }
+                    }
+                    await ZetAdres(a, oud);
+                }
+            }
             if (!veranderd && _monitor.Bezet.Count == 0 && n == 2)
             {
                 var om = _adressen.Where(Fysiek).ToList();
@@ -421,6 +460,18 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             }
         }
         return new List<int>();
+    }
+
+    /// <summary>BUG #405: de wissels die waarschijnlijk bij melder m liggen: eerst die met een zone of relevantie bij m, daarna de rest.</summary>
+    private List<int> KandidatenStroom405(int m)
+    {
+        var dichtbij = new List<int>();
+        foreach (var a in _adressen)
+        {
+            if (_k.Zone(a).Contains(m)) { dichtbij.Add(a); continue; }
+            if (_k.Relevant.Any(kv => kv.Value.Contains(a) && (kv.Key.Contains($">{m}:") || kv.Key.StartsWith($"{m}>")))) dichtbij.Add(a);
+        }
+        return dichtbij.Concat(_adressen.Except(dichtbij)).ToList();
     }
 
     // ================================================================ taken kiezen (wat is nu het nuttigst?)

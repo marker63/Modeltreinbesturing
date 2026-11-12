@@ -3493,6 +3493,13 @@ overgeslagen taken een nieuwe kans. Geprobeerd en weer weggehaald: na zo'n mislu
 Simulatie: alle starts, varianten en hervatten gelijk aan #403. Hervatten vanaf Marco's voortgang van 09:20 (loc op 21): voltooid maar 720 min en een valse wissel 11: die
 voortgang is beschadigd (8 overgeslagen taken, kennis uit mislukte proeven); beter een nieuwe verkenning beginnen.
 
+## BUG #405 – OPGELOST (nog niet getest op de baan, niet na te bootsen in de simulatie): loc stroomloos bij de overloop 5/6, ook in de basisstand
+(Logcontroles 12-11: 08:35 na 129, 09:33 na 129 en 10:35 na 10, telkens geen enkele melder meer bezet en de loc beweegt niet, ook niet met rijstroom op alle blokken
+en ook in de basisstand.) De loc staat dan op een stuk zonder melder en zonder stroom (waarschijnlijk het puntstuk van wissel 5/6 bij de overloop en de keerlus); alleen een
+wissel daar geeft het weer stroom. Nu: bij het zoeken van de loc, na de basisstand (#403), de wissels die bij de laatste melder horen (zone of relevantie) eerst, daarna de rest,
+één voor één omzetten, na elke omzetting 8 s achteruit en 8 s vooruit kruipen; ziet een melder de loc weer, dan blijft die stand staan. Aan Marco gemeld (10:09) dat een tong
+onder een stilstaande loc kan verschuiven; standaard zelf oplossen (#305). Simulatie: gewoon, realistisch, start 25 zonder melding bij de start en hervatten gelijk aan #404.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:
