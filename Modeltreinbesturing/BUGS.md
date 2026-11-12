@@ -3524,6 +3524,13 @@ Nu: bij het zoeken van de loc eerst rijstroom per blok: elk blok rond de laatste
 tegengestelde richting, steeds 6 s. Pas daarna het gewone zoeken (#396), de basisstand (#403) en de wissels (#405).
 Simulatie module 2 (alle varianten, hervatten realistisch, start 5, 10 en 25 zonder melding bij de start): gelijk aan #407.
 
+## BUG #409 – OPGELOST (nog niet getest op de baan): verkenning stopte zonder de loc te zoeken
+(Logcontrole 12-11, hervatting 16:18, gestopt 16:25.) De rit "een stukje verder" 129 -> 4 liep vast, daarna was geen melder meer bezet, en de verkenning stopte
+meteen als NIET af ("4 taken konden vanaf melder 129 niet gepland worden"). Nu wordt de loc dan eerst gezocht (#408, #396, #403, #405).
+Open: rond 129 kan de loc met rijstroom op alleen blok 9 vaak niet weg ("lijkt stil te staan"); kortsluiting op de grens van 129 en 137. Gevraagd aan Marco hoe
+Koploper de keerlus/sectiescheiding daar aanstuurt.
+Simulatie module 2 (alle varianten, hervatten realistisch, start 5, 10 en 17): gelijk aan #408.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:

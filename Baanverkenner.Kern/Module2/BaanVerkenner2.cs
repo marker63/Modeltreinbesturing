@@ -195,6 +195,11 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                     // Er zijn nog taken, maar vanaf hier lukt geen plan (bijv. geen veilige plek om een wissel om te zetten): een stukje bekende baan
                     // rijden en opnieuw proberen (hoogstens 6 keer achter elkaar).
                     if (_onbereikbaar > 0 && verplaatst++ < 6 && await RijdStukjeVerder()) continue;
+                    // WAT: is de loc bij dat stukje verder rijden uit beeld geraakt, dan eerst zoeken (begin van de lus) in plaats van stoppen.
+                    // WAAROM (BUG #409, Marco 12-11 16:25): de rit 129 -> 4 liep vast, geen melder meer bezet, en de verkenning stopte meteen als NIET af
+                    // ("4 taken konden vanaf melder 129 niet gepland worden") zonder de loc te zoeken.
+                    _monitor.Bijwerken();
+                    if (_monitor.Bezet.Count == 0 && !Kortsluiting() && verplaatst <= 6) continue;
                     // BUG #404: zijn er taken overgeslagen, dan krijgen die aan het eind nog één keer een kans (met alles wat inmiddels bekend is)
                     if (_k.Overgeslagen.Count > 0 && !_herkansing404)
                     {
