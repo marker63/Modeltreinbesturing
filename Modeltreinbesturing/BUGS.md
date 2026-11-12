@@ -3479,6 +3479,11 @@ wordt de loc dan eerst gezocht (#396, hoogstens 10 minuten); lukt dat niet, dan 
 niet te plannen zijn, dan is de verkenning niet voltooid. Simulatie: alle starts (13, 5, 10, 17, 25), varianten en hervatten gelijk aan #398.
 Open: waar stond de loc om 08:40 (ontspoord, zonder stroom op de kruiswissel)? Mogelijk moet de wisseltest de kruiswissel 10+13 niet samen met alle andere adressen omzetten.
 
+## BUG #403 – OPGELOST (nog niet getest op de baan, niet na te bootsen in de simulatie): loc stroomloos op melder 129
+(Marco 12-11 08:47: de loc stond om 08:40 op melder 129.) Dinamo meldde 129 om 08:35:59 vrij terwijl de loc er nog stond: een melder ziet de loc alleen als er stroom loopt.
+Met de proefstand (alle adressen omgezet) lag het stuk van de kruiswissel waar de loc stond zonder stroom, dus kon hij niet weg en was hij onzichtbaar. Nu: bij het zoeken
+van de loc (#396/#402) gaan na twee vergeefse pogingen alle omgezette wissels terug in de basisstand (de loc staat stil en er loopt geen stroom), daarna wordt verder gezocht.
+
 ## MODULE 2 – GEMAAKT (nog niet getest op de baan): Baanverkenner module 2, kiesbaar als optie 7
 (Marco 27-10 15:56: "een compleet nieuwe tweede versie maken Baanverkenner module 2, zodat ik kan kiezen welke ik gebruik"; keuze in hetzelfde programma, zelfde kaartformaat, in één keer compleet.)
 Zie `Baanverkenner.Kern/Module2/`. Opzet volgens het stappenplan van 27-10:

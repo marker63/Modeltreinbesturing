@@ -386,6 +386,18 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             await Stop();
             _monitor.Bijwerken();
             if (Kortsluiting()) { await HerstelKortsluiting(new Dictionary<int, bool>(), r); _monitor.Bijwerken(); }
+            // BUG #403 (Marco 12-11 08:47: de loc stond op melder 129, terwijl Dinamo 129 als vrij meldde): een melder ziet de loc alleen als er stroom loopt. Met
+            // de proefstand (alle adressen omgezet) lag het stuk van de kruiswissel waar de loc stond zonder stroom: de loc kon niet weg en was voor Dinamo
+            // onzichtbaar. Na twee vergeefse pogingen daarom alle wissels terug in de basisstand (de loc staat stil en er loopt geen stroom), daarna verder zoeken.
+            if (!veranderd && _monitor.Bezet.Count == 0 && n == 2)
+            {
+                var om = _adressen.Where(Fysiek).ToList();
+                if (om.Count > 0)
+                {
+                    _log.Waarschuwing($"De loc staat waarschijnlijk zonder stroom (nog steeds op melder {_k.LocMelder}?): wissel {string.Join(", ", om)} terug in de basisstand, daarna verder zoeken (BUG #403, nog niet getest op de baan).");
+                    foreach (var a in om) await ZetAdres(a, false);
+                }
+            }
             if (veranderd || _monitor.Bezet.Count > 0)
             {
                 if (_monitor.Bezet.Count != 1) { try { await Herparkeer(r, alleBlokken: true); } catch (PlanFout) { } }
