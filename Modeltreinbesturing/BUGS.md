@@ -3656,4 +3656,10 @@ Simulatie module 2: gelijk aan #419.
   Alle standen kloppen met Marco (overloop 2/1, 5/6, wissel 9 omgekeerd, wissel 14, kruiswissel 24).
 - Simulatie: optionele ruis zoals in de logs (alleen tests, standaard uit): `KansNietBestaandeMelder` (melder 268 kort bij
   een sectie-overgang) en `GemisteMelders` (24 en 129 soms niet gezien). Meten met `MARCO2_RUIS=1`.
+- **Wissel ook andersom proberen** (Marco 14-11 16:03 "dit moet ook gelden als we andersom rijden"): met ruis werd 12 -> 5 alleen met
+  wissel 2 afbuigend gereden; de kant 12 -> 1 bleef onbekend en de verkenning eindigde 'voltooid' zonder melders 1, 9 en 10. Nieuwe taak
+  'andersom': per gevonden wissel, per tak, de stap terug naar de wissel ook met de andere stand (hoogstens 3 pogingen, houdt 'voltooid' niet tegen).
+- **Vastgelopen tegenspraak**: een gemiste melder (21 -> 24 -> 14 terwijl het 129 was) gaf een tegenspraak die nooit op te lossen was (tientallen keren
+  dezelfde taak). Na 4 keer bij dezelfde ingang wordt de zeldzaamste waarneming vergeten, alleen als beide uitkomsten een melder zijn
+  (een kortsluiting is wel te herhalen, bijv. wissel 9 + motor 10 samen).
 - Nog niet getest op de baan (alleen simulatie).
