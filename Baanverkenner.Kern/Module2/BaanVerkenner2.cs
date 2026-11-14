@@ -246,6 +246,8 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                 // ergens anders uitkwam, daarna bleef de hele buitenring onverkend).
                 bool nieuws394 = _k.Melders.Count() > meldersVoor394 || _k.Stappen.Count(x => !x.Afgeleid) > stappenVoor394 + 1;
                 if (nieuws394 && _k.Overgeslagen.Count > 0) { _k.Overgeslagen.Clear(); _k.Mislukt.Clear(); }
+                // BUG #421: mislukte pogingen over de hele verkenning tellen (de gewone teller hieronder wordt bij nieuws weer leeggemaakt)
+                if (!gelukt || taak.Soort == Soort.Dekking) _mislukTotaal421[taak.Sleutel] = _mislukTotaal421.GetValueOrDefault(taak.Sleutel) + 1;   // dekking: elke poging telt
                 if (!gelukt && !nieuws394)
                 {
                     int n = _k.Mislukt[taak.Sleutel] = _k.Mislukt.GetValueOrDefault(taak.Sleutel) + 1;
@@ -643,6 +645,9 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             foreach (var t in Kandidaten(soort))
             {
                 if (_k.Overgeslagen.Contains(t.Sleutel)) continue;
+                // WAT: een dekkingsrit (adressen testen) met precies dezelfde route en adressen die al 4 keer gereden is, niet meer proberen. WAAROM (BUG #421, simulatie start 25 'streng'): de rit
+                // 21 - 24 - 129 gaf 327 keer dezelfde kortsluiting (wissel 9 en motor 10 samen verkeerd); elke keer werd de 'overgeslagen'-lijst door nieuws weer leeg.
+                if (soort == Soort.Dekking && _mislukTotaal421.GetValueOrDefault(t.Sleutel) >= 4) continue;
                 var (plan, kosten) = PlanVoor(t, kaart);
                 // BUG #421: een 'andersom'- of 'na de kortsluitproef'-rit is een extra controle; is die niet te plannen, dan houdt dat de verkenning niet tegen
                 if (plan is null) { if (soort != Soort.Andersom && soort != Soort.NaProef) onbereikbaar.Add(t.Omschrijving); continue; }
@@ -956,35 +961,16 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                 // waarneming blijft staan; de routeplanner kiest dan alleen nog een combinatie die eerder goed ging.
                 // WAAROM (BUG #421, simulatie start 25 'streng': 353 keer dezelfde tegenspraak 29 -> 21 en 327 keer dezelfde dekkingsrit 21 - 24 - 129):
                 // de kortsluiting werd steeds vergeten en de volgende rit zette weer precies dezelfde combinatie.
-                if ((a.Uitkomst == StapUitkomst.Kortsluiting || b.Uitkomst == StapUitkomst.Kortsluiting) && alleVerschil.Count is >= 2 and <= 3 && alleVerschil.All(_k.IsGevonden))
+                if ((a.Uitkomst == StapUitkomst.Kortsluiting || b.Uitkomst == StapUitkomst.Kortsluiting) && alleVerschil.Count is >= 2 and <= 3 && alleVerschil.All(_k.IsGevonden)
+                    && _combinatie411.GetValueOrDefault("U|" + Kennis2.Sleutel(t.Via, t.Melder, t.Richting)) >= 3)
                 {
                     foreach (var x in alleVerschil) _k.MaakRelevant(t.Via, t.Melder, t.Richting, x);
                     _log.Waarschuwing($"Bij {t.Via} -> {t.Melder} ({t.Richting.Tekst()}) bepalen de al gevonden wissels {string.Join(" en ", alleVerschil)} samen de uitkomst (kortsluiting bij {string.Join(",", (a.Uitkomst == StapUitkomst.Kortsluiting ? a : b).Stand)} afbuigend); dat wordt onthouden (BUG #421, nog niet getest op de baan).");
                     return true;
                 }
-                // WAT: zit er bij de verschillen een al gevonden wissel (bijv. motor 10), dan elk nog niet gevonden adres SAMEN met die wissel(s) proberen.
-                // Geeft dat de andere uitkomst, dan bepalen ze samen deze stap: allebei relevant. WAAROM: zie hierboven (BUG #421, start 25 'streng':
-                // wissel 9 werd nooit gevonden, omdat 9 alleen samen met motor 10 de kortsluiting gaf).
-                var gevonden421 = alleVerschil.Where(_k.IsGevonden).ToList();
-                if ((a.Uitkomst == StapUitkomst.Kortsluiting || b.Uitkomst == StapUitkomst.Kortsluiting) && gevonden421.Count is >= 1 and <= 2 && !_combinatieGeprobeerd421.Contains(t.Sleutel))
-                {
-                    _combinatieGeprobeerd421.Add(t.Sleutel);
-                    foreach (var x in alleVerschil.Where(q => !_k.IsGevonden(q)).Take(4))
-                    {
-                        var stand2 = new Dictionary<int, bool>(basis);
-                        foreach (var q in gevonden421.Append(x)) stand2[q] = b.Stand.Contains(q);
-                        _log.Stap($"Controle: adres {x} samen met wissel {string.Join(", ", gevonden421)} zoals bij de tweede uitkomst (BUG #421).");
-                        var u2 = await Proef(t.Via, t.Melder, t.Richting, stand2, herstel: a.Uitkomst > 0 ? new Dictionary<int, bool>(basis) : new Dictionary<int, bool>());
-                        if (u2 is null) return false;
-                        if (u2.Value == a.Uitkomst) continue;
-                        foreach (var q in gevonden421.Append(x)) _k.MaakRelevant(t.Via, t.Melder, t.Richting, q);
-                        _log.Vondst($"Bij {t.Via} -> {t.Melder} ({t.Richting.Tekst()}) bepalen adres {x} en wissel {string.Join(", ", gevonden421)} samen de uitkomst ({StapUitkomst.Tekst(u2.Value)} als ze allebei zo staan) (BUG #421, nog niet getest op de baan).");
-                        return true;
-                    }
-                }
                 string sleutel411 = "U|" + Kennis2.Sleutel(t.Via, t.Melder, t.Richting);
                 _combinatie411[sleutel411] = _combinatie411.GetValueOrDefault(sleutel411) + 1;
-                if (_combinatie411[sleutel411] >= 2 && false)   // BUG #411: uitgezet, maakte start 17 en 25 (zonder scheiding) veel slechter (720 min)
+                if (_combinatie411[sleutel411] >= 2 && false)   // BUG #411: uitgezet, maakte start 17 en 25 (zonder scheiding) veel slechter (720 min); BUG #421: ook bij 5 keer slechter
                     _log.Waarschuwing($"Het verschil bij {t.Via} -> {t.Melder} ({t.Richting.Tekst()}) komt weer door een combinatie; de waarneming met {StapUitkomst.Tekst(b.Uitkomst)} (adressen {string.Join(",", b.Stand)} afbuigend) blijft nu staan, zodat deze stap met die stand niet meer gepland wordt (BUG #411).");
                 else
                 {
@@ -1067,8 +1053,8 @@ public partial class BaanVerkenner2 : IBaanVerkenner
     internal readonly Dictionary<string, int> _andersomMislukt421 = new();
     /// <summary>BUG #421: hoe vaak een tegenspraak-taak al begonnen is (de gewone teller wordt bij nieuws leeggemaakt, BUG #394).</summary>
     private readonly Dictionary<string, int> _tegenspraakPogingen421 = new();
-    /// <summary>BUG #421: tegenspraken waarvoor de combinatie 'open adres + gevonden wissel' al geprobeerd is.</summary>
-    private readonly HashSet<string> _combinatieGeprobeerd421 = new();
+    /// <summary>BUG #421: mislukte pogingen per taak over de hele verkenning.</summary>
+    private readonly Dictionary<string, int> _mislukTotaal421 = new();
 
     // ================================================================ taak: uitweg zoeken (fase 5)
 
@@ -1118,7 +1104,11 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         // BUG #404: ook niet voltooid als er (na de herkansing) meer dan 2 taken overgeslagen zijn (09:20:48: 8 taken binnen een halve seconde twee keer mislukt en
         // overgeslagen, toch "voltooid"). Eén of twee overgeslagen taken komen ook in een complete verkenning voor (bijv. een uitweg na een kortsluiting die er echt
         // niet is); die staan als open punt in het rapport.
-        k.Voltooid = zonderBlok.Count == 0 && _locKwijt402 is null && _onbereikbaar == 0 && _k.Overgeslagen.Count <= 2;
+        // BUG #421 (simulatie start 25 'streng': 'voltooid' met 17 van de 23 melders): een overgeslagen verkenningstaak betekent dat er achter een melder
+        // nog onbekende baan ligt; dan is de verkenning nooit af.
+        var onverkend421 = _k.Overgeslagen.Where(x => x.StartsWith("V|")).ToList();
+        k.Voltooid = zonderBlok.Count == 0 && _locKwijt402 is null && _onbereikbaar == 0 && _k.Overgeslagen.Count <= 2 && onverkend421.Count == 0;
+        if (onverkend421.Count > 0) _log.Waarschuwing($"De verkenning is nog NIET af: achter melder {string.Join(", ", onverkend421.Select(x => x.Split('|')[1]))} is nog niet verkend (BUG #421).");
         if (_k.Overgeslagen.Count > 2) _log.Waarschuwing($"De verkenning is nog NIET af: {_k.Overgeslagen.Count} taken zijn overgeslagen (BUG #404).");
         // BUG #402: niet voltooid als de loc kwijt is of als er nog taken zijn die niet te plannen waren
         if (_locKwijt402 is not null && !k.Waarschuwingen.Contains(_locKwijt402)) k.Waarschuwingen.Add(_locKwijt402);
