@@ -644,7 +644,8 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             {
                 if (_k.Overgeslagen.Contains(t.Sleutel)) continue;
                 var (plan, kosten) = PlanVoor(t, kaart);
-                if (plan is null) { onbereikbaar.Add(t.Omschrijving); continue; }
+                // BUG #421: een 'andersom'-proef is een extra controle; is die niet te plannen, dan houdt dat de verkenning niet tegen
+                if (plan is null) { if (soort != Soort.Andersom) onbereikbaar.Add(t.Omschrijving); continue; }
                 if (kosten >= besteKosten) continue;
                 t.Plan = plan; beste = t; besteKosten = kosten;
                 if (soort == Soort.Dekking) break;   // de dekkingsritten komen al op volgorde van nut
@@ -870,6 +871,24 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             _k.Stappen.Remove(a);
             return false;
         }
+        // WAT: lukte deze tegenspraak al eens niet, dan eerst controleren of een uitkomst die maar één keer gezien is nog terugkomt met precies die stand.
+        // Komt hij niet terug, dan was het een foute waarneming (bijv. een melder die niet meldde) en wordt die vergeten.
+        // WAAROM (BUG #421, simulatie met ruis zoals in de hardwarelogs): 21 -> 24 -> 14 met motor 10 afbuigend (melder 129 niet gezien) stond als waarneming
+        // tegenover het echte 21 -> 24 -> 129. Elke halveerproef liep vast op een kortsluiting, de taak kwam 53 keer terug en stand A werd nooit opnieuw gereden.
+        if (_k.Mislukt.GetValueOrDefault(t.Sleutel) >= 1 || _k.Overgeslagen.Contains(t.Sleutel) || _tegenspraakPogingen421.GetValueOrDefault(t.Sleutel) >= 2)
+            foreach (var w in new[] { a, b }.Where(x => x.Aantal <= 1 && x.Uitkomst != StapUitkomst.Kortsluiting).OrderBy(x => x.Aantal))
+            {
+                var standW = new Dictionary<int, bool>();
+                foreach (var x in _adressen) standW[x] = w.Stand.Contains(x);
+                _log.Stap($"Controle: de uitkomst {StapUitkomst.Tekst(w.Uitkomst)} (één keer gezien) nog eens met precies die stand (BUG #421).");
+                var uw = await Proef(t.Via, t.Melder, t.Richting, standW, herstel: new Dictionary<int, bool>());
+                if (uw is null) break;
+                if (uw.Value == w.Uitkomst) continue;
+                _log.Waarschuwing($"Stap {t.Via} -> {t.Melder} ({t.Richting.Tekst()}): met dezelfde stand nu {StapUitkomst.Tekst(uw.Value)} in plaats van {StapUitkomst.Tekst(w.Uitkomst)}. Die ene waarneming wordt vergeten (BUG #421, nog niet getest op de baan).");
+                _k.Stappen.Remove(w);
+                return true;
+            }
+        _tegenspraakPogingen421[t.Sleutel] = _tegenspraakPogingen421.GetValueOrDefault(t.Sleutel) + 1;
         while (kandidaten.Count > 1 && proeven < 8)
         {
             var helft = kandidaten.Take(kandidaten.Count / 2).ToList();
@@ -996,6 +1015,8 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         return stand;
     }
     internal readonly Dictionary<string, int> _andersomMislukt421 = new();
+    /// <summary>BUG #421: hoe vaak een tegenspraak-taak al begonnen is (de gewone teller wordt bij nieuws leeggemaakt, BUG #394).</summary>
+    private readonly Dictionary<string, int> _tegenspraakPogingen421 = new();
 
     // ================================================================ taak: uitweg zoeken (fase 5)
 
