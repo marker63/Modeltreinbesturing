@@ -654,11 +654,18 @@ public partial class BaanVerkenner2
             }
             int pauze = pauzes[Math.Min(poging, pauzes.Length - 1)];
             _log.Waarschuwing($"Wissel {a}: geen terugmelding van Dinamo (niet uitgevoerd). Over {pauze} s opnieuw.");
-            if (!gevraagd && _klok.Nu - t0 > ZelfZoekenMaximaal)
+            // WAT: komt er na een kortsluiting geen enkele wisselterugmelding meer, dan zit het (volgens Marco 14-11 14:33) in de TM-H's: alle rode LEDjes
+            // knipperden en alleen spanningsloos maken hielp. Dat kan het programma niet zelf oplossen, dus dan al na 3 minuten vragen in plaats van na 10.
+            // WAAROM (BUG #419, 14-11 12:57-13:07): na de kortsluiting in blok 9 en 2 werd "wissel 9 afbuigend" 22 keer niet uitgevoerd.
+            bool naKortsluiting = _laatsteKortsluiting419 is DateTime lk && t0 - lk < TimeSpan.FromMinutes(5);
+            var vraagNa = naKortsluiting ? TimeSpan.FromMinutes(3) : ZelfZoekenMaximaal;
+            if (!gevraagd && _klok.Nu - t0 > vraagNa)
             {
                 gevraagd = true;
-                _log.Waarschuwing("Dinamo voert al 10 minuten geen wisselcommando uit: Marco gevraagd Dinamo te controleren.");
-                await _vraag("Dinamo voert geen wisselcommando's uit", $"Dinamo meldt al 10 minuten geen enkel wisselcommando terug (laatste: wissel {a}). Controleer Dinamo (eventueel even uit en aan) en klik daarna op OK.");
+                _log.Waarschuwing($"Dinamo voert al {(_klok.Nu - t0).TotalMinutes:0} minuten geen wisselcommando uit{(naKortsluiting ? " (sinds een kortsluiting)" : "")}: Marco gevraagd Dinamo te controleren (BUG #419).");
+                await _vraag("Dinamo voert geen wisselcommando's uit",
+                    $"Dinamo meldt al {(_klok.Nu - t0).TotalMinutes:0} minuten geen enkel wisselcommando terug (laatste: wissel {a}){(naKortsluiting ? ", sinds de laatste kortsluiting" : "")}. " +
+                    "Kijk of de rode LEDjes op de TM-H's knipperen. Zo ja: maak Dinamo even spanningsloos en zet hem weer aan. Klik daarna op OK.");
             }
             if (pauze > 0) await Wacht(TimeSpan.FromSeconds(pauze));
         }
@@ -674,10 +681,12 @@ public partial class BaanVerkenner2
     /// </summary>
     /// <summary>BUG #414: hoe vaak de kortsluitproef moet lukken voordat een wissel als oorzaak geldt (Marco: "herhaal deze test 3x").</summary>
     private const int KortsluitProefHerhalen = 3;
+    private DateTime? _laatsteKortsluiting419;   // BUG #419: tijd van de laatste kortsluiting
 
     private async Task<bool> HerstelKortsluiting(Dictionary<int, bool> terug, Richting r)
     {
         _k.Kortsluitingen++;
+        _laatsteKortsluiting419 = _klok.Nu;   // BUG #419
         int melder = _k.LocMelder;
         _log.Waarschuwing($"KORTSLUITING na melder {melder} ({r.Tekst()}). Zelf oplossen.");
         var t0 = _klok.Nu;

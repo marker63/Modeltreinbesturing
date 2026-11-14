@@ -3634,3 +3634,10 @@ Dinamo-commando's juist 'afbuigend' = 129 <-> 4 (kortsluitproeven 10:39 en 11:14
   voltooid, met sectiescheiding start 10 maar 7 melders en toch "voltooid"). Die laatste is ook een zwakte van "voltooid": melders die nooit gezien zijn, telt
   de verkenner niet mee (open punt).
 Simulatie module 2 en module 1: gelijk aan #417.
+
+## BUG #419 – OPGELOST (nog niet getest op de baan): na een kortsluiting voerde de Dinamo geen wissels meer uit
+(14-11 12:57-14:33.) Na de kortsluiting in blok 9 en 2 om 12:57:12 kwam er geen enkele wisselterugmelding meer ("wissel 9 afbuigend", 22 pogingen); de
+verbinding zelf leefde nog. Marco 14:33: "Dinamo heb ik spanningsloos moeten maken, alle rode LEDjes op de TM-H's knipperden." Dat kan het programma niet
+zelf oplossen (Reset Fault wordt bij een F-bit al automatisch gestuurd). Nu: komt er binnen 5 minuten na een kortsluiting geen wisselterugmelding meer, dan
+wordt Marco al na 3 minuten gevraagd (anders na 10), met de aanwijzing: kijk of de rode LEDjes op de TM-H's knipperen, zo ja Dinamo even spanningsloos maken.
+Simulatie module 2: gelijk aan #418.
