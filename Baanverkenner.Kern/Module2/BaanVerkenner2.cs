@@ -951,6 +951,37 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                 // stand, en dan gebruikt de routeplanner deze stap met die stand niet meer om te navigeren.
                 // WAAROM (BUG #411, simulatie met sectiescheiding, start 17: 349 keer dezelfde lus): de dekkingsrit reed 21 -> 24 -> 129 met 9 en 10 afbuigend,
                 // de kruiswissel gaf kortsluiting, de proef concludeerde "combinatie" en vergat de kortsluiting, en de volgende dekkingsrit deed precies hetzelfde.
+                // WAT: verschillen alleen al gevonden wissels (2 of 3) en gaf één van de twee kortsluiting, dan bepalen die wissels SAMEN deze stap
+                // (bijv. wissel 9 en motor 10 van de kruiswissel: allebei 'verkeerd' = kortsluiting). Ze worden hier allebei als relevant vastgelegd en de
+                // waarneming blijft staan; de routeplanner kiest dan alleen nog een combinatie die eerder goed ging.
+                // WAAROM (BUG #421, simulatie start 25 'streng': 353 keer dezelfde tegenspraak 29 -> 21 en 327 keer dezelfde dekkingsrit 21 - 24 - 129):
+                // de kortsluiting werd steeds vergeten en de volgende rit zette weer precies dezelfde combinatie.
+                if ((a.Uitkomst == StapUitkomst.Kortsluiting || b.Uitkomst == StapUitkomst.Kortsluiting) && alleVerschil.Count is >= 2 and <= 3 && alleVerschil.All(_k.IsGevonden))
+                {
+                    foreach (var x in alleVerschil) _k.MaakRelevant(t.Via, t.Melder, t.Richting, x);
+                    _log.Waarschuwing($"Bij {t.Via} -> {t.Melder} ({t.Richting.Tekst()}) bepalen de al gevonden wissels {string.Join(" en ", alleVerschil)} samen de uitkomst (kortsluiting bij {string.Join(",", (a.Uitkomst == StapUitkomst.Kortsluiting ? a : b).Stand)} afbuigend); dat wordt onthouden (BUG #421, nog niet getest op de baan).");
+                    return true;
+                }
+                // WAT: zit er bij de verschillen een al gevonden wissel (bijv. motor 10), dan elk nog niet gevonden adres SAMEN met die wissel(s) proberen.
+                // Geeft dat de andere uitkomst, dan bepalen ze samen deze stap: allebei relevant. WAAROM: zie hierboven (BUG #421, start 25 'streng':
+                // wissel 9 werd nooit gevonden, omdat 9 alleen samen met motor 10 de kortsluiting gaf).
+                var gevonden421 = alleVerschil.Where(_k.IsGevonden).ToList();
+                if ((a.Uitkomst == StapUitkomst.Kortsluiting || b.Uitkomst == StapUitkomst.Kortsluiting) && gevonden421.Count is >= 1 and <= 2 && !_combinatieGeprobeerd421.Contains(t.Sleutel))
+                {
+                    _combinatieGeprobeerd421.Add(t.Sleutel);
+                    foreach (var x in alleVerschil.Where(q => !_k.IsGevonden(q)).Take(4))
+                    {
+                        var stand2 = new Dictionary<int, bool>(basis);
+                        foreach (var q in gevonden421.Append(x)) stand2[q] = b.Stand.Contains(q);
+                        _log.Stap($"Controle: adres {x} samen met wissel {string.Join(", ", gevonden421)} zoals bij de tweede uitkomst (BUG #421).");
+                        var u2 = await Proef(t.Via, t.Melder, t.Richting, stand2, herstel: a.Uitkomst > 0 ? new Dictionary<int, bool>(basis) : new Dictionary<int, bool>());
+                        if (u2 is null) return false;
+                        if (u2.Value == a.Uitkomst) continue;
+                        foreach (var q in gevonden421.Append(x)) _k.MaakRelevant(t.Via, t.Melder, t.Richting, q);
+                        _log.Vondst($"Bij {t.Via} -> {t.Melder} ({t.Richting.Tekst()}) bepalen adres {x} en wissel {string.Join(", ", gevonden421)} samen de uitkomst ({StapUitkomst.Tekst(u2.Value)} als ze allebei zo staan) (BUG #421, nog niet getest op de baan).");
+                        return true;
+                    }
+                }
                 string sleutel411 = "U|" + Kennis2.Sleutel(t.Via, t.Melder, t.Richting);
                 _combinatie411[sleutel411] = _combinatie411.GetValueOrDefault(sleutel411) + 1;
                 if (_combinatie411[sleutel411] >= 2 && false)   // BUG #411: uitgezet, maakte start 17 en 25 (zonder scheiding) veel slechter (720 min)
@@ -1036,6 +1067,8 @@ public partial class BaanVerkenner2 : IBaanVerkenner
     internal readonly Dictionary<string, int> _andersomMislukt421 = new();
     /// <summary>BUG #421: hoe vaak een tegenspraak-taak al begonnen is (de gewone teller wordt bij nieuws leeggemaakt, BUG #394).</summary>
     private readonly Dictionary<string, int> _tegenspraakPogingen421 = new();
+    /// <summary>BUG #421: tegenspraken waarvoor de combinatie 'open adres + gevonden wissel' al geprobeerd is.</summary>
+    private readonly HashSet<string> _combinatieGeprobeerd421 = new();
 
     // ================================================================ taak: uitweg zoeken (fase 5)
 
