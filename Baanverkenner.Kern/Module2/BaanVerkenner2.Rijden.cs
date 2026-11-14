@@ -728,6 +728,7 @@ public partial class BaanVerkenner2
             {
                 _log.Vondst($"Kortsluitproef na melder {melder} ({r.Tekst()}): wissel {a} {(!oud ? "afbuigend" : "rechtdoor")} hief de kortsluiting {gelukt} keer op; deze wissel ligt achter deze sectie en blijft zo staan (stappenplan Marco 14-11, BUG #414, nog niet getest op de baan).");
                 OnthoudOnderLoc395(a);
+                _k.ProefOplossingen.Add($"{melder}|{r}|{a}|{!oud}");   // BUG #421: later de stap met deze stand opnieuw rijden
                 return true;
             }
             // niet zeker: zorg dat de kortsluiting weg is als dat met deze stand kan, anders terug naar de oude stand

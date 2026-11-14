@@ -354,6 +354,11 @@ public class Kennis2
     /// <summary>BUG #420: uitweg-taken waarvan vaststaat dat er geen uitweg is ("U|..."-sleutel). Anders dan Overgeslagen wordt dit niet gewist als ergens
     /// anders iets nieuws gevonden wordt.</summary>
     public HashSet<string> GeenUitweg { get; set; } = new();
+    /// <summary>
+    /// BUG #421: wissels die bij een kortsluitproef de kortsluiting opheften: "melder|richting|adres|stand" (stand true = afbuigend, Dinamo).
+    /// Daarmee rijdt de verkenner die stap later opnieuw, nu met die stand, om te zien welke melder er achter de wissel ligt (Marco 14-11 15:22).
+    /// </summary>
+    public HashSet<string> ProefOplossingen { get; set; } = new();
 
     /// <summary>WAT: zoekt een melder X die tussen a en b ligt (a -> X -> b), terwijl de loc met precies dezelfde wisselstand ook rechtstreeks van a naar b reed.
     /// Een echte melder kan de loc niet overslaan; dan is X een spook (Dinamo-ingang die zonder sectie bezet raakt).

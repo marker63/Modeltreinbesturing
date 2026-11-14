@@ -615,7 +615,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
 
     // ================================================================ taken kiezen (wat is nu het nuttigst?)
 
-    private enum Soort { Tegenspraak, Verken, Uitweg, Bevestig, Andersom, Dekking, Blok }
+    private enum Soort { Tegenspraak, Verken, NaProef, Uitweg, Bevestig, Andersom, Dekking, Blok }
 
     private sealed class Taak
     {
@@ -637,15 +637,15 @@ public partial class BaanVerkenner2 : IBaanVerkenner
     {
         var kaart = Dijkstra();
         var onbereikbaar = new List<string>();
-        foreach (var soort in new[] { Soort.Tegenspraak, Soort.Verken, Soort.Uitweg, Soort.Bevestig, Soort.Andersom, Soort.Dekking, Soort.Blok })
+        foreach (var soort in new[] { Soort.Tegenspraak, Soort.Verken, Soort.NaProef, Soort.Uitweg, Soort.Bevestig, Soort.Andersom, Soort.Dekking, Soort.Blok })
         {
             Taak? beste = null; int besteKosten = int.MaxValue;
             foreach (var t in Kandidaten(soort))
             {
                 if (_k.Overgeslagen.Contains(t.Sleutel)) continue;
                 var (plan, kosten) = PlanVoor(t, kaart);
-                // BUG #421: een 'andersom'-proef is een extra controle; is die niet te plannen, dan houdt dat de verkenning niet tegen
-                if (plan is null) { if (soort != Soort.Andersom) onbereikbaar.Add(t.Omschrijving); continue; }
+                // BUG #421: een 'andersom'- of 'na de kortsluitproef'-rit is een extra controle; is die niet te plannen, dan houdt dat de verkenning niet tegen
+                if (plan is null) { if (soort != Soort.Andersom && soort != Soort.NaProef) onbereikbaar.Add(t.Omschrijving); continue; }
                 if (kosten >= besteKosten) continue;
                 t.Plan = plan; beste = t; besteKosten = kosten;
                 if (soort == Soort.Dekking) break;   // de dekkingsritten komen al op volgorde van nut
@@ -737,6 +737,26 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                     yield return new Taak { Soort = soort, Sleutel = $"B|{v.Adres}|{Kennis2.Sleutel(v.Via, v.Melder, v.Richting)}", Via = v.Via, Melder = v.Melder, Richting = v.Richting, Vondst = v,
                         Omschrijving = $"wissel {v.Adres} na melder {v.Melder} ({v.Richting.Tekst()}) ook {(v.Rechtdoor is null ? "rechtdoor" : "afbuigend")} rijden" };
                 break;
+            case Soort.NaProef:
+                // WAT: een stap die kortsluiting gaf, waarbij de kortsluitproef liet zien welke wissel de kortsluiting ophief, nog eens rijden mét die stand.
+                // WAAROM (BUG #421, Marco 14-11 15:22: "waarom ga je niet ... de wissel voorbij en dan alle aftakkingen afrijden"; simulatie met
+                // sectiescheidingen, start 11): na de kortsluitproef op 129 (motor 10 afbuigend) werd de stap 129 -> 24 nooit met motor 10 afbuigend gereden.
+                // De loc bleef in de binnenring en de verkenning eindigde 'voltooid' met 7 van de 23 melders.
+                foreach (var po in _k.ProefOplossingen)
+                {
+                    var d = po.Split('|');
+                    if (d.Length != 4 || !int.TryParse(d[0], out var pm) || !Enum.TryParse<Richting>(d[1], out var pr) || !int.TryParse(d[2], out var pa) || !bool.TryParse(d[3], out var ps)) continue;
+                    foreach (var g in _k.Stappen.Where(x => !x.Afgeleid && !x.Terug && x.Via > 0 && x.Melder == pm && x.Richting == pr && x.Uitkomst == StapUitkomst.Kortsluiting).GroupBy(x => x.IngangSleutel))
+                    {
+                        if (_k.Stappen.Any(x => x.IngangSleutel == g.Key && !x.Afgeleid && x.Stand.Contains(pa) == ps)) continue;   // al met die stand gereden
+                        string sl = $"N|{pa}|{ps}|{g.Key}";
+                        if (_andersomMislukt421.GetValueOrDefault(sl) >= 3) continue;
+                        var s0 = g.First();
+                        yield return new Taak { Soort = soort, Sleutel = sl, Via = s0.Via, Melder = pm, Richting = pr, A = s0, Vondst = new WisselVondst2 { Adres = pa, Stand = ps ? new List<int>() : new List<int> { pa } },
+                            Omschrijving = $"na de kortsluitproef: stap {s0.Via} -> {pm} ({pr.Tekst()}) met wissel {pa} {(ps ? "afbuigend" : "rechtdoor")} rijden" };
+                    }
+                }
+                break;
             case Soort.Andersom:
                 // WAT: een gevonden wissel ook van de andere kant (vanaf de gesplitste kant terug naar de puntzijde) met de andere stand proberen.
                 // WAAROM (BUG #421, Marco 14-11 16:03: "Dit moet ook gelden als we andersom rijden natuurlijk"; simulatie met ruis zoals in de logs):
@@ -780,6 +800,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             case Soort.Uitweg: return await DoeUitweg(t);
             case Soort.Bevestig: return await DoeBevestig(t);
             case Soort.Andersom: return await DoeAndersom(t);
+            case Soort.NaProef: return await DoeAndersom(t);
             case Soort.Dekking: return await DoeDekking(t);
             case Soort.Blok: return await DoeBlok(t);
         }
@@ -1000,7 +1021,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                 _log.Info($"'{t.Omschrijving}' lukt niet; deze proef wordt niet meer geprobeerd (BUG #421).");
             return false;
         }
-        _log.Vondst($"Wissel {v.Adres} andersom: {t.Via} -> {t.Melder} ({t.Richting.Tekst()}) met wissel {v.Adres} {(nieuw ? "afbuigend" : "rechtdoor")} -> {StapUitkomst.Tekst(u.Value)} (BUG #421, nog niet getest op de baan).");
+        _log.Vondst($"{(t.Soort == Soort.NaProef ? "Na de kortsluitproef" : $"Wissel {v.Adres} andersom")}: {t.Via} -> {t.Melder} ({t.Richting.Tekst()}) met wissel {v.Adres} {(nieuw ? "afbuigend" : "rechtdoor")} -> {StapUitkomst.Tekst(u.Value)} (BUG #421, nog niet getest op de baan).");
         return true;
     }
 
