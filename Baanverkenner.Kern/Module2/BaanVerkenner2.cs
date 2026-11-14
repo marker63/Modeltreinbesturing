@@ -871,24 +871,20 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             _k.Stappen.Remove(a);
             return false;
         }
-        // WAT: lukte deze tegenspraak al eens niet, dan eerst controleren of een uitkomst die maar één keer gezien is nog terugkomt met precies die stand.
-        // Komt hij niet terug, dan was het een foute waarneming (bijv. een melder die niet meldde) en wordt die vergeten.
+        // WAT: is de tegenspraak bij deze ingang al 4 keer aangepakt zonder uitkomst, dan wordt de zeldzaamste waarneming vergeten.
         // WAAROM (BUG #421, simulatie met ruis zoals in de hardwarelogs): 21 -> 24 -> 14 met motor 10 afbuigend (melder 129 niet gezien) stond als waarneming
-        // tegenover het echte 21 -> 24 -> 129. Elke halveerproef liep vast op een kortsluiting, de taak kwam 53 keer terug en stand A werd nooit opnieuw gereden.
-        if (_k.Mislukt.GetValueOrDefault(t.Sleutel) >= 1 || _k.Overgeslagen.Contains(t.Sleutel) || _tegenspraakPogingen421.GetValueOrDefault(t.Sleutel) >= 2)
-            foreach (var w in new[] { a, b }.Where(x => x.Aantal <= 1 && x.Uitkomst != StapUitkomst.Kortsluiting).OrderBy(x => x.Aantal))
-            {
-                var standW = new Dictionary<int, bool>();
-                foreach (var x in _adressen) standW[x] = w.Stand.Contains(x);
-                _log.Stap($"Controle: de uitkomst {StapUitkomst.Tekst(w.Uitkomst)} (één keer gezien) nog eens met precies die stand (BUG #421).");
-                var uw = await Proef(t.Via, t.Melder, t.Richting, standW, herstel: new Dictionary<int, bool>());
-                if (uw is null) break;
-                if (uw.Value == w.Uitkomst) continue;
-                _log.Waarschuwing($"Stap {t.Via} -> {t.Melder} ({t.Richting.Tekst()}): met dezelfde stand nu {StapUitkomst.Tekst(uw.Value)} in plaats van {StapUitkomst.Tekst(w.Uitkomst)}. Die ene waarneming wordt vergeten (BUG #421, nog niet getest op de baan).");
-                _k.Stappen.Remove(w);
-                return true;
-            }
-        _tegenspraakPogingen421[t.Sleutel] = _tegenspraakPogingen421.GetValueOrDefault(t.Sleutel) + 1;
+        // tegenover het echte 21 -> 24 -> 129. Elke halveerproef liep vast op een kortsluiting en de taak kwam tientallen keren terug (de gewone teller voor
+        // mislukte taken wordt bij nieuws weer leeggemaakt, BUG #394). Een waarneming die niet te herhalen is, is niet bruikbaar.
+        string ingang421 = Kennis2.Sleutel(t.Via, t.Melder, t.Richting);
+        int keer421 = _tegenspraakPogingen421[ingang421] = _tegenspraakPogingen421.GetValueOrDefault(ingang421) + 1;
+        if (keer421 > 4)
+        {
+            var weg = a.Aantal < b.Aantal ? a : b.Aantal < a.Aantal ? b : (a.Laatst <= b.Laatst ? a : b);
+            _log.Waarschuwing($"Stap {t.Via} -> {t.Melder} ({t.Richting.Tekst()}): na {keer421 - 1} keer nog niet uitgezocht welk adres het verschil maakt. De waarneming {weg} wordt vergeten (BUG #421, nog niet getest op de baan).");
+            _k.Stappen.Remove(weg);
+            _tegenspraakPogingen421[ingang421] = 0;
+            return true;
+        }
         while (kandidaten.Count > 1 && proeven < 8)
         {
             var helft = kandidaten.Take(kandidaten.Count / 2).ToList();
