@@ -262,7 +262,8 @@ public partial class BaanVerkenner2
                 break;
             default:
                 // proeven: de kosten om bij de ingang te komen (de proef plant zichzelf bij het uitvoeren opnieuw)
-                var keuze = KiesProefStart(kaart, t.Via, t.Melder, t.Richting, new Dictionary<int, bool>());
+                // BUG #421: bij een 'andersom'-proef meteen met de echte proefstand kijken of er een veilige beginplek is (anders steeds opnieuw 'geen veilige plek')
+                var keuze = KiesProefStart(kaart, t.Via, t.Melder, t.Richting, t.Soort == Soort.Andersom ? AndersomStand(t) : new Dictionary<int, bool>());
                 if (keuze is null) return (null, 0);
                 return (keuze.Value.Plan, keuze.Value.Plan.Kosten + 2 * keuze.Value.Keten.Count);
         }

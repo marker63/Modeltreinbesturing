@@ -615,7 +615,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
 
     // ================================================================ taken kiezen (wat is nu het nuttigst?)
 
-    private enum Soort { Tegenspraak, Verken, Uitweg, Bevestig, Dekking, Blok }
+    private enum Soort { Tegenspraak, Verken, Uitweg, Bevestig, Andersom, Dekking, Blok }
 
     private sealed class Taak
     {
@@ -637,7 +637,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
     {
         var kaart = Dijkstra();
         var onbereikbaar = new List<string>();
-        foreach (var soort in new[] { Soort.Tegenspraak, Soort.Verken, Soort.Uitweg, Soort.Bevestig, Soort.Dekking, Soort.Blok })
+        foreach (var soort in new[] { Soort.Tegenspraak, Soort.Verken, Soort.Uitweg, Soort.Bevestig, Soort.Andersom, Soort.Dekking, Soort.Blok })
         {
             Taak? beste = null; int besteKosten = int.MaxValue;
             foreach (var t in Kandidaten(soort))
@@ -736,6 +736,24 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                     yield return new Taak { Soort = soort, Sleutel = $"B|{v.Adres}|{Kennis2.Sleutel(v.Via, v.Melder, v.Richting)}", Via = v.Via, Melder = v.Melder, Richting = v.Richting, Vondst = v,
                         Omschrijving = $"wissel {v.Adres} na melder {v.Melder} ({v.Richting.Tekst()}) ook {(v.Rechtdoor is null ? "rechtdoor" : "afbuigend")} rijden" };
                 break;
+            case Soort.Andersom:
+                // WAT: een gevonden wissel ook van de andere kant (vanaf de gesplitste kant terug naar de puntzijde) met de andere stand proberen.
+                // WAAROM (BUG #421, Marco 14-11 16:03: "Dit moet ook gelden als we andersom rijden natuurlijk"; simulatie met ruis zoals in de logs):
+                // werd de stap 12 -> 5 alleen met wissel 2 afbuigend gereden, dan bleef de kant 12 -> 1 (wissel 2 rechtdoor) onbekend. De verkenning
+                // eindigde dan als 'voltooid' zonder melders 1, 9 en 10. Per gevonden wissel: voor elke tak (uitkomst) de stap terug naar de wissel, als die
+                // stap nog nooit met de andere stand van deze wissel gereden is.
+                foreach (var v in _k.Vondsten.Where(v => v.Rechtdoor > 0 && v.Afbuigend > 0))
+                    foreach (var (u, afb) in new[] { (v.Rechtdoor!.Value, false), (v.Afbuigend!.Value, true) })
+                        foreach (var g in _k.Stappen.Where(x => !x.Afgeleid && !x.Terug && x.Via > 0 && x.Melder == u && x.Richting == v.Richting.Om() && x.Uitkomst == v.Melder).GroupBy(x => x.IngangSleutel))
+                        {
+                            var s0 = g.First();
+                            if (_k.Stappen.Any(x => x.IngangSleutel == g.Key && x.Stand.Contains(v.Adres) != afb)) continue;   // al eens met de andere stand gereden
+                            if (_k.Relevant.TryGetValue(g.Key, out var rel421) && rel421.Contains(v.Adres)) continue;            // daar al gevonden
+                            if (_andersomMislukt421.GetValueOrDefault($"A|{v.Adres}|{g.Key}") >= 3) continue;                  // lukt hier niet
+                            yield return new Taak { Soort = soort, Sleutel = $"A|{v.Adres}|{g.Key}", Via = s0.Via, Melder = u, Richting = s0.Richting, Vondst = v, A = s0,
+                                Omschrijving = $"wissel {v.Adres} andersom: stap {s0.Via} -> {u} ({s0.Richting.Tekst()}) met wissel {v.Adres} {(afb ? "rechtdoor" : "afbuigend")}" };
+                        }
+                break;
             case Soort.Dekking:
                 foreach (var d in DekkingRitten()) yield return new Taak { Soort = soort, Sleutel = d.Sleutel, Dekking = d, Omschrijving = d.Omschrijving };
                 break;
@@ -760,6 +778,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             case Soort.Tegenspraak: return await DoeTegenspraak(t);
             case Soort.Uitweg: return await DoeUitweg(t);
             case Soort.Bevestig: return await DoeBevestig(t);
+            case Soort.Andersom: return await DoeAndersom(t);
             case Soort.Dekking: return await DoeDekking(t);
             case Soort.Blok: return await DoeBlok(t);
         }
@@ -945,6 +964,38 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         _log.Vondst($"Wissel {v.Adres} na melder {v.Melder} ({v.Richting.Tekst()}): {(afb ? "afbuigend" : "rechtdoor")} -> {StapUitkomst.Tekst(u.Value)}.");
         return true;
     }
+
+    /// <summary>WAT: rijdt de stap t.Via -> t.Melder met wissel t.Vondst.Adres (en zijn overloop-partner) in de andere stand dan tot nu toe.
+    /// De uitkomst wordt als gewone stap vastgelegd; komt er iets anders uit, dan zoekt de tegenspraak-taak daarna uit welk adres het verschil maakt.
+    /// WAAROM: BUG #421 (zie Kandidaten, Soort.Andersom).</summary>
+    private async Task<bool> DoeAndersom(Taak t)
+    {
+        var v = t.Vondst!;
+        bool nieuw = !t.A!.Stand.Contains(v.Adres);
+        var stand = AndersomStand(t);
+        var herstel = new Dictionary<int, bool> { [v.Adres] = !nieuw };
+        foreach (var (vo, dv) in Volgers(v.Adres, !nieuw)) herstel[vo] = dv;
+        var u = await Proef(t.Via, t.Melder, t.Richting, stand, herstel: herstel);
+        if (u is null)
+        {
+            // hoogstens 3 pogingen in de hele verkenning (de gewone 'overgeslagen'-lijst wordt bij nieuws weer leeggemaakt, BUG #394)
+            if ((_andersomMislukt421[t.Sleutel] = _andersomMislukt421.GetValueOrDefault(t.Sleutel) + 1) >= 3)
+                _log.Info($"'{t.Omschrijving}' lukt niet; deze proef wordt niet meer geprobeerd (BUG #421).");
+            return false;
+        }
+        _log.Vondst($"Wissel {v.Adres} andersom: {t.Via} -> {t.Melder} ({t.Richting.Tekst()}) met wissel {v.Adres} {(nieuw ? "afbuigend" : "rechtdoor")} -> {StapUitkomst.Tekst(u.Value)} (BUG #421, nog niet getest op de baan).");
+        return true;
+    }
+
+    /// <summary>BUG #421: de proefstand voor een 'andersom'-taak: de wissel (en de volgers van de overloopset) in de andere stand dan bij de eerdere rit.</summary>
+    private Dictionary<int, bool> AndersomStand(Taak t)
+    {
+        bool nieuw = !t.A!.Stand.Contains(t.Vondst!.Adres);
+        var stand = new Dictionary<int, bool> { [t.Vondst.Adres] = nieuw };
+        foreach (var (vo, dv) in Volgers(t.Vondst.Adres, nieuw)) stand[vo] = dv;
+        return stand;
+    }
+    internal readonly Dictionary<string, int> _andersomMislukt421 = new();
 
     // ================================================================ taak: uitweg zoeken (fase 5)
 
