@@ -726,6 +726,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                     // alleen als er vanuit deze melder in deze richting nog géén enkele doorgang bekend is
                     if (_k.Stappen.Any(s => s.Melder == s0.Melder && s.Richting == s0.Richting && s.Uitkomst != StapUitkomst.Kortsluiting)
                         && !(afgesneden388 && bereik388.Contains(s0.Melder))) continue;
+                    if (_k.GeenUitweg.Contains("U|" + g.Key)) continue;   // BUG #420: hier is al vastgesteld dat er geen uitweg is
                     yield return new Taak { Soort = soort, Sleutel = "U|" + g.Key, Via = s0.Via, Melder = s0.Melder, Richting = s0.Richting, A = s0,
                         Omschrijving = $"een uitweg zoeken na melder {s0.Melder} ({s0.Richting.Tekst()}): daar gaf elke stand tot nu toe kortsluiting" };
                 }
@@ -964,6 +965,10 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         {
             _log.Vondst($"Na melder {t.Melder} ({t.Richting.Tekst()}, vanaf {t.Via}) is met geen enkel ander adres een uitweg: die kant is (in deze richting) niet berijdbaar.");
             if (!_k.Overgeslagen.Contains(t.Sleutel)) _k.Overgeslagen.Add(t.Sleutel);
+            // WAT: onthouden dat hier geen uitweg is, zodat dezelfde taak niet steeds terugkomt. WAAROM (BUG #420, Marco 14-11 15:22: "je bent na 35 minuten nog
+            // steeds deze 2 blokken aan het meten"): elke uitweg-taak vond onderweg via de kortsluitproef iets nieuws, en daardoor werd de lijst met
+            // overgeslagen taken gewist (#394). Zo kwamen "uitweg na 10" en "uitweg na 4" steeds opnieuw, op de binnenring, terwijl daar echt geen uitweg is.
+            _k.GeenUitweg.Add(t.Sleutel);
         }
         return true;
     }

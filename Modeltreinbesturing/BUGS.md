@@ -3641,3 +3641,12 @@ verbinding zelf leefde nog. Marco 14:33: "Dinamo heb ik spanningsloos moeten mak
 zelf oplossen (Reset Fault wordt bij een F-bit al automatisch gestuurd). Nu: komt er binnen 5 minuten na een kortsluiting geen wisselterugmelding meer, dan
 wordt Marco al na 3 minuten gevraagd (anders na 10), met de aanwijzing: kijk of de rode LEDjes op de TM-H's knipperen, zo ja Dinamo even spanningsloos maken.
 Simulatie module 2: gelijk aan #418.
+
+## BUG #420 – OPGELOST (nog niet getest op de baan): op de binnenring steeds dezelfde "uitweg zoeken"-taken
+(Marco 14-11 15:22: "de software loopt nu al ruim 35 minuten en je bent nog steeds deze 2 blokken aan het meten".) Log 14:48-15:18: "uitweg na melder 4
+(achteruit)" en "uitweg na melder 10 (vooruit)" kwamen elk 3-4 keer terug, steeds met de uitkomst "geen uitweg, die kant is niet berijdbaar" (klopt: van 10
+naar de overloop 5/6 kan alleen naar 129). Oorzaak: de kortsluitproef vond onderweg steeds iets "nieuws", en daardoor werd de lijst overgeslagen taken
+gewist (#394). Nu wordt "geen uitweg" apart onthouden (Kennis2.GeenUitweg) en komt die taak niet meer terug.
+Ook geprobeerd (Marco's voorstel): na een geslaagde kortsluitproef meteen over de wissel doorrijden en verder verkennen. In de simulatie wisselend: met
+sectiescheiding start 10 beter, maar binnenring-start 11 60 -> 72 min en start 5 niet meer voltooid. Daarom nog niet aangezet; open punt.
+Simulatie module 2: gelijk aan #419.

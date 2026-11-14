@@ -351,6 +351,9 @@ public class Kennis2
     /// <summary>BUG #410: per melder de rijstroom-truc die de loc daar weer liet rijden ("blok,richting" of "blok,richting,tweede blok"),
     /// geleerd tijdens het zoeken per blok (#408). Wordt de volgende keer als eerste geprobeerd.</summary>
     public Dictionary<int, string> BlokTruc { get; set; } = new();
+    /// <summary>BUG #420: uitweg-taken waarvan vaststaat dat er geen uitweg is ("U|..."-sleutel). Anders dan Overgeslagen wordt dit niet gewist als ergens
+    /// anders iets nieuws gevonden wordt.</summary>
+    public HashSet<string> GeenUitweg { get; set; } = new();
 
     /// <summary>WAT: zoekt een melder X die tussen a en b ligt (a -> X -> b), terwijl de loc met precies dezelfde wisselstand ook rechtstreeks van a naar b reed.
     /// Een echte melder kan de loc niet overslaan; dan is X een spook (Dinamo-ingang die zonder sectie bezet raakt).
