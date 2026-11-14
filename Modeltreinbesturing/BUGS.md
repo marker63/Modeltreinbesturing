@@ -3651,7 +3651,7 @@ Ook geprobeerd (Marco's voorstel): na een geslaagde kortsluitproef meteen over d
 sectiescheiding start 10 beter, maar binnenring-start 11 60 -> 72 min en start 5 niet meer voltooid. Daarom nog niet aangezet; open punt.
 Simulatie module 2: gelijk aan #419.
 
-## #421 Wisselcontrole uit alle hardwarelogs + simulatie-ruis zoals op de baan (14-11)
+## #421 Wisselcontrole uit alle hardwarelogs, simulatie met ruis, en vijf verbeteringen in module 2 (14-11, nachtwerk)
 - Marco's stap-voor-stap methode toegepast op alle wissels uit de 20 hardwarelogs (4-14 nov): zie `WISSELCONTROLE.md`.
   Alle standen kloppen met Marco (overloop 2/1, 5/6, wissel 9 omgekeerd, wissel 14, kruiswissel 24).
 - Simulatie: optionele ruis zoals in de logs (alleen tests, standaard uit): `KansNietBestaandeMelder` (melder 268 kort bij
@@ -3659,7 +3659,16 @@ Simulatie module 2: gelijk aan #419.
 - **Wissel ook andersom proberen** (Marco 14-11 16:03 "dit moet ook gelden als we andersom rijden"): met ruis werd 12 -> 5 alleen met
   wissel 2 afbuigend gereden; de kant 12 -> 1 bleef onbekend en de verkenning eindigde 'voltooid' zonder melders 1, 9 en 10. Nieuwe taak
   'andersom': per gevonden wissel, per tak, de stap terug naar de wissel ook met de andere stand (hoogstens 3 pogingen, houdt 'voltooid' niet tegen).
-- **Vastgelopen tegenspraak**: een gemiste melder (21 -> 24 -> 14 terwijl het 129 was) gaf een tegenspraak die nooit op te lossen was (tientallen keren
-  dezelfde taak). Na 4 keer bij dezelfde ingang wordt de zeldzaamste waarneming vergeten, alleen als beide uitkomsten een melder zijn
-  (een kortsluiting is wel te herhalen, bijv. wissel 9 + motor 10 samen).
+- **Na de kortsluitproef de wissel voorbij rijden** (Marco 14-11 15:22): de wissel die bij de kortsluitproef de kortsluiting ophief wordt onthouden
+  (`ProefOplossingen`); daarna rijdt de verkenner die stap opnieuw mét die stand en ziet zo welke melder erachter ligt. Met sectiescheidingen,
+  start 11 (binnenring): eerst 'voltooid' met 7 van de 23 melders, nu 23/23.
+- **Vastgelopen tegenspraak**: een gemiste melder (21 -> 24 -> 14 terwijl het 129 was) gaf een tegenspraak die nooit op te lossen was. Na 4 keer
+  bij dezelfde ingang wordt de zeldzaamste waarneming vergeten, alleen als beide uitkomsten een melder zijn.
+- **Dekkingsrit kijkt een stap vooruit**: bij 24 werd steeds 24 -> 14 gekozen, 24 -> 129 -> 14 werd nooit getest (adressen 3, 4, 7, 8, 11, 12 niet
+  'zonder effect'). Daarnaast: dezelfde dekkingsrit hoogstens 4 keer (start 25 'streng': 327 keer dezelfde kortsluiting).
+- **Nooit 'voltooid' met een overgeslagen verkenningstaak** (achter die melder ligt nog onbekende baan).
+- Geprobeerd en teruggedraaid: wissel + motor 10 'samen relevant' maken bij een combinatie-kortsluiting (wissel 9 werd dan bij 4 niet meer gevonden).
+- Metingen (gewoon/streng/realistisch/vertraagd, starts 13, 5, 17, 11, 25; ruis; sectiescheidingen; hervatten): alles voltooid 23/23, valse 0,
+  gebruiker 0, behalve start 25 'streng' (niet voltooid, 17/23, stopt nu na ~2,5 u in plaats van 12 u lus) = open punt. Tijden t.o.v. bug420:
+  start 5 65 -> 68 min, 11 60 -> 72, 17 133 -> 98, 25 118 -> 79. Start 11: zonder-effect leeg (was ook zo).
 - Nog niet getest op de baan (alleen simulatie).
