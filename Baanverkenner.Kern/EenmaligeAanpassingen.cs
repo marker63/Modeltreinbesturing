@@ -20,6 +20,16 @@ public static class EenmaligeAanpassingen
             ins.OmgekeerdAangesloten = string.Join(", ", set.OrderBy(a => a));
             return true;
         }),
+        // BUG #418 (Marco 14-11 11:52/12:08): "wissel 9 moet afbuigend staan als je via 5/6 afbuigend van 14 naar 24 rijdt via 129". De verkenner zag op 14-11
+        // juist Dinamo 'afbuigend' = 129 <-> 4 (kortsluitproeven 10:39 en 11:14) en Dinamo 'rechtdoor' = 129 <-> kruiswissel. Dus net als wissel 6 omgekeerd aangesloten.
+        new("418-wissel9-omgekeerd", "Wissel 9 staat nu bij 'Omgekeerd aangesloten' (Marco 14-11: op de baan afbuigend = naar de kruiswissel; de Dinamo noemt dat rechtdoor).", ins =>
+        {
+            var set = ins.OmgekeerdeWissels();
+            if (set.Contains(9)) return false;
+            set.Add(9);
+            ins.OmgekeerdAangesloten = string.Join(", ", set.OrderBy(a => a));
+            return true;
+        }),
         // Marco 20-10 18:23/18:32: wissel 5 en 6 zijn een overloopset en staan op de baan altijd hetzelfde (beide rechtdoor of beide afbuigend).
         new("259-overloop-5-6", "Wissel 5 en 6 staan nu bij 'Gekoppelde wissels' (5+6, overloopset): wissel 6 schakelt automatisch mee met wissel 5, op de baan altijd dezelfde stand.", ins =>
         {

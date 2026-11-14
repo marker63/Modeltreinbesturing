@@ -78,8 +78,19 @@ public static class MiniworldBaan
             b.Verbind(w6, Af, s10, A);
         }
         b.Verbind(w9, P, s129, B);
-        b.Verbind(w9, R, k, SimulatieBaan.Poort.KA2);
-        b.Verbind(w9, Af, s4, A);
+        if (EchteAansluiting)
+        {
+            // BUG #418 (Marco 14-11 12:08): op de baan is wissel 9 afbuigend = naar de kruiswissel, rechtdoor = binnenring 4; de Dinamo noemt het andersom
+            // (omgekeerd aangesloten, zoals wissel 6). Voor de Dinamo-commando's verandert er dus niets.
+            b.Verbind(w9, Af, k, SimulatieBaan.Poort.KA2);
+            b.Verbind(w9, R, s4, A);
+            b.OmgekeerdeAdressen.Add(9);
+        }
+        else
+        {
+            b.Verbind(w9, R, k, SimulatieBaan.Poort.KA2);
+            b.Verbind(w9, Af, s4, A);
+        }
         b.Verbind(s4, B, s11, A); b.Verbind(s11, B, s12, A);
         b.Verbind(w1, P, s12, B);
         b.Verbind(w1, Af, verbinding, A);

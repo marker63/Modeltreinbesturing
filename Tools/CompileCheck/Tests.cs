@@ -1084,7 +1084,7 @@ public static class Tests
         Console.WriteLine("Test: rondrijden met de keerlus achter melder 129 (BUG #232), met Marco's aansluiting (overloopsets 5+6 en 2+1, wissel 6 omgekeerd; nachtwerk 25/26-10)");
         Baanverkenner.Kern.Simulatie.MiniworldBaan.Keerlus = true;
         Baanverkenner.Kern.Simulatie.MiniworldBaan.EchteAansluiting = true;
-        Action<VerkenInstellingen> marco = i => { i.Rondrit = true; i.StapVoorStap = false; i.GekoppeldeWissels = "5+6,2+1"; i.OmgekeerdAangesloten = "6"; };
+        Action<VerkenInstellingen> marco = i => { i.Rondrit = true; i.StapVoorStap = false; i.GekoppeldeWissels = "5+6,2+1"; i.OmgekeerdAangesloten = Environment.GetEnvironmentVariable("MARCO_OUD9") == "1" ? "6" : "6,9"; };
         try
         {
             foreach (var start in (Environment.GetEnvironmentVariable("KEERLUS_START") ?? "13").Split(',').Select(int.Parse))
@@ -3329,7 +3329,7 @@ public static class Tests
                 Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan? uv = null;
                 var simMeldingen = new List<(DateTime Tijd, string Tekst)>();
                 var r = MiniworldRit(start, 10,
-                    insAanpassing: i => { i.Rondrit = true; i.StapVoorStap = false; i.GekoppeldeWissels = "5+6,2+1"; i.OmgekeerdAangesloten = "6"; i.KruisMotoren = "10+13"; if (variant == "vertraagd6") i.WisselHerhalingen = 6; },
+                    insAanpassing: i => { i.Rondrit = true; i.StapVoorStap = false; i.GekoppeldeWissels = "5+6,2+1"; i.OmgekeerdAangesloten = Environment.GetEnvironmentVariable("MARCO_OUD9") == "1" ? "6" : "6,9"; i.KruisMotoren = "10+13"; if (variant == "vertraagd6") i.WisselHerhalingen = 6; },
                     simAanpassing: sa => { sim = sa; sa.BuurwisselHeftKruisKortsluitingOp = variant == "streng"; sa.StatusBericht += t => { if (t.Contains("KORTSLUITING")) simMeldingen.Add((sa.HuidigeSimTijd, t)); }; },
                     simFabriek: variant is "uitval" or "realistisch" ? () => uv = new Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan { UitvalVanafCommando = 120, UitvalDuur = TimeSpan.FromSeconds(90), NegeerHelftBijKortsluiting = variant == "realistisch" }
                         // BUG #352: Dinamo voert elk datagram als aparte puls van 0,4 s uit (vertraagd = nieuwe instelling 1 keer, vertraagd6 = oude 6 keer)
@@ -3383,7 +3383,7 @@ public static class Tests
                 var simMeld = new List<(DateTime T, string S)>();
                 sim.StatusBericht += t => { if (t.Contains("KORTSLUITING") || t.Contains("met de hand")) simMeld.Add((sim.HuidigeSimTijd, "##SIM## " + t)); };
                 var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 14, DinamoBlokken = "1-12", KruisMotoren = "10+13", HoogsteMelder = 150,
-                    GekoppeldeWissels = "5+6,2+1", OmgekeerdAangesloten = "6", WisselHerhalingen = variant == "vertraagd6" ? 6 : 1 };
+                    GekoppeldeWissels = "5+6,2+1", OmgekeerdAangesloten = Environment.GetEnvironmentVariable("MARCO_OUD9") == "1" ? "6" : "6,9", WisselHerhalingen = variant == "vertraagd6" ? 6 : 1 };
                 sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
                 var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
                 var log = new VerkenLog(klok);
@@ -3449,7 +3449,7 @@ public static class Tests
             var sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(true, start, realistisch
                 ? () => new Baanverkenner.Kern.Simulatie.UitvalSimulatieBaan { UitvalVanafCommando = 120, UitvalDuur = TimeSpan.FromSeconds(90), NegeerHelftBijKortsluiting = true } : null);
             var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 14, DinamoBlokken = "1-12", KruisMotoren = "10+13", HoogsteMelder = 150,
-                GekoppeldeWissels = "5+6,2+1", OmgekeerdAangesloten = "6", Module2 = true };
+                GekoppeldeWissels = "5+6,2+1", OmgekeerdAangesloten = Environment.GetEnvironmentVariable("MARCO_OUD9") == "1" ? "6" : "6,9", Module2 = true };
             sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
             var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
             VerkenStatus? status = Environment.GetEnvironmentVariable("MARCO2_STATUS") is { Length: > 0 } sp ? VerkenStatus.VanJson(System.IO.File.ReadAllText(sp)) : null;   // hervatten vanaf Marco's echte voortgang
@@ -3502,7 +3502,7 @@ public static class Tests
             var simMeld = new List<(DateTime T, string S)>();
             sim.StatusBericht += t => { if (t.Contains("KORTSLUITING")) simMeld.Add((sim.HuidigeSimTijd, "##SIM## " + t)); };
             var ins = new VerkenInstellingen { LocAdres = 5408, LocStappen = 28, Verkensnelheid = 12, Kruipsnelheid = 5, WisselAdresVan = 1, WisselAdresTot = 14, DinamoBlokken = "1-12", KruisMotoren = "10+13", HoogsteMelder = 150,
-                Rondrit = true, GekoppeldeWissels = "5+6,2+1", OmgekeerdAangesloten = "6" };
+                Rondrit = true, GekoppeldeWissels = "5+6,2+1", OmgekeerdAangesloten = Environment.GetEnvironmentVariable("MARCO_OUD9") == "1" ? "6" : "6,9" };
             sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
             var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
             var status = new VerkenStatus { Instellingen = ins };

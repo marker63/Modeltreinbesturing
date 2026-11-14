@@ -3622,3 +3622,15 @@ Simulatie module 2: gelijk aan #415.
 "alleen adres X" de uitkomst 24, en omdat stand A (de oude waarneming) niet opnieuw gereden werd, werd telkens adres X als wissel aangewezen: 4, 11, 12 en 2
 na elkaar. De controle van stand A (#380) gebeurde alleen na twee of meer halveerproeven; nu altijd voordat een wissel wordt toegeschreven.
 Simulatie module 2: alles voltooid, 23/23, 8 wissels, valse 0, gebruiker 0; tijden gelijk aan #416 (start 10 beter, met sectiescheiding start 17 iets langzamer).
+
+## BUG #418 – INGEVOERD (nog niet getest op de baan): wissel 9 is omgekeerd aangesloten
+(Marco 14-11 11:52/12:08: "wissel 9 moet afbuigend staan als je via 5/6 afbuigend van 14 naar 24 rijdt via 129".) De verkenner zag op 14-11 met de
+Dinamo-commando's juist 'afbuigend' = 129 <-> 4 (kortsluitproeven 10:39 en 11:14) en 'rechtdoor' = 129 <-> kruiswissel. Dus net als wissel 6 omgekeerd aangesloten.
+- Eenmalige aanpassing "418-wissel9-omgekeerd" (Omgekeerd aangesloten: 6, 9); Marco kan het in het scherm terugdraaien. Meldingen en rapport noemen nu ook
+  bij wissel 9 de stand op de baan.
+- Simulatie (EchteAansluiting): wissel 9 op de baan afbuigend = kruiswissel, rechtdoor = binnenring 4, met omgekeerde Dinamo-commando's. Voor de Dinamo
+  verandert er niets; MARCO_OUD9=1 = de oude instelling (alleen 6).
+- Geprobeerd en NIET gedaan: met wissel 9 op de baan rechtdoor beginnen (Dinamo afbuigend). In de simulatie veel slechter (start 13 66 -> 90 min, start 17 niet
+  voltooid, met sectiescheiding start 10 maar 7 melders en toch "voltooid"). Die laatste is ook een zwakte van "voltooid": melders die nooit gezien zijn, telt
+  de verkenner niet mee (open punt).
+Simulatie module 2 en module 1: gelijk aan #417.

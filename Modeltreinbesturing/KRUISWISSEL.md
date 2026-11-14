@@ -93,5 +93,5 @@ De standen in de Modeltreinbesturing-wisselstraten (tabel hierboven, "veldgetest
 - Van melder 14 naar 24 met de overloop 5/6 rechtdoor: de loc komt op de "onderste poot" van de kruiswissel (melder 24).
 - Van melder 14 met de overloop 5/6 afbuigend: de loc komt in melder 129; staat wissel 9 dan afbuigend, dan komt hij ook op de kruiswissel, maar op de
   "rechterpoot". Dat is een omweg naar de kruiswissel.
-- Let op (Claude, nog te bevestigen door Marco): de verkenner leerde op 14-11 juist "wissel 9 afbuigend (Dinamo) -> melder 4" en "rechtdoor -> kruiswissel".
-  Als Marco's "afbuigend" de stand op de baan is, dan is wissel 9 omgekeerd aangesloten (zoals wissel 6). Nog niet ingevoerd.
+- Marco 12:08: "wissel 9 moet afbuigend staan als je via 5/6 afbuigend van 14 naar 24 rijdt via 129". De verkenner zag met de Dinamo-commando's juist
+  'afbuigend' -> melder 4 en 'rechtdoor' -> kruiswissel: wissel 9 is dus omgekeerd aangesloten, zoals wissel 6 (BUG #418, eenmalige aanpassing).

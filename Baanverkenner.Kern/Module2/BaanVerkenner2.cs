@@ -346,6 +346,9 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         => (_ins.KruisMotoren ?? "").Split(new[] { '+', ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries).Select(x => int.TryParse(x.Trim(), out var a) ? a : 0).Where(a => a > 0).ToList();
 
     /// <summary>De basisstand van een adres: rechtdoor (Dinamo). Voor een volger van een overloopset volgt de stand uit de meester.</summary>
+    /// <summary>WAT: de beginstand van een adres (Dinamo-commando 'rechtdoor').
+    /// BUG #418: geprobeerd om bij een omgekeerd aangesloten wissel (9) met Dinamo 'afbuigend' te beginnen (op de baan rechtdoor, stappenplan stap 1). In de simulatie
+    /// werd dat duidelijk slechter (start 13: 66 -> 90 min, start 17 niet meer voltooid), dus niet gedaan: de verkenner begint met alle Dinamo-commando's rechtdoor.</summary>
     private bool BasisStand(int a) => false;
 
     /// <summary>WAT: wacht tot Dinamo 3 s lang niets meer terugmeldt (hoogstens 3 minuten). WAAROM: BUG #355: anders voert Dinamo nog oude commando's uit tijdens de eerste rit.</summary>
