@@ -87,3 +87,11 @@ De standen in de Modeltreinbesturing-wisselstraten (tabel hierboven, "veldgetest
 - 15 -> 8 -> 24 -> 14 (achteruit, wissel 14 afbuigend) vraagt vóór het inrijden van 24 motor 13 afbuigend; met motor 13 rechtdoor blijft de loc op 24 hangen (17:43) of geeft kortsluiting (17:47, 17:50).
 - Hypothese (past bij alle bewezen standen, NIET bewezen): Engelse wissel = dubbele wissel; motor 13 kiest de oostkant (rechtdoor = 21, afbuigend = 8), motor 10 de westkant (rechtdoor = 14, afbuigend = 129). Dan geldt 14<->21 = (10 r, 13 r), 14<->8 = (10 r, 13 a), 129<->21 = (10 a, 13 r) en zou 129<->8 = (10 a, 13 a) zijn. Alleen de eerste drie zijn gereden.
 - De kaart legde standen vast die de wissels niet hadden (ZetConfiguratie slaat een motor over als de loc op de kruiswissel staat). Dat is gerepareerd (`WerkelijkeStand`); oudere kaarten kunnen nog zulke ruis bevatten.
+
+## Marco 14-11-2026 11:52 (vastgesteld door Marco)
+- Melder 24 is de kruiswissel.
+- Van melder 14 naar 24 met de overloop 5/6 rechtdoor: de loc komt op de "onderste poot" van de kruiswissel (melder 24).
+- Van melder 14 met de overloop 5/6 afbuigend: de loc komt in melder 129; staat wissel 9 dan afbuigend, dan komt hij ook op de kruiswissel, maar op de
+  "rechterpoot". Dat is een omweg naar de kruiswissel.
+- Let op (Claude, nog te bevestigen door Marco): de verkenner leerde op 14-11 juist "wissel 9 afbuigend (Dinamo) -> melder 4" en "rechtdoor -> kruiswissel".
+  Als Marco's "afbuigend" de stand op de baan is, dan is wissel 9 omgekeerd aangesloten (zoals wissel 6). Nog niet ingevoerd.
