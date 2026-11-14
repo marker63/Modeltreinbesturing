@@ -3587,3 +3587,9 @@ Simulatie: start 13 (alle varianten), 5, 17 en 17 met sectiescheiding: 52 van 52
 kortsluitingen (de kaart had bij de kruiswissel motor 10 en 13 verwisseld), de verkenning loste dat op, tweede controle 0 kortsluitingen; 2 overgangen
 (24 -> 129 in gespiegelde kaartrichting na de keerlus) niet te bereiken. Start 25: 32 van 48, de binnenring achter de keerlus is in die kaart niet te bereiken
 (open punt). Verkenning zelf (zonder controle) en hervatten (MARCO2_HERVAT zonder MARCO2!) gelijk aan of beter dan #411.
+
+## BUG #413 – OPGELOST (nog niet getest op de baan): kortsluiting bij het parkeren nadat de loc op de sectiescheiding was teruggevonden
+(Logcontrole 14-11, verkenning 08:42, laatste regel 09:03:35.) Op de baan werkte het zoeken per blok (#408) voor het eerst: de loc stond op de grens van
+melder 14 (blok 3) en 129 (blok 9) en werd weer gezien met "alleen blok 3 achteruit". Het netjes parkeren daarna gaf rijstroom naar alle blokken, en dat gaf
+meteen kortsluiting op de scheiding 14/129. Nu kruipt de loc met hetzelfde commando dat werkte verder tot er nog één melder bezet is.
+Simulatie module 2: alle varianten, hervatten en met sectiescheiding start 5, 10, 13, 17 en 25 voltooid (23/23, 8 wissels, valse 0, onder-loc 0).

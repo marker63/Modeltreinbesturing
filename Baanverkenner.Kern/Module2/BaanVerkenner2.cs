@@ -571,7 +571,21 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                 _k.BlokTruc[startMelder] = tweede is int t3 ? $"{b},{r},{t3}" : $"{b},{r}";
                 string wat = tweede is int t ? $"blok {b} {r.Tekst()} en blok {t} {r.Om().Tekst()}" : $"alleen blok {b} {r.Tekst()}";
                 _log.Vondst($"Loc weer gezien met rijstroom op {wat}: melder {string.Join(", ", _monitor.Bezet)} (BUG #408).");
-                if (_monitor.Bezet.Count != 1) { try { await Herparkeer(r, alleBlokken: true); } catch (PlanFout) { } }
+                // WAT: staat de loc nog op twee melders, dan met HETZELFDE commando dat werkte verder kruipen tot er nog één melder bezet is.
+                // WAAROM (BUG #413, Marco 14-11 09:03): op de baan werkte "alleen blok 3 achteruit" (loc op 14 en 129), maar het netjes parkeren daarna gaf
+                // rijstroom naar alle blokken, en dat gaf meteen kortsluiting op de scheiding 14/129.
+                if (_monitor.Bezet.Count > 1)
+                {
+                    var t1 = _klok.Nu;
+                    StuurSnelheid(v, r, new[] { b });
+                    if (tweede is int b3) StuurSnelheid(v, r.Om(), new[] { b3 });
+                    while (_klok.Nu - t1 < TimeSpan.FromSeconds(10) && _monitor.Bezet.Count > 1 && !Kortsluiting()) { await _klok.Wacht(Poll); _monitor.Bijwerken(); }
+                    await Stop();
+                    _monitor.Bijwerken();
+                    if (Kortsluiting()) { await HerstelKortsluiting(new Dictionary<int, bool>(), r); _monitor.Bijwerken(); }
+                    _log.Info($"Met hetzelfde commando doorgekropen: nu melder {string.Join(", ", _monitor.Bezet)} (BUG #413, nog niet getest op de baan).");
+                }
+                if (_monitor.Bezet.Count == 0) { try { await Herparkeer(r, alleBlokken: true); } catch (PlanFout) { } }
                 var res = _monitor.Bezet.ToList();
                 if (res.Count > 0) return res;
             }
