@@ -162,6 +162,20 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
     public double SpookpulsenPerMinuut { get; set; }
     /// <summary>Test: kan de simulatie de melderstand opvragen (zoals Dinamo)?</summary>
     public bool StatusOpvraagbaar { get; set; } = true;
+    /// <summary>
+    /// Test (BUG #421, nabootsen van de hardwarelogs van 4-14 nov): kans dat bij het overgaan naar een andere sectie kort
+    /// (300 ms) een melder meldt die niet op de baan bestaat (in de logs: 268 tussen 25-17, 29-30, ...).
+    /// </summary>
+    public double KansNietBestaandeMelder { get; set; }
+    public int NietBestaandeMelder { get; set; } = 268;
+    /// <summary>
+    /// Test (BUG #421): melders die af en toe niet melden als de loc er overheen rijdt (in de logs: 24 en 129),
+    /// met de kans per keer dat de loc de sectie binnenrijdt.
+    /// </summary>
+    public Dictionary<int, double> GemisteMelders { get; } = new();
+    private object? _vorigElement421;
+    private readonly HashSet<int> _gemistNu421 = new();
+    private readonly Random _toeval421 = new(421);
     private readonly Random _toeval = new(12345);
     private DateTime? _spookTot;
     private int _spookMelder;
@@ -501,6 +515,21 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
                 _geflikkerd++;
             }
         }
+        // BUG #421: ruis zoals in de hardwarelogs. Bij elke overgang naar een ander element: kans op een korte melding
+        // van een melder die niet bestaat, en kans dat de melder van het nieuwe element deze keer niet meldt.
+        if (!ReferenceEquals(_element, _vorigElement421))
+        {
+            _vorigElement421 = _element;
+            int nieuwM = _element is Sectie ns421 ? ns421.Melder : _element is Wissel nw421 ? nw421.Melder : 0;
+            _gemistNu421.RemoveWhere(m => m != nieuwM && !BezetteMeldersRuw().Contains(m));
+            if (nieuwM > 0 && GemisteMelders.TryGetValue(nieuwM, out var kans421) && _toeval421.NextDouble() < kans421) _gemistNu421.Add(nieuwM);
+            if (KansNietBestaandeMelder > 0 && _spookTot is null && _toeval421.NextDouble() < KansNietBestaandeMelder)
+            {
+                _spookMelder = NietBestaandeMelder;
+                _spookTot = nu + TimeSpan.FromMilliseconds(300);
+            }
+        }
+        if (_spookTot is DateTime st421 && nu >= st421 && SpookpulsenPerMinuut <= 0) _spookTot = null;
         if (SpookpulsenPerMinuut > 0)
         {
             if (_spookTot is DateTime tot && nu >= tot) _spookTot = null;
@@ -704,7 +733,23 @@ public class SimulatieBaan : IHardwareInterface, IBlokAlarmBron
             if (e is Sectie sec && sec.Melder > 0) res.Add(sec.Melder);
             else if (e is Wissel wk && wk.Melder > 0) res.Add(wk.Melder);
         }
+        // BUG #421: melders die deze keer gemist worden (alleen als er nog een andere melder bezet is, anders is de loc 'weg')
+        if (_gemistNu421.Count > 0 && res.Count > 1) res.ExceptWith(_gemistNu421);
         if (FlikkerMelder > 0 && _flikkerTotActief()) res.Remove(FlikkerMelder);
+        return res;
+    }
+
+    /// <summary>BUG #421: melders onder de loc zonder ruis (om te bepalen of een gemiste melder nog onder de loc is).</summary>
+    private HashSet<int> BezetteMeldersRuw()
+    {
+        var res = new HashSet<int>();
+        if (_element is Sectie s && s.Melder > 0) res.Add(s.Melder);
+        if (_element is Wissel kw && kw.Melder > 0) res.Add(kw.Melder);
+        foreach (var e in ElementenOnderLoc())
+        {
+            if (e is Sectie sec && sec.Melder > 0) res.Add(sec.Melder);
+            else if (e is Wissel wk && wk.Melder > 0) res.Add(wk.Melder);
+        }
         return res;
     }
 

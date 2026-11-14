@@ -3650,3 +3650,10 @@ gewist (#394). Nu wordt "geen uitweg" apart onthouden (Kennis2.GeenUitweg) en ko
 Ook geprobeerd (Marco's voorstel): na een geslaagde kortsluitproef meteen over de wissel doorrijden en verder verkennen. In de simulatie wisselend: met
 sectiescheiding start 10 beter, maar binnenring-start 11 60 -> 72 min en start 5 niet meer voltooid. Daarom nog niet aangezet; open punt.
 Simulatie module 2: gelijk aan #419.
+
+## #421 Wisselcontrole uit alle hardwarelogs + simulatie-ruis zoals op de baan (14-11)
+- Marco's stap-voor-stap methode toegepast op alle wissels uit de 20 hardwarelogs (4-14 nov): zie `WISSELCONTROLE.md`.
+  Alle standen kloppen met Marco (overloop 2/1, 5/6, wissel 9 omgekeerd, wissel 14, kruiswissel 24).
+- Simulatie: optionele ruis zoals in de logs (alleen tests, standaard uit): `KansNietBestaandeMelder` (melder 268 kort bij
+  een sectie-overgang) en `GemisteMelders` (24 en 129 soms niet gezien). Meten met `MARCO2_RUIS=1`.
+- Nog niet getest op de baan (alleen simulatie).

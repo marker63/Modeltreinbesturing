@@ -3378,6 +3378,8 @@ public static class Tests
                 Baanverkenner.Kern.Simulatie.MiniworldBaan.Sectiescheidingen = false;
                 if (double.TryParse(Environment.GetEnvironmentVariable("MARCO2_SCHEIDING_KANS"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var kansVast)) sim.KansVastOpGrens = kansVast;
                 sim.BuurwisselHeftKruisKortsluitingOp = variant == "streng";
+                // BUG #421: MARCO2_RUIS=1 = ruis zoals in de hardwarelogs (niet-bestaande melder 268, soms gemiste 24/129)
+                if (Environment.GetEnvironmentVariable("MARCO2_RUIS") == "1") { sim.KansNietBestaandeMelder = 0.05; sim.GemisteMelders[24] = 0.1; sim.GemisteMelders[129] = 0.1; }
                 // BUG #396: MARCO2_STIL=1 = Dinamo meldt bij de start niet dat de loc al op een melder staat (alleen wijzigingen)
                 if (Environment.GetEnvironmentVariable("MARCO2_STIL") == "1") sim.StatusOpvraagbaar = false;
                 var simMeld = new List<(DateTime T, string S)>();
