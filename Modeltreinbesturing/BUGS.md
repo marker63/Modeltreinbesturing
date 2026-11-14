@@ -3593,3 +3593,13 @@ kortsluitingen (de kaart had bij de kruiswissel motor 10 en 13 verwisseld), de v
 melder 14 (blok 3) en 129 (blok 9) en werd weer gezien met "alleen blok 3 achteruit". Het netjes parkeren daarna gaf rijstroom naar alle blokken, en dat gaf
 meteen kortsluiting op de scheiding 14/129. Nu kruipt de loc met hetzelfde commando dat werkte verder tot er nog één melder bezet is.
 Simulatie module 2: alle varianten, hervatten en met sectiescheiding start 5, 10, 13, 17 en 25 voltooid (23/23, 8 wissels, valse 0, onder-loc 0).
+
+## BUG #414 – GEMAAKT (nog niet getest op de baan): kortsluitproef volgens Marco's stappenplan (14-11)
+(Marco 14-11 09:14 "Stappen plan.docx", akkoord 09:18 dat wissels bij een kortsluiting omgezet mogen worden terwijl de loc stilstaat, ook vlak bij/op de wissel.)
+Bij een kortsluiting nu, na het terugzetten van de voor deze rit omgezette wissels: met de loc STIL de wissels één voor één omzetten (eerst die van deze
+knoop, dan die in de buurt, dan de rest), steeds 5 s wachten. Verdwijnt de kortsluiting, dan de proef herhalen (terug = kortsluiting terug, weer om = weg) tot
+3 keer gelukt; dan blijft de wissel in de oplossende stand. Pas als geen wissel helpt: langzaam terugrijden (zoals eerst).
+Waarom: eerst terugrijden liet de kortsluiting verdwijnen zonder te weten welke wissel het was (vals "wissel 3", #406).
+Simulatie module 2: alles voltooid, 23/23, 8 wissels, valse 0, gebruiker 0. Start 17: 155 -> 132 min (kortsluitingen 95 -> 38), start 25: 168 -> 117 min
+(140 -> 33), start 10 nu ook zonder-effect [3,4,7,8,11,12]; start 13 en 5 iets langzamer (59 -> 65, 58 -> 64 min). onder-loc is nu > 0: dat zijn de
+herhalingen van de kortsluitproef (bewust, met akkoord van Marco). Controle (#412): 52/52, 0 kortsluitingen.

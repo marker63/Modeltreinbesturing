@@ -668,6 +668,9 @@ public partial class BaanVerkenner2
     /// van die knoop één voor één proberen. Pas na 10 minuten wordt Marco gevraagd de loc terug te zetten.
     /// WAAROM: Marco 25-10 (BUG #305): zelf oplossen; BUG #169: een wissel van de gesplitste kant bereden: omzetten heft de kortsluiting op.
     /// </summary>
+    /// <summary>BUG #414: hoe vaak de kortsluitproef moet lukken voordat een wissel als oorzaak geldt (Marco: "herhaal deze test 3x").</summary>
+    private const int KortsluitProefHerhalen = 3;
+
     private async Task<bool> HerstelKortsluiting(Dictionary<int, bool> terug, Richting r)
     {
         _k.Kortsluitingen++;
@@ -681,6 +684,42 @@ public partial class BaanVerkenner2
         {
             await ZetAdres(a, v);
             if (await WachtOpGeenKortsluiting(TimeSpan.FromSeconds(2))) { _log.Info($"Zelf opgelost: wissel {a} terugzetten hief de kortsluiting op."); OnthoudOnderLoc395(a); return true; }
+        }
+        // 1b. KORTSLUITPROEF volgens Marco's stappenplan (14-11, "Stappen plan.docx"; akkoord 09:18 om wissels om te zetten terwijl de loc stilstaat, ook als hij
+        // er vlak bij of op staat). WAT: met de loc STIL de wissels van deze plek één voor één omzetten, steeds 5 s wachten (de Dinamo voert elk datagram als
+        // aparte puls uit, #352). Verdwijnt de kortsluiting, dan de proef herhalen (terug: kortsluiting moet terugkomen; weer om: weg) tot 3 keer gelukt.
+        // Lukt dat, dan blijft de wissel in de stand die de kortsluiting oploste en ligt hij "achter deze sectie".
+        // WAAROM: eerder werd eerst teruggereden; dan verdwijnt de kortsluiting doordat de loc wegrijdt en weet je niet welke wissel het was
+        // (zo ontstond ook de valse vondst "wissel 3", #406). Met de loc stil kan alleen de wissel de oorzaak zijn.
+        // volgorde: de wissels van deze knoop, dan die in de buurt van deze melder, dan de rest
+        var proefKand = _k.RelevantInKnoop(melder, r).Concat(_adressen.Where(a => _k.Zone(a).Contains(melder) || _k.Zone(a).Contains(_k.LocVia)))
+                          .Concat(_adressen).Distinct().ToList();
+        foreach (var a in proefKand)
+        {
+            if (_klok.Nu - t0 >= ZelfZoekenMaximaal / 2) break;
+            if (!Kortsluiting()) { _log.Info("Zelf opgelost: de kortsluiting is weg."); return true; }
+            bool oud = Fysiek(a);
+            await ZetAdres(a, !oud);
+            if (!await WachtOpGeenKortsluiting(TimeSpan.FromSeconds(5))) { await ZetAdres(a, oud); await Wacht(TimeSpan.FromSeconds(1)); continue; }
+            // herhalen: terug moet de kortsluiting teruggeven, weer om moet hem opheffen
+            int gelukt = 1;
+            while (gelukt < KortsluitProefHerhalen)
+            {
+                await ZetAdres(a, oud);
+                if (await WachtOpGeenKortsluiting(TimeSpan.FromSeconds(5))) break;          // kwam niet terug: niet zeker
+                await ZetAdres(a, !oud);
+                if (!await WachtOpGeenKortsluiting(TimeSpan.FromSeconds(5))) break;         // ging niet weg: niet zeker
+                gelukt++;
+            }
+            if (gelukt >= KortsluitProefHerhalen && !Kortsluiting())
+            {
+                _log.Vondst($"Kortsluitproef na melder {melder} ({r.Tekst()}): wissel {a} {(!oud ? "afbuigend" : "rechtdoor")} hief de kortsluiting {gelukt} keer op; deze wissel ligt achter deze sectie en blijft zo staan (stappenplan Marco 14-11, BUG #414, nog niet getest op de baan).");
+                OnthoudOnderLoc395(a);
+                return true;
+            }
+            // niet zeker: zorg dat de kortsluiting weg is als dat met deze stand kan, anders terug naar de oude stand
+            if (Kortsluiting()) { await ZetAdres(a, !Fysiek(a)); await WachtOpGeenKortsluiting(TimeSpan.FromSeconds(5)); }
+            if (!Kortsluiting()) { _log.Info($"Kortsluiting weg na omzetten van wissel {a}, maar de herhaling klopte niet ({gelukt} van {KortsluitProefHerhalen}): niet als oorzaak vastgelegd (BUG #414)."); return true; }
         }
         // 2. langzaam terugrijden (van het puntstuk af)
         for (int poging = 0; poging < 2; poging++)
