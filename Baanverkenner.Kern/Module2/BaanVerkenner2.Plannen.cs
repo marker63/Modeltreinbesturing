@@ -500,7 +500,17 @@ public partial class BaanVerkenner2
         {
             var opties = _k.Mogelijkheden(t.Via, t.M, t.H).Where(o => o.Uitkomst > 0 && o.Eis.All(e => !rit.Eis.TryGetValue(e.Key, out var v) || v == e.Value)).ToList();
             if (opties.Count == 0) break;
-            var keuze = opties.OrderByDescending(o => open.Count(a => !_k.IsGetest(a, t.M, o.Uitkomst))).ThenByDescending(o => o.Aantal).First();
+            // WAT: kies de tak met de meeste nog niet geteste overgangen, en kijk daarbij ook één stap verder.
+            // WAAROM (BUG #421, simulatie start 13): bij 24 (achteruit vanaf 21) was 24 -> 14 en 24 -> 129 gelijk 'nieuw' gewogen op deze stap alleen;
+            // de rit koos steeds 14, zodat 24 -> 129 -> 14 nooit getest werd en adressen 3, 4, 7, 8, 11, 12 niet 'zonder effect' werden.
+            int Ongetest421(int van, int naar) => open.Count(a => !_k.IsGetest(a, van, naar));
+            int Verder421((int Uitkomst, Dictionary<int, bool> Eis, bool Terugval, int Aantal) o)
+            {
+                var volgende = _k.Mogelijkheden(t.M, o.Uitkomst, t.H).Where(o2 => o2.Uitkomst > 0
+                    && o2.Eis.All(e => (!rit.Eis.TryGetValue(e.Key, out var v1) || v1 == e.Value) && (!o.Eis.TryGetValue(e.Key, out var v2) || v2 == e.Value)));
+                return volgende.Select(o2 => Ongetest421(o.Uitkomst, o2.Uitkomst)).DefaultIfEmpty(0).Max();
+            }
+            var keuze = opties.OrderByDescending(o => 2 * Ongetest421(t.M, o.Uitkomst) + Verder421(o)).ThenByDescending(o => o.Aantal).First();
             var sleutel = $"{t.M}>{keuze.Uitkomst}";
             // WAT: met één wisselstand kan de loc niet twee keer door dezelfde melder naar dezelfde opvolger rijden als hij er de tweede keer van een
             // andere voorganger binnenkomt: dan komt hij via een ander been van een wissel binnen, en die wissel moet daarvoor anders staan. De rit
