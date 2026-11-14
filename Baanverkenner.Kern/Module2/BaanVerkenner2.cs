@@ -862,7 +862,9 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         }
         if (kandidaten.Count != 1) return false;
         int adres = kandidaten[0];
-        if (proeven >= 2 && !aGezien && !await EersteUitkomstKlopt()) return true;
+        // BUG #417 (Marco 14-11 11:49-11:51): ook zonder halveerproeven eerst controleren of stand A nog steeds de eerste uitkomst geeft. Er was één oude
+        // waarneming "29 -> 21 -> 14" (24 niet gezien); daarna gaf elke losse controle 24, en zo werden na elkaar adres 4, 11, 12 en 2 "gevonden" bij melder 21.
+        if (!aGezien && !await EersteUitkomstKlopt()) return true;
         if (uitkomstLos is null)
         {
             // Nooit 'door wegstrepen' concluderen: het laatste adres eerst alléén omgezet rijden. Verandert er dan niets, dan kwam het verschil door een

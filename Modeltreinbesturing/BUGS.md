@@ -3616,3 +3616,9 @@ baan niet). Nu telt het opnieuw bezet worden van de melder waar de loc al op sta
 Nog open: "adres 2 na melder 129 (vanaf 4): rechtdoor -> kortsluiting" (10:36) komt waarschijnlijk van een kortsluiting op de scheiding 129/137 (de loc
 werd daar met rijstroom op alle blokken gestopt), niet van wissel 2. Kortsluitingen op een scheiding en door een wissel zijn nog niet uit elkaar te houden.
 Simulatie module 2: gelijk aan #415.
+
+## BUG #417 – OPGELOST (nog niet getest op de baan): reeks valse wissels bij melder 21 (adres 4, 11, 12, 2)
+(Logcontrole 14-11 11:49-11:51.) Er was één oude waarneming "29 -> 21 -> 14" (de kruiswissel 24 niet gezien). Bij het uitzoeken gaf elke losse controle
+"alleen adres X" de uitkomst 24, en omdat stand A (de oude waarneming) niet opnieuw gereden werd, werd telkens adres X als wissel aangewezen: 4, 11, 12 en 2
+na elkaar. De controle van stand A (#380) gebeurde alleen na twee of meer halveerproeven; nu altijd voordat een wissel wordt toegeschreven.
+Simulatie module 2: alles voltooid, 23/23, 8 wissels, valse 0, gebruiker 0; tijden gelijk aan #416 (start 10 beter, met sectiescheiding start 17 iets langzamer).
