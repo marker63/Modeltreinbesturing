@@ -3608,3 +3608,11 @@ herhalingen van de kortsluitproef (bewust, met akkoord van Marco). Controle (#41
 (Logcontrole 14-11, verkenning 09:03 met bug412: om 09:33 loc kwijt bij melder 10.) Van melder 10 en zijn buren was het Dinamo-blok nog niet bekend, en dan
 sloeg het zoeken per blok (#408) zich helemaal over; alleen het gewone zoeken met alle blokken (zonder resultaat). Nu wordt dan elk blok alleen geprobeerd
 (achteruit en vooruit). Simulatie module 2 (varianten, hervatten, met sectiescheiding start 5, 10, 17, 25, ook zonder melding bij de start): alles voltooid.
+
+## BUG #416 – OPGELOST (nog niet getest op de baan): melder die zich twee keer meldt gaf de stap "4 -> 4" en een valse wissel 3
+(Logcontrole 14-11, verkenning 10:12.) Op de sectiescheiding 4/129 meldde melder 4 zich twee keer achter elkaar ("Rit klaar: 129, 4, 4"). Dat werd de stap
+"4 -> 4", en daaruit volgde de valse vondst "WISSEL GEVONDEN: adres 3 na melder 4: rechtdoor -> melder 4, afbuigend -> melder 129" (wissel 3 bestaat op de
+baan niet). Nu telt het opnieuw bezet worden van de melder waar de loc al op staat niet als nieuwe stap.
+Nog open: "adres 2 na melder 129 (vanaf 4): rechtdoor -> kortsluiting" (10:36) komt waarschijnlijk van een kortsluiting op de scheiding 129/137 (de loc
+werd daar met rijstroom op alle blokken gestopt), niet van wissel 2. Kortsluitingen op een scheiding en door een wissel zijn nog niet uit elkaar te houden.
+Simulatie module 2: gelijk aan #415.

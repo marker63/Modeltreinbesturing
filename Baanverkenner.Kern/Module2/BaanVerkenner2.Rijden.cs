@@ -202,6 +202,10 @@ public partial class BaanVerkenner2
         // Een nieuwe melder is bezet geworden: vastleggen, vergelijken met wat verwacht werd, en beslissen of de loc hier gaat parkeren.
         void Binnen(int n, DateTime tijd)
         {
+            // WAT: wordt de melder waar de loc al op staat opnieuw bezet (even vrij en weer bezet), dan is dat geen nieuwe stap.
+            // WAAROM (BUG #416, Marco 14-11 10:35): op de sectiescheiding 4/129 meldde melder 4 zich twee keer ("129, 4, 4"); dat werd de stap "4 -> 4", en
+            // daaruit volgde de valse vondst "wissel 3 na melder 4: rechtdoor -> melder 4, afbuigend -> melder 129" (wissel 3 bestaat op de baan niet).
+            if (res.Reeks.Count > 0 && res.Reeks[^1] == n) return;
             if (soloStart is DateTime ss && soloSnelheid > 0 && res.Reeks.Count >= 2)
             {
                 // hoe lang stond de loc alleen op de vorige melder? (om later netjes in het midden te parkeren)
