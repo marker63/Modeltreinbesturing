@@ -877,7 +877,9 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         // mislukte taken wordt bij nieuws weer leeggemaakt, BUG #394). Een waarneming die niet te herhalen is, is niet bruikbaar.
         string ingang421 = Kennis2.Sleutel(t.Via, t.Melder, t.Richting);
         int keer421 = _tegenspraakPogingen421[ingang421] = _tegenspraakPogingen421.GetValueOrDefault(ingang421) + 1;
-        if (keer421 > 4)
+        // Alleen als beide uitkomsten een melder zijn: een kortsluiting is wel te herhalen (vaak een combinatie van twee wissels, zoals 9 en motor 10),
+        // een gemiste melder niet.
+        if (keer421 > 4 && a.Uitkomst > 0 && b.Uitkomst > 0)
         {
             var weg = a.Aantal < b.Aantal ? a : b.Aantal < a.Aantal ? b : (a.Laatst <= b.Laatst ? a : b);
             _log.Waarschuwing($"Stap {t.Via} -> {t.Melder} ({t.Richting.Tekst()}): na {keer421 - 1} keer nog niet uitgezocht welk adres het verschil maakt. De waarneming {weg} wordt vergeten (BUG #421, nog niet getest op de baan).");
