@@ -523,13 +523,18 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         foreach (var r0 in new[] { Richting.Vooruit, Richting.Achteruit }) foreach (var b in _k.KantBuren(_k.LocMelder, r0)) if (!melders.Contains(b)) melders.Add(b);
         var blokken = new List<int>();
         foreach (var m in melders) if (_k.Blokken.TryGetValue(m, out var bl) && !blokken.Contains(bl)) blokken.Add(bl);
+        // BUG #415 (Marco 14-11 09:33): van melder 10 en zijn buren was het blok nog niet bekend, en toen werd het zoeken per blok helemaal overgeslagen.
+        // Dan elk blok alleen proberen (achteruit en vooruit); paren van blokken dan niet (alle paren zou te lang duren). Op de baan werkte om 09:03 juist
+        // "alleen blok 3".
+        bool onbekend415 = blokken.Count == 0;
+        if (onbekend415) blokken = AlleBlokken().ToList();
         if (blokken.Count == 0) return new List<int>();
-        blokken = blokken.Take(3).ToList();
+        if (!onbekend415) blokken = blokken.Take(3).ToList();
         _log.Waarschuwing($"De loc staat waarschijnlijk op een sectiescheiding bij melder {_k.LocMelder}: rijstroom per blok proberen (blok {string.Join(", ", blokken)}) (BUG #408, nog niet getest op de baan).");
         int v = BaanVerkenner.ZoekKruipSnelheid(Math.Max(1, _ins.Kruipsnelheid), _ins.Verkensnelheid, 3);
         var pogingen = new List<(int blok, Richting r, int? tweede)>();
         foreach (var b in blokken) foreach (var r in new[] { Richting.Achteruit, Richting.Vooruit }) pogingen.Add((b, r, null));
-        for (int i = 0; i < blokken.Count; i++) for (int j = 0; j < blokken.Count; j++) if (i != j) pogingen.Add((blokken[i], Richting.Vooruit, blokken[j]));
+        if (!onbekend415) for (int i = 0; i < blokken.Count; i++) for (int j = 0; j < blokken.Count; j++) if (i != j) pogingen.Add((blokken[i], Richting.Vooruit, blokken[j]));
         // BUG #410: daarna het blok van de loc tegen elk ander blok (het blok van de buurmelder kan nog onbekend zijn)
         // (ook als er wel twee bekend zijn: in de simulatie lag de scheiding bij 129 tegen blok 2 van melder 4, waarvan het blok nog niet bekend was)
         foreach (var ander in AlleBlokken().Where(x => !blokken.Contains(x)))
