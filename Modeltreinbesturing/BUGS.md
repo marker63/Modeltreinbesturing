@@ -1516,7 +1516,6 @@ Onderzoek naar Rocrail, Win-Digipet, JMRI en de NMRA-normen: `Modeltreinbesturin
 - Oorzaak rijrichting: de vraag "Zet de loc op melder N" zei niets over de stand van de neus; 'vooruit' in de verkenner is de kant van de volgende melders uit de kaart. Oplossing: `OrientatieTekst` in de vraag, bv. "RIJRICHTING: de NEUS van de loc naar melder 14 en de achterkant naar melder 5". Test `OrientatieTekstTest`.
 - Kruiswissel: uit alle logs (14:40, 15:40, 15:48, 10-10 eerder) volgt dat een commando voor motor 13 of 10 terwijl de loc op melder 24 staat altijd binnen 0,2 s een kortsluiting geeft. Oplossing: in `VoerOpdrachtUit` wordt, als de loc na het naar de start rijden op melder 24 staat en motor 13/10 nog omgezet zou moeten worden (kon vooraf niet, zie #95), de opdracht overgeslagen met een waarschuwing en gaat de loc terug zonder iets om te zetten (`TerugNaarHuis` met de huidige stand).
 - NIET opgelost / niet bewezen: waarom motor 13 fysiek verkeerd staat (Dinamo geeft alleen het laatste commando terug, geen echte tongstand). De logs van de laatste mislukte run ontbreken.
-- Metingen: alle varianten gelijk aan #421 (overal voltooid 23/23, valse 0, gebruiker 0; open punt blijft start 25 streng). Regressietests ALLES OK.
 - Nog niet getest op de baan.
 
 ## #97 - Loc stond op melder 13 andersom; de rit "13 achteruit" reed de hele baan rond tot kortsluiting bij wissel 2 (Marco 16:08)
@@ -1524,7 +1523,6 @@ Onderzoek naar Rocrail, Win-Digipet, JMRI en de NMRA-normen: `Modeltreinbesturin
 - Oorzaak: de loc stond andersom (neus de verkeerde kant op). De eerste melder (14) hoort in de kaart bij 13 VOORUIT; de verkenningsrit controleerde de eerste stap niet en liet hem de hele baan rondrijden (de afwijking van de basisrit wordt pas na ExtraNaAfwijking melders beoordeeld).
 - Oplossing: `IsLocAndersom` in `RitUitvoeren`: wijkt bij een verkenningsrit de EERSTE stap af van de basisrit, hoort die stap alleen bij de tegengestelde richting, is hij in deze richting met deze wisselstand nooit gezien en is de basisstap wel bekend, dan stopt de loc direct, wordt er niets in de kaart vastgelegd en volgt de normale 'zet de loc terug'-vraag met de uitleg dat de loc andersom staat. Test: CompileCheck `LocAndersomTest` (echte kaart van 16:08, 4 gevallen).
 - Opmerking: de neus-tekst uit #96 stond er in feite al; die is dus geen echte oplossing. De kaart van 16:08 bevat de foute rit al (13 -> 14 achteruit bij wissel 1,2), en ook andere overgangen met wissel 13 afbuigend (13 -> 5 vooruit, 14 -> 13 vooruit) zijn verdacht (mogelijk ook met de loc andersom gereden): controleren voor die kaart verder gebruikt wordt.
-- Metingen: alle varianten gelijk aan #421 (overal voltooid 23/23, valse 0, gebruiker 0; open punt blijft start 25 streng). Regressietests ALLES OK.
 - Nog niet getest op de baan.
 
 ## #98 - Wissel 14 vergeten bij 14 -> 24 -> 8; kaart bevatte ritten met de loc andersom (Marco 16:24)
@@ -2202,7 +2200,6 @@ Test: CompileCheck (ALLES OK, KruisPlusTest met de kaart van 17:50). Nog niet ge
 ## #167 – Plusteken: twee blokken per poot (16-10, 18:18)
 - Marco vroeg om per poot van het plusteken twee blokken (met alle bezetmelders in volgorde) te tonen; #165 kapte elke poot af bij de eerste blokwissel.
 - Fix: `KruisPlus.Maak` laat elke poot doorlopen tot twee Dinamo-blokken; bij een splitsing staat "daarna X (blok n) of Y (blok m)", een lus naar een ander been wordt benoemd. Test in `KruisPlusTest`.
-- Metingen: alle varianten gelijk aan #421 (overal voltooid 23/23, valse 0, gebruiker 0; open punt blijft start 25 streng). Regressietests ALLES OK.
 - Nog niet getest op de baan.
 
 ## #168 – Plusteken: bij een splitsing beide takken tonen (16-10, 18:24)
