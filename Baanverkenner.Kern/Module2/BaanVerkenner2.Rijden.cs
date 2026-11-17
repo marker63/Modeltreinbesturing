@@ -52,6 +52,8 @@ public partial class BaanVerkenner2
         public List<double> Seconden = new();
         /// <summary>BUG #386: de eerste stap paste niet bij de kaart en de plek van de loc aan het begin was niet zeker: die stap niet vastleggen.</summary>
         public bool EersteStapOnzeker;
+        /// <summary>BUG #422: vanaf deze index in Reeks paste de rit niet bij de kaartrichting; die stappen niet vastleggen.</summary>
+        public int? NietVastleggenVanaf;
     }
 
     private bool _kortStatus;
@@ -235,13 +237,14 @@ public partial class BaanVerkenner2
             }
             if (tegen && !mee)
             {
-                _k.Omgedraaid = !_k.Omgedraaid;
-                h = h.Om();
-                // BUG #390 (Marco 09-11 14:03): de loc zelf draait nooit om. Wat hier gebeurt: de loc heeft de keerlus (129 - 4 - 11 - 12 - 1 - 9 - 10 - 129) gereden en rijdt
-                // daarna met dezelfde decoderrichting de andere kant op over de baan. De kaartrichting (vooruit/achteruit) wordt daarom vanaf hier gespiegeld.
-                _log.Vondst($"Keerlus gereden: van melder {vorigeM} naar {n} is volgens de kaart {h.Tekst()}. De loc rijdt gewoon door in dezelfde decoderrichting; alleen de kaartrichting wordt vanaf nu gespiegeld.");
-                omgedraaidInRit = true;
-                draaiIndex = res.Reeks.Count;   // index die n zo krijgt
+                // WAT: de loc kwam melder n binnen vanaf de kant waar volgens de kaart de andere richting heen gaat. De rit stopt hier en deze stap (en wat
+                // erna komt) wordt niet vastgelegd; de kaartrichting blijft zoals hij was.
+                // WAAROM (BUG #422, Marco 17-11 08:15: "er zit geen keerlus in de baan"; ook #390: "de loc zelf draait nooit om"): vroeger werd hier de kaartrichting
+                // gespiegeld ("keerlus gereden"). Zonder keerlus kan dat niet kloppen: dan was de plek van de loc of een eerdere waarneming fout (bijv. een gemiste
+                // melder). In de simulatie met ruis gaf het spiegelen tientallen verkeerde ritten na elkaar.
+                _log.Waarschuwing($"Melder {n} na melder {vorigeM} past niet bij de rijrichting ({h.Tekst()}) in de kaart. Er is geen keerlus, dus de loc is niet omgedraaid: de rit stopt hier en deze stap wordt niet vastgelegd (BUG #422, nog niet getest op de baan).");
+                res.NietVastleggenVanaf ??= res.Reeks.Count;   // index die n zo krijgt
+                omgedraaidInRit = true;   // zelfde afhandeling: afwijking, loc parkeren
             }
             double naSec = (tijd - binnenTijd).TotalSeconds;
             res.Seconden.Add(naSec * snelheid / verken);
@@ -419,6 +422,7 @@ public partial class BaanVerkenner2
         // naar 24 reed en 10 alleen even aanraakte). Daarom pas vastleggen vanaf de derde melder, zonder herkomst.
         for (int i = res.EersteStapOnzeker ? 3 : 1; i < r.Count; i++)
         {
+            if (res.NietVastleggenVanaf is int nv422 && i >= nv422) break;   // BUG #422
             // bleek de loc halverwege andersom te rijden (keerlus), dan hebben de stappen daarvóór nog de oude kaartrichting; bij de eerste stap is alles de nieuwe
             var hi = draaiIndex > 1 && i < draaiIndex ? h.Om() : h;
             bool eersteTerug = i == 1 && terug && draaiIndex != 1;

@@ -24,7 +24,7 @@ Wissel 1 en 2, en 5 en 6, zijn overloopsets: ze staan op de baan altijd samen.
 
 Klopt helemaal met Marco: 5 -> 16 rechtdoor, 5 -> 12 afbuigend, en andersom hetzelfde. Nooit anders gezien.
 
-## Overloop 5/6 (bij melder 14, 129 en 10)
+## Overloop 5/6 (bij melder 14, 129 en 10; melder 129 = wissel 6 en 9)
 
 | Van -> naar | wissel 5 (+6) | gereden | kortsluiting daarna |
 |---|---|---|---|
@@ -34,7 +34,7 @@ Klopt helemaal met Marco: 5 -> 16 rechtdoor, 5 -> 12 afbuigend, en andersom hetz
 | 24 -> 14 | rechtdoor | 82 | 0 |
 | 24 -> 14 | afbuigend (verkeerde poot) | 39 | 48 |
 | 129 -> 10 | rechtdoor | 86 | 12 |
-| 10 -> 129 | rechtdoor | 84 | **71** (zie "keerlus" hieronder) |
+| 10 -> 129 | rechtdoor | 84 | **71** (door wissel 9 + motor 10, zie punt 1 hieronder) |
 | 10 -> 129 | afbuigend (verkeerde poot) | 28 | 33 |
 
 Klopt met Marco: rechtdoor 14 <-> kruiswissel (24) en 10 <-> 129; afbuigend 14 <-> 129.
@@ -76,14 +76,21 @@ Kortsluiting op 24: komend van 21 met motor 13 afbuigend (24x), komend van 129 m
 
 ## Wat verder opvalt
 
-1. **Keerlus-grens 10 / 129.** Van 10 naar 129 met de overloop goed (rechtdoor) volgt in 71 van de 84 ritten toch een
-   kortsluiting, de andere kant op (129 -> 10) maar 12 van de 86. Melder 10 hoort bij Dinamo-blok 1, melder 129 bij blok 9.
-   Dat past bij de keerlus: daar sluit de lus zich, en met hetzelfde rijcommando op beide blokken werken de twee kanten
-   elkaar tegen. Dit is geen wisselprobleem. Vraag aan Marco: hoe stuurt Koploper dit stuk (blok 1 en 9) aan?
+1. **Kortsluiting na 10 -> 129 (gecorrigeerd 17-11).** Eerst dacht ik aan een keerlus; Marco 17-11 08:15: er zit **geen keerlus** in de baan,
+   en melder 129 bestaat uit de twee wissels 6 en 9. Opnieuw uitgezocht per stand van wissel 9 en kruiswissel-motor 10 (overloop 5/6 rechtdoor):
+
+   | 10 -> 129, wissel 9 (Dinamo) | motor 10 | gereden | kortsluiting daarna |
+   |---|---|---|---|
+   | rechtdoor (= op de baan afbuigend, naar de kruiswissel) | rechtdoor | 31 | 61 |
+   | rechtdoor (= op de baan afbuigend, naar de kruiswissel) | afbuigend | 35 | 1 |
+   | afbuigend (= op de baan rechtdoor, naar de binnenring 4) | - | 18 | 9 |
+
+   De kortsluitingen komen dus van de kruiswissel: via wissel 9 naar de kruiswissel met motor 10 rechtdoor is de verkeerde poot
+   (vanaf 129 moet motor 10 afbuigend, zoals in de tabel van de kruiswissel). Geen blok- of keerlusprobleem.
 2. **Melders die soms niet melden.** 14 -> 21 (13x) en 10 -> 24 / 24 -> 10 (20x): daar werd de kruiswissel 24 of melder 129
    niet gezien. Zo'n gemiste melder gaf eerder valse wissels (#417).
-3. **Melders die niet bestaan.** 268 (tussen 25-17, 29-30, 21-...), 137, 138, 3, 23, 31, 32 verschijnen kort tussen twee
-   echte melders. Behandelen als spookmelders.
+3. **Melders die niet bestaan.** 268 bestaat niet (Marco, meermaals bevestigd); verschijnt kort tussen twee echte melders (25-17, 29-30, 21-...).
+   Ook 137, 138, 3, 23, 31, 32 verschijnen soms kort. Behandelen als spookmelders (niet hard coderen, het programma blijft zelflerend).
 4. **Verkeerde poot.** Komt de loc een wissel van de verkeerde gesplitste kant binnen, dan wordt de melder van de wissel
    nog bezet en volgt daarna de kortsluiting (16 -> 5, 24 -> 14, 17 -> 8, 4 -> 129, 1 -> 12). Precies zoals Marco beschreef.
 5. **Verkenning 14-11 15:38 (versie bug420):** voltooid in 1 u 8 min, 23 melders, 9 blokken, wissels 1, 2, 5, 6, 9, 10, 13, 14,

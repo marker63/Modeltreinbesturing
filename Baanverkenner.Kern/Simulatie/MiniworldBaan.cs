@@ -16,15 +16,16 @@
 /// </summary>
 public static class MiniworldBaan
 {
-    /// <summary>BUG #232 (autolog 18-10 13:42-13:48): de echte baan heeft achter de binnenring een KEERLUS: 129 -> [wissel 9 afbuigend] 4 - 11 - 12 -> [wissel 1 rechtdoor] 1 - 9 - 10
-    /// -> [wissel 6 afbuigend] 129 (rit 13:42:48: 14, 129, 4, 11, 12, 1, 9, 10, 129). Melder 1, 9 en 10 liggen in Dinamo-blok 1 (alarm 'blok 1 en 9' met de loc op 10/129).
-    /// Afgeleid uit de logs, niet door Marco bevestigd. Standaard uit, zodat de bestaande tests (21 melders, 10 als zijspoor) hetzelfde blijven.</summary>
+    /// <summary>BUG #232 (autolog 18-10 13:42-13:48): achter de binnenring ligt een RONDJE: 129 -> [wissel 9] 4 - 11 - 12 -> [wissel 1 rechtdoor] 1 - 9 - 10
+    /// -> [wissel 6] 129 (rit 13:42:48: 14, 129, 4, 11, 12, 1, 9, 10, 129). Melder 1, 9 en 10 liggen in Dinamo-blok 1.
+    /// BUG #422 (Marco 17-11 08:15): dit is GEEN keerlus; de loc rijdt het rondje in dezelfde richting (zo is het hier ook nagebouwd: 129 wordt vanaf 10 aan dezelfde
+    /// kant binnengereden als vanaf 14). Melder 129 bestaat uit de twee wissels 6 en 9. De naam 'Keerlus' is gebleven voor de bestaande tests. Standaard uit, zodat de bestaande tests (21 melders, 10 als zijspoor) hetzelfde blijven.</summary>
     public static bool Keerlus { get; set; }
 
     /// <summary>Nachtwerk 25/26-10 (Marco 25-10 19:58: "ruim 350 versies, iedere keer 1 bug opgelost en een nieuwe ontdekt"): de simulatie met de aansluiting zoals Marco die heeft
     /// vastgesteld. Wissel 5 en 6 vormen een overloopset (op de baan altijd dezelfde stand, Marco 20-10 18:32): beide afbuigend = 14 &lt;-&gt; 129, beide rechtdoor = 14 -> kruiswissel en
-    /// 129 &lt;-&gt; 10 (keerlus). Wissel 6 is omgekeerd aangesloten (Dinamo 'afbuigend' = baan rechtdoor). Wissel 2 en 1 vormen ook een overloopset (beide afbuigend = 5 &lt;-&gt; 12).
-    /// Altijd met de keerlus. Tot nu toe draaide geen enkele volledige simulatie met deze aansluiting en Marco's instellingen (5+6, 2+1, 6 omgekeerd).</summary>
+    /// 129 &lt;-&gt; 10 (rondje, geen keerlus). Wissel 6 is omgekeerd aangesloten (Dinamo 'afbuigend' = baan rechtdoor). Wissel 2 en 1 vormen ook een overloopset (beide afbuigend = 5 &lt;-&gt; 12).
+    /// Altijd met het rondje 1 - 9 - 10. Tot nu toe draaide geen enkele volledige simulatie met deze aansluiting en Marco's instellingen (5+6, 2+1, 6 omgekeerd).</summary>
     public static bool EchteAansluiting { get; set; }
 
     /// <summary>BUG #410: sectiescheidingen waarop de loc kan vastlopen (blok 1/2 bij 12-1 en blok 2/9 bij 4-129), zie SimulatieBaan.Sectiescheidingen.

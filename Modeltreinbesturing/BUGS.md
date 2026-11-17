@@ -3672,3 +3672,12 @@ Simulatie module 2: gelijk aan #419.
   gebruiker 0, behalve start 25 'streng' (niet voltooid, 17/23, stopt nu na ~2,5 u in plaats van 12 u lus) = open punt. Tijden t.o.v. bug420:
   start 5 65 -> 68 min, 11 60 -> 72, 17 133 -> 98, 25 118 -> 79. Start 11: zonder-effect leeg (was ook zo).
 - Nog niet getest op de baan (alleen simulatie).
+
+## #422 Geen keerlus: kaartrichting niet meer spiegelen (Marco 17-11 08:15)
+- Marco: er zit geen keerlus in de baan; melder 129 bestaat uit de wissels 6 en 9; melder 268 bestaat niet.
+- Module 2 spiegelde de kaartrichting als de loc een melder "van de verkeerde kant" binnenkwam ("Keerlus gereden", #390). Zonder keerlus is dat altijd een
+  verkeerde aanname (plek van de loc of een eerdere waarneming fout). Nu: de rit stopt daar, die stap wordt niet vastgelegd, de kaartrichting blijft.
+  In de simulatie met ruis gebeurde het spiegelen 4 tot 16 keer per verkenning.
+- WISSELCONTROLE.md punt 1 gecorrigeerd: de kortsluitingen na 10 -> 129 komen van wissel 9 (naar de kruiswissel) met motor 10 rechtdoor (61 van de 66 keer),
+  niet van een keerlus. Teksten in de simulatie (MiniworldBaan) en module 1 aangepast; de simulatiebaan zelf was al goed (rondje, geen keerlus).
+- Nog niet getest op de baan.

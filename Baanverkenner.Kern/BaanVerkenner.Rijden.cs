@@ -1918,7 +1918,7 @@ public partial class BaanVerkenner
     private void DraaiLocRichtingOm()
     {
         _status.LocOmgedraaid = !_status.LocOmgedraaid;
-        _log.Waarschuwing($"De loc staat andersom ten opzichte van de kaart (bijvoorbeeld na de keerlus): de verkenner draait vanaf nu zelf de rijrichting om; 'vooruit' in de kaart is nu Dinamo-commando {(_status.LocOmgedraaid ? "achteruit" : "vooruit")}. De gebruiker hoeft de loc niet om te draaien (BUG #342, nog niet getest op de baan).");
+        _log.Waarschuwing($"De loc staat andersom ten opzichte van de kaart (bijvoorbeeld met de hand andersom neergezet; een keerlus is er niet, Marco 17-11): de verkenner draait vanaf nu zelf de rijrichting om; 'vooruit' in de kaart is nu Dinamo-commando {(_status.LocOmgedraaid ? "achteruit" : "vooruit")}. De gebruiker hoeft de loc niet om te draaien (BUG #342, nog niet getest op de baan).");
     }
 
     /// <summary>BUG #342: elk rijcommando naar Dinamo gaat hierlangs; staat de loc andersom (<see cref="VerkenStatus.LocOmgedraaid"/>), dan wordt de richting omgedraaid.</summary>

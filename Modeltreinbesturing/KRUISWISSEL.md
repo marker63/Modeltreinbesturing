@@ -95,3 +95,8 @@ De standen in de Modeltreinbesturing-wisselstraten (tabel hierboven, "veldgetest
   "rechterpoot". Dat is een omweg naar de kruiswissel.
 - Marco 12:08: "wissel 9 moet afbuigend staan als je via 5/6 afbuigend van 14 naar 24 rijdt via 129". De verkenner zag met de Dinamo-commando's juist
   'afbuigend' -> melder 4 en 'rechtdoor' -> kruiswissel: wissel 9 is dus omgekeerd aangesloten, zoals wissel 6 (BUG #418, eenmalige aanpassing).
+
+## Marco 17-11 08:15
+- Er zit geen keerlus in de baan. Melder 129 bestaat uit de twee wissels 6 en 9.
+- Vanuit 14 de kruiswissel bereiken: wissel 5 rechtdoor = de ene poot (direct); wissel 5 (+6) afbuigend en wissel 9 afbuigend (op de baan) = de andere poot, via 129.
+- Hardwarelogs 4-14 nov: 10 -> 129 met wissel 9 naar de kruiswissel en motor 10 rechtdoor gaf 61 keer kortsluiting, met motor 10 afbuigend 1 keer. Dus vanaf 129 moet motor 10 afbuigend.
