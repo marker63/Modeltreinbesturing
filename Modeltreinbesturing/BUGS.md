@@ -3690,3 +3690,8 @@ Simulatie module 2: gelijk aan #419.
 - Oplossing: wijst de kortsluitproef binnen een tegenspraak-proef een kandidaat aan (omzetten naar de stand van de uitkomst zonder kortsluiting heft de kortsluiting
   op), dan is dat het adres; geen aparte controlerit. Is de controlerit niet te plannen, dan geldt een eerdere kortsluitproef op die plek voor precies dat adres ook
   als controle. Daarnaast komt een tegenspraak die al 6 keer bij dezelfde ingang is aangepakt niet meer terug.
+- Metingen (gewoon/streng/realistisch/vertraagd/uitval, ruis, sectiescheidingen, hervatten; starts 13, 5, 17, 11, 25 en nieuw 8): alles voltooid 23/23, valse 0,
+  gebruiker 0. Ook het open punt start 25 'streng' is nu voltooid (80 min). Sectiescheidingen start 5: 141 -> 91 min, start 17: 116 -> 105 min. Start 8: 65 -> 67 min.
+  De lus van 18-11 zelf zit niet precies zo in de simulatie; de nieuwe regel grijpt bij Marco's opgeslagen voortgang meteen in (de kortsluitproef op 24 met motor 13
+  staat al in de kennis).
+- Nog niet getest op de baan.
