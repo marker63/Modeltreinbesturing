@@ -238,24 +238,27 @@ public class Kennis2
     {
         var res = new HashSet<int>();
         if (ExtraZone.TryGetValue(adres, out var extra)) res.UnionWith(extra);   // BUG #395
+        // BUG #426 (simulatie met ruis, start 25: "wissel 5 omgezet terwijl de loc erop stond" op melder 14): een melder waar de uitgang aantoonbaar van dit adres
+        // afhangt (14 vooruit: 24 met 5 rechtdoor, 129 met 5 afbuigend) hoort altijd bij de zone, ook als het adres daar (nog) niet als relevant is vastgelegd.
+        foreach (var g in Stappen.Where(x => x.Uitkomst > 0 && !x.Afgeleid).GroupBy(x => (x.Melder, x.Richting)))
+        {
+            var perUit = g.GroupBy(x => x.Uitkomst).Select(u => u.Select(x => x.Stand.Contains(adres)).Distinct().ToList()).ToList();
+            if (perUit.Count >= 2 && perUit.All(st => st.Count == 1) && perUit.Select(st => st[0]).Distinct().Count() == 2) res.Add(g.Key.Melder);
+        }
         foreach (var (sleutel, adressen) in Relevant)
         {
             if (!adressen.Contains(adres)) continue;
             var (_, melder, richting) = Ontleed(sleutel);
             // de melder zelf, waar de loc vanuit dat einde uitkwam, en wat vanaf de andere kant door hetzelfde einde binnenkwam (en die kant weer op kan)
             res.Add(melder);
-            // BUG #426 (Marco 18-11 14:25, controle: "wissel 9 kan tussen stap 0 en 0 (14) nergens veilig om"): een tak waar de loc met BEIDE standen van dit adres
-            // kwam, loopt niet over deze wissel (bijv. 24 -> 14 gaat niet over wissel 9, wel 24 -> 129). Die tak hoort niet bij de zone; anders mocht wissel 9 niet om
-            // terwijl de loc op 14 stond, en was de hele binnenring in 3 van de 4 wisselstanden niet te plannen.
-            bool OverDezeWissel(IEnumerable<StapWaarneming> naarTak) { var st = naarTak.Select(x => x.Stand.Contains(adres)).Distinct().Count(); return st <= 1; }
-            foreach (var g in Stappen.Where(s => s.Melder == melder && s.Richting == richting && s.Uitkomst > 0 && !s.Afgeleid).GroupBy(s => s.Uitkomst))
+            // (BUG #426: een verfijning 'tak met beide standen hoort niet bij de zone' is teruggedraaid: in de simulatie werd wissel 5 daardoor omgezet met de loc
+            // op melder 14. De standen in de kennis zijn Dinamo-commando's, niet altijd wat er op de baan lag.)
+            foreach (var s in Stappen.Where(s => s.Melder == melder && s.Richting == richting && s.Uitkomst > 0))
             {
-                if (!OverDezeWissel(g)) continue;
-                res.Add(g.Key);
-                foreach (var t in Stappen.Where(t => t.Melder == g.Key && t.Richting == richting.Om() && t.Uitkomst > 0)) res.Add(t.Uitkomst);
+                res.Add(s.Uitkomst);
+                foreach (var t in Stappen.Where(t => t.Melder == s.Uitkomst && t.Richting == richting.Om() && t.Uitkomst > 0)) res.Add(t.Uitkomst);
             }
-            foreach (var g in Stappen.Where(s => s.Uitkomst == melder && s.Richting == richting.Om() && !s.Afgeleid).GroupBy(s => s.Melder))
-                if (OverDezeWissel(g)) res.Add(g.Key);
+            foreach (var s in Stappen.Where(s => s.Uitkomst == melder && s.Richting == richting.Om())) res.Add(s.Melder);
         }
         return res;
     }

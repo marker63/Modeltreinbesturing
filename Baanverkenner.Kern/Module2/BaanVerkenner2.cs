@@ -801,24 +801,8 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                             yield return new Taak { Soort = soort, Sleutel = $"A|{v.Adres}|{g.Key}", Via = s0.Via, Melder = u, Richting = s0.Richting, Vondst = v, A = s0,
                                 Omschrijving = $"wissel {v.Adres} andersom: stap {s0.Via} -> {u} ({s0.Richting.Tekst()}) met wissel {v.Adres} {(afb ? "rechtdoor" : "afbuigend")}" };
                         }
-                // WAT: een wissel die alleen "van achteren" gevonden is (de ene stand: verder, de andere: kortsluiting) heeft nog een onbekende tak. Vanaf de melder achter de
-                // wissel terugrijden, met de wissel in de stand die van achteren kortsluiting gaf: dan gaat de loc de onbekende tak op.
-                // WAAROM (BUG #426, simulatie met ruis, start 8: 'voltooid' met 17 van de 23 melders): wissel 9 was alleen bekend als "21 -> 24 -> 129, met 9 afbuigend
-                // kortsluiting"; 129 vooruit met wissel 9 afbuigend (naar de binnenring 4 - 11 - 12 - 1 - 9 - 10) werd nooit gereden.
-                foreach (var v in _k.Vondsten.Where(v => !kruis426.Contains(v.Adres) && ((v.Rechtdoor > 0 && v.Afbuigend == StapUitkomst.Kortsluiting) || (v.Afbuigend > 0 && v.Rechtdoor == StapUitkomst.Kortsluiting))))
-                {
-                    bool goedAfb = v.Afbuigend > 0;
-                    int p = goedAfb ? v.Afbuigend!.Value : v.Rechtdoor!.Value;
-                    var r2 = v.Richting.Om();
-                    if (_k.Stappen.Any(x => !x.Afgeleid && x.Melder == p && x.Richting == r2 && x.Stand.Contains(v.Adres) != goedAfb)) continue;   // die stand al eens gereden
-                    var s0 = _k.Stappen.Where(x => !x.Afgeleid && !x.Terug && x.Via > 0 && x.Melder == p && x.Richting == r2 && x.Uitkomst > 0 && x.Stand.Contains(v.Adres) == goedAfb)
-                                       .OrderByDescending(x => x.Aantal).FirstOrDefault();
-                    if (s0 is null) continue;
-                    string sl = $"P|{v.Adres}|{s0.IngangSleutel}";
-                    if (_andersomMislukt421.GetValueOrDefault(sl) >= 3) continue;
-                    yield return new Taak { Soort = soort, Sleutel = sl, Via = s0.Via, Melder = p, Richting = r2, Vondst = v, A = s0,
-                        Omschrijving = $"wissel {v.Adres} vanaf de andere kant: stap {s0.Via} -> {p} ({r2.Tekst()}) met wissel {v.Adres} {(goedAfb ? "rechtdoor" : "afbuigend")} (de nog onbekende tak)" };
-                }
+                // (BUG #426: een taak 'wissel vanaf de andere kant rijden' voor wissels die alleen van achteren gevonden zijn is geprobeerd en weer uitgezet:
+                // in de simulatie gaf dat veel meer kortsluitingen en niet voltooide verkenningen.)
                 break;
             case Soort.Dekking:
                 foreach (var d in DekkingRitten()) yield return new Taak { Soort = soort, Sleutel = d.Sleutel, Dekking = d, Omschrijving = d.Omschrijving };
@@ -1308,8 +1292,9 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         var onbekendeTak426 = _k.Vondsten.Where(v => !KruisMotoren().Contains(v.Adres) && ((v.Rechtdoor > 0 && v.Afbuigend == StapUitkomst.Kortsluiting) || (v.Afbuigend > 0 && v.Rechtdoor == StapUitkomst.Kortsluiting))
             && !_k.Stappen.Any(x => !x.Afgeleid && x.Melder == (v.Afbuigend > 0 ? v.Afbuigend : v.Rechtdoor) && x.Richting == v.Richting.Om() && x.Stand.Contains(v.Adres) != (v.Afbuigend > 0))
             && !_k.Vondsten.Any(w => w.Adres == v.Adres && w.Rechtdoor > 0 && w.Afbuigend > 0)).Select(v => v.Adres).Distinct().ToList();
-        k.Voltooid = zonderBlok.Count == 0 && _locKwijt402 is null && _onbereikbaar == 0 && overgeslagen424 <= 2 && onverkend421.Count == 0 && onbekendeTak426.Count == 0;
-        if (onbekendeTak426.Count > 0) _log.Waarschuwing($"De verkenning is nog NIET af: achter wissel {string.Join(", ", onbekendeTak426)} ligt nog een onbekende tak (BUG #426).");
+        k.Voltooid = zonderBlok.Count == 0 && _locKwijt402 is null && _onbereikbaar == 0 && overgeslagen424 <= 2 && onverkend421.Count == 0;
+        // (een niet gereden onbekende tak houdt 'voltooid' niet tegen: in de simulatie bleek die vaak geen nieuwe tak te hebben; alleen een melding)
+        if (onbekendeTak426.Count > 0) _log.Info($"Achter wissel {string.Join(", ", onbekendeTak426)} is de stand vanaf de andere kant nog niet gereden (BUG #426).");
         if (onverkend421.Count > 0) _log.Waarschuwing($"De verkenning is nog NIET af: achter melder {string.Join(", ", onverkend421.Select(x => x.Split('|')[1]))} is nog niet verkend (BUG #421).");
         if (overgeslagen424 > 2) _log.Waarschuwing($"De verkenning is nog NIET af: {overgeslagen424} taken zijn overgeslagen (BUG #404).");
         // BUG #402: niet voltooid als de loc kwijt is of als er nog taken zijn die niet te plannen waren
