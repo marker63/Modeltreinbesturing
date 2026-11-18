@@ -135,6 +135,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             bool naControle412 = false;
             if (_status.Controle)
             {
+                NormaliseerAchteren426();   // BUG #426
                 if (await Controle412()) { BewaarNu(); return; }
                 _log.Stap("Controle: er zijn fouten gevonden; de verkenning lost ze nu zelf op en controleert daarna opnieuw (BUG #412, nog niet getest op de baan).");
                 naControle412 = true;
@@ -206,6 +207,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                 if (_monitor.Bezet.Count == 1 && !Kortsluiting()) _k.Echt.Add(_monitor.Bezet.First());   // BUG #393: de loc staat stil en alleen op deze melder
                 // BUG #394 (werkwijze van Marco): staat de loc netjes op een melder waarvan het blok nog onbekend is, dan daar meteen de blokproef.
                 if (W3a && _monitor.Bezet.Count == 1 && !Kortsluiting() && _k.LocMelder == _monitor.Bezet.First()) await BlokProefAlsNodig();
+                NormaliseerAchteren426();   // BUG #426
                 var taak = KiesTaak();
                 if (taak is null)
                 {
@@ -264,6 +266,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             if (naControle412)
             {
                 _status.Controle = true;
+                NormaliseerAchteren426();   // BUG #426
                 await Controle412(tweede: true);
                 BewaarNu();
             }
@@ -324,7 +327,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             _log.Info($"Hervat: {_k.Overgeslagen.Count} eerder overgeslagen taak/taken krijgen een nieuwe kans (BUG #404).");
             _k.Overgeslagen.Clear(); _k.Mislukt.Clear();
         }
-        if (_hervat) HerstelVerkeerdePoot425();
+        NormaliseerAchteren426();   // BUG #426: ook een bestaande voortgang corrigeren
         await WachtTotDinamoRustig();
         await BepaalPlek();
         if (!_hervat)
@@ -903,12 +906,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             var (w424, kortAfb) = vp;
             var goed = a.Uitkomst == StapUitkomst.Kortsluiting ? b : a;
             var kort425 = ReferenceEquals(goed, a) ? b : a;
-            // BUG #425: ligt de wissel op de grens tussen 'via' en deze melder (daar is hij al relevant, bijv. wissel 5 tussen 24 en 14), dan NIET hier relevant maken:
-            // de knoop van deze stap is de andere kant van de melder (14 -> 13). Dat gaf in de controle van 18-11 "wissel 5 kan nergens veilig om" voor 21 overgangen.
-            // De kortsluiting is dan verklaard door een al bekende eis bij de stap ervoor; de waarneming wordt weggehaald.
-            bool aanIngang425 = !KruisMotoren().Contains(w424) && _k.RelevantInKnoop(t.Via, t.Richting).Contains(w424);   // niet voor de motoren van de kruiswissel
-            if (aanIngang425) _k.Stappen.RemoveAll(x => x.IngangSleutel == kort425.IngangSleutel && x.Uitkomst == StapUitkomst.Kortsluiting && x.Stand.Contains(w424) == kortAfb);
-            else _k.MaakRelevant(t.Via, t.Melder, t.Richting, w424);
+            _k.MaakRelevant(t.Via, t.Melder, t.Richting, w424);   // BUG #426: ligt hij aan de binnenkomstkant, dan verplaatst NormaliseerAchteren426 hem
             var v424 = new WisselVondst2
             {
                 Adres = w424, Via = t.Via, Melder = t.Melder, Richting = t.Richting, Tijd = _klok.Nu,
@@ -1186,20 +1184,33 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         catch { return sleutel; }
     }
 
-    /// <summary>WAT: haalt bij hervatten een 'verkeerde poot'-wissel weer weg bij een knoop waar hij niet ligt (zie BUG #425 in DoeTegenspraak) en de
-    /// kortsluitingen die daardoor al verklaard zijn. WAAROM (BUG #425, Marco's voortgang 18-11): versie bug424 had wissel 5 bij 24 -> 14 (achteruit) en wissel 14
-    /// bij 17 -> 8 (vooruit) relevant gemaakt; daardoor kon de controle 21 van de 52 overgangen niet plannen.</summary>
-    private void HerstelVerkeerdePoot425()
+    /// <summary>WAT: een wissel die een stap "van achteren" bepaalt (de ene stand: verder, de andere: kortsluiting) ligt soms aan de BINNENKOMSTKANT van de melder
+    /// in plaats van aan de uitgang. Dat is zo als dezelfde wissel ook bepaalt waar de loc heen gaat als hij de melder de andere kant op verlaat (bijv. wissel 5:
+    /// 14 vooruit gaat naar 24 of 129, dus wissel 5 ligt aan de 24/129-kant van melder 14; 24 -> 14 -> 13 met wissel 5 afbuigend is de verkeerde poot bij het
+    /// binnenrijden). Dan wordt de wissel bij die kant vastgelegd en zijn de kortsluitingen bij deze stap verklaard (weggehaald).
+    /// WAAROM (BUG #426, Marco 18-11 14:52, controle 14:06 en 14:16: "wissel 5 kan tussen stap 2 en 2 (14) nergens veilig om", 14 van de 50 overgangen niet gereden):
+    /// wissel 5 stond als "na melder 14 (achteruit)" (de kant 14 | 13) en wissel 14 als "na melder 8 (vooruit)" (8 | 15). Elke route 13 -> 14 en 15 -> 8 eiste toen ook
+    /// die wissel, en bij melder 14 en 8 kan hij niet om. Ook bij hervatten wordt een bestaande voortgang zo gecorrigeerd (vervangt de correctie van #425).</summary>
+    private void NormaliseerAchteren426()
     {
         var kruis = KruisMotoren();
         foreach (var v in _k.Vondsten.Where(v => v.Via > 0 && !kruis.Contains(v.Adres) && (v.Rechtdoor == StapUitkomst.Kortsluiting || v.Afbuigend == StapUitkomst.Kortsluiting)).ToList())
         {
-            // alleen als de wissel aan de ingang (grens via | melder) al relevant is door een andere vondst
-            if (!_k.VerwijderRelevant(v.Via, v.Melder, v.Richting, v.Adres)) continue;
-            if (!_k.RelevantInKnoop(v.Via, v.Richting).Contains(v.Adres)) { _k.MaakRelevant(v.Via, v.Melder, v.Richting, v.Adres); continue; }
+            string sl = Kennis2.Sleutel(v.Via, v.Melder, v.Richting);
+            if (!_k.Relevant.TryGetValue(sl, out var l) || !l.Contains(v.Adres)) continue;
+            // bepaalt deze wissel ook de uitgang aan de andere kant van de melder?
+            var anders = _k.Stappen.Where(x => !x.Afgeleid && !x.Terug && x.Melder == v.Melder && x.Richting == v.Richting.Om() && x.Uitkomst > 0).ToList();
+            var perUitkomst = anders.GroupBy(x => x.Uitkomst).Select(g => g.Select(x => x.Stand.Contains(v.Adres)).Distinct().ToList()).ToList();
+            bool bepaaltAndereKant = perUitkomst.Count >= 2 && perUitkomst.All(st => st.Count == 1) && perUitkomst.Select(st => st[0]).Distinct().Count() == 2;
+            if (!bepaaltAndereKant) continue;
+            int viaAnders = anders.Where(x => x.Via > 0).GroupBy(x => x.Via).OrderByDescending(g => g.Sum(x => x.Aantal)).Select(g => g.Key).FirstOrDefault();
+            if (viaAnders <= 0) continue;
+            _k.VerwijderRelevant(v.Via, v.Melder, v.Richting, v.Adres);
+            _k.MaakRelevant(viaAnders, v.Melder, v.Richting.Om(), v.Adres);
             bool kortAfb = v.Afbuigend == StapUitkomst.Kortsluiting;
             int weg = _k.Stappen.RemoveAll(x => x.Via == v.Via && x.Melder == v.Melder && x.Richting == v.Richting && x.Uitkomst == StapUitkomst.Kortsluiting && x.Stand.Contains(v.Adres) == kortAfb);
-            _log.Info($"Wissel {v.Adres} ligt tussen melder {v.Via} en {v.Melder}, niet na melder {v.Melder} ({v.Richting.Tekst()}); dat is gecorrigeerd ({weg} verklaarde kortsluiting(en) weggehaald) (BUG #425, nog niet getest op de baan).");
+            _log.Info($"Wissel {v.Adres} ligt aan de kant van melder {v.Melder} waar de loc vanaf {v.Via} binnenkomt (hij bepaalt ook {v.Melder} {v.Richting.Om().Tekst()}); "
+                    + $"vastgelegd bij 'na melder {v.Melder} ({v.Richting.Om().Tekst()})', {weg} verklaarde kortsluiting(en) weggehaald (BUG #426, nog niet getest op de baan).");
         }
     }
 

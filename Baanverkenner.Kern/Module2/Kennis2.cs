@@ -244,12 +244,18 @@ public class Kennis2
             var (_, melder, richting) = Ontleed(sleutel);
             // de melder zelf, waar de loc vanuit dat einde uitkwam, en wat vanaf de andere kant door hetzelfde einde binnenkwam (en die kant weer op kan)
             res.Add(melder);
-            foreach (var s in Stappen.Where(s => s.Melder == melder && s.Richting == richting && s.Uitkomst > 0))
+            // BUG #426 (Marco 18-11 14:25, controle: "wissel 9 kan tussen stap 0 en 0 (14) nergens veilig om"): een tak waar de loc met BEIDE standen van dit adres
+            // kwam, loopt niet over deze wissel (bijv. 24 -> 14 gaat niet over wissel 9, wel 24 -> 129). Die tak hoort niet bij de zone; anders mocht wissel 9 niet om
+            // terwijl de loc op 14 stond, en was de hele binnenring in 3 van de 4 wisselstanden niet te plannen.
+            bool OverDezeWissel(IEnumerable<StapWaarneming> naarTak) { var st = naarTak.Select(x => x.Stand.Contains(adres)).Distinct().Count(); return st <= 1; }
+            foreach (var g in Stappen.Where(s => s.Melder == melder && s.Richting == richting && s.Uitkomst > 0 && !s.Afgeleid).GroupBy(s => s.Uitkomst))
             {
-                res.Add(s.Uitkomst);
-                foreach (var t in Stappen.Where(t => t.Melder == s.Uitkomst && t.Richting == richting.Om() && t.Uitkomst > 0)) res.Add(t.Uitkomst);
+                if (!OverDezeWissel(g)) continue;
+                res.Add(g.Key);
+                foreach (var t in Stappen.Where(t => t.Melder == g.Key && t.Richting == richting.Om() && t.Uitkomst > 0)) res.Add(t.Uitkomst);
             }
-            foreach (var s in Stappen.Where(s => s.Uitkomst == melder && s.Richting == richting.Om())) res.Add(s.Melder);
+            foreach (var g in Stappen.Where(s => s.Uitkomst == melder && s.Richting == richting.Om() && !s.Afgeleid).GroupBy(s => s.Melder))
+                if (OverDezeWissel(g)) res.Add(g.Key);
         }
         return res;
     }
@@ -332,6 +338,32 @@ public class Kennis2
             }
             var s0 = g.First();
             res.Add((uit[0], rel.ToDictionary(a => a, a => s0.Stand.Contains(a)), terugval, g.Sum(x => x.Aantal)));
+        }
+        // WAT: is dezelfde uitkomst gezien met twee standen die maar in één adres verschillen, dan doet dat adres er voor deze uitkomst niet toe: er komt een extra
+        // mogelijkheid bij zonder dat adres in de eis (alleen paren die allebei echt gereden zijn, dus geen ongeziene combinaties).
+        // WAAROM (BUG #426, controle 18-11 14:16 en 14:25): 14 -> 129 eiste motor 10 rechtdoor en 129 -> 4 motor 10 afbuigend (de motoren van de kruiswissel horen bij
+        // dezelfde knoop), terwijl 10 voor die stappen niet uitmaakt. Motor 10 moest dan omgezet worden met de loc op 14 of 129: de hele binnenring was in de helft
+        // van de wisselstanden niet te plannen.
+        for (int ronde = 0; ronde < 3; ronde++)
+        {
+            var erbij = new List<(int, Dictionary<int, bool>, bool, int)>();
+            foreach (var grp in res.Where(x => x.Item1 > 0).GroupBy(x => x.Item1))
+            {
+                var lijst = grp.ToList();
+                for (int i = 0; i < lijst.Count; i++)
+                    for (int j = i + 1; j < lijst.Count; j++)
+                    {
+                        var (e1, e2) = (lijst[i].Item2, lijst[j].Item2);
+                        if (e1.Count != e2.Count || !e1.Keys.All(e2.ContainsKey)) continue;
+                        var versch = e1.Keys.Where(k => e1[k] != e2[k]).ToList();
+                        if (versch.Count != 1) continue;
+                        var kern = e1.Where(x => x.Key != versch[0]).ToDictionary(x => x.Key, x => x.Value);
+                        if (res.Concat(erbij).Any(x => x.Item1 == grp.Key && x.Item2.Count == kern.Count && kern.All(k => x.Item2.TryGetValue(k.Key, out var w) && w == k.Value))) continue;
+                        erbij.Add((grp.Key, kern, lijst[i].Item3 || lijst[j].Item3, lijst[i].Item4 + lijst[j].Item4));
+                    }
+            }
+            if (erbij.Count == 0) break;
+            res.AddRange(erbij);
         }
         return res;
     }

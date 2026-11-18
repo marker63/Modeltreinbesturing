@@ -3363,6 +3363,7 @@ public static class Tests
     {
         var st = VerkenStatus.VanJson(System.IO.File.ReadAllText(pad))!;
         int start = st.Module2?.LocMelder is int lm && lm > 0 ? lm : 13;
+        if (int.TryParse(Environment.GetEnvironmentVariable("MARCO2_ECHT_START"), out var es)) { start = es; if (st.Module2 is not null) { st.Module2.LocMelder = es; st.Module2.LocVia = 0; } }
         var sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(true, start);
         var ins = st.Instellingen;
         sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
@@ -3374,7 +3375,25 @@ public static class Tests
             foreach (bool h in new[] { false, true })
             {
                 var stx = VerkenStatus.VanJson(System.IO.File.ReadAllText(pad))!;
+                if (int.TryParse(Environment.GetEnvironmentVariable("MARCO2_ECHT_START"), out var es2) && stx.Module2 is not null) { stx.Module2.LocMelder = es2; stx.Module2.LocVia = int.TryParse(Environment.GetEnvironmentVariable("MARCO2_ECHT_VIA"), out var ev) ? ev : 0; if (Environment.GetEnvironmentVariable("MARCO2_ECHT_R") == "A") stx.Module2.LocRichting = Richting.Achteruit; }
                 var vx = new BaanVerkenner2(sim, ins, klok, log, (kop, tekst) => Task.FromResult(true), stx);
+                if (Environment.GetEnvironmentVariable("MARCO2_ECHT_STANDEN") == "1")
+                {
+                    // alle combinaties van de standen van de echte wissels: de planner kiest per stap de stand die het minst afwijkt van wat er nu staat
+                    var echte = new[] { 1, 2, 5, 6, 9, 10, 13, 14 };
+                    var slechtst = new Dictionary<string, int>();
+                    for (int m = 0; m < (1 << echte.Length); m++)
+                    {
+                        var sx = VerkenStatus.VanJson(System.IO.File.ReadAllText(pad))!;
+                        if (int.TryParse(Environment.GetEnvironmentVariable("MARCO2_ECHT_START"), out var es3) && sx.Module2 is not null) { sx.Module2.LocMelder = es3; sx.Module2.LocVia = int.TryParse(Environment.GetEnvironmentVariable("MARCO2_ECHT_VIA"), out var ev3) ? ev3 : 0; if (Environment.GetEnvironmentVariable("MARCO2_ECHT_R") == "A") sx.Module2.LocRichting = Richting.Achteruit; }
+                        var vs = new BaanVerkenner2(sim, ins, klok, log, (kop, tekst) => Task.FromResult(true), sx);
+                        var st2 = echte.Select((a, i) => (a, ((m >> i) & 1) == 1)).ToDictionary(x => x.a, x => x.Item2);
+                        foreach (var r in vs.PlanTest425(h, st2).Skip(1)) { var key = r.Split(':')[0]; slechtst[key] = slechtst.GetValueOrDefault(key) + 1; if (slechtst[key] == 1 && Environment.GetEnvironmentVariable("MARCO2_ECHT_REDEN") == "1") Console.WriteLine($"   [{string.Join(" ", st2.Select(x => $"{x.Key}{(x.Value ? "A" : "R")}"))}] {r[..Math.Min(700, r.Length)]}"); }
+                    }
+                    Console.WriteLine($"PLANTEST herstel={h}, alle {1 << echte.Length} standen: {slechtst.Count} overgangen soms niet te plannen");
+                    foreach (var (k2, n2) in slechtst.OrderByDescending(x => x.Value)) Console.WriteLine($"   {k2}: {n2}x");
+                    continue;
+                }
                 Console.WriteLine($"PLANTEST herstel={h}:");
                 foreach (var r in vx.PlanTest425(h)) Console.WriteLine("   " + r);
             }

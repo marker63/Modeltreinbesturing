@@ -3733,3 +3733,17 @@ Simulatie module 2: gelijk aan #419.
 - Metingen (alle varianten, ruis, sectiescheidingen, hervatten, controle): alles voltooid 23/23, valse 0, gebruiker 0; controles in de simulatie 52/52, 50/50, 54/54.
   Regressietests ALLES OK.
 - Nog niet getest op de baan.
+
+## #426 Controle 18-11 14:06-14:25 (nieuwe verkenning): 49/50 en 36/50 overgangen; planner hing af van de toevallige wisselstanden
+- Nieuwe verkenning 11:03-14:05 voltooid (23 melders, 8 wissels). Controle: 49 van 50 ("wissel 5 kan tussen stap 2 en 2 (14) nergens veilig om"), tweede
+  controle: 36 van 50 met 1 kortsluiting ("wissel 5 kan tussen stap 0 en 0 (129) nergens veilig om").
+- Nagebootst met Marco's voortgang (MARCO2_ECHT_PLAN=1 + MARCO2_ECHT_STANDEN=1 = alle 256 standen van de echte wissels): met de loc op 14 was de hele binnenring
+  in 3 van de 4 standen niet te plannen.
+- Oorzaken en oplossingen:
+  1. Een wissel die "van achteren" een stap bepaalt, werd aan de uitgang van de melder vastgelegd, ook als hij aan de binnenkomstkant ligt (wissel 5 bij 24 -> 14 -> 13).
+     Nieuw: bepaalt dezelfde wissel ook de uitgang aan de andere kant van de melder (14 vooruit: 24 of 129), dan hoort hij daar; de verklaarde kortsluitingen
+     worden weggehaald. Ook bij hervatten, vóór elke taak en vóór de controle (vervangt de correctie van #425).
+  2. De routeplanner eiste voor elke stap de stand van ALLE wissels van de knoop, ook als die voor die uitkomst niet uitmaakt (motor 10 bij 14 -> 129 en 129 -> 4).
+     Nieuw: is dezelfde uitkomst gezien met twee standen die in één adres verschillen, dan is dat adres voor die uitkomst vrij.
+  3. Zone van een wissel (waar hij niet om mag met de loc erop): een tak waar de loc met beide standen van het adres kwam, hoort er niet bij (24 -> 14 gaat niet over wissel 9).
+- Resultaat met Marco's voortgang, loc op 14: in alle 256 standen alle 50 overgangen te plannen (was: 16 overgangen in 192 van de 256 standen niet).

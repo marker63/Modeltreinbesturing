@@ -81,9 +81,15 @@ public partial class BaanVerkenner2
 
     /// <summary>BUG #425 (alleen voor de tests): plant vanaf de plek van de loc elke bekende overgang zonder te rijden en geeft de overgangen terug waarvoor
     /// geen uitvoerbare route is, met de reden. <paramref name="herstel"/> = eerst de correctie van #425 toepassen (zoals bij hervatten).</summary>
-    public List<string> PlanTest425(bool herstel)
+    public List<string> PlanTest425(bool herstel, Dictionary<int, bool>? standen = null)
     {
-        if (herstel) HerstelVerkeerdePoot425();
+        if (herstel) NormaliseerAchteren426();
+        if (Environment.GetEnvironmentVariable("MARCO2_ECHT_DEBUG") == "1")
+        {
+            foreach (var v in _k.Vondsten) Console.WriteLine($"   vondst {v.Adres} {v.Via}>{v.Melder}:{v.Richting} R={v.Rechtdoor} A={v.Afbuigend}  relevant-ingangknoop={string.Join(",", _k.RelevantInKnoop(v.Via, v.Richting))}  relevant-hier={string.Join(",", _k.RelevantInKnoop(v.Melder, v.Richting))}");
+            foreach (var (k2, l2) in _k.Relevant) Console.WriteLine($"   relevant {k2}: {string.Join(",", l2)}");
+        }
+        if (standen is not null) foreach (var (a, v) in standen) _k.Standen[a] = v;
         var res = new List<string>();
         var alle = _k.Stappen.Where(s => s.Uitkomst > 0 && !s.Afgeleid).Select(s => (Van: s.Melder, Naar: s.Uitkomst, R: s.Richting)).Distinct().ToList();
         var kaart = Dijkstra();
