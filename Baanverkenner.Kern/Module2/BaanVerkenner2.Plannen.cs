@@ -264,9 +264,7 @@ public partial class BaanVerkenner2
                 // proeven: de kosten om bij de ingang te komen (de proef plant zichzelf bij het uitvoeren opnieuw)
                 // BUG #421: bij een 'andersom'-proef meteen met de echte proefstand kijken of er een veilige beginplek is (anders steeds opnieuw 'geen veilige plek')
                 var proefStand424 = t.Soort is Soort.Andersom or Soort.NaProef ? AndersomStand(t) : new Dictionary<int, bool>();
-                _vrijNaM424.Clear(); _vrijNaM424.UnionWith(proefStand424.Keys);
-                var keuze = KiesProefStart(kaart, t.Via, t.Melder, t.Richting, proefStand424);
-                _vrijNaM424.Clear();
+                var keuze = KiesProefStart(kaart, t.Via, t.Melder, t.Richting, proefStand424);   // BUG #424: _vrijNaM424 wordt door KiesTaak gezet
                 if (keuze is null) return (null, 0);
                 return (keuze.Value.Plan, keuze.Value.Plan.Kosten + 2 * keuze.Value.Keten.Count);
         }

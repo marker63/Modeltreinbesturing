@@ -622,6 +622,8 @@ public partial class BaanVerkenner2 : IBaanVerkenner
     private sealed class Taak
     {
         public Soort Soort;
+        /// <summary>BUG #424: de geteste wissel mag bij de laatste stap al in de proefstand (alleen als de rit anders niet te plannen was).</summary>
+        public bool VrijNaM;
         public string Sleutel = "";
         public string Omschrijving = "";
         public int Via, Melder; public Richting Richting;
@@ -657,6 +659,19 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             }
             if (beste is not null) return beste;
         }
+        // WAT: is er verder niets meer te doen, dan de 'andersom'- en 'na de kortsluitproef'-ritten die niet te plannen waren nog eens plannen, nu met de geteste
+        // wissel al in de proefstand vóór de melder waar hij werkt. WAAROM (BUG #424, Marco 18-11 10:03, log 09:57: "wissel 13 na melder 24 (achteruit) ook afbuigend
+        // rijden": steeds "geen veilige plek"). Alleen aan het eind: eerder gaf dat in de simulatie met ruis een andere volgorde en een slechtere verkenning.
+        foreach (var soort in new[] { Soort.NaProef, Soort.Andersom })
+            foreach (var t in Kandidaten(soort))
+            {
+                if (_k.Overgeslagen.Contains(t.Sleutel)) continue;
+                t.VrijNaM = true;
+                _vrijNaM424.Clear(); _vrijNaM424.UnionWith(AndersomStand(t).Keys);
+                var (plan, _) = PlanVoor(t, kaart);
+                _vrijNaM424.Clear();
+                if (plan is not null) { t.Plan = plan; return t; }
+            }
         // WAT: is er niets te plannen, probeer dan één keer de andere aanname over hoe de loc staat (omgedraaid of niet). De eerste rit controleert dat meteen (#379/#386).
         // WAAROM (BUG #388, Marco 09-11 12:03: "je vraagt nog steeds om de loc op een bepaalde melder te zetten, terwijl je er gewoon zelf naar toe kan rijden"; log 09:26-09:28 en
         // 12:01-12:03): na de keerlus stond de loc volgens de kennis "omgedraaid". Vanaf 10, 129, 4, 11 en 1 vond de planning geen enkele weg naar de buitenring meer; na zes keer
@@ -1123,7 +1138,8 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         var stand = AndersomStand(t);
         var herstel = new Dictionary<int, bool> { [v.Adres] = !nieuw };
         foreach (var (vo, dv) in Volgers(v.Adres, !nieuw)) herstel[vo] = dv;
-        _vrijNaM424.Clear(); _vrijNaM424.UnionWith(stand.Keys);   // BUG #424: deze wissel mag bij de laatste stap al in de proefstand
+        _vrijNaM424.Clear();
+        if (t.VrijNaM) _vrijNaM424.UnionWith(stand.Keys);   // BUG #424: zie KiesTaak
         int? u;
         try { u = await Proef(t.Via, t.Melder, t.Richting, stand, herstel: herstel); }
         finally { _vrijNaM424.Clear(); }
