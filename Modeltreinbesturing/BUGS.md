@@ -3711,3 +3711,25 @@ Simulatie module 2: gelijk aan #419.
 - Metingen (alle varianten, ruis, sectiescheidingen, hervatten; starts 13, 5, 17, 11, 25, 8): alles voltooid 23/23, valse 0, gebruiker 0; tijden gelijk aan #423.
   Regressietests ALLES OK.
 - Nog niet getest op de baan.
+
+## #425 Controle 18-11: 21 van de 52 overgangen niet gereden; rapportfouten (Marco 18-11 11:00)
+- De controle na de voltooide verkenning reed 32 en 31 van de 52 overgangen. Alle andere: "geen uitvoerbare route: wissel 5 kan tussen stap 12 en 12 (14)
+  nergens veilig om" (de hele binnenring, 14 -> 129, 129 -> 24, 24 -> 129) en hetzelfde met wissel 14 bij melder 8.
+- Oorzaak: #424 legde de 'verkeerde poot' vast bij de knoop van de stap (wissel 5 "na melder 14 achteruit" = de kant 14 | 13, wissel 14 "na melder 8 vooruit" =
+  8 | 15). De wissels liggen aan de andere kant (24 | 14 en 17 | 8), waar ze al bekend waren. Elke route over 13 | 14 of 8 | 15 eiste toen ook wissel 5 of 14.
+- Opgelost:
+  - Verkeerde poot: ligt de wissel aan de ingangskant (daar al bekend), dan wordt de kortsluiting als verklaard weggehaald in plaats van de wissel aan de verkeerde
+    kant vast te leggen. Bij hervatten wordt dit in de bestaande voortgang gecorrigeerd (melding in het logboek).
+  - Planner: kan een wissel halverwege nergens veilig om, dan (1) een andere bekende stand van de stap ervoor (bijv. 14 -> 24 met motor 13 rechtdoor), of
+    (2) een uitstapje: een paar bekende stappen naar een melder buiten de wissel en terug.
+  - Getest met Marco's echte voortgang van 18-11 (nieuwe test MARCO2_ECHT=pad, MARCO2_ECHT_PLAN=1): eerst 32 van 52 overgangen te plannen, nu 51 van 52.
+    Nog open: 24 -> 8 (vooruit), via de kruiswissel met motor 13 eerst afbuigend en daarna rechtdoor.
+- Rapport:
+  - "kruiswissel in melder 8, 14, 24" en een plusteken rond melder 8: nu melder 24 (de melder waar de motoren aan beide kanten van invloed zijn).
+  - Een wissel met kortsluiting bij rechtdoor (volger 6 van de overloopset, wissel 9 bij 4) stond als "puntzijde, rechtdoor: doodlopend / onbekend"; nu
+    "van achteren bereden: niet rijden als rechtdoor".
+  - Een nog niet gereden kant van een wissel (wissel 13 na 24 achteruit: "afbuigend: geen melder bereikt") wordt aangevuld uit de gereden stappen.
+  - Kortsluitpunt "opgelost met adres  op rechtdoor" (zonder adres) en overgeslagen taken als interne sleutel ("T|8>24:a|...") zijn nu leesbaar.
+- Metingen (alle varianten, ruis, sectiescheidingen, hervatten, controle): alles voltooid 23/23, valse 0, gebruiker 0; controles in de simulatie 52/52, 50/50, 54/54.
+  Regressietests ALLES OK.
+- Nog niet getest op de baan.
