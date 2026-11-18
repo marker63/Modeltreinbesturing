@@ -928,6 +928,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         int proeven = 0;
         bool aGezien = false;   // BUG #380: kwam de eerste uitkomst in deze ronde nog terug?
         bool bewezen423 = false;   // BUG #423: de kortsluitproef wees het adres al aan
+        int opnieuw424 = 0;   // BUG #424: hoe vaak de proeven opnieuw begonnen omdat een andere wissel de kortsluiting gaf
 
         // WAT: gaf een proef kortsluiting en hief de kortsluitproef die op door één van de kandidaten om te zetten naar de stand van de uitkomst zonder
         // kortsluiting, dan is dat het adres: de kortsluitproef heeft het al 3 keer bevestigd. Geen aparte controlerit meer nodig.
@@ -989,6 +990,24 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             if (u.Value != a.Uitkomst) { kandidaten = helft; uitkomstLos = helft.Count == 1 ? u : null; }
             else { kandidaten = kandidaten.Except(helft).ToList(); uitkomstLos = null; aGezien = true; }
             if (u.Value == StapUitkomst.Kortsluiting && KortsluitproefWijst423(voor423, kandidaten) is int bewijs) { kandidaten = new() { bewijs }; bewezen423 = true; aGezien = true; break; }
+            // WAT: hief de kortsluitproef de kortsluiting op met een al gevonden wissel die GEEN kandidaat is, dan kwam de kortsluiting door die wissel en zegt
+            // deze proef niets over de kandidaten. Die wissel gaat in de basisstand zoals de kortsluitproef liet zien, en de stand A wordt aan het eind opnieuw gecontroleerd.
+            // WAAROM (BUG #424, simulatie met ruis, start 11: valse wissels 3 en 4 na melder 129): de kortsluiting kwam van motor 10 bij de kruiswissel (melder 24 werd
+            // gemist), maar werd aan de nog niet gevonden adressen 3 en 4 toegeschreven.
+            if (u.Value == StapUitkomst.Kortsluiting && opnieuw424 < 2)
+            {
+                var stoorder = _k.ProefOplossingen.Except(voor423).Select(x => x.Split('|')).Where(d => d.Length == 4 && int.TryParse(d[2], out _))
+                    .Select(d => (Adres: int.Parse(d[2]), Stand: bool.Parse(d[3]))).FirstOrDefault(x => !kandidaten.Contains(x.Adres) && _k.IsGevonden(x.Adres));
+                if (stoorder.Adres > 0)
+                {
+                    opnieuw424++;
+                    basis[stoorder.Adres] = stoorder.Stand;
+                    aGezien = false;
+                    kandidaten = verschil.Where(x => x != stoorder.Adres).ToList();
+                    _log.Info($"De kortsluiting kwam door wissel {stoorder.Adres} (geen kandidaat); die blijft {(stoorder.Stand ? "afbuigend" : "rechtdoor")} en de proeven beginnen opnieuw (BUG #424, nog niet getest op de baan).");
+                    continue;
+                }
+            }
         }
         if (kandidaten.Count != 1) return false;
         int adres = kandidaten[0];
@@ -1104,7 +1123,10 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         var stand = AndersomStand(t);
         var herstel = new Dictionary<int, bool> { [v.Adres] = !nieuw };
         foreach (var (vo, dv) in Volgers(v.Adres, !nieuw)) herstel[vo] = dv;
-        var u = await Proef(t.Via, t.Melder, t.Richting, stand, herstel: herstel);
+        _vrijNaM424.Clear(); _vrijNaM424.UnionWith(stand.Keys);   // BUG #424: deze wissel mag bij de laatste stap al in de proefstand
+        int? u;
+        try { u = await Proef(t.Via, t.Melder, t.Richting, stand, herstel: herstel); }
+        finally { _vrijNaM424.Clear(); }
         if (u is null)
         {
             // hoogstens 3 pogingen in de hele verkenning (de gewone 'overgeslagen'-lijst wordt bij nieuws weer leeggemaakt, BUG #394)
@@ -1125,6 +1147,8 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         return stand;
     }
     internal readonly Dictionary<string, int> _andersomMislukt421 = new();
+    /// <summary>BUG #424: adressen die bij de laatste stap van een proef al in de proefstand mogen (alleen tijdens een 'andersom'/'na de kortsluitproef'-rit).</summary>
+    private readonly HashSet<int> _vrijNaM424 = new();
     /// <summary>BUG #421: hoe vaak een tegenspraak-taak al begonnen is (de gewone teller wordt bij nieuws leeggemaakt, BUG #394).</summary>
     private readonly Dictionary<string, int> _tegenspraakPogingen421 = new();
     /// <summary>BUG #421: mislukte pogingen per taak over de hele verkenning.</summary>

@@ -263,7 +263,10 @@ public partial class BaanVerkenner2
             default:
                 // proeven: de kosten om bij de ingang te komen (de proef plant zichzelf bij het uitvoeren opnieuw)
                 // BUG #421: bij een 'andersom'-proef meteen met de echte proefstand kijken of er een veilige beginplek is (anders steeds opnieuw 'geen veilige plek')
-                var keuze = KiesProefStart(kaart, t.Via, t.Melder, t.Richting, t.Soort is Soort.Andersom or Soort.NaProef ? AndersomStand(t) : new Dictionary<int, bool>());
+                var proefStand424 = t.Soort is Soort.Andersom or Soort.NaProef ? AndersomStand(t) : new Dictionary<int, bool>();
+                _vrijNaM424.Clear(); _vrijNaM424.UnionWith(proefStand424.Keys);
+                var keuze = KiesProefStart(kaart, t.Via, t.Melder, t.Richting, proefStand424);
+                _vrijNaM424.Clear();
                 if (keuze is null) return (null, 0);
                 return (keuze.Value.Plan, keuze.Value.Plan.Kosten + 2 * keuze.Value.Keten.Count);
         }
@@ -308,12 +311,13 @@ public partial class BaanVerkenner2
             var zet = new Dictionary<int, bool>();
             bool botst = false;
             // BUG #424 (log 18-11 09:57 "wissel 13 na melder 24 (achteruit) ook afbuigend rijden": steeds "geen veilige plek"): bij de laatste stap (via -> m) mag de
-            // proefstand afwijken voor adressen die pas ná melder m werken (de wissels van knoop m); die worden juist getest.
+            // proefstand afwijken voor de wissel die getest wordt als die pas ná melder m werkt (een wissel van knoop m). Alleen voor de wissel van een
+            // 'andersom'- of 'na de kortsluitproef'-rit (_vrijNaM424): voor alle adressen tegelijk gaf dat in de simulatie met ruis valse wissels (3 en 4).
             var naM424 = _k.RelevantInKnoop(m, r);
             for (int si = 0; si < keten.Count; si++)
                 foreach (var (a, v) in keten[si].Eis)
                 {
-                    bool laatsteNaM = si == keten.Count - 1 && naM424.Contains(a) && stand.ContainsKey(a);
+                    bool laatsteNaM = si == keten.Count - 1 && naM424.Contains(a) && _vrijNaM424.Contains(a);
                     if (stand.TryGetValue(a, out var w) && w != v && zacht?.Contains(a) != true && !laatsteNaM) botst = true;
                     zet[a] = v;
                 }
