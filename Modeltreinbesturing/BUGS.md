@@ -3702,5 +3702,12 @@ Simulatie module 2: gelijk aan #419.
   "nog NIET af" en stoppen. Marco: "waarom stop je dan als je dat al weet?"
 - Verkeerde poot (regel van Marco, #169): verschilt een tegenspraak met kortsluiting precies in een al gevonden wissel die hier vanaf een gesplitste tak wordt
   bereden (kortsluiting met de wissel naar de andere tak), dan wordt dat zonder rit vastgelegd (24 -> 14: wissel 5; 17 -> 8: wissel 14).
-- Proef-beginplek: bij de laatste stap (via -> m) mag de proefstand afwijken voor adressen die pas na melder m werken (motor 13 bij 24).
+- Proef-beginplek: aan het eind (als er niets anders meer te doen is) wordt een 'andersom'/'na de kortsluitproef'-rit die niet te plannen was opnieuw gepland,
+  nu met de geteste wissel al in de proefstand vóór de melder waar hij werkt (motor 13 bij 24). Eerder in de verkenning, of voor alle adressen tegelijk, gaf dat
+  in de simulatie met ruis valse wissels (3 en 4) of een niet voltooide verkenning.
 - 'Voltooid': overgeslagen extra controles ('andersom', 'na de kortsluitproef') tellen niet meer mee.
+- Daarnaast: gaf een proef kortsluiting die de kortsluitproef ophief met een al gevonden wissel die geen kandidaat is, dan gaat die wissel in de basisstand en
+  beginnen de proeven opnieuw.
+- Metingen (alle varianten, ruis, sectiescheidingen, hervatten; starts 13, 5, 17, 11, 25, 8): alles voltooid 23/23, valse 0, gebruiker 0; tijden gelijk aan #423.
+  Regressietests ALLES OK.
+- Nog niet getest op de baan.
