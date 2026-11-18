@@ -710,6 +710,8 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                 foreach (var g in _k.Stappen.Where(s => !s.Afgeleid && !s.Terug && s.Via > 0).GroupBy(s => s.IngangSleutel))
                 {
                     var s0 = g.First();
+                    // BUG #423: een tegenspraak die al 6 keer is aangepakt bij dezelfde ingang komt niet meer terug (de gewone 'overgeslagen'-lijst wordt bij nieuws leeggemaakt)
+                    if (_tegenspraakPogingen421.GetValueOrDefault(Kennis2.Sleutel(s0.Via, s0.Melder, s0.Richting)) >= 6) continue;
                     if (_k.Tegenstrijdig(s0.Via, s0.Melder, s0.Richting) is { } t)
                         yield return new Taak { Soort = soort, Sleutel = "T|" + g.Key + "|" + string.Join(",", t.A.Stand) + "|" + string.Join(",", t.B.Stand), Via = s0.Via, Melder = s0.Melder, Richting = s0.Richting, A = t.A, B = t.B,
                             Omschrijving = $"uitzoeken welk adres de stap {s0.Via} -> {s0.Melder} ({s0.Richting.Tekst()}) verandert ({StapUitkomst.Tekst(t.A.Uitkomst)} of {StapUitkomst.Tekst(t.B.Uitkomst)})" };
@@ -883,6 +885,24 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         int? uitkomstLos = null;   // uitkomst met alleen de gevonden kandidaat omgezet (als die proef gedaan is)
         int proeven = 0;
         bool aGezien = false;   // BUG #380: kwam de eerste uitkomst in deze ronde nog terug?
+        bool bewezen423 = false;   // BUG #423: de kortsluitproef wees het adres al aan
+
+        // WAT: gaf een proef kortsluiting en hief de kortsluitproef die op door één van de kandidaten om te zetten naar de stand van de uitkomst zonder
+        // kortsluiting, dan is dat het adres: de kortsluitproef heeft het al 3 keer bevestigd. Geen aparte controlerit meer nodig.
+        // WAAROM (BUG #423, Marco 18-11 09:30 "ik krijg het idee dat ik in een loop ben beland", log 08:57-09:24): bij 8 -> 24 (achteruit) vond de kortsluitproef
+        // elke keer correct "motor 13 afbuigend heft de kortsluiting op", maar daarna was er voor de controlerit "alleen adres 13" geen veilige beginplek.
+        // De taak werd opgegeven en begon opnieuw: ruim een half uur steeds hetzelfde rondje.
+        int? KortsluitproefWijst423(HashSet<string> voor, List<int> kand)
+        {
+            var schoon = a.Uitkomst == StapUitkomst.Kortsluiting ? b : a;   // de waarneming zonder kortsluiting
+            foreach (var po in _k.ProefOplossingen)
+            {
+                var d = po.Split('|');
+                if (d.Length != 4 || d[0] != t.Melder.ToString() || d[1] != t.Richting.ToString() || !int.TryParse(d[2], out var x) || !bool.TryParse(d[3], out var v)) continue;
+                if (kand.Contains(x) && schoon.Stand.Contains(x) == v && (!voor.Contains(po) || kand.Count == 1)) return x;
+            }
+            return null;
+        }
 
         // WAT: rijdt de stap met precies stand A nog steeds naar de eerste uitkomst? Zo niet, dan was die oude waarneming niet (meer) betrouwbaar: vergeten, geen wissel.
         // WAAROM (BUG #380, Marco 05-11, module 2 op de baan, log 08:34-08:36): de stap 29 -> 21 achteruit was eens naar 129 gegaan en later naar 24. Bij het halveren gaf ELKE
@@ -921,23 +941,34 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             proeven++;
             _log.Stap($"Proef {proeven}: adres {string.Join(", ", helft)} {(helft.Count == 1 ? "staat" : "staan")} zoals bij de tweede uitkomst, de rest zoals bij de eerste.");
             // bij kortsluiting: terug naar stand A als die bewezen goed ging; anders langzaam terugrijden
+            var voor423 = _k.ProefOplossingen.ToHashSet();
             var u = await Proef(t.Via, t.Melder, t.Richting, stand, herstel: a.Uitkomst > 0 ? new Dictionary<int, bool>(basis) : new Dictionary<int, bool>());
             if (u is null) return false;
             if (u.Value != a.Uitkomst) { kandidaten = helft; uitkomstLos = helft.Count == 1 ? u : null; }
             else { kandidaten = kandidaten.Except(helft).ToList(); uitkomstLos = null; aGezien = true; }
+            if (u.Value == StapUitkomst.Kortsluiting && KortsluitproefWijst423(voor423, kandidaten) is int bewijs) { kandidaten = new() { bewijs }; bewezen423 = true; aGezien = true; break; }
         }
         if (kandidaten.Count != 1) return false;
         int adres = kandidaten[0];
         // BUG #417 (Marco 14-11 11:49-11:51): ook zonder halveerproeven eerst controleren of stand A nog steeds de eerste uitkomst geeft. Er was één oude
         // waarneming "29 -> 21 -> 14" (24 niet gezien); daarna gaf elke losse controle 24, en zo werden na elkaar adres 4, 11, 12 en 2 "gevonden" bij melder 21.
         if (!aGezien && !await EersteUitkomstKlopt()) return true;
-        if (uitkomstLos is null)
+        if (uitkomstLos is null && bewezen423)
+            _log.Vondst($"De kortsluitproef liet zien dat adres {adres} de stap {t.Via} -> {t.Melder} ({t.Richting.Tekst()}) bepaalt; geen aparte controlerit nodig (BUG #423, nog niet getest op de baan).");
+        if (uitkomstLos is null && !bewezen423)
         {
             // Nooit 'door wegstrepen' concluderen: het laatste adres eerst alléén omgezet rijden. Verandert er dan niets, dan kwam het verschil door een
             // combinatie van adressen (bijv. wissel 5 en motor 13 samen bij de Engelse wissel); die waarneming wordt dan vergeten.
             var stand1 = new Dictionary<int, bool>(basis) { [adres] = b.Stand.Contains(adres) };
             _log.Stap($"Controle: alleen adres {adres} zoals bij de tweede uitkomst.");
             var u1 = await Proef(t.Via, t.Melder, t.Richting, stand1, herstel: a.Uitkomst > 0 ? new Dictionary<int, bool>(basis) : new Dictionary<int, bool>());
+            // BUG #423: niet te plannen, maar een eerdere kortsluitproef op deze plek wees precies dit adres al aan: dat geldt als controle
+            if (u1 is null && KortsluitproefWijst423(new HashSet<string>(), new() { adres }) is int)
+            {
+                _log.Vondst($"De controlerit voor adres {adres} is niet te plannen, maar de kortsluitproef op deze plek wees adres {adres} al aan; dat geldt als controle (BUG #423, nog niet getest op de baan).");
+                bewezen423 = true;
+                goto Vastleggen423;
+            }
             if (u1 is null) return false;
             if (u1.Value == a.Uitkomst && verschil.Count < alleVerschil.Count && !_tegenspraakBreed.Contains(t.Sleutel))
             {
@@ -986,6 +1017,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             }
             uitkomstLos = u1;
         }
+        Vastleggen423:
         _k.MaakRelevant(t.Via, t.Melder, t.Richting, adres);
         bool aAfb = a.Stand.Contains(adres);
         int? metB = uitkomstLos ?? (verschil.Count == 1 ? b.Uitkomst : null);

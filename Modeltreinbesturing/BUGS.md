@@ -3682,3 +3682,11 @@ Simulatie module 2: gelijk aan #419.
   niet van een keerlus. Teksten in de simulatie (MiniworldBaan) en module 1 aangepast; de simulatiebaan zelf was al goed (rondje, geen keerlus).
 - Metingen: alle varianten gelijk aan #421 (overal voltooid 23/23, valse 0, gebruiker 0; open punt blijft start 25 streng). Regressietests ALLES OK.
 - Nog niet getest op de baan.
+
+## #423 Lus bij 8 -> 24 (achteruit): kortsluitproef wees motor 13 aan, controlerit niet te plannen (Marco 18-11 09:30)
+- Log 18-11 08:57-09:24 (ook na een herstart): de taak "uitzoeken welk adres de stap 8 -> 24 (achteruit) verandert (kortsluiting of melder 129)" reed steeds
+  15 -> 8 -> 24 met motor 13 rechtdoor: kortsluiting. De kortsluitproef vond elke keer correct "motor 13 afbuigend heft de kortsluiting op" (3x bevestigd).
+  Daarna wilde de taak nog een controlerit "alleen adres 13", vond daarvoor geen veilige beginplek, gaf op en begon opnieuw: ruim een half uur hetzelfde rondje.
+- Oplossing: wijst de kortsluitproef binnen een tegenspraak-proef een kandidaat aan (omzetten naar de stand van de uitkomst zonder kortsluiting heft de kortsluiting
+  op), dan is dat het adres; geen aparte controlerit. Is de controlerit niet te plannen, dan geldt een eerdere kortsluitproef op die plek voor precies dat adres ook
+  als controle. Daarnaast komt een tegenspraak die al 6 keer bij dezelfde ingang is aangepakt niet meer terug.
