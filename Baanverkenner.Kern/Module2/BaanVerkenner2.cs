@@ -324,6 +324,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             _log.Info($"Hervat: {_k.Overgeslagen.Count} eerder overgeslagen taak/taken krijgen een nieuwe kans (BUG #404).");
             _k.Overgeslagen.Clear(); _k.Mislukt.Clear();
         }
+        if (_hervat) HerstelVerkeerdePoot425();
         await WachtTotDinamoRustig();
         await BepaalPlek();
         if (!_hervat)
@@ -900,8 +901,14 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         if (VerkeerdePoot424() is { } vp)
         {
             var (w424, kortAfb) = vp;
-            _k.MaakRelevant(t.Via, t.Melder, t.Richting, w424);
             var goed = a.Uitkomst == StapUitkomst.Kortsluiting ? b : a;
+            var kort425 = ReferenceEquals(goed, a) ? b : a;
+            // BUG #425: ligt de wissel op de grens tussen 'via' en deze melder (daar is hij al relevant, bijv. wissel 5 tussen 24 en 14), dan NIET hier relevant maken:
+            // de knoop van deze stap is de andere kant van de melder (14 -> 13). Dat gaf in de controle van 18-11 "wissel 5 kan nergens veilig om" voor 21 overgangen.
+            // De kortsluiting is dan verklaard door een al bekende eis bij de stap ervoor; de waarneming wordt weggehaald.
+            bool aanIngang425 = !KruisMotoren().Contains(w424) && _k.RelevantInKnoop(t.Via, t.Richting).Contains(w424);   // niet voor de motoren van de kruiswissel
+            if (aanIngang425) _k.Stappen.RemoveAll(x => x.IngangSleutel == kort425.IngangSleutel && x.Uitkomst == StapUitkomst.Kortsluiting && x.Stand.Contains(w424) == kortAfb);
+            else _k.MaakRelevant(t.Via, t.Melder, t.Richting, w424);
             var v424 = new WisselVondst2
             {
                 Adres = w424, Via = t.Via, Melder = t.Melder, Richting = t.Richting, Tijd = _klok.Nu,
@@ -1152,6 +1159,23 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         }
         _log.Vondst($"{(t.Soort == Soort.NaProef ? "Na de kortsluitproef" : $"Wissel {v.Adres} andersom")}: {t.Via} -> {t.Melder} ({t.Richting.Tekst()}) met wissel {v.Adres} {(nieuw ? "afbuigend" : "rechtdoor")} -> {StapUitkomst.Tekst(u.Value)} (BUG #421, nog niet getest op de baan).");
         return true;
+    }
+
+    /// <summary>WAT: haalt bij hervatten een 'verkeerde poot'-wissel weer weg bij een knoop waar hij niet ligt (zie BUG #425 in DoeTegenspraak) en de
+    /// kortsluitingen die daardoor al verklaard zijn. WAAROM (BUG #425, Marco's voortgang 18-11): versie bug424 had wissel 5 bij 24 -> 14 (achteruit) en wissel 14
+    /// bij 17 -> 8 (vooruit) relevant gemaakt; daardoor kon de controle 21 van de 52 overgangen niet plannen.</summary>
+    private void HerstelVerkeerdePoot425()
+    {
+        var kruis = KruisMotoren();
+        foreach (var v in _k.Vondsten.Where(v => v.Via > 0 && !kruis.Contains(v.Adres) && (v.Rechtdoor == StapUitkomst.Kortsluiting || v.Afbuigend == StapUitkomst.Kortsluiting)).ToList())
+        {
+            // alleen als de wissel aan de ingang (grens via | melder) al relevant is door een andere vondst
+            if (!_k.VerwijderRelevant(v.Via, v.Melder, v.Richting, v.Adres)) continue;
+            if (!_k.RelevantInKnoop(v.Via, v.Richting).Contains(v.Adres)) { _k.MaakRelevant(v.Via, v.Melder, v.Richting, v.Adres); continue; }
+            bool kortAfb = v.Afbuigend == StapUitkomst.Kortsluiting;
+            int weg = _k.Stappen.RemoveAll(x => x.Via == v.Via && x.Melder == v.Melder && x.Richting == v.Richting && x.Uitkomst == StapUitkomst.Kortsluiting && x.Stand.Contains(v.Adres) == kortAfb);
+            _log.Info($"Wissel {v.Adres} ligt tussen melder {v.Via} en {v.Melder}, niet na melder {v.Melder} ({v.Richting.Tekst()}); dat is gecorrigeerd ({weg} verklaarde kortsluiting(en) weggehaald) (BUG #425, nog niet getest op de baan).");
+        }
     }
 
     /// <summary>BUG #421: de proefstand voor een 'andersom'-taak: de wissel (en de volgers van de overloopset) in de andere stand dan bij de eerdere rit.</summary>

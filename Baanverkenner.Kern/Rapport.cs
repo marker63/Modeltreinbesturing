@@ -21,13 +21,15 @@ public static class Rapport
         {
             foreach (var obs in w.Waarnemingen)
             {
-                string ligging = obs.Soort switch
+                string ligging = obs.KortsluitingBijRechtdoor
+                    ? (obs.Via is int via0 ? $"ingang {via0} → {obs.NaMelder} ({obs.Richting.Tekst()}), van achteren bereden: niet rijden als rechtdoor" : $"na melder {obs.NaMelder} ({obs.Richting.Tekst()}), van achteren bereden: niet rijden als rechtdoor")
+                    : obs.Soort switch
                 {
                     WaarnemingSoort.Splitsing => $"na melder {obs.NaMelder} ({obs.Richting.Tekst()}), puntzijde",
                     WaarnemingSoort.KortsluitingBijOmzetten => obs.Via is int via ? $"ingang {via} → {obs.NaMelder} ({obs.Richting.Tekst()}), van achteren bereden: niet rijden als afbuigend" : $"na melder {obs.NaMelder} ({obs.Richting.Tekst()}), van achteren bereden",
                     _ => $"na melder {obs.NaMelder} ({obs.Richting.Tekst()}), van achteren bereden"
                 };
-                string recht = obs.VolgendeBijRechtdoor is int r ? $"melder {r}" : (obs.Soort == WaarnemingSoort.LostKortsluitingOp ? "–" : "doodlopend / onbekend");
+                string recht = obs.VolgendeBijRechtdoor is int r ? $"melder {r}" : obs.KortsluitingBijRechtdoor ? "kortsluiting" : (obs.Soort == WaarnemingSoort.LostKortsluitingOp ? "–" : "doodlopend / onbekend");
                 string afb = obs.VolgendeBijAfbuigend is int a ? $"melder {a}"
                     : obs.Soort == WaarnemingSoort.KortsluitingBijOmzetten ? "kortsluiting"
                     : obs.Soort == WaarnemingSoort.LostKortsluitingOp ? "–"

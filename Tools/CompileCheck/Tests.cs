@@ -3357,6 +3357,40 @@ public static class Tests
 
     /// <summary>Module 2 (27-10): dezelfde meting als <see cref="MarcoBench"/>, maar met <see cref="BaanVerkenner2"/>. MARCO2=1 draait alleen deze meting;
     /// MARCO2_START (standaard 13), MARCO2_VARIANT (gewoon,streng,realistisch,vertraagd,uitval), MARCO_LOG = pad-voorvoegsel voor log en kaart.</summary>
+    /// <summary>BUG #425: 'Voltooide baan nogmaals checken' met Marco's ECHTE opgeslagen voortgang (MARCO2_ECHT=pad naar voortgang.json) op de simulatie
+    /// van zijn baan. Zo is te zien of de controle met zijn kennis alle overgangen kan plannen en rijden.</summary>
+    internal static void Marco2EchteControle(string pad)
+    {
+        var st = VerkenStatus.VanJson(System.IO.File.ReadAllText(pad))!;
+        int start = st.Module2?.LocMelder is int lm && lm > 0 ? lm : 13;
+        var sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(true, start);
+        var ins = st.Instellingen;
+        sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
+        var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;
+        var log = new VerkenLog(klok);
+        st.VoorControle(klok.Nu);
+        if (Environment.GetEnvironmentVariable("MARCO2_ECHT_PLAN") == "1")
+        {
+            foreach (bool h in new[] { false, true })
+            {
+                var stx = VerkenStatus.VanJson(System.IO.File.ReadAllText(pad))!;
+                var vx = new BaanVerkenner2(sim, ins, klok, log, (kop, tekst) => Task.FromResult(true), stx);
+                Console.WriteLine($"PLANTEST herstel={h}:");
+                foreach (var r in vx.PlanTest425(h)) Console.WriteLine("   " + r);
+            }
+            return;
+        }
+        var v = new BaanVerkenner2(sim, ins, klok, log, (kop, tekst) => Task.FromResult(true), st);
+        using var cts = new CancellationTokenSource();
+        var t0 = klok.Nu;
+        klok.Getikt += nu => { if ((nu - t0).TotalHours > 6) cts.Cancel(); };
+        string einde = "klaar";
+        try { v.VoerUit(cts.Token).GetAwaiter().GetResult(); } catch (OperationCanceledException) { einde = "tijdslimiet"; } catch (Exception ex) { einde = "FOUT: " + ex.Message; Console.WriteLine(ex); }
+        foreach (var vs in v.Kaart.ControleVerslagen) Console.WriteLine($"MARCO2-ECHT start {start}: {einde}  {vs.Samenvatting}  onder-loc {sim.OnderLocOmgezet}  {(klok.Nu - t0).TotalMinutes:0} min");
+        foreach (var r in log.Regels.Where(x => x.Tekst.Contains("Niet gereden") || x.Tekst.Contains("NIET af") || x.Tekst.Contains("Resultaat module 2"))) Console.WriteLine("   " + r.Tekst[..Math.Min(400, r.Tekst.Length)]);
+        if (Environment.GetEnvironmentVariable("MARCO_LOG") is { Length: > 0 } lp) System.IO.File.WriteAllLines(lp + "_echt.txt", log.Regels.Select(x => x.Tijd.ToString("HH:mm:ss.f") + "  " + x.Tekst));
+    }
+
     internal static List<string> Marco2Bench(string? starts = null, string? varianten = null)
     {
         var uit = new List<string>();
@@ -3842,6 +3876,7 @@ public static class Tests
         if (Environment.GetEnvironmentVariable("BENCH") == "1") { BenchTest(); return 0; }
         if (Environment.GetEnvironmentVariable("MARCO") == "1") { MarcoBench(); return 0; }
         if (Environment.GetEnvironmentVariable("MARCO2") == "1") { Marco2Bench(); return 0; }
+        if (Environment.GetEnvironmentVariable("MARCO2_ECHT") is { Length: > 0 } echtPad) { Marco2EchteControle(echtPad); return 0; }
         if (Environment.GetEnvironmentVariable("MARCO2_HERVAT") == "1") { Marco2HervatBench(double.Parse(Environment.GetEnvironmentVariable("MARCO_MIN") ?? "40"), start: int.Parse(Environment.GetEnvironmentVariable("MARCO2_START") ?? "13"), realistisch: Environment.GetEnvironmentVariable("MARCO2_HERVAT_REALISTISCH") == "1"); return 0; }
         if (Environment.GetEnvironmentVariable("MARCO_HERVAT") == "1") { foreach (var mn in (Environment.GetEnvironmentVariable("MARCO_MIN") ?? "40").Split(',')) MarcoHervatBench(double.Parse(mn)); return 0; }
         if (Environment.GetEnvironmentVariable("ALLEEN_382") == "1") { SpookmelderTest(); Console.WriteLine(_fouten == 0 ? "ALLES OK" : $"{_fouten} FOUT(EN)"); return _fouten == 0 ? 0 : 1; }

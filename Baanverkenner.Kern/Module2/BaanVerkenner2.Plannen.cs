@@ -151,7 +151,7 @@ public partial class BaanVerkenner2
             int? keuze = null;
             for (int p = lo; p <= hi; p++) if (breekpunten.Contains(p) && VeiligOp(p, a)) { keuze = p; break; }
             if (keuze is null) for (int p = lo; p <= hi; p++) if (VeiligOp(p, a)) { keuze = p; break; }
-            if (keuze is not int q) { _planFoutStap = hi; _planFout = $"wissel {a} kan tussen stap {lo} en {hi} ({string.Join(",", Enumerable.Range(lo, hi - lo + 1).Select(Plek))}) nergens veilig om (route vanaf {start.M}: {string.Join(", ", stappen)})"; return false; }
+            if (keuze is not int q) { _planFoutStap = hi; _planFoutAdres = a; _planFoutWaarde = v; _planFoutVorige = lo - 1; _planFout = $"wissel {a} kan tussen stap {lo} en {hi} ({string.Join(",", Enumerable.Range(lo, hi - lo + 1).Select(Plek))}) nergens veilig om (route vanaf {start.M}: {string.Join(", ", stappen)})"; return false; }
             if (!zetten.TryGetValue(q, out var z)) zetten[q] = z = new Dictionary<int, bool>();
             z[a] = v; cur[a] = v;
             return true;
@@ -205,8 +205,45 @@ public partial class BaanVerkenner2
 
     private string _planFout = "";
     private int _planFoutStap = -1;
+    private int _planFoutAdres;   // BUG #425: de wissel die nergens veilig om kon
+    private bool _planFoutWaarde;   // BUG #425: de stand die hij moest krijgen
+    private int _planFoutVorige = -1;   // BUG #425: de stap die de oude stand nodig had
     private readonly Dictionary<Toestand, DijkstraKaart> _omwegCache = new();
     private int _omwegCacheVoor = -1;
+
+    /// <summary>BUG #425: route <paramref name="pad"/> met vóór stap <paramref name="i"/> een uitstapje van hoogstens 4 bekende stappen dat begint en eindigt in de
+    /// toestand vóór stap i en onderweg een melder buiten de zone van wissel <paramref name="adres"/> bezoekt. Null als er zo'n uitstapje niet is.</summary>
+    private List<PlanStap>? MetUitstapje425(Toestand start, List<PlanStap> pad, int i, int adres)
+    {
+        var t0 = i == 0 ? start : new Toestand(pad[i - 1].Naar, pad[i - 1].Van, pad[i - 1].H);
+        var zone = _k.Zone(adres);
+        foreach (var (v, _) in Volgers(adres, false)) zone.UnionWith(_k.Zone(v));
+        if (zone.Count == 0) return null;
+        // het uitstapje moet eindigen op dezelfde melder, zodat stap i daarna gewoon kan (eventueel met omkeren)
+        List<PlanStap>? beste = null;
+        var rij = new List<PlanStap>();
+        void Zoek(Toestand t, int diepte, bool buiten)
+        {
+            if (beste is not null && rij.Count >= beste.Count) return;
+            if (diepte > 0 && buiten && t.M == t0.M && SluitAan(t, pad[i])) { beste = rij.ToList(); return; }
+            if (diepte >= 4) return;
+            foreach (var (n, stap, _) in Buren(t))
+            {
+                rij.Add(stap);
+                Zoek(n, diepte + 1, buiten || !zone.Contains(n.M));
+                rij.RemoveAt(rij.Count - 1);
+            }
+        }
+        Zoek(t0, 0, false);
+        if (beste is null) return null;
+        // stap i opnieuw bepalen vanuit de toestand na het uitstapje (rijrichting en omkeren kunnen anders zijn)
+        var na = new Toestand(beste[^1].Naar, beste[^1].Van, beste[^1].H);
+        var vervolg = Buren(na).Where(b => b.Stap.Naar == pad[i].Naar && b.Stap.H == pad[i].H).Select(b => b.Stap).FirstOrDefault();
+        if (vervolg is null) return null;
+        return pad.Take(i).Concat(beste).Append(vervolg).Concat(pad.Skip(i + 1)).ToList();
+    }
+
+    private bool SluitAan(Toestand t, PlanStap volgende) => Buren(t).Any(b => b.Stap.Naar == volgende.Naar && b.Stap.H == volgende.H);
 
     /// <summary>WAT: een uitvoerbaar plan naar toestand <paramref name="doel"/>. Lukt de kortste route niet (een wissel die om moet kan nergens veilig om,
     /// bijv. wissel 9 terwijl de loc op melder 4 staat), dan een omweg via een plek in de buurt waar het wel kan (eerst een stukje weg, omzetten, terug).</summary>
@@ -220,6 +257,44 @@ public partial class BaanVerkenner2
         // BUG #389: de kortste route vraagt soms een wisselomzetting die nergens veilig kan (wissel 10 moet tussen 129->24 (10A) en 24->14 (10R)
         // om terwijl de loc in de zone van de kruiswissel staat). Dijkstra kijkt niet naar standen, dus dan de stap die de onmogelijke omzetting
         // vraagt verbieden en opnieuw zoeken (hoogstens 6 keer). Zo rijdt de loc zelf een andere weg in plaats van Marco te vragen hem te verplaatsen.
+        // WAT: kan een wissel halverwege de route nergens veilig om (de loc staat dan juist op de melder van die wissel, bijv. wissel 5 op melder 14), maak dan
+        // daar een uitstapje: een paar bekende stappen naar een melder buiten de zone van de wissel en weer terug, zodat de wissel daar om kan.
+        // WAAROM (BUG #425, Marco 18-11 11:00, controle 10:26 en 10:32): 21 van de 52 overgangen (de hele binnenring 129-4-11-12-1-9-10, en 14->129, 24->129, 8->24)
+        // werden niet gecontroleerd: "wissel 5 kan tussen stap 12 en 12 (14) nergens veilig om". De route kwam via 24 -> 14 aan (wissel 5 rechtdoor) en moest
+        // daarna 14 -> 129 (wissel 5 afbuigend); de loc kan dan eerst naar 13 rijden, wissel 5 omzetten en terugkomen.
+        // WAT: eerst kijken of de stap die de oude stand nodig had, ook met de nieuwe stand bekend is (een andere eerdere rit met dezelfde uitkomst). Dan hoeft de
+        // wissel onderweg niet om. WAAROM (BUG #425, controle 18-11): 14 -> 24 -> 8 vroeg motor 13 eerst afbuigend (eis van een rit 14 -> 24 -> 21) en daarna
+        // rechtdoor, terwijl 14 -> 24 ook met motor 13 rechtdoor bekend is. De planner koos per stap maar één stand.
+        var padW = pad;
+        for (int poging = 0; poging < 4 && _planFoutStap >= 0 && _planFoutVorige >= 0 && _planFoutVorige < padW.Count; poging++)
+        {
+            var j = _planFoutVorige;
+            var sj = padW[j];
+            if (sj.Omkeer) break;
+            int viaJ = j == 0 ? kaart.Start.Via : padW[j - 1].Van;
+            var alt = _k.Mogelijkheden(viaJ, sj.Van, sj.H).Where(x => x.Uitkomst == sj.Naar && x.Eis.TryGetValue(_planFoutAdres, out var w) && w == _planFoutWaarde)
+                       .OrderByDescending(x => x.Aantal).Select(x => x.Eis).FirstOrDefault();
+            if (alt is null) break;
+            padW = padW.ToList();
+            padW[j] = new PlanStap { Van = sj.Van, Naar = sj.Naar, H = sj.H, Eis = alt, Zacht = sj.Zacht, ZachtAdressen = sj.ZachtAdressen };
+            _planFoutStap = -1; _planFoutVorige = -1;
+            p = MaakPlan(kaart.Start, padW, doel, kost, extraAanEind);
+            if (p is not null) return p;
+        }
+        _planFoutStap = -1;
+        MaakPlan(kaart.Start, pad, doel, kost, extraAanEind);   // foutplek van de oorspronkelijke route terugzetten
+        for (int poging = 0; poging < 4 && _planFoutStap >= 0 && _planFoutStap < pad.Count; poging++)
+        {
+            var metUitstap = MetUitstapje425(kaart.Start, pad, _planFoutStap, _planFoutAdres);
+            if (metUitstap is null) break;
+            _planFoutStap = -1;
+            pad = metUitstap;
+            p = MaakPlan(kaart.Start, pad, doel, kost + 4 * (poging + 1), extraAanEind);
+            if (p is not null) return p;
+        }
+        pad = Pad(kaart, doel);
+        _planFoutStap = -1;
+        MaakPlan(kaart.Start, pad, doel, kost, extraAanEind);   // foutplek van de oorspronkelijke route terugzetten voor de verboden-stappen hieronder
         var verboden = new HashSet<(Toestand, int, Richting)>();
         for (int poging = 0; poging < 6 && _planFoutStap >= 0 && _planFoutStap < pad.Count; poging++)
         {

@@ -135,6 +135,9 @@ public class WisselWaarneming
     public int? VolgendeBijAfbuigend { get; set; }
     public string Configuratie { get; set; } = "";
     public string Toelichting { get; set; } = "";
+    /// <summary>BUG #425: met dit adres op RECHTDOOR (Dinamo) gaf de stap kortsluiting (bijv. volger 6 van de overloopset, omgekeerd aangesloten, of een wissel
+    /// die hier van achteren bereden wordt met rechtdoor als verkeerde poot). Alleen voor het rapport.</summary>
+    public bool KortsluitingBijRechtdoor { get; set; }
 }
 
 public class WisselVondst

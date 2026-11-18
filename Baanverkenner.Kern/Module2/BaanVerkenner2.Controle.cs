@@ -79,6 +79,26 @@ public partial class BaanVerkenner2
         return goed;
     }
 
+    /// <summary>BUG #425 (alleen voor de tests): plant vanaf de plek van de loc elke bekende overgang zonder te rijden en geeft de overgangen terug waarvoor
+    /// geen uitvoerbare route is, met de reden. <paramref name="herstel"/> = eerst de correctie van #425 toepassen (zoals bij hervatten).</summary>
+    public List<string> PlanTest425(bool herstel)
+    {
+        if (herstel) HerstelVerkeerdePoot425();
+        var res = new List<string>();
+        var alle = _k.Stappen.Where(s => s.Uitkomst > 0 && !s.Afgeleid).Select(s => (Van: s.Melder, Naar: s.Uitkomst, R: s.Richting)).Distinct().ToList();
+        var kaart = Dijkstra();
+        foreach (var o in alle)
+        {
+            var doel = new Toestand(o.Naar, o.Van, o.R);
+            if (!kaart.Kosten.ContainsKey(doel)) { res.Add($"{o.Van}->{o.Naar} ({o.R.Tekst()}): niet bereikbaar"); continue; }
+            var verder = _k.Mogelijkheden(doel.Via, doel.M, doel.H).Where(m => m.Uitkomst > 0 && !m.Terugval).OrderByDescending(m => m.Aantal).Select(m => m.Eis).FirstOrDefault();
+            var plan = PlanNaar(kaart, doel, verder) ?? PlanNaar(kaart, doel);
+            if (plan is null) res.Add($"{o.Van}->{o.Naar} ({o.R.Tekst()}): {_planFout}");
+        }
+        res.Insert(0, $"{alle.Count - res.Count} van {alle.Count} overgangen te plannen vanaf melder {_k.LocMelder}");
+        return res;
+    }
+
     /// <summary>WAT: zorgt dat de loc netjes op één melder staat (kortsluiting opheffen, parkeren, zo nodig zoeken), zoals aan het begin van de verkenningslus.
     /// Geeft false als de loc kwijt is.</summary>
     private async Task<bool> LocNetjes412()

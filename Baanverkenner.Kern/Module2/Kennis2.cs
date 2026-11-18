@@ -133,6 +133,16 @@ public class Kennis2
     }
 
     /// <summary>WAT: adres <paramref name="adres"/> heeft bewezen invloed bij ingang (via, melder, r). Geeft true als dat nieuw is.</summary>
+    /// <summary>BUG #425: haalt een adres weg uit de relevante adressen van ingang (via, melder, r).</summary>
+    public bool VerwijderRelevant(int via, int melder, Richting r, int adres)
+    {
+        var k = Sleutel(via, melder, r);
+        if (!Relevant.TryGetValue(k, out var l) || !l.Remove(adres)) return false;
+        if (l.Count == 0) Relevant.Remove(k);
+        _knopen = null;
+        return true;
+    }
+
     public bool MaakRelevant(int via, int melder, Richting r, int adres)
     {
         var k = Sleutel(via, melder, r);

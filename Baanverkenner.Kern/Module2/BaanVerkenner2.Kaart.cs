@@ -65,8 +65,9 @@ public partial class BaanVerkenner2
             });
         }
         // gevonden wissels, met de volgers van de overloopsets (zelfde plek, eigen Dinamo-stand)
-        foreach (var v in _k.Vondsten.OrderBy(v => v.Adres))
+        foreach (var v0 in _k.Vondsten.OrderBy(v => v.Adres))
         {
+            var v = AangevuldeVondst425(v0);
             VoegWaarnemingToe(k, v.Adres, v, false, "");
             foreach (var (vol, dvBijRd) in Volgers(v.Adres, false))
                 VoegWaarnemingToe(k, vol, v, dvBijRd, $"Schakelt mee met wissel {v.Adres} (overloopset). ");
@@ -80,6 +81,21 @@ public partial class BaanVerkenner2
             k.Wisselstraatvoorstellen = WisselstraatVoorstel.Bereken(k);
         }
         catch (Exception ex) { _log.Waarschuwing($"Blokvoorstel/wisselstraten konden niet berekend worden: {ex.Message}"); }
+    }
+
+    /// <summary>WAT: een kopie van de vondst waarin een nog niet gereden kant ("nog niet gereden") is aangevuld uit de gereden stappen bij dezelfde ingang met
+    /// dit adres in die stand. WAAROM (BUG #425, rapport 18-11 10:58): bij wissel 13 na melder 24 (achteruit, vanaf 8) stond "afbuigend: geen melder bereikt",
+    /// terwijl de loc daar met motor 13 afbuigend wel naar 14 en 129 gereden was (zie de vondst van motor 10 bij dezelfde ingang).</summary>
+    private WisselVondst2 AangevuldeVondst425(WisselVondst2 v)
+    {
+        if (v.Rechtdoor is not null && v.Afbuigend is not null) return v;
+        int? Zoek(bool afb) => _k.Stappen.Where(s => !s.Afgeleid && !s.Terug && s.Via == v.Via && s.Melder == v.Melder && s.Richting == v.Richting && s.Uitkomst > 0 && s.Stand.Contains(v.Adres) == afb)
+            .GroupBy(s => s.Uitkomst).OrderByDescending(g => g.Sum(s => s.Aantal)).Select(g => (int?)g.Key).FirstOrDefault();
+        return new WisselVondst2
+        {
+            Adres = v.Adres, Via = v.Via, Melder = v.Melder, Richting = v.Richting, Stand = v.Stand, Tijd = v.Tijd,
+            Rechtdoor = v.Rechtdoor ?? Zoek(false), Afbuigend = v.Afbuigend ?? Zoek(true)
+        };
     }
 
     /// <summary>Voegt de waarneming van vondst <paramref name="v"/> toe bij adres <paramref name="adres"/>. <paramref name="omgedraaid"/> = dit adres krijgt bij
@@ -100,7 +116,11 @@ public partial class BaanVerkenner2
         if (af == StapUitkomst.Kortsluiting && rd is int r1 && r1 > 0)
         { ob.Soort = WaarnemingSoort.KortsluitingBijOmzetten; ob.VolgendeBijRechtdoor = r1; }
         else if (rd == StapUitkomst.Kortsluiting && af is int a1 && a1 > 0)
-        { ob.Soort = WaarnemingSoort.Splitsing; ob.VolgendeBijAfbuigend = a1; }
+        {
+            // BUG #425 (rapport 18-11 10:58: "Adres 6 na melder 14 (achteruit), puntzijde, rechtdoor: doodlopend / onbekend"): rechtdoor gaf hier kortsluiting
+            // (verkeerde poot); dat stond als 'puntzijde' en 'onbekend' in het rapport.
+            ob.Soort = WaarnemingSoort.Splitsing; ob.VolgendeBijAfbuigend = a1; ob.KortsluitingBijRechtdoor = true;
+        }
         else
         {
             ob.Soort = WaarnemingSoort.Splitsing;
