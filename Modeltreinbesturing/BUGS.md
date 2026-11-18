@@ -3745,5 +3745,10 @@ Simulatie module 2: gelijk aan #419.
      worden weggehaald. Ook bij hervatten, vóór elke taak en vóór de controle (vervangt de correctie van #425).
   2. De routeplanner eiste voor elke stap de stand van ALLE wissels van de knoop, ook als die voor die uitkomst niet uitmaakt (motor 10 bij 14 -> 129 en 129 -> 4).
      Nieuw: is dezelfde uitkomst gezien met twee standen die in één adres verschillen, dan is dat adres voor die uitkomst vrij.
-  3. Zone van een wissel (waar hij niet om mag met de loc erop): een tak waar de loc met beide standen van het adres kwam, hoort er niet bij (24 -> 14 gaat niet over wissel 9).
+  3. Zone van een wissel (waar hij niet om mag met de loc erop): een melder waar de uitgang aantoonbaar van het adres afhangt (14 vooruit: 24 of 129 door wissel 5)
+     hoort er altijd bij. (Een verfijning de andere kant op, 'een tak met beide standen hoort er niet bij', gaf in de simulatie een wissel omgezet met de loc erop:
+     teruggedraaid. Ook een taak 'wissel vanaf de andere kant rijden' voor wissels die alleen van achteren gevonden zijn gaf meer kortsluitingen: uitgezet.)
 - Resultaat met Marco's voortgang, loc op 14: in alle 256 standen alle 50 overgangen te plannen (was: 16 overgangen in 192 van de 256 standen niet).
+- Metingen (alle varianten, ruis, sectiescheidingen, hervatten, controle): alles voltooid 23/23, valse 0, gebruiker 0; controles 52/52, 50/50, 54/54, 48/48.
+  Tijden gelijk aan #425. Regressietests ALLES OK. Nog open: start 11 en start 25 'streng' bevestigen de adressen zonder effect niet allemaal (zonder-effect leeg).
+- Nog niet getest op de baan.
