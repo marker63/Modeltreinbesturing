@@ -73,6 +73,11 @@ public partial class BaanVerkenner2
                 VoegWaarnemingToe(k, vol, v, dvBijRd, $"Schakelt mee met wissel {v.Adres} (overloopset). ");
         }
         k.KruisMidden = _k.Melders.Where(m => _k.ViaAfhankelijk(m, Richting.Vooruit) || _k.ViaAfhankelijk(m, Richting.Achteruit)).OrderBy(m => m).ToList();
+        // BUG #425 (rapport 18-11: "kruiswissel in melder 8, 14, 24", plusteken rond melder 8; Marco 14-11: melder 24 is de kruiswissel): de kruiswissel is de melder
+        // waar de motoren van de Engelse wissel aan BEIDE kanten van invloed zijn. Alleen als dat er precies één is, anders de oude bepaling.
+        var motoren425 = KruisMotoren();
+        var midden425 = _k.Melders.Where(m => motoren425.Count > 0 && _k.RelevantInKnoop(m, Richting.Vooruit).Overlaps(motoren425) && _k.RelevantInKnoop(m, Richting.Achteruit).Overlaps(motoren425)).ToList();
+        if (midden425.Count == 1) k.KruisMidden = midden425;
         var paren = _k.GerichteOvergangen.ToList();
         k.AdressenZonderEffect = _adressen.Where(a => !_k.IsGevonden(a) && paren.Count > 0 && paren.All(p => _k.IsGetest(a, p.Van, p.Naar))).ToList();
         try

@@ -423,7 +423,7 @@ ul{margin:6px 0 0 18px;padding:0}
         Kop("KORTSLUITPUNTEN EN ONVERWACHTE TERUGWEGEN");
         foreach (var x in k.Kortsluitpunten)
             sb.AppendLine($"  #{x.Id} [{(x.Soort == KortsluitpuntSoort.OnverwachteTerugweg ? "onverwachte terugweg, geen kortsluiting" : "kortsluiting")}] na melder {x.NaMelder} ({x.Richting.Tekst()}), {x.Configuratie}" + (x.TweedeMelders.Count > 0 ? $" [ook bezet: melder {string.Join(" en ", x.TweedeMelders)}]" : "") + (x.AlarmBlokken.Count > 0 ? $" [Dinamo-alarm in blok {string.Join(", ", x.AlarmBlokken)}]" : "") + ": " +
-                (x.Opgelost ? $"opgelost met adres {x.OpgelostDoorAdres} op {(x.OpgelostMetAfbuigend == true ? "afbuigend" : "rechtdoor")}" : x.Tijdelijk ? "tijdelijk (lukte bij herhaling)" : x.Opgegeven ? "opgegeven" : "open"));
+                (x.Opgelost ? (x.OpgelostDoorAdres is int oa ? $"opgelost met adres {oa} op {(x.OpgelostMetAfbuigend == true ? "afbuigend" : "rechtdoor")}" : "opgelost (met een andere wisselstand gaat het verder)") : x.Tijdelijk ? "tijdelijk (lukte bij herhaling)" : x.Opgegeven ? "opgegeven" : "open"));
         if (k.Kortsluitpunten.Count == 0) sb.AppendLine("  (geen)");
 
         Kop("ADRESSEN ZONDER GEVONDEN EFFECT");

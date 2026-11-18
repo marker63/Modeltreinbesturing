@@ -1161,6 +1161,31 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         return true;
     }
 
+    /// <summary>BUG #425: maakt van de interne sleutel van een taak (bijv. "T|8>24:a|6,14|6,10,13,14") een leesbare tekst voor het rapport.</summary>
+    private static string LeesbareTaak425(string sleutel)
+    {
+        var d = sleutel.Split('|');
+        string Ingang(string x)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(x, @"^(\d+)>(\d+):([va])$");
+            return m.Success ? $"{m.Groups[1].Value} -> {m.Groups[2].Value} ({(m.Groups[3].Value == "v" ? "vooruit" : "achteruit")})" : x;
+        }
+        try
+        {
+            return d[0] switch
+            {
+                "T" when d.Length >= 2 => $"uitzoeken welk adres de stap {Ingang(d[1])} verandert",
+                "V" when d.Length >= 3 => $"verkennen wat er na melder {d[1]} komt ({(d[2].StartsWith("V") ? "vooruit" : "achteruit")})",
+                "B" when d.Length >= 3 => $"wissel {d[1]} bij {Ingang(d[2])} ook in de andere stand rijden",
+                "A" when d.Length >= 3 => $"wissel {d[1]} andersom rijden bij {Ingang(d[2])}",
+                "N" when d.Length >= 4 => $"na de kortsluitproef: wissel {d[1]} {(d[2] == "True" ? "afbuigend" : "rechtdoor")} rijden bij {Ingang(d[3])}",
+                "U" when d.Length >= 2 => $"een uitweg zoeken bij {Ingang(d[1])}",
+                _ => sleutel
+            };
+        }
+        catch { return sleutel; }
+    }
+
     /// <summary>WAT: haalt bij hervatten een 'verkeerde poot'-wissel weer weg bij een knoop waar hij niet ligt (zie BUG #425 in DoeTegenspraak) en de
     /// kortsluitingen die daardoor al verklaard zijn. WAAROM (BUG #425, Marco's voortgang 18-11): versie bug424 had wissel 5 bij 24 -> 14 (achteruit) en wissel 14
     /// bij 17 -> 8 (vooruit) relevant gemaakt; daardoor kon de controle 21 van de 52 overgangen niet plannen.</summary>
@@ -1272,7 +1297,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         }
         foreach (var s in _k.Overgeslagen)
         {
-            var w = $"Module 2: taak overgeslagen ({s}).";
+            var w = $"Module 2: taak overgeslagen: {LeesbareTaak425(s)}.";   // BUG #425: leesbaar in plaats van de interne sleutel
             if (!k.Waarschuwingen.Contains(w)) k.Waarschuwingen.Add(w);
         }
         _fase = k.Voltooid ? "Voltooid" : "Gestopt (tussenstand)";
