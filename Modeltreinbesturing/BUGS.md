@@ -3695,3 +3695,12 @@ Simulatie module 2: gelijk aan #419.
   De lus van 18-11 zelf zit niet precies zo in de simulatie; de nieuwe regel grijpt bij Marco's opgeslagen voortgang meteen in (de kortsluitproef op 24 met motor 13
   staat al in de kennis).
 - Nog niet getest op de baan.
+
+## #424 Gestopt met "nog NIET af" door 3 overgeslagen taken zonder veilige beginplek (Marco 18-11 10:03)
+- Log 18-11 09:52-10:01: de kaart was compleet (23 melders, 8 wissels, 6 zonder effect), maar 3 taken vonden geen veilige beginplek: 24 -> 14 (achteruit,
+  melder 13 of kortsluiting), 17 -> 8 (vooruit, melder 15 of kortsluiting) en "wissel 13 na melder 24 (achteruit) ook afbuigend rijden". Na 2 pogingen per taak:
+  "nog NIET af" en stoppen. Marco: "waarom stop je dan als je dat al weet?"
+- Verkeerde poot (regel van Marco, #169): verschilt een tegenspraak met kortsluiting precies in een al gevonden wissel die hier vanaf een gesplitste tak wordt
+  bereden (kortsluiting met de wissel naar de andere tak), dan wordt dat zonder rit vastgelegd (24 -> 14: wissel 5; 17 -> 8: wissel 14).
+- Proef-beginplek: bij de laatste stap (via -> m) mag de proefstand afwijken voor adressen die pas na melder m werken (motor 13 bij 24).
+- 'Voltooid': overgeslagen extra controles ('andersom', 'na de kortsluitproef') tellen niet meer mee.

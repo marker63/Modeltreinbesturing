@@ -877,6 +877,48 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             _k.Stappen.Remove(weg);
             return true;
         }
+        // WAT: regel van Marco (CLAUDE.md, BUG #169; stappenplan 14-11): rijdt de loc een al gevonden wissel binnen vanaf een gesplitste tak, dan geeft de wissel
+        // in de stand naar de ANDERE tak kortsluiting ("verkeerde poot"). Is dat precies het verschil tussen de twee waarnemingen, dan is de tegenspraak verklaard
+        // zonder te rijden: de wissel wordt bij deze stap vastgelegd.
+        // WAAROM (BUG #424, Marco 18-11 10:03, log 09:56-10:01): de taken "24 -> 14 (melder 13 of kortsluiting)" (wissel 5) en "17 -> 8 (melder 15 of kortsluiting)"
+        // (wissel 14) vonden geen veilige beginplek voor de controlerit, werden overgeslagen, en de verkenning stopte met "nog NIET af".
+        if (VerkeerdePoot424() is { } vp)
+        {
+            var (w424, kortAfb) = vp;
+            _k.MaakRelevant(t.Via, t.Melder, t.Richting, w424);
+            var goed = a.Uitkomst == StapUitkomst.Kortsluiting ? b : a;
+            var v424 = new WisselVondst2
+            {
+                Adres = w424, Via = t.Via, Melder = t.Melder, Richting = t.Richting, Tijd = _klok.Nu,
+                Rechtdoor = kortAfb ? goed.Uitkomst : StapUitkomst.Kortsluiting, Afbuigend = kortAfb ? StapUitkomst.Kortsluiting : goed.Uitkomst,
+                Stand = rel.Where(x => goed.Stand.Contains(x)).OrderBy(x => x).ToList()
+            };
+            _k.Vondsten.RemoveAll(x => x.Adres == w424 && x.Via == v424.Via && x.Melder == v424.Melder && x.Richting == v424.Richting);
+            _k.Vondsten.Add(v424);
+            _log.Vondst($"Stap {t.Via} -> {t.Melder} ({t.Richting.Tekst()}): wissel {w424} wordt hier vanaf een gesplitste tak bereden; {(kortAfb ? "afbuigend" : "rechtdoor")} is de verkeerde poot (kortsluiting), {(kortAfb ? "rechtdoor" : "afbuigend")} gaat naar {StapUitkomst.Tekst(goed.Uitkomst)}. Vastgelegd zonder extra rit (regel van Marco, BUG #424, nog niet getest op de baan).");
+            return true;
+        }
+        (int Adres, bool KortAfbuigend)? VerkeerdePoot424()
+        {
+            if ((a.Uitkomst == StapUitkomst.Kortsluiting) == (b.Uitkomst == StapUitkomst.Kortsluiting)) return null;
+            var kort = a.Uitkomst == StapUitkomst.Kortsluiting ? a : b;
+            var goed = ReferenceEquals(kort, a) ? b : a;
+            if (goed.Uitkomst <= 0) return null;
+            foreach (var v in _k.Vondsten.Where(v => v.Rechtdoor > 0 && v.Afbuigend > 0 && alleVerschil.Contains(v.Adres)))
+            {
+                // de rit gaat van een tak terug naar de puntzijde: (tak -> melder van de wissel) of (melder van de wissel als tak, verder naar de puntzijde)
+                int? tak = null;
+                if (t.Richting == v.Richting.Om() && t.Melder == v.Melder && goed.Uitkomst == v.Via && (t.Via == v.Rechtdoor || t.Via == v.Afbuigend)) tak = t.Via;
+                else if (t.Richting == v.Richting.Om() && goed.Uitkomst == v.Melder && (t.Melder == v.Rechtdoor || t.Melder == v.Afbuigend)) tak = t.Melder;
+                if (tak is null) continue;
+                bool takIsAfbuigend = tak == v.Afbuigend;
+                bool kortAfb = kort.Stand.Contains(v.Adres);
+                bool goedAfb = goed.Stand.Contains(v.Adres);
+                // kortsluiting met de wissel naar de andere tak, goed met de wissel naar deze tak
+                if (kortAfb != takIsAfbuigend && goedAfb == takIsAfbuigend) return (v.Adres, kortAfb);
+            }
+            return null;
+        }
         // basis = de volledige stand A (uitkomst a.Uitkomst); proef = een deel van 'verschil' naar de stand van B. Alle andere adressen staan zoals bij A,
         // zodat de proef precies één verschil heeft met A.
         var basis = new Dictionary<int, bool>();
@@ -1139,9 +1181,12 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         // BUG #421 (simulatie start 25 'streng': 'voltooid' met 17 van de 23 melders): een overgeslagen verkenningstaak betekent dat er achter een melder
         // nog onbekende baan ligt; dan is de verkenning nooit af.
         var onverkend421 = _k.Overgeslagen.Where(x => x.StartsWith("V|")).ToList();
-        k.Voltooid = zonderBlok.Count == 0 && _locKwijt402 is null && _onbereikbaar == 0 && _k.Overgeslagen.Count <= 2 && onverkend421.Count == 0;
+        // BUG #424 (Marco 18-11 10:03 "waarom stop je dan als je dat al weet?"): overgeslagen extra controles ('andersom', 'na de kortsluitproef') tellen niet
+        // mee; die voegen alleen een bevestiging toe aan een al bekende wissel.
+        int overgeslagen424 = _k.Overgeslagen.Count(x => !x.StartsWith("N|") && !x.StartsWith("A|"));
+        k.Voltooid = zonderBlok.Count == 0 && _locKwijt402 is null && _onbereikbaar == 0 && overgeslagen424 <= 2 && onverkend421.Count == 0;
         if (onverkend421.Count > 0) _log.Waarschuwing($"De verkenning is nog NIET af: achter melder {string.Join(", ", onverkend421.Select(x => x.Split('|')[1]))} is nog niet verkend (BUG #421).");
-        if (_k.Overgeslagen.Count > 2) _log.Waarschuwing($"De verkenning is nog NIET af: {_k.Overgeslagen.Count} taken zijn overgeslagen (BUG #404).");
+        if (overgeslagen424 > 2) _log.Waarschuwing($"De verkenning is nog NIET af: {overgeslagen424} taken zijn overgeslagen (BUG #404).");
         // BUG #402: niet voltooid als de loc kwijt is of als er nog taken zijn die niet te plannen waren
         if (_locKwijt402 is not null && !k.Waarschuwingen.Contains(_locKwijt402)) k.Waarschuwingen.Add(_locKwijt402);
         if (_onbereikbaar > 0)

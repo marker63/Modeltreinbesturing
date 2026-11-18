@@ -307,7 +307,16 @@ public partial class BaanVerkenner2
             // eisen van de keten mogen niet botsen met de proefstand
             var zet = new Dictionary<int, bool>();
             bool botst = false;
-            foreach (var s in keten) foreach (var (a, v) in s.Eis) { if (stand.TryGetValue(a, out var w) && w != v && zacht?.Contains(a) != true) botst = true; zet[a] = v; }
+            // BUG #424 (log 18-11 09:57 "wissel 13 na melder 24 (achteruit) ook afbuigend rijden": steeds "geen veilige plek"): bij de laatste stap (via -> m) mag de
+            // proefstand afwijken voor adressen die pas ná melder m werken (de wissels van knoop m); die worden juist getest.
+            var naM424 = _k.RelevantInKnoop(m, r);
+            for (int si = 0; si < keten.Count; si++)
+                foreach (var (a, v) in keten[si].Eis)
+                {
+                    bool laatsteNaM = si == keten.Count - 1 && naM424.Contains(a) && stand.ContainsKey(a);
+                    if (stand.TryGetValue(a, out var w) && w != v && zacht?.Contains(a) != true && !laatsteNaM) botst = true;
+                    zet[a] = v;
+                }
             if (botst) continue;
             foreach (var (a, v) in stand) if (!(zacht?.Contains(a) == true && zet.ContainsKey(a))) zet[a] = v;
             // nog niet gevonden adressen gaan op Q om: Q moet een geschikte plek zijn
