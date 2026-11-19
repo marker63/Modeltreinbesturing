@@ -3752,3 +3752,17 @@ Simulatie module 2: gelijk aan #419.
 - Metingen (alle varianten, ruis, sectiescheidingen, hervatten, controle): alles voltooid 23/23, valse 0, gebruiker 0; controles 52/52, 50/50, 54/54, 48/48.
   Tijden gelijk aan #425. Regressietests ALLES OK. Nog open: start 11 en start 25 'streng' bevestigen de adressen zonder effect niet allemaal (zonder-effect leeg).
 - Nog niet getest op de baan.
+
+## #427 Verkenning 19-11 (08:19-17:14): voltooid; controle 50/52; doodlopend einde en kortsluitproef-rit
+- Verkenning voltooid (23 melders, 8 wissels; actief ca. 2,5 uur, met pauzes 09:44-10:59 en 11:30-16:36). Alle wisselstanden kloppen met Marco
+  (overloop 2/1, 5/6, wissel 9 en 6 omgekeerd, wissel 14, kruiswissel 24 met motor 10 en 13). Controle en tweede controle: 50 van 52, 0 kortsluitingen.
+- Niet gereden: 24 -> 129 (vooruit) en 129 -> 21 (vooruit). Die bestaan op de baan niet: rit #99 (09:08) meldde 24, 129, 21 vooruit met de loc op de grens van
+  24 en 129. Nieuw: een overgang die maar één keer gezien is en in de controle niet te rijden is, wordt als foute waarneming weggehaald (melding in het logboek
+  en in het controleverslag).
+- "Doodlopend na melder 24 (achteruit)" in het rapport: één rit (#154) zag daar niets, latere ritten reden naar 14 en 129. Een doodlopend einde telt nu alleen als
+  er bij die melder en richting nooit een melder bereikt is.
+- 'Na de kortsluitproef: 21 -> 24 (achteruit) met wissel 13 afbuigend' gaf 3 keer opnieuw kortsluiting (9 kortsluitingen). 21 -> 24 met motor 13 afbuigend is volgens
+  de logs juist de verkeerde poot; de kortsluitproef was gestoord. Nieuw: geeft zo'n rit opnieuw kortsluiting, dan wordt de oplossing vergeten en niet nog eens geprobeerd.
+- Met Marco's voortgang van 19-11: alle 50 echte overgangen te plannen vanaf 14, 129, 8 en 4 in alle 256 wisselstanden; de twee foute worden in de controle weggehaald.
+- Metingen: alle varianten gelijk aan #426 (overal voltooid 23/23, valse 0, gebruiker 0; controles volledig). Regressietests ALLES OK.
+- Nog niet getest op de baan.
