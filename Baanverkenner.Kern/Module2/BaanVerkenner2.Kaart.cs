@@ -47,7 +47,10 @@ public partial class BaanVerkenner2
             o.AantalKeer += Math.Max(0, s.Aantal - 1);
             if (s.Via > 0 && !s.Terug) k.RegistreerDoorgang(s.Via, s.Melder, s.Uitkomst, s.Richting, c);
         }
-        foreach (var s in _k.Stappen.Where(s => !s.Afgeleid && s.Uitkomst == StapUitkomst.Doodlopend))
+        // BUG #427 (rapport 19-11: "doodlopend na melder 24 (achteruit)", terwijl de loc daar later naar 14 en 129 reed): een doodlopend einde telt alleen als er bij
+        // dezelfde melder en richting nooit een melder bereikt is.
+        foreach (var s in _k.Stappen.Where(s => !s.Afgeleid && s.Uitkomst == StapUitkomst.Doodlopend
+                     && !_k.Stappen.Any(x => !x.Afgeleid && x.Melder == s.Melder && x.Richting == s.Richting && x.Uitkomst > 0)))
             k.RegistreerKopspoor(s.Melder, s.Richting, Beperkt(s));
         int id = 1;
         foreach (var g in _k.Stappen.Where(s => !s.Afgeleid && s.Uitkomst == StapUitkomst.Kortsluiting).GroupBy(s => (s.Via, s.Melder, s.Richting, Beperkt(s).Sleutel)))

@@ -61,6 +61,18 @@ public partial class BaanVerkenner2
             BewaarNu();
         }
         _gereden412 ??= new();
+        // WAT: een overgang die de controle niet kon rijden en die maar één keer gezien is, is bijna zeker een foute waarneming (een gemiste of te vroeg gemelde
+        // melder op de grens van twee secties). Die wordt uit de kennis gehaald en telt niet meer mee.
+        // WAAROM (BUG #427, controle 19-11 16:49 en 17:09: "Niet gereden: 24->129 (vooruit), 129->21 (vooruit)"): rit #99 om 09:08 meldde 24, 129, 21 vooruit, terwijl
+        // de loc op de grens van 24 en 129 stond. Zo'n overgang bestaat op de baan niet en de controle kan hem nooit rijden.
+        var onbetrouwbaar427 = alle.Where(o => !_gereden412.Contains(o)
+            && _k.Stappen.Where(x => x.Melder == o.Van && x.Uitkomst == o.Naar && x.Richting == o.R && !x.Afgeleid).Sum(x => x.Aantal) <= 1).ToList();
+        foreach (var o in onbetrouwbaar427)
+        {
+            _k.Stappen.RemoveAll(x => x.Melder == o.Van && x.Uitkomst == o.Naar && x.Richting == o.R);
+            _log.Waarschuwing($"Overgang {o.Van} -> {o.Naar} ({o.R.Tekst()}) is maar één keer gezien en was in de controle niet te rijden: waarschijnlijk een foute waarneming, weggehaald (BUG #427, nog niet getest op de baan).");
+        }
+        if (onbetrouwbaar427.Count > 0) { alle = alle.Except(onbetrouwbaar427).ToList(); BewaarNu(); }
         int gereden = alle.Count(o => _gereden412.Contains(o));
         var nietGereden = alle.Where(o => !_gereden412.Contains(o)).Select(o => $"{o.Van}->{o.Naar} ({o.R.Tekst()}){(reden.TryGetValue(o, out var rd) ? $" [{rd}]" : "")}").ToList();
         int kortsluitingen = _k.Kortsluitingen - kortVoor;
@@ -69,6 +81,7 @@ public partial class BaanVerkenner2
         var verslag = new ControleVerslag { Datum = _klok.Nu, Samenvatting = samenvatting, Verschillen = !goed };
         verslag.Regels.AddRange(fout);
         if (nietGereden.Count > 0) verslag.Regels.Add($"Niet gereden: {string.Join(", ", nietGereden)}.");
+        if (onbetrouwbaar427.Count > 0) verslag.Regels.Add($"Weggehaald als foute waarneming (één keer gezien, niet te rijden): {string.Join(", ", onbetrouwbaar427.Select(o => $"{o.Van}->{o.Naar} ({o.R.Tekst()})"))}.");
         if (goed) verslag.Regels.Add("Alles gereden zonder kortsluiting: de kaart klopt.");
         _status.Kaart.ControleVerslagen.Add(verslag);
         _log.Vondst(samenvatting);

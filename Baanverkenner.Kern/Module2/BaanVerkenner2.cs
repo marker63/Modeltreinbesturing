@@ -1149,8 +1149,20 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         _vrijNaM424.Clear();
         if (t.VrijNaM) _vrijNaM424.UnionWith(stand.Keys);   // BUG #424: zie KiesTaak
         int? u;
+        int kortVoor427 = _k.Kortsluitingen;
         try { u = await Proef(t.Via, t.Melder, t.Richting, stand, herstel: herstel); }
         finally { _vrijNaM424.Clear(); }
+        // WAT: gaf de rit 'na de kortsluitproef' met de oplossende stand tóch weer kortsluiting, dan klopte die oplossing niet (de kortsluitproef werd waarschijnlijk
+        // gestoord, bijv. door een sectiescheiding). De oplossing wordt vergeten en de rit niet nog eens geprobeerd.
+        // WAAROM (BUG #427, log 19-11 16:52-16:58): 'na de kortsluitproef: stap 21 -> 24 (achteruit) met wissel 13 afbuigend' gaf 3 keer opnieuw kortsluiting (9 kortsluitingen
+        // met de kortsluitproeven erbij). Volgens de logs is 21 -> 24 met motor 13 afbuigend juist de verkeerde poot.
+        if (t.Soort == Soort.NaProef && (u == StapUitkomst.Kortsluiting || (u is null && _k.Kortsluitingen > kortVoor427)))
+        {
+            _k.ProefOplossingen.RemoveWhere(x => x.StartsWith($"{t.Melder}|{t.Richting}|{v.Adres}|"));
+            _andersomMislukt421[t.Sleutel] = 3;
+            _log.Waarschuwing($"Na de kortsluitproef: {t.Via} -> {t.Melder} ({t.Richting.Tekst()}) met wissel {v.Adres} {(nieuw ? "afbuigend" : "rechtdoor")} gaf opnieuw kortsluiting; die oplossing wordt vergeten (BUG #427, nog niet getest op de baan).");
+            return u is not null;
+        }
         if (u is null)
         {
             // hoogstens 3 pogingen in de hele verkenning (de gewone 'overgeslagen'-lijst wordt bij nieuws weer leeggemaakt, BUG #394)
