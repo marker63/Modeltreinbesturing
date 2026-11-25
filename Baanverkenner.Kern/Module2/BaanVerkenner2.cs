@@ -818,7 +818,28 @@ public partial class BaanVerkenner2 : IBaanVerkenner
     /// <summary>Is bekend waar de loc komt als hij melder m in richting r verlaat? Ja als er een stap vanuit m in r is, of een stap die m in de
     /// andere richting binnenkwam (die kwam dan door het r-einde van m binnen).</summary>
     internal bool UitgangBekend(int m, Richting r)
-        => _k.Stappen.Any(s => s.Melder == m && s.Richting == r) || _k.Stappen.Any(s => s.Uitkomst == m && s.Richting == r.Om());
+    {
+        if (_k.Stappen.Any(s => s.Uitkomst == m && s.Richting == r.Om())) return true;
+        var obs = _k.Stappen.Where(s => s.Melder == m && s.Richting == r).ToList();
+        if (obs.Count == 0) return false;
+        if (obs.Any(s => s.Uitkomst != StapUitkomst.Kortsluiting)) return true;
+        // BUG #428 (Marco 25-11 09:23, "die vindt nu maar 2 melders"): gaf deze uitgang tot nu toe alleen kortsluiting, maar wees de kortsluitproef een oplossing aan
+        // die nog nooit (allemaal tegelijk) gereden is, dan is de uitgang nog NIET bekend: verkennen met die stand.
+        var opl = ProefOplossingen428(m, r);
+        return opl.Count == 0 || obs.Any(s => opl.All(o => s.Stand.Contains(o.Key) == o.Value));
+    }
+
+    /// <summary>BUG #428: de standen die bij de kortsluitproef na melder <paramref name="m"/> (<paramref name="r"/>) de kortsluiting ophieven.</summary>
+    private Dictionary<int, bool> ProefOplossingen428(int m, Richting r)
+    {
+        var res = new Dictionary<int, bool>();
+        foreach (var po in _k.ProefOplossingen)
+        {
+            var d = po.Split('|');
+            if (d.Length == 4 && d[0] == m.ToString() && d[1] == r.ToString() && int.TryParse(d[2], out var a) && bool.TryParse(d[3], out var v)) res[a] = v;
+        }
+        return res;
+    }
 
     private async Task<bool> VoerTaakUit(Taak t)
     {
@@ -868,6 +889,16 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         if (!await VoerPlanUit(t.Plan!)) return false;
         if (UitgangBekend(t.Melder, t.Richting)) return true;   // onderweg al gezien
         if (_k.LocMelder != t.Melder) return false;
+        // BUG #428: gaf deze uitgang eerder kortsluiting en wees de kortsluitproef een oplossing aan, dan eerst die standen zetten (de loc staat stil; zo deed de
+        // kortsluitproef het ook, Marco 14-11 09:18)
+        var opl428 = ProefOplossingen428(t.Melder, t.Richting);
+        if (opl428.Count > 0)
+        {
+            var zet = new Dictionary<int, bool>(opl428);
+            foreach (var (a, v) in opl428) foreach (var (vo, dv) in Volgers(a, v)) zet[vo] = dv;
+            _log.Stap($"Verkennen na melder {t.Melder} ({t.Richting.Tekst()}) met de stand die bij de kortsluitproef de kortsluiting ophief: {string.Join(", ", opl428.Select(x => $"wissel {x.Key} {(x.Value ? "afbuigend" : "rechtdoor")}"))} (BUG #428, nog niet getest op de baan).");
+            if (!await ZetStand(zet, "verkennen na de kortsluitproef")) return false;
+        }
         await Rijd(new RitOpdracht2 { Richting = t.Richting, Verkennen = true, StopBijAfwijking = false, Reden = "verkennen" });
         return true;
     }
@@ -1268,7 +1299,9 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             // WAT: onthouden dat hier geen uitweg is, zodat dezelfde taak niet steeds terugkomt. WAAROM (BUG #420, Marco 14-11 15:22: "je bent na 35 minuten nog
             // steeds deze 2 blokken aan het meten"): elke uitweg-taak vond onderweg via de kortsluitproef iets nieuws, en daardoor werd de lijst met
             // overgeslagen taken gewist (#394). Zo kwamen "uitweg na 10" en "uitweg na 4" steeds opnieuw, op de binnenring, terwijl daar echt geen uitweg is.
-            _k.GeenUitweg.Add(t.Sleutel);
+            // BUG #428: niet als de kortsluitproef hier een oplossing aanwees (log 25-11 08:59: "na melder 24 (achteruit) is met geen enkel ander adres een uitweg",
+            // terwijl wissel 9 rechtdoor en motor 13 afbuigend de kortsluiting ophieven; daarna stopte de verkenning met 2 melders)
+            if (ProefOplossingen428(t.Melder, t.Richting).Count == 0) _k.GeenUitweg.Add(t.Sleutel);
         }
         return true;
     }
