@@ -3766,3 +3766,13 @@ Simulatie module 2: gelijk aan #419.
 - Met Marco's voortgang van 19-11: alle 50 echte overgangen te plannen vanaf 14, 129, 8 en 4 in alle 256 wisselstanden; de twee foute worden in de controle weggehaald.
 - Metingen: alle varianten gelijk aan #426 (overal voltooid 23/23, valse 0, gebruiker 0; controles volledig). Regressietests ALLES OK.
 - Nog niet getest op de baan.
+
+## #428 Nieuwe verkenning 25-11 08:48: 'voltooid' met 2 melders (Marco 25-11 09:23)
+- Start op melder 8. 8 vooruit: kortsluiting; de kortsluitproef vond terecht wissel 14 afbuigend. Omdat de loc bij de start nog geen 'vandaan' had (via 0), kwam er
+  geen taak 'na de kortsluitproef' en gold de uitgang als bekend (alleen kortsluiting). 24 achteruit: de uitweg-proef (alle wissels tegelijk om) gaf kortsluiting,
+  de kortsluitproef vond wissel 9 rechtdoor en motor 13 afbuigend, maar de uitweg-taak legde toch "geen uitweg" vast. Geen taken meer over: 'voltooid' met 2 melders.
+- Nieuw: een uitgang die alleen kortsluiting gaf, telt pas als bekend als de standen die de kortsluitproef daar aanwees (samen) ook gereden zijn; de verkenner
+  verkent dan opnieuw met die standen. 'Geen uitweg' wordt niet vastgelegd als de kortsluitproef op die plek een oplossing vond.
+- Metingen: overal voltooid 23/23, valse 0, gebruiker 0, controles volledig. Sommige verkenningen duren langer door de extra verkenningsritten
+  (start 13 74 -> 93 min, start 5 'streng' 66 -> 114 min, sectiescheidingen start 5 85 -> 129 min); start 5 bevestigt de adressen zonder effect niet meer allemaal.
+- Nog niet getest op de baan.
