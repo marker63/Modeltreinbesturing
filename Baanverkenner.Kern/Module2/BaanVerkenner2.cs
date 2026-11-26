@@ -832,13 +832,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
     /// <summary>BUG #428: de standen die bij de kortsluitproef na melder <paramref name="m"/> (<paramref name="r"/>) de kortsluiting ophieven.</summary>
     private Dictionary<int, bool> ProefOplossingen428(int m, Richting r)
     {
-        var res = new Dictionary<int, bool>();
-        foreach (var po in _k.ProefOplossingen)
-        {
-            var d = po.Split('|');
-            if (d.Length == 4 && d[0] == m.ToString() && d[1] == r.ToString() && int.TryParse(d[2], out var a) && bool.TryParse(d[3], out var v)) res[a] = v;
-        }
-        return res;
+        return _k.ProefOplossingenBij(m, r);
     }
 
     private async Task<bool> VoerTaakUit(Taak t)

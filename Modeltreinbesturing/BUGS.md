@@ -3776,3 +3776,26 @@ Simulatie module 2: gelijk aan #419.
 - Metingen: overal voltooid 23/23, valse 0, gebruiker 0, controles volledig. Sommige verkenningen duren langer door de extra verkenningsritten
   (start 13 74 -> 93 min, start 5 'streng' 66 -> 114 min, sectiescheidingen start 5 85 -> 129 min); start 5 bevestigt de adressen zonder effect niet meer allemaal.
 - Nog niet getest op de baan.
+
+## #429 Tweede controle 26-11 09:56: 52/52 overgangen, maar 2 kortsluitingen na de kruiswissel 24 (Marco 26-11 09:56)
+- Kortsluiting 1 (09:46, 24 -> 14 achteruit, vanaf 8): de eis was "9R 10R 5A" zonder motor 13. Bij 8 -> 24 (achteruit) was 14 gezien met wissel 5 rechtdoor én
+  met wissel 5 afbuigend + motor 13 afbuigend (met motor 13 rechtdoor gaf dat kortsluiting). Bij een tegenstrijdige groep mocht er maar één weg per uitkomst zijn
+  over ALLE groepen samen, dus de weg met 5 afbuigend + 13 afbuigend viel weg en een samengevoegde eis zonder motor 13 bleef over.
+  Opgelost: één weg per uitkomst per groep (Kennis2.Mogelijkheden).
+- Beide controles (09:26 en 09:46) vond de kortsluitproef na 24 (achteruit) motor 13 afbuigend; die vondst werd voor de planning niet gebruikt.
+  Opgelost: tijdens de controle komt een stand uit de kortsluitproef bij de eis als die uitkomst ook echt met die stand gereden is, en de planner kiest eerst
+  een stand die bij de kortsluitproef past (Buren, VervolgEis429).
+- Kortsluiting 2 (09:47, 24 -> 129): de loc stond op de kruiswissel 24; de vervolgstappen vanaf 24 waren allemaal 'terugval' en telden voor het alvast zetten van de
+  wissels niet mee. Wissel 5 kon op 24 niet om, de planner liet hem "staan" (#389) en de loc reed een kortsluiting in.
+  Opgelost: (a) in de controle zoekt PlanNaar eerst een plan waarin elke wissel echt goed komt (andere bekende stand of uitstapje), pas daarna 'blijft staan';
+  (b) de controle zet voor aankomst de wissels voor een vervolgstap, ook een terugval-stap, bij voorkeur een vervolgstap die nog gereden moet worden;
+  (c) de controle neemt van de 6 dichtstbijzijnde open overgangen de eerste waarvoor geen wissel hoeft te 'blijven staan'.
+  (d) in de controle gaat een wissel zo laat mogelijk om (vlak voor de stap die hem nodig heeft): in de simulatie ging wissel 9 al op 29 om voor 129 -> 4
+  en stoorde hij onderweg 21 -> 24 -> 129 (kortsluiting).
+- (a), (d) en de kortsluitproef-stand in de eis gelden alleen in de controle: tijdens het verkennen maakten ze de simulatie slechter (start 8 'streng' 17 i.p.v. 23
+  melders, met ruis start 11 een valse wissel, start 5 188 -> 225 ritten). Tijdens het verkennen is 'doorrijden en kijken' juist een manier om te leren.
+- Getest met Marco's eigen kennis (voortgang.json van 26-11) in de simulatie: vanaf 8 de eerste controle 46 i.p.v. 8 van 52 overgangen, 0 kortsluitingen
+  (de rest verschilt doordat de simulatie in de binnenring andere blokken heeft). De oude versie gaf met dezelfde kennis precies Marco's 2 kortsluitingen.
+- Metingen (MARCO2, ruis, sectiescheidingen, hervatten): gelijk aan #428, start 17 iets beter (193 -> 186 ritten, 20 -> 18 kortsluitingen). Controlebank:
+  overal alle overgangen, 0 kortsluitingen. Regressietests ALLES OK.
+- Nog niet getest op de baan.

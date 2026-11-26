@@ -14,6 +14,13 @@ public partial class BaanVerkenner2
     private async Task<bool> Controle412(bool tweede = false)
     {
         _fase = "Controle";
+        _k.ProefInEis429 = true;
+        try { return await Controle412Intern(tweede); }
+        finally { _k.ProefInEis429 = false; }
+    }
+
+    private async Task<bool> Controle412Intern(bool tweede)
+    {
         _gereden412 = new();
         // alle bekende overgangen (geen kortsluiting, geen doodlopend), zonder afgeleide waarnemingen
         var alle = _k.Stappen.Where(s => s.Uitkomst > 0 && !s.Afgeleid).Select(s => (Van: s.Melder, Naar: s.Uitkomst, R: s.Richting)).Distinct().ToList();
@@ -34,15 +41,28 @@ public partial class BaanVerkenner2
             var bereikbaar = open.Select(o => (O: o, Doel: new Toestand(o.Naar, o.Van, o.R)))
                                  .Where(x => kaart.Kosten.ContainsKey(x.Doel)).OrderBy(x => kaart.Kosten[x.Doel]).ToList();
             if (bereikbaar.Count == 0) { foreach (var o in open) nietBereikt.Add(o); break; }
-            var (doelO, doel) = bereikbaar[0];
             int kortNu = _k.Kortsluitingen;
             bool ok;
             // De wissels voorbij de doelmelder alvast goed zetten voor een bekende vervolgstap: na aankomst kruipt de loc nog een stukje door (netjes op één
             // melder), en met een verkeerd staande wissel daarachter gaf dat in de simulatie kortsluiting (10 - 129 - 24 vooruit, wissel 14 van achteren).
-            var verder = _k.Mogelijkheden(doel.Via, doel.M, doel.H).Where(m => m.Uitkomst > 0 && !m.Terugval).OrderByDescending(m => m.Aantal).Select(m => m.Eis).FirstOrDefault();
-            if (Environment.GetEnvironmentVariable("MARCO2_DEBUG") == "1") _log.Info($"DEBUG controle verder na {doel.M} (via {doel.Via}, {doel.H}): {(verder is null ? "geen" : string.Join(" ", verder.Select(e => $"{e.Key}{(e.Value ? "A" : "R")}")))}; alle: {string.Join(" | ", _k.Mogelijkheden(doel.Via, doel.M, doel.H).Select(m => $"{m.Uitkomst}:{string.Join("", m.Eis.Select(e => $"{e.Key}{(e.Value ? "A" : "R")}"))}{(m.Terugval ? "t" : "")}x{m.Aantal}"))}");
-            var plan = PlanNaar(kaart, doel, verder);
-            if (plan is null && verder is not null) plan = PlanNaar(kaart, doel);
+            // WAT (BUG #429): van de dichtstbijzijnde open overgangen (hoogstens 6) de eerste nemen waarvoor een plan bestaat waarin geen wissel 'blijft staan'.
+            // WAAROM (controle Marco 26-11 09:56): de loc stond op de kruiswissel 24 en de dichtstbijzijnde overgang vroeg een andere stand van wissel 5 dan er
+            // stond; die kon op 24 niet om, bleef staan en de loc reed een kortsluiting in. Een andere open overgang vanaf 24 kon wél met de staande wissels.
+            var openSet429 = open.ToHashSet();
+            var doelO = bereikbaar[0].O;
+            Toestand doel = bereikbaar[0].Doel;
+            Dictionary<int, bool>? verder = null;
+            Plan? plan = null;
+            bool eerste429 = true;
+            foreach (var kand in bereikbaar.Take(6))
+            {
+                var vd = VervolgEis429(kand.Doel, uit => openSet429.Contains((kand.Doel.M, uit, kand.Doel.H)));
+                var pl = PlanNaar(kaart, kand.Doel, vd);
+                if (pl is null && vd is not null) pl = PlanNaar(kaart, kand.Doel);
+                if (eerste429) { doelO = kand.O; doel = kand.Doel; verder = vd; plan = pl; eerste429 = false; }
+                if (pl is not null && pl.Zacht is null) { doelO = kand.O; doel = kand.Doel; verder = vd; plan = pl; break; }
+            }
+            if (Environment.GetEnvironmentVariable("MARCO2_DEBUG") == "1") _log.Info($"DEBUG controle verder na {doel.M} (via {doel.Via}, {doel.H}): {(verder is null ? "geen" : string.Join(" ", verder.Select(e => $"{e.Key}{(e.Value ? "A" : "R")}")))}");
             if (plan is null) ok = false;
             else
             {
@@ -96,13 +116,32 @@ public partial class BaanVerkenner2
     /// geen uitvoerbare route is, met de reden. <paramref name="herstel"/> = eerst de correctie van #425 toepassen (zoals bij hervatten).</summary>
     public List<string> PlanTest425(bool herstel, Dictionary<int, bool>? standen = null)
     {
+        _fase = "Controle"; _k.ProefInEis429 = true;   // BUG #429: zoals in de echte controle
         if (herstel) NormaliseerAchteren426();
         if (Environment.GetEnvironmentVariable("MARCO2_ECHT_DEBUG") == "1")
         {
             foreach (var v in _k.Vondsten) Console.WriteLine($"   vondst {v.Adres} {v.Via}>{v.Melder}:{v.Richting} R={v.Rechtdoor} A={v.Afbuigend}  relevant-ingangknoop={string.Join(",", _k.RelevantInKnoop(v.Via, v.Richting))}  relevant-hier={string.Join(",", _k.RelevantInKnoop(v.Melder, v.Richting))}");
             foreach (var (k2, l2) in _k.Relevant) Console.WriteLine($"   relevant {k2}: {string.Join(",", l2)}");
         }
+        // WAT: alleen voor het testprogramma: de mogelijkheden (uitkomst + eis) bij één ingang tonen, bijv. MARCO2_ECHT_MOG=8,24,A.
+        if (Environment.GetEnvironmentVariable("MARCO2_ECHT_MOG") is { Length: > 0 } mog)
+        {
+            var d = mog.Split(',');
+            var rm = d[2] == "A" ? Richting.Achteruit : Richting.Vooruit;
+            Console.WriteLine($"   relevant-in-knoop {d[1]}:{rm} = {string.Join(",", _k.RelevantInKnoop(int.Parse(d[1]), rm))}");
+            foreach (var x in _k.Mogelijkheden(int.Parse(d[0]), int.Parse(d[1]), rm))
+                Console.WriteLine($"   mogelijk -> {x.Uitkomst} [{string.Join(" ", x.Eis.OrderBy(e => e.Key).Select(e => $"{e.Key}{(e.Value ? "A" : "R")}"))}] terugval={x.Terugval} aantal={x.Aantal}");
+        }
         if (standen is not null) foreach (var (a, v) in standen) _k.Standen[a] = v;
+        // WAT: alleen voor het testprogramma: het controleplan naar één doel tonen, met de vervolgstand die alvast gezet wordt (MARCO2_ECHT_DOEL=8,24,A).
+        if (Environment.GetEnvironmentVariable("MARCO2_ECHT_DOEL") is { Length: > 0 } dl)
+        {
+            var d = dl.Split(',');
+            var dt = new Toestand(int.Parse(d[1]), int.Parse(d[0]), d[2] == "A" ? Richting.Achteruit : Richting.Vooruit);
+            var vd = VervolgEis429(dt);
+            var pl = PlanNaar(Dijkstra(), dt, vd) ?? PlanNaar(Dijkstra(), dt);
+            return new List<string> { "doel", $"DOEL {dl} standen [{string.Join(" ", _k.Standen.OrderBy(x => x.Key).Select(x => $"{x.Key}{(x.Value ? "A" : "R")}"))}] vervolg [{(vd is null ? "-" : string.Join(" ", vd.OrderBy(x => x.Key).Select(x => $"{x.Key}{(x.Value ? "A" : "R")}")))}] plan: {(pl is null ? _planFout : pl.ToString() + " | " + string.Join(" ; ", pl.Benen.Select(b => string.Join(",", b.Zetten.Select(z => $"{z.Key}{(z.Value ? "A" : "R")}")))))}{(pl?.Zacht is null ? "" : " ZACHT " + pl.Zacht)}" };
+        }
         var res = new List<string>();
         var alle = _k.Stappen.Where(s => s.Uitkomst > 0 && !s.Afgeleid).Select(s => (Van: s.Melder, Naar: s.Uitkomst, R: s.Richting)).Distinct().ToList();
         var kaart = Dijkstra();
@@ -110,12 +149,24 @@ public partial class BaanVerkenner2
         {
             var doel = new Toestand(o.Naar, o.Van, o.R);
             if (!kaart.Kosten.ContainsKey(doel)) { res.Add($"{o.Van}->{o.Naar} ({o.R.Tekst()}): niet bereikbaar"); continue; }
-            var verder = _k.Mogelijkheden(doel.Via, doel.M, doel.H).Where(m => m.Uitkomst > 0 && !m.Terugval).OrderByDescending(m => m.Aantal).Select(m => m.Eis).FirstOrDefault();
+            var verder = VervolgEis429(doel);
             var plan = PlanNaar(kaart, doel, verder) ?? PlanNaar(kaart, doel);
             if (plan is null) res.Add($"{o.Van}->{o.Naar} ({o.R.Tekst()}): {_planFout}");
+            else if (plan.Zacht is not null) res.Add($"{o.Van}->{o.Naar} ({o.R.Tekst()}) zacht: {plan.Zacht}");   // BUG #429: wissel blijft staan = kans op kortsluiting
         }
         res.Insert(0, $"{alle.Count - res.Count} van {alle.Count} overgangen te plannen vanaf melder {_k.LocMelder}");
         return res;
+    }
+
+    /// <summary>WAT: de wisselstand voor een bekende stap NA de doelmelder, die alvast gezet wordt voordat de loc daar aankomt.
+    /// WAAROM: staat de loc eenmaal op het doel (bijv. op de kruiswissel 24), dan kunnen de wissels daar niet meer veilig om. Eerst een stap zonder twijfel,
+    /// anders (BUG #429) de vaakst gereden stap met een 'terugval'-eis (stand van een stap die wél doorreed).</summary>
+    private Dictionary<int, bool>? VervolgEis429(Toestand doel, Func<int, bool>? nogOpen = null)
+    {
+        var opl = _k.ProefOplossingenBij(doel.M, doel.H);
+        return _k.Mogelijkheden(doel.Via, doel.M, doel.H).Where(m => m.Uitkomst > 0)
+            .OrderBy(m => nogOpen is not null && !nogOpen(m.Uitkomst))   // eerst een vervolgstap die de controle nog moet rijden
+            .ThenBy(m => m.Terugval && NietPassend429(m.Eis, opl) > 0).ThenBy(m => NietPassend429(m.Eis, opl)).ThenByDescending(m => m.Aantal).Select(m => m.Eis).FirstOrDefault();
     }
 
     /// <summary>WAT: zorgt dat de loc netjes op één melder staat (kortsluiting opheffen, parkeren, zo nodig zoeken), zoals aan het begin van de verkenningslus.

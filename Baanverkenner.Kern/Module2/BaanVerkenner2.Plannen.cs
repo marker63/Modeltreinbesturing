@@ -56,14 +56,20 @@ public partial class BaanVerkenner2
 
     private Toestand Hier => new(_k.LocMelder, _k.LocVia, _k.LocRichting);
 
+    /// <summary>WAT: hoeveel standen uit de kortsluitproef (<paramref name="opl"/>) een eis niet vastlegt of tegenspreekt. 0 = de eis past bij de proef.</summary>
+    private static int NietPassend429(Dictionary<int, bool> eis, Dictionary<int, bool> opl) =>
+        opl.Count(o => !eis.TryGetValue(o.Key, out var w) || w != o.Value);
+
     /// <summary>WAT: de stap(pen) die vanuit toestand t mogelijk zijn: verder rijden (alle bekende uitkomsten met hun eis) of omkeren.</summary>
     private IEnumerable<(Toestand Naar, PlanStap Stap, int Kosten)> Buren(Toestand t)
     {
         // Per uitkomst één stand: die het minst afwijkt van wat er nu op de baan staat (meestal de basisstand). Zo kiezen twee stappen door dezelfde
         // knoop (bijv. 4 -> 129 -> 14) geen tegenstrijdige standen voor dezelfde wissel.
+        // BUG #429: eerst de stand die past bij wat de kortsluitproef hier vond (na 24 achteruit: motor 13 afbuigend), pas daarna de kleinste afwijking.
+        var opl429 = _k.ProefOplossingenBij(t.M, t.H);
         foreach (var g in _k.Mogelijkheden(t.Via, t.M, t.H).Where(x => x.Uitkomst > 0).GroupBy(x => x.Uitkomst))
         {
-            var (uit, eis, terugval, _) = g.OrderBy(x => x.Eis.Count(e => Fysiek(e.Key) != e.Value)).ThenByDescending(x => x.Aantal).First();
+            var (uit, eis, terugval, _) = g.OrderBy(x => NietPassend429(x.Eis, opl429)).ThenBy(x => x.Eis.Count(e => Fysiek(e.Key) != e.Value)).ThenByDescending(x => x.Aantal).First();
             yield return (new Toestand(uit, t.M, t.H), new PlanStap { Van = t.M, Naar = uit, H = t.H, Eis = eis, Zacht = terugval }, terugval ? 3 : 1);
         }
         if (t.Via > 0)
@@ -149,8 +155,12 @@ public partial class BaanVerkenner2
             var breekpunten = new HashSet<int>(zetten.Keys) { 0 };
             for (int i = 0; i < stappen.Count; i++) if (stappen[i].Omkeer) breekpunten.Add(i);
             int? keuze = null;
-            for (int p = lo; p <= hi; p++) if (breekpunten.Contains(p) && VeiligOp(p, a)) { keuze = p; break; }
-            if (keuze is null) for (int p = lo; p <= hi; p++) if (VeiligOp(p, a)) { keuze = p; break; }
+            // WAT (BUG #429): in de controle een wissel zo LAAT mogelijk omzetten (vlak voor de stap die hem nodig heeft), tijdens het verkennen zo vroeg mogelijk.
+            // WAAROM (simulatie, controle vanaf 8): wissel 9 ging al op 29 om voor 129 -> 4, terwijl de loc eerst nog 21 -> 24 -> 129 reed; die stap noemde
+            // wissel 9 niet in zijn eis, maar hij deed er wel toe: kortsluiting. Hoe korter een wissel 'vooruit' gezet staat, hoe minder stappen hij kan storen.
+            var volgorde = _fase == "Controle" ? Enumerable.Range(lo, hi - lo + 1).Reverse().ToList() : Enumerable.Range(lo, hi - lo + 1).ToList();
+            foreach (var p in volgorde) if (breekpunten.Contains(p) && VeiligOp(p, a)) { keuze = p; break; }
+            if (keuze is null) foreach (var p in volgorde) if (VeiligOp(p, a)) { keuze = p; break; }
             if (keuze is not int q) { _planFoutStap = hi; _planFoutAdres = a; _planFoutWaarde = v; _planFoutVorige = lo - 1; _planFout = $"wissel {a} kan tussen stap {lo} en {hi} ({string.Join(",", Enumerable.Range(lo, hi - lo + 1).Select(Plek))}) nergens veilig om (route vanaf {start.M}: {string.Join(", ", stappen)})"; return false; }
             if (!zetten.TryGetValue(q, out var z)) zetten[q] = z = new Dictionary<int, bool>();
             z[a] = v; cur[a] = v;
@@ -165,7 +175,8 @@ public partial class BaanVerkenner2
                     // BUG #389 (Marco 09-11 12:39: "ik moet nog steeds iedere keer de loc verplaatsen terwijl hij er naar toe kan rijden"): de stap is vanaf deze
                     // ingang nooit gereden (de eis is geleend van een andere ingang). Kan de wissel nergens veilig om, dan rijdt de loc met de huidige stand door
                     // en kijkt waar hij uitkomt; komt hij ergens anders uit, dan wordt dat vastgelegd en opnieuw gepland (kortsluiting wordt gewoon hersteld).
-                    if (!stappen[i].Zacht && !stappen[i].ZachtAdressen.Contains(a)) return null;
+                    // BUG #429: in de eerste ronde van PlanNaar mag dit niet (_zachtUit429); dan eerst een stand-wissel of uitstapje zoeken.
+                    if (_zachtUit429 || (!stappen[i].Zacht && !stappen[i].ZachtAdressen.Contains(a))) return null;
                     zachtGeschrapt.Add(a);
                     continue;
                 }
@@ -248,6 +259,24 @@ public partial class BaanVerkenner2
     /// <summary>WAT: een uitvoerbaar plan naar toestand <paramref name="doel"/>. Lukt de kortste route niet (een wissel die om moet kan nergens veilig om,
     /// bijv. wissel 9 terwijl de loc op melder 4 staat), dan een omweg via een plek in de buurt waar het wel kan (eerst een stukje weg, omzetten, terug).</summary>
     private Plan? PlanNaar(DijkstraKaart kaart, Toestand doel, IReadOnlyDictionary<int, bool>? extraAanEind = null)
+    {
+        // WAT: eerst een plan zoeken waarin elke wissel ook echt in de gevraagde stand komt (eventueel met een andere bekende stand of een uitstapje);
+        // pas als dat niet lukt een plan waarin een wissel 'blijft staan' (BUG #389).
+        // WAAROM (BUG #429, controle Marco 26-11 09:56, kortsluiting 2): de loc stond op de kruiswissel 24 en moest naar 14 met wissel 5 rechtdoor. Wissel 5 kon
+        // op 24 niet veilig om, dus liet de planner hem afbuigend staan ("blijft staan") en de loc reed een kortsluiting in, terwijl een uitstapje
+        // (eerst een stukje weg, wissel 5 omzetten, terug) wel kon. 'Blijven staan' is bedoeld als laatste redmiddel, niet als eerste keus.
+        // Alleen in de controle: tijdens het verkennen is 'blijven staan' juist een manier om te leren (in de simulatie gaf 'eerst streng' daar slechtere
+        // verkenningen: start 8 'streng' vond 17 i.p.v. 23 melders).
+        _zachtUit429 = _fase == "Controle";
+        Plan? streng;
+        try { streng = PlanNaarIntern(kaart, doel, extraAanEind); }
+        finally { _zachtUit429 = false; }
+        return streng ?? PlanNaarIntern(kaart, doel, extraAanEind);
+    }
+
+    private bool _zachtUit429;
+
+    private Plan? PlanNaarIntern(DijkstraKaart kaart, Toestand doel, IReadOnlyDictionary<int, bool>? extraAanEind)
     {
         if (!kaart.Kosten.TryGetValue(doel, out var kost)) return null;
         _planFoutStap = -1;

@@ -313,6 +313,22 @@ public class Kennis2
 
     /// <summary>WAT: alle uitkomsten die vanaf ingang (via, m, r) bekend zijn, elk met de wisselstand (alleen de relevante wissels) die erbij hoort.
     /// WAAROM: de routeplanner kiest daaruit de stap die hij nodig heeft.</summary>
+    /// <summary>WAT: true tijdens de controle van de voltooide baan; dan tellen de standen uit de kortsluitproef mee in de eis (BUG #429). Een veld, geen
+    /// eigenschap: het hoort niet in het opgeslagen bestand.</summary>
+    public bool ProefInEis429;
+
+    /// <summary>WAT: de standen die bij de kortsluitproef na melder <paramref name="m"/> (<paramref name="r"/>) de kortsluiting ophieven (BUG #428/#429).</summary>
+    public Dictionary<int, bool> ProefOplossingenBij(int m, Richting r)
+    {
+        var res = new Dictionary<int, bool>();
+        foreach (var po in ProefOplossingen)
+        {
+            var d = po.Split('|');
+            if (d.Length == 4 && d[0] == m.ToString() && d[1] == r.ToString() && int.TryParse(d[2], out var a) && bool.TryParse(d[3], out var v)) res[a] = v;
+        }
+        return res;
+    }
+
     public List<(int Uitkomst, Dictionary<int, bool> Eis, bool Terugval, int Aantal)> Mogelijkheden(int via, int m, Richting r)
     {
         var rel = RelevantInKnoop(m, r);
@@ -328,13 +344,17 @@ public class Kennis2
                 // uitbreiden terwijl je gewoon zelf verder had kunnen gaan"; log 10:42-10:44): 14 -> 24 reed met de basisstand naar 21, maar met een stand waarin 4, 7, 8, 10, 11,
                 // 13 en 14 om stonden gaf het kortsluiting. Die twee vielen in dezelfde groep, dus kende de planning geen enkele weg voorbij 24 meer; de loc pendelde tussen 13, 5 en 14
                 // en de verkenning stopte als "niet af".
+                // BUG #429 (controle Marco 26-11 09:56, kortsluiting 1): 'één weg per uitkomst' gold eerst voor ALLE groepen samen. Bij 8 -> 24 (achteruit) was er al een
+                // weg naar 14 met wissel 5 rechtdoor; de weg met wissel 5 afbuigend (waarbij motor 13 afbuigend moet: met 13 rechtdoor gaf het kortsluiting) viel
+                // daardoor weg, en een samengevoegde eis zonder motor 13 bleef over. Nu één weg per uitkomst per groep (per stand van de relevante wissels).
+                int begin429 = res.Count;
                 foreach (var goed in g.Where(x => x.Uitkomst > 0).OrderByDescending(x => x.Aantal))
                 {
                     var anders = g.Where(x => x.Uitkomst != goed.Uitkomst).ToList();
                     var verschil = anders.SelectMany(x => x.Stand.Union(goed.Stand).Except(x.Stand.Intersect(goed.Stand))).Distinct().ToList();
                     var eis = rel.Union(verschil).Distinct().ToDictionary(a => a, a => goed.Stand.Contains(a));
                     if (verschil.Count == 0 || anders.Any(x => eis.All(e => x.Stand.Contains(e.Key) == e.Value))) continue;
-                    if (res.Any(x => x.Item1 == goed.Uitkomst)) continue;
+                    if (res.Skip(begin429).Any(x => x.Item1 == goed.Uitkomst)) continue;
                     res.Add((goed.Uitkomst, eis, true, goed.Aantal));
                 }
                 continue;
@@ -342,6 +362,23 @@ public class Kennis2
             var s0 = g.First();
             res.Add((uit[0], rel.ToDictionary(a => a, a => s0.Stand.Contains(a)), terugval, g.Sum(x => x.Aantal)));
         }
+        // WAT: heeft de kortsluitproef na deze melder (in deze richting) een wissel gevonden die de kortsluiting ophief, dan komt die stand bij de eis, als die
+        // uitkomst ook echt met die stand gereden is. WAAROM (BUG #429, controle Marco 26-11 09:26 en 09:46): twee keer kortsluiting na de kruiswissel 24
+        // (achteruit, vanaf 8) op weg naar 14; beide keren hief motor 13 afbuigend het op. Die vondst stond wel in de kennis, maar de eis voor 24 -> 14 noemde
+        // motor 13 niet, dus de controle zette hem niet en reed er de tweede keer weer in.
+        var opl429 = ProefOplossingenBij(m, r);
+        // Alleen tijdens de controle (ProefInEis429): tijdens het verkennen maakte dit de verkenning langer (simulatie start 5: 188 -> 225 ritten).
+        if (opl429.Count > 0 && ProefInEis429)
+            for (int i = 0; i < res.Count; i++)
+            {
+                var (uit, eis, tv, n) = res[i];
+                if (uit <= 0) continue;
+                var nieuw = new Dictionary<int, bool>(eis);
+                foreach (var (a, v) in opl429)
+                    if (!nieuw.ContainsKey(a) && kand.Any(s => s.Uitkomst == uit && s.Stand.Contains(a) == v && nieuw.All(e => s.Stand.Contains(e.Key) == e.Value)))
+                        nieuw[a] = v;
+                if (nieuw.Count != eis.Count) res[i] = (uit, nieuw, tv, n);
+            }
         // WAT: is dezelfde uitkomst gezien met twee standen die maar in één adres verschillen, dan doet dat adres er voor deze uitkomst niet toe: er komt een extra
         // mogelijkheid bij zonder dat adres in de eis (alleen paren die allebei echt gereden zijn, dus geen ongeziene combinaties).
         // WAAROM (BUG #426, controle 18-11 14:16 en 14:25): 14 -> 129 eiste motor 10 rechtdoor en 129 -> 4 motor 10 afbuigend (de motoren van de kruiswissel horen bij
