@@ -182,6 +182,8 @@ public partial class BaanVerkenner2
         bool omgedraaidInRit = false;
         int draaiIndex = -1;
         var res = new RitUitslag2();
+        // BUG #432: de eerste rit nadat de loc gezocht moest worden: waar hij precies begon is onzeker, dus de eerste stap niet vastleggen.
+        if (_startOnzeker432 && !op.NietVastleggen) { res.EersteStapOnzeker = true; _startOnzeker432 = false; }
         _monitor.Bijwerken();
         var bezet = new HashSet<int>(_monitor.Bezet);
         int start = _k.LocMelder;

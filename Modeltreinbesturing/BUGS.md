@@ -3799,3 +3799,34 @@ Simulatie module 2: gelijk aan #419.
 - Metingen (MARCO2, ruis, sectiescheidingen, hervatten): gelijk aan #428, start 17 iets beter (193 -> 186 ritten, 20 -> 18 kortsluitingen). Controlebank:
   overal alle overgangen, 0 kortsluitingen. Regressietests ALLES OK.
 - Nog niet getest op de baan.
+
+## #430 Hervatten 27-11 10:14: Dinamo gaf op 64 standvragen geen antwoord, loc stond op 29 én 21 (log/hardwarelog Marco 27-11)
+- Bij het hervatten kwam op de standvraag van melder 1 t/m 64 geen enkel antwoord, terwijl melder 21 bezet was ("21 vrij" kwam om 10:16:35). Eerder
+  (18-11 t/m 26-11) antwoordde Dinamo altijd binnen de minuut. Het programma meldde "geen enkele melder is bezet" en ging blind kruipen; met de bloktruc (#408)
+  werd 29 bezet, maar 21 bleef onzichtbaar. De controle begon daardoor met 29 -> 21 en kwam meteen op 24 uit (afwijking, verder goed afgelopen).
+- Opgelost: meldt zich geen enkele melder, dan wordt de stand van alle melders nog één keer opgevraagd; na het terugvinden met de bloktruc worden ook de
+  buurmelders (uit de gereden stappen) opgevraagd, zodat "loc op twee melders" (#413) wordt herkend.
+- Niet te testen in de simulatie (die antwoordt altijd). Nog niet getest op de baan.
+
+## #431 Zes keer dezelfde kortsluiting bij melder 14 tijdens de verkenning van 26-11 (rapport Marco, ritten #106 t/m #255)
+- "navigatie vanaf 21 achteruit, wissel 5 afbuigend: 21 -> 24 -> 14, kortsluiting" (14:49, 14:50, 14:59, 15:33, 15:40, 15:53, 15:57). Het doel was melder 14 zelf;
+  wissel 5 bleef afbuigend staan en bij het stoppen kroop de loc net voorbij 14 van achteren over wissel 5. Dat wissel 5 na 14 (achteruit, vanaf 24) rechtdoor
+  moet, stond in de gevonden wissels en in de kortsluitproef ("14|Achteruit|5|False"), maar telde alleen voor ritten die verder gingen dan 14.
+  De kortsluitingen zelf stonden daarna niet meer in de stappen (door #426 uitgelegd en weggehaald), dus de planner leerde er niet van.
+- Opgelost: PlanNaar zet bij elk doel eerst de wissels direct voorbij het doel in de stand die geen kortsluiting geeft (gevonden wissels met één kant
+  kortsluiting; in de controle ook de kortsluitproef bij die melder en richting); lukt dat plan niet, dan zonder. De kortsluitproef ook tijdens het
+  verkennen gaf in de simulatie met ruis (start 11) een onvoltooide verkenning (wissel 13 niet gevonden, 301 i.p.v. 166 ritten).
+- Nog niet getest op de baan.
+
+## #432 "Uitzoeken welk adres de stap 14 -> 24 (vooruit) verandert (melder 21 of melder 29)" op het tweede traject (Marco 27-11 11:14)
+- Marco had een tweede traject toegevoegd (fysiek gescheiden, melders 132, 133, 136, 139, 140, 143, 144). Daar verscheen een taak voor 14 -> 24 op het eerste
+  traject, die niet te plannen was; daardoor bleef de verkenning "NIET af".
+- Oorzaak: #430. Bij de controle van 10:16 stond de loc op 29 én 21; de rit "29 -> 21" werd vastgelegd als 29 -> 24 (achteruit), en daaruit volgde
+  (afgeleid) "14 -> 24 vooruit komt op 29", tegenover 5 echte ritten 14 -> 24 -> 21.
+- Opgelost: (1) is er niets meer te plannen, dan wordt een afgeleide waarneming (één keer, uit een rit in de andere richting) die alleen een tegenspraak geeft
+  en door minstens 3 echte ritten wordt tegengesproken, vergeten (Kennis2.OverstemdeAfleidingen432). Altijd negeren maakte de simulatie slechter (start 5:
+  188 -> 260 ritten), want daar was zo'n tegenspraak juist nuttig; (2) nadat de loc gezocht moest worden (geen melder bezet), wordt de
+  eerste stap van de eerste rit niet vastgelegd (onzekere start).
+- Met Marco's voortgang van 27-11 11:15 wordt precies deze waarneming gevonden (MARCO2_ECHT_TEGEN=1: "overstemd 14 -> 24 (vooruit) -> melder 29"). Nog niet getest op de baan.
+- Metingen #430 t/m #432 (MARCO2, ruis, sectiescheidingen, hervatten, controlebank): overal voltooid, 23/23, valse 0, gebruiker 0; gelijk aan #429
+  (start 17 186 ritten, sectiescheidingen start 5 iets beter: 266 -> 261 ritten). Controlebank: alle overgangen, 0 kortsluitingen. Regressietests ALLES OK.

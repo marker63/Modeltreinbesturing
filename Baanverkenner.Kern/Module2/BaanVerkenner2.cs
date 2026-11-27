@@ -176,6 +176,7 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                     {
                         _log.Waarschuwing($"De loc is na melder {_k.LocMelder} op geen enkele melder meer te zien: zoeken (BUG #402, nog niet getest op de baan).");
                         var gevonden = await ZoekLoc396();
+                        _startOnzeker432 = true;
                         if (gevonden.Count == 0)
                         {
                             _locKwijt402 = $"De loc is na melder {_k.LocMelder} kwijtgeraakt (geen enkele melder bezet, ook niet na 10 minuten zoeken). Kijk of de loc ontspoord is of op een stuk zonder stroom staat, zet hem op een melder en hervat.";
@@ -385,13 +386,26 @@ public partial class BaanVerkenner2 : IBaanVerkenner
         else await Wacht(TimeSpan.FromSeconds(1));
         _monitor.Bijwerken();
         var bezet = _monitor.Bezet.ToList();
+        if (bezet.Count == 0 && _hw.KanMelderStatusOpvragen)
+        {
+            // BUG #430 (hardwarelog Marco 27-11 10:14): op 64 standvragen kwam geen enkel antwoord, terwijl melder 21 wel bezet was (later kwam "21 vrij").
+            // Eerder (18-11 t/m 26-11) antwoordde Dinamo altijd binnen de minuut. Daarom nog één keer alles vragen voordat de loc blind gaat kruipen.
+            _log.Info("Geen enkele melder meldt zich bezet: de stand van alle melders nog een keer opvragen (BUG #430).");
+            await VraagStatusOp430(Enumerable.Range(1, Math.Max(1, _ins.HoogsteMelder)));
+            bezet = _monitor.Bezet.ToList();
+        }
         if (bezet.Count == 0)
         {
             _log.Waarschuwing("Geen enkele melder is bezet: de loc kruipt vooruit tot er een melder bezet wordt.");
+            _startOnzeker432 = true;
             await Herparkeer(Richting.Vooruit, alleBlokken: true);
             bezet = _monitor.Bezet.ToList();
             if (bezet.Count == 0) { await Herparkeer(Richting.Achteruit, alleBlokken: true); bezet = _monitor.Bezet.ToList(); }
             if (bezet.Count == 0) bezet = await ZoekLoc396();
+            // BUG #432 (log Marco 27-11 10:16): na het zoeken stond de loc op 29 én 21 (21 meldde zich niet); de controle legde "29 -> 24 (achteruit)" vast, en
+            // daaruit volgde "14 -> 24 (vooruit) komt op 29". Dat gaf daarna de taak "uitzoeken welk adres de stap 14 -> 24 (vooruit) verandert (21 of 29)",
+            // die vanaf het tweede traject niet te plannen was. Na zoeken is de eerste stap van de eerste rit dus onzeker.
+            _startOnzeker432 = true;
             if (bezet.Count == 0) throw new InvalidOperationException("De loc is op geen enkele melder te vinden. Zet de loc op een melder en start opnieuw.");
             // BUG #383 (log 05-11 10:51): de kruiprit begon "vanaf" de bewaarde melder (30), maar de loc stond daar niet meer; daardoor gold 30 als 'kwam van' en plande hij
             // 14 -> 30 (omkeren), wat meteen misging. Waar de loc vandaan kwam is na zo'n kruiprit onbekend.
@@ -585,6 +599,9 @@ public partial class BaanVerkenner2 : IBaanVerkenner
                 _k.BlokTruc[startMelder] = tweede is int t3 ? $"{b},{r},{t3}" : $"{b},{r}";
                 string wat = tweede is int t ? $"blok {b} {r.Tekst()} en blok {t} {r.Om().Tekst()}" : $"alleen blok {b} {r.Tekst()}";
                 _log.Vondst($"Loc weer gezien met rijstroom op {wat}: melder {string.Join(", ", _monitor.Bezet)} (BUG #408).");
+                // BUG #430 (log Marco 27-11 10:16): Dinamo meldde alleen 29 bezet, maar de loc stond ook nog op 21 (21 had zich nooit gemeld; "21 vrij" kwam pas
+                // 20 s later). De controle begon daardoor met 29 -> 21 en kwam meteen op 24 uit. Daarom de buurmelders nog eens opvragen.
+                await VraagStatusOp430(BuurMelders430(_monitor.Bezet));
                 // WAT: staat de loc nog op twee melders, dan met HETZELFDE commando dat werkte verder kruipen tot er nog één melder bezet is.
                 // WAAROM (BUG #413, Marco 14-11 09:03): op de baan werkte "alleen blok 3 achteruit" (loc op 14 en 129), maar het netjes parkeren daarna gaf
                 // rijstroom naar alle blokken, en dat gaf meteen kortsluiting op de scheiding 14/129.
@@ -605,6 +622,27 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             }
         }
         return new List<int>();
+    }
+
+    /// <summary>WAT: vraagt bij Dinamo de stand van deze melders op en wacht op de antwoorden (BUG #430).
+    /// WAAROM: Dinamo meldt een melder alleen als hij verandert; een melder die al bezet was voordat het programma luisterde, of waarvan de melding
+    /// verloren ging, blijft anders onzichtbaar.</summary>
+    private async Task VraagStatusOp430(IEnumerable<int> melders)
+    {
+        if (!_hw.KanMelderStatusOpvragen) return;
+        var lijst = melders.Where(m => m > 0).Distinct().ToList();
+        if (lijst.Count == 0) return;
+        foreach (var m in lijst) _hw.VraagMelderStatusOp(m);
+        await Wacht(TimeSpan.FromMilliseconds(Math.Min(60000, lijst.Count * DinamoCyclus.TotalMilliseconds + 1500)));
+        _monitor.Bijwerken();
+    }
+
+    /// <summary>WAT: de melders die volgens de gereden stappen direct naast een van deze melders liggen (BUG #430).</summary>
+    private List<int> BuurMelders430(IEnumerable<int> melders)
+    {
+        var set = melders.ToHashSet();
+        return _k.Stappen.Where(s => s.Uitkomst > 0 && (set.Contains(s.Melder) || set.Contains(s.Uitkomst)))
+            .SelectMany(s => new[] { s.Melder, s.Uitkomst }).Where(m => !set.Contains(m)).Distinct().ToList();
     }
 
     /// <summary>BUG #405: de wissels die waarschijnlijk bij melder m liggen: eerst die met een zone of relevantie bij m, daarna de rest.</summary>
@@ -698,6 +736,18 @@ public partial class BaanVerkenner2 : IBaanVerkenner
             _k.LocRichting = _k.LocRichting.Om();
             _omwegCache.Clear();
             return null;
+        }
+        // BUG #432: is er niets meer te plannen en hangt een tegenspraak alleen aan één afgeleide waarneming die door minstens 3 echte ritten wordt
+        // tegengesproken, dan is die waarneming fout (bijv. uit een rit met een onzekere start) en wordt hij vergeten.
+        if (onbereikbaar.Count > 0 && _k.OverstemdeAfleidingen432() is { Count: > 0 } weg432)
+        {
+            foreach (var s in weg432)
+            {
+                _log.Waarschuwing($"De waarneming {s} (één keer afgeleid) spreekt minstens 3 echte ritten tegen en wordt vergeten (BUG #432, nog niet getest op de baan).");
+                _k.Stappen.Remove(s);
+            }
+            _omwegCache.Clear();
+            return KiesTaak();
         }
         if (onbereikbaar.Count > 0)
         {
@@ -1268,6 +1318,8 @@ public partial class BaanVerkenner2 : IBaanVerkenner
     private readonly HashSet<int> _vrijNaM424 = new();
     /// <summary>BUG #421: hoe vaak een tegenspraak-taak al begonnen is (de gewone teller wordt bij nieuws leeggemaakt, BUG #394).</summary>
     private readonly Dictionary<string, int> _tegenspraakPogingen421 = new();
+    /// <summary>BUG #432: true nadat de loc gezocht moest worden (geen melder bezet); de eerste stap van de volgende rit wordt dan niet vastgelegd.</summary>
+    private bool _startOnzeker432;
     /// <summary>BUG #421: mislukte pogingen per taak over de hele verkenning.</summary>
     private readonly Dictionary<string, int> _mislukTotaal421 = new();
 

@@ -3364,7 +3364,9 @@ public static class Tests
         var st = VerkenStatus.VanJson(System.IO.File.ReadAllText(pad))!;
         int start = st.Module2?.LocMelder is int lm && lm > 0 ? lm : 13;
         if (int.TryParse(Environment.GetEnvironmentVariable("MARCO2_ECHT_START"), out var es)) { start = es; if (st.Module2 is not null) { st.Module2.LocMelder = es; st.Module2.LocVia = 0; } }
-        var sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(true, start == 24 ? 8 : start);   // de simulatie kan niet op de kruiswissel 24 beginnen; alleen de planning gebruikt dan 24
+        Baanverkenner.Kern.Simulatie.SimulatieBaan sim;
+        try { sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(true, start == 24 ? 8 : start); }
+        catch (InvalidOperationException) { sim = Baanverkenner.Kern.Simulatie.MiniworldBaan.Maak(true, 8); }   // melder bestaat niet in de simulatie (bijv. het tweede traject)   // de simulatie kan niet op de kruiswissel 24 beginnen; alleen de planning gebruikt dan 24
         var ins = st.Instellingen;
         sim.VerbindenAsync("SIM").GetAwaiter().GetResult();
         var klok = new VirtueleKlok(); klok.Getikt += sim.Tik;

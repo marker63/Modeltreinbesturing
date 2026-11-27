@@ -123,6 +123,13 @@ public partial class BaanVerkenner2
             foreach (var v in _k.Vondsten) Console.WriteLine($"   vondst {v.Adres} {v.Via}>{v.Melder}:{v.Richting} R={v.Rechtdoor} A={v.Afbuigend}  relevant-ingangknoop={string.Join(",", _k.RelevantInKnoop(v.Via, v.Richting))}  relevant-hier={string.Join(",", _k.RelevantInKnoop(v.Melder, v.Richting))}");
             foreach (var (k2, l2) in _k.Relevant) Console.WriteLine($"   relevant {k2}: {string.Join(",", l2)}");
         }
+        // WAT: alleen voor het testprogramma: alle ingangen met een tegenspraak tonen (MARCO2_ECHT_TEGEN=1, BUG #432).
+        if (Environment.GetEnvironmentVariable("MARCO2_ECHT_TEGEN") == "1")
+            foreach (var s in _k.OverstemdeAfleidingen432()) Console.WriteLine($"   overstemd {s}");
+        if (Environment.GetEnvironmentVariable("MARCO2_ECHT_TEGEN") == "1")
+            foreach (var g in _k.Stappen.Where(s => !s.Afgeleid && !s.Terug && s.Via > 0).GroupBy(s => (s.Via, s.Melder, s.Richting)))
+                if (_k.Tegenstrijdig(g.Key.Via, g.Key.Melder, g.Key.Richting) is { } tg)
+                    Console.WriteLine($"   tegenspraak {g.Key.Via}->{g.Key.Melder} ({g.Key.Richting}): {tg.A.Uitkomst} x{tg.A.Aantal}{(tg.A.Afgeleid ? " afgeleid" : "")} / {tg.B.Uitkomst} x{tg.B.Aantal}{(tg.B.Afgeleid ? " afgeleid" : "")}");
         // WAT: alleen voor het testprogramma: de mogelijkheden (uitkomst + eis) bij één ingang tonen, bijv. MARCO2_ECHT_MOG=8,24,A.
         if (Environment.GetEnvironmentVariable("MARCO2_ECHT_MOG") is { Length: > 0 } mog)
         {

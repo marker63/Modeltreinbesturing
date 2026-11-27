@@ -267,11 +267,39 @@ public partial class BaanVerkenner2
         // (eerst een stukje weg, wissel 5 omzetten, terug) wel kon. 'Blijven staan' is bedoeld als laatste redmiddel, niet als eerste keus.
         // Alleen in de controle: tijdens het verkennen is 'blijven staan' juist een manier om te leren (in de simulatie gaf 'eerst streng' daar slechtere
         // verkenningen: start 8 'streng' vond 17 i.p.v. 23 melders).
-        _zachtUit429 = _fase == "Controle";
-        Plan? streng;
-        try { streng = PlanNaarIntern(kaart, doel, extraAanEind); }
-        finally { _zachtUit429 = false; }
-        return streng ?? PlanNaarIntern(kaart, doel, extraAanEind);
+        // BUG #431: eerst met de wissels voorbij het doel in een veilige stand; lukt dat niet, dan zonder.
+        var veilig = VeiligNaAankomst431(doel, extraAanEind);
+        Plan? Probeer() => (veilig is not null ? PlanNaarIntern(kaart, doel, veilig) : null) ?? PlanNaarIntern(kaart, doel, extraAanEind);
+        if (_fase == "Controle")
+        {
+            _zachtUit429 = true;
+            Plan? streng;
+            try { streng = Probeer(); }
+            finally { _zachtUit429 = false; }
+            if (streng is not null) return streng;
+        }
+        return Probeer();
+    }
+
+    /// <summary>WAT: de gevraagde eindstand plus, voor de wissels direct voorbij het doel, de stand die GEEN kortsluiting geeft (uit de gevonden wissels en de
+    /// kortsluitproef bij die melder en richting, die laatste alleen in de controle). Null als er niets bij komt.
+    /// WAAROM (BUG #431, rapport Marco 26-11 14:49 t/m 15:57): zes keer "navigatie vanaf 21 achteruit, wissel 5 afbuigend: 21 -> 24 -> 14, kortsluiting". De loc
+    /// moest alleen naar 14, dus wissel 5 bleef afbuigend staan; bij het stoppen kroop de loc net voorbij 14 over wissel 5 (van achteren) en gaf kortsluiting.
+    /// Dat wissel 5 na 14 (achteruit, vanaf 24) rechtdoor moet, was al gevonden.</summary>
+    private Dictionary<int, bool>? VeiligNaAankomst431(Toestand doel, IReadOnlyDictionary<int, bool>? extra)
+    {
+        var res = extra is null ? new Dictionary<int, bool>() : new Dictionary<int, bool>(extra);
+        bool erbij = false;
+        void Zet(int a, bool v) { if (!res.ContainsKey(a)) { res[a] = v; erbij = true; } }
+        foreach (var v in _k.Vondsten.Where(v => v.Melder == doel.M && v.Richting == doel.H && (v.Via == doel.Via || v.Via == 0)))
+        {
+            if (v.Afbuigend == StapUitkomst.Kortsluiting && v.Rechtdoor is > 0) Zet(v.Adres, false);
+            else if (v.Rechtdoor == StapUitkomst.Kortsluiting && v.Afbuigend is > 0) Zet(v.Adres, true);
+        }
+        // De kortsluitproef alleen in de controle: tijdens het verkennen gaf dat in de simulatie met ruis (start 11) een onvoltooide verkenning
+        // (wissel 13 niet gevonden, 301 i.p.v. 166 ritten); een proefuitkomst kan daar nog door ruis vertekend zijn.
+        if (_fase == "Controle") foreach (var (a, v) in _k.ProefOplossingenBij(doel.M, doel.H)) Zet(a, v);
+        return erbij ? res : null;
     }
 
     private bool _zachtUit429;

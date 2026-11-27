@@ -420,6 +420,34 @@ public class Kennis2
         return null;
     }
 
+    /// <summary>WAT: is waarneming <paramref name="b"/> één keer afgeleid (uit een rit in de andere richting) terwijl <paramref name="a"/> minstens 3 keer echt
+    /// gereden is, dan telt b niet als tegenspraak (en ook niet als die andere uitkomst nooit echt in deze richting is gereden).
+    /// WAAROM (BUG #432, Marco 27-11 11:14: "uitzoeken welk adres de stap 14 -> 24 (vooruit) verandert", terwijl de loc op het tweede traject stond): 14 -> 24
+    /// vooruit kwam 5 keer echt op 21, en één keer 'afgeleid' op 29, uit een rit waarbij de loc onzeker op 29/21 begon. Zo'n taak kost ritten en houdt de verkenning
+    /// "niet af" als hij niet te plannen is. Alleen gebruikt als er verder niets meer te plannen is (zie OverstemdeAfleidingen432): in de simulatie (start 5)
+    /// was zo'n tegenspraak juist nuttig om een wissel te vinden (188 i.p.v. 260 ritten).</summary>
+    private static bool Overstemd432(StapWaarneming a, StapWaarneming b, List<StapWaarneming> l)
+    {
+        if (!b.Afgeleid || b.Aantal > 1) return false;
+        int echtA = l.Where(x => !x.Afgeleid && x.Uitkomst == a.Uitkomst).Sum(x => x.Aantal);
+        bool echtB = l.Any(x => !x.Afgeleid && x.Uitkomst == b.Uitkomst);
+        return echtA >= 3 && !echtB;
+    }
+
+    /// <summary>WAT: de afgeleide waarnemingen die alleen een tegenspraak geven en door minstens 3 echte ritten worden tegengesproken (BUG #432).</summary>
+    public List<StapWaarneming> OverstemdeAfleidingen432()
+    {
+        var res = new List<StapWaarneming>();
+        foreach (var g in Stappen.Where(s => !s.Terug && s.Via > 0).GroupBy(s => (s.Via, s.Melder, s.Richting)))
+            if (Tegenstrijdig(g.Key.Via, g.Key.Melder, g.Key.Richting) is { } t)
+            {
+                var l = g.ToList();
+                if (Overstemd432(t.A, t.B, l)) res.Add(t.B);
+                else if (Overstemd432(t.B, t.A, l)) res.Add(t.A);
+            }
+        return res;
+    }
+
     /// <summary>Alle melders die ooit gezien zijn.</summary>
     /// <summary>BUG #382: melders die als spook herkend zijn (geen echte sectie); bewaard zodat een hervatting ze ook negeert.</summary>
     public List<int> Spookmelders { get; set; } = new();
